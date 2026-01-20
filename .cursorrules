@@ -1,0 +1,51 @@
+# Project-Wide Cursor Rules
+
+This file provides general context and guidelines for working with this codebase.
+
+## Project Overview
+
+This is **Vinlytic** - a Laravel + Vue.js + Inertia.js application for vehicle analytics and valuation.
+
+## Tech Stack
+
+- **Backend**: Laravel 12 (PHP 8.2+)
+- **Frontend**: Vue 3 + TypeScript + Inertia.js
+- **Styling**: Tailwind CSS 4
+- **Database**: SQLite (development), PostgreSQL (production)
+- **Queue**: Laravel Queues with Redis
+- **Testing**: Pest (PHP)
+
+## Key Conventions
+
+- Follow Laravel conventions for controllers, models, and services
+- Use TypeScript for all frontend code
+- Service layer pattern: Controllers delegate to Services
+- Use DTOs for structured data transfer
+- Document architectural decisions in `/decisions`
+- Write specs before implementation in `/specs`
+- Document implementation details in `/dev`
+- Document customer support investigations in `/support`
+
+## Directory-Specific Agents
+
+This project uses specialized agents for different types of work:
+
+- **Architect Agent** (`/decisions/.cursorrules`): For architectural decisions
+- **Specs Agent** (`/specs/.cursorrules`): For technical specifications
+- **Dev Agent** (`/dev/.cursorrules`): For implementation notes
+- **Support Agent** (`/support/.cursorrules`): For customer support investigations
+
+See `AGENT_CONFIGURATION.md` for details on using these agents.
+
+## Code Style
+
+- PHP: Laravel Pint (automatically formats on save)
+- JavaScript/TypeScript: ESLint + Prettier
+- Follow existing patterns in the codebase
+- Write tests for new features
+
+## Important Files
+
+- `CLAUDE.md`: Development commands and architecture overview
+- `AGENT_CONFIGURATION.md`: How to use specialized agents
+- `docs/`: Additional project documentation

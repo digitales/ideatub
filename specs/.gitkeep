@@ -1,0 +1,2 @@
+# This file ensures the specs directory is tracked in git
+# even when empty (before first spec is added)
