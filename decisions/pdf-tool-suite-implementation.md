@@ -94,7 +94,7 @@
 
 ### Tech Stack (Laravel)
 
-- **Framework:** Laravel 11
+- **Framework:** Laravel 12 (Latest version with AI-aware development features)
 - **Frontend:** Blade templates + Alpine.js + Tailwind CSS
 - **PDF Library:** pdf-lib (JavaScript, runs in browser)
 - **Payments:** Laravel Cashier (Stripe integration)
@@ -105,6 +105,7 @@
 - **Database:** SQLite (simple, no external DB needed)
 - **Hosting:** Railway.app ($5/month) or DigitalOcean App Platform ($5/month)
 - **Cost:** ~$5/month (easily covered by first paying customer)
+- **AI Features (Optional):** Laravel Boost/MCP for AI-aware development
 
 ---
 
