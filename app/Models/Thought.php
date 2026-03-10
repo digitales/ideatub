@@ -24,6 +24,7 @@ class Thought extends Model
         'embedding',
         'metadata',
         'user_id',
+        'evernote_note_guid',
     ];
 
     /**
