@@ -66,6 +66,8 @@ A Laravel app for your personal knowledge system: semantic search over thoughts,
 
 ## Configuration
 
+Do not commit `.env`; it is listed in `.gitignore` and is never sent to the client.
+
 See `.env.example` for all variables. Key ones:
 
 | Variable | Required | Description |
