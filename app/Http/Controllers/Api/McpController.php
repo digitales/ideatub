@@ -23,7 +23,7 @@ class McpController extends Controller
         $key = $request->query('key') ?? $request->header('x-brain-key');
         $expected = config('services.mcp.access_key');
 
-        if ($expected === null || $expected === '' || $key !== $expected) {
+        if ($expected === null || $expected === '' || ! hash_equals((string) ($key ?? ''), $expected)) {
             return response()->json([
                 'jsonrpc' => '2.0',
                 'error' => ['code' => -32001, 'message' => 'Unauthorized: invalid or missing MCP key'],
@@ -40,10 +40,19 @@ class McpController extends Controller
             return $this->jsonRpcError(-32600, 'Invalid request: method required', $id);
         }
 
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought'];
+        if (! in_array($method, $knownMethods, true)) {
+            return $this->jsonRpcError(-32601, 'Method not found', $id);
+        }
+
         try {
             $result = $this->dispatch($method, is_array($params) ? $params : []);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonRpcError(-32602, $e->getMessage(), $id);
         } catch (\Throwable $e) {
-            return $this->jsonRpcError(-32603, 'Internal error: '.$e->getMessage(), $id);
+            report($e);
+
+            return $this->jsonRpcError(-32603, 'Internal error', $id);
         }
 
         return response()->json([
@@ -182,6 +191,6 @@ class McpController extends Controller
             'jsonrpc' => '2.0',
             'error' => ['code' => $code, 'message' => $message],
             'id' => $id,
-        ], $code === -32001 ? 401 : 200);
+        ], 200);
     }
 }
