@@ -77,6 +77,12 @@ See `.env.example` for all variables. Key ones:
 | `DB_CONNECTION` | Yes | e.g. `pgsql` (default). |
 | `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` | Yes (for pgsql) | PostgreSQL connection. |
 | `QUEUE_CONNECTION` | No | `sync` for no queue; `redis` (or similar) when using queued jobs (e.g. Evernote sync). |
+| `EVERNOTE_ACCESS_TOKEN` | No | Evernote API token; if set, thoughts are mirrored to Evernote (see [Evernote mirror](docs/evernote-mirror.md)). |
+| `EVERNOTE_NOTEBOOK_GUID_*` | No | Notebook GUIDs for mapping (e.g. `_DEFAULT`, `_IDEA`, `_TASK`). See [Evernote mirror](docs/evernote-mirror.md). |
+
+## Evernote mirror
+
+Thoughts can be mirrored to Evernote as notes. Set `EVERNOTE_ACCESS_TOKEN` (and optional `EVERNOTE_NOTEBOOK_GUID_*` vars) to enable. Sync runs via a queued job—use `php artisan queue:work` when `QUEUE_CONNECTION` is not `sync`. Full setup, notebook mapping (type/tags → notebooks), and env reference: [docs/evernote-mirror.md](docs/evernote-mirror.md).
 
 ## MCP URL and per-user key
 
