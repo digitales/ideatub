@@ -5,6 +5,17 @@
 
 This document is the single source of product decisions, planned features, and implementation context for the IdeaTub Laravel app. It consolidates the initial architecture decisions. Use it as imported context when working on the codebase in its own repository.
 
+### Implementation progress (2025-03-10)
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| **0** | Bootstrap: pgvector, Thought model, OpenRouterService, MCP API (POST /api/mcp) | ✅ Done |
+| **1** | User isolation: user_id on thoughts, user_mcp_keys, MCP key → user, all tools scoped by user | ✅ Done |
+| **2** | Web GUI: IdeaController (GET /, POST /thoughts), Blade view (search, capture, recent), auth, README + .env.example | ✅ Done |
+| **3** | Evernote mirror: evernote_note_guid, EvernoteService, SyncThoughtToEvernote job, model events, docs | ✅ Done |
+
+**Branch:** `feature/ideatub-implementation`. **Plan:** `docs/superpowers/plans/2025-03-10-ideatub-implementation.md`. Slack remains out of scope.
+
 ---
 
 ## 1. What this project is
@@ -18,10 +29,10 @@ This document is the single source of product decisions, planned features, and i
 
 ## 2. Current implementation (as built / target)
 
-- **Capture:** Simple web GUI — form for new thoughts and comments; submit → embed + metadata (OpenRouter) → store in `thoughts` table. MCP tool `capture_thought` also writes thoughts (e.g. when user says “remember this” in chat). Slack is not in scope for initial build.
-- **Retrieval:** MCP over HTTP at `POST /api/mcp`. Auth: `?key=MCP_ACCESS_KEY` or `x-brain-key` header. Tools: `search_thoughts`, `browse_recent`, `thought_stats`, `capture_thought`.
-- **Storage:** PostgreSQL with pgvector. Table `thoughts`: `id` (uuid), `content`, `embedding` (vector 1536), `metadata` (json), `created_at`, `updated_at`.
-- **Services:** `OpenRouterService` (embed + extract metadata); `Thought` model with `HasNeighbors` for cosine similarity search.
+- **Capture:** Simple web GUI — form for new thoughts; submit → embed + metadata (OpenRouter) → store in `thoughts` table. MCP tool `capture_thought` also writes thoughts (e.g. when user says “remember this” in chat). Comment-on-thought is future work; Slack is not in scope.
+- **Retrieval:** MCP over HTTP at `POST /api/mcp`. Auth: per-user key via `?key=...` or `x-brain-key` header (resolved via `user_mcp_keys`). Tools: `search_thoughts`, `browse_recent`, `thought_stats`, `capture_thought`, all scoped by user. Web: `GET /?q=...` (semantic search) and recent list on same page.
+- **Storage:** PostgreSQL with pgvector. Table `thoughts`: `id` (uuid), `user_id`, `content`, `embedding` (vector 1536), `metadata` (json), `evernote_note_guid` (nullable), `created_at`, `updated_at`. Table `user_mcp_keys`: per-user MCP keys (key_hash, label, last_used_at).
+- **Services:** `OpenRouterService` (embed + extract metadata); `Thought` model with `HasNeighbors` for cosine similarity search; `EvernoteService` (create/update note, notebook from type/tag); `SyncThoughtToEvernote` job on Thought::created/updated (queued, skip if Evernote not configured).
 
 ---
 
@@ -80,18 +91,18 @@ This document is the single source of product decisions, planned features, and i
 
 **Feature order:** (1) User model + per-user auth, (2) **Simple web GUI** (search, input, comments), (3) Evernote mirror. MCP remains as-is; Evernote comes after web. Slack is not in scope.
 
-### 4.1 Web interface (planned) — *implement first*
+### 4.1 Web interface — *implemented*
 
 - **Decision:** Focus on a **simple web GUI** for input and comments. Users search, add thoughts, and view recent items in the browser. This is the primary capture and read surface.
 - **Auth:** Per-user (see §3). Auth middleware and user scoping for all web routes.
 - **Planned behaviour:**
   - **Search:** One page with a search box; submit runs semantic search via a **GET query variable** (e.g. `?q=...`). Same as MCP `search_thoughts`; show results on the same page (full-page or simple JS). Same page serves index and search; no separate `/search` route when `q` is present.
-  - **Capture / input:** Form to add a new thought (and comments if supported); same pipeline as MCP (embed + metadata → save).
+  - **Capture / input:** Form to add a new thought (and comments if supported); same pipeline as MCP (embed + metadata → save). *Comment-on-thought or follow-up comments are **future work**; initial implementation is new-thought capture only.*
   - **Recent:** Show last N thoughts on the same page.
 - **Implementation:** New `IdeaController` (index, search, store); routes `GET /` (and `GET /?q=...` for search), `POST /thoughts`; one Blade view (Tailwind).
 - **Files to add/change:** User model/migration if not present; `app/Http/Controllers/IdeaController.php`, `resources/views/idea/index.blade.php`, `routes/web.php`, auth middleware for per-user key; `config/services.php` and `.env.example`; README.
 
-### 4.2 Evernote mirror (planned) — *implement after Web UI*
+### 4.2 Evernote mirror — *implemented*
 
 - **Decision:** Use **Evernote as a mirror only**. Postgres remains the source of truth. Every new thought is synced to Evernote; when a thought is **updated**, **update the existing Evernote note** in place (do not create a new note).
 - **Notebooks:** **Notebook per type/tag** — support mapping type/tag (or similar) to Evernote `notebook_guid` (config or user settings). EvernoteService resolves target notebook from thought metadata (e.g. `metadata.type`, `metadata.tags`) and optionally user.
@@ -120,12 +131,12 @@ This document is the single source of product decisions, planned features, and i
 
 ```
 Capture:  Web GUI ──► POST /thoughts ──► OpenRouterService ──► Thought
-          MCP     ──► tools/call capture_thought
+          MCP     ──► tools/call capture_thought (per-user key)
 
-Storage:  thoughts (Postgres + pgvector); optional mirror to Evernote (planned)
+Storage:  thoughts (Postgres + pgvector, user_id); optional mirror to Evernote (queued job)
 
-Read:     MCP tools: search_thoughts, browse_recent, thought_stats
-          Web: GET /?q=... (planned)
+Read:     MCP tools: search_thoughts, browse_recent, thought_stats (scoped by user)
+          Web: GET /?q=... (semantic search), same page recent list
 ```
 
 ---

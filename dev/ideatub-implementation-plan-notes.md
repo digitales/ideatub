@@ -33,3 +33,4 @@ The repo may currently contain a different Laravel app (e.g. Vinlytic-style). Th
 - [Project spec](../decisions/project-spec.md)
 - [MCP auth and multi-agent](../decisions/2025-03-10-mcp-auth-multi-agent.md)
 - [IdeaTub follow-up decisions](../decisions/2025-03-10-ideatub-follow-up-decisions.md)
+- [Comment-on-thought implementation plan](comment-on-thought-implementation-plan.md) — future work for parent_id, comments UI, MCP, Evernote

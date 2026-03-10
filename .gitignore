@@ -18,3 +18,6 @@ yarn-error.log
 /.vscode
 .DS_Store
 .worktrees
+/bootstrap/cache
+/database/database.sqlite
+/storage
