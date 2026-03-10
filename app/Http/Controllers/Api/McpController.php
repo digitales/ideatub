@@ -53,4 +53,60 @@ class McpController extends Controller
 
         return ['id' => $thought->id];
     }
+
+    /**
+     * Return a thought as MCP payload (includes parent_id for thread display).
+     */
+    public static function thoughtToPayload(Thought $thought): array
+    {
+        return [
+            'id' => $thought->id,
+            'content' => $thought->content,
+            'metadata' => $thought->metadata ?? [],
+            'parent_id' => $thought->parent_id,
+            'created_at' => $thought->created_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Search thoughts (e.g. semantic search). Returns payloads including parent_id.
+     * Call from MCP tool search_thoughts. Optional top_level_only scope.
+     *
+     * @param  array{query: string, limit?: int, top_level_only?: bool}  $params
+     * @return array{thoughts: array<int, array{id, content, metadata, parent_id, created_at}>}
+     */
+    public static function searchThoughts(User $user, array $params): array
+    {
+        $limit = (int) ($params['limit'] ?? 10);
+        $query = Thought::where('user_id', $user->id);
+        if (! empty($params['top_level_only'])) {
+            $query->topLevel();
+        }
+        $thoughts = $query->latest()->take($limit)->get();
+
+        return [
+            'thoughts' => $thoughts->map(fn (Thought $t) => self::thoughtToPayload($t))->values()->all(),
+        ];
+    }
+
+    /**
+     * Browse recent thoughts. Returns payloads including parent_id.
+     * Call from MCP tool browse_recent. Optional top_level_only scope.
+     *
+     * @param  array{limit?: int, top_level_only?: bool}  $params
+     * @return array{thoughts: array<int, array{id, content, metadata, parent_id, created_at}>}
+     */
+    public static function browseRecent(User $user, array $params): array
+    {
+        $limit = (int) ($params['limit'] ?? 20);
+        $query = Thought::where('user_id', $user->id);
+        if (! empty($params['top_level_only'])) {
+            $query->topLevel();
+        }
+        $thoughts = $query->latest()->take($limit)->get();
+
+        return [
+            'thoughts' => $thoughts->map(fn (Thought $t) => self::thoughtToPayload($t))->values()->all(),
+        ];
+    }
 }
