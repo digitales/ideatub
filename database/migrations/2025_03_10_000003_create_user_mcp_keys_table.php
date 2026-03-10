@@ -14,12 +14,10 @@ return new class extends Migration
         Schema::create('user_mcp_keys', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('key_hash')->unique();
+            $table->string('key_hash', 64)->unique();
             $table->string('label')->nullable();
             $table->timestamp('last_used_at')->nullable();
             $table->timestamps();
-
-            $table->index('user_id');
         });
     }
 
