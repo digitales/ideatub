@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::table('thoughts', function (Blueprint $table) {
             $table->unsignedBigInteger('parent_id')->nullable()->after('user_id');
             $table->foreign('parent_id')->references('id')->on('thoughts')->nullOnDelete();
-            $table->index('parent_id');
             $table->index(['user_id', 'parent_id']);
         });
     }
@@ -26,7 +25,6 @@ return new class extends Migration
     {
         Schema::table('thoughts', function (Blueprint $table) {
             $table->dropForeign(['parent_id']);
-            $table->dropIndex(['parent_id']);
             $table->dropIndex(['user_id', 'parent_id']);
         });
     }
