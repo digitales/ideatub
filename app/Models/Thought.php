@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Jobs\SyncThoughtToEvernote;
+use App\Services\EvernoteService;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +15,23 @@ class Thought extends Model
 {
     use HasNeighbors;
     use HasUuids;
+
+    /**
+     * Boot the model and register sync job dispatch on created/updated.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        $dispatchSync = function (Thought $thought): void {
+            if (app(EvernoteService::class)->isConfigured()) {
+                SyncThoughtToEvernote::dispatch($thought->id);
+            }
+        };
+
+        static::created($dispatchSync);
+        static::updated($dispatchSync);
+    }
 
     /**
      * The attributes that are mass assignable.
