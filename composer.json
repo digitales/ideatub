@@ -1,8 +1,8 @@
 {
-    "name": "pdf-tools/pdf-tool-suite",
+    "name": "ideatub/ideatub",
     "type": "project",
-    "description": "Freemium PDF tool suite with client-side processing",
-    "keywords": ["laravel", "pdf", "tools", "stripe"],
+    "description": "Personal knowledge system with semantic search: capture thoughts via web or MCP, mirror to Evernote",
+    "keywords": ["laravel", "ideatub", "knowledge", "mcp", "pgvector", "evernote"],
     "license": "MIT",
     "require": {
         "php": "^8.2",
