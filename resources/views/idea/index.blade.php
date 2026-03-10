@@ -9,6 +9,12 @@
     <form action="{{ route('thoughts.store') }}" method="POST" class="mb-8">
         @csrf
         <input type="hidden" name="parent_id" value="{{ request('parent_id', '') }}">
+        @if (isset($replyingTo) && $replyingTo)
+            <p class="text-sm text-gray-600 mb-2">
+                Replying to: {{ Str::limit($replyingTo->content, 80) }}
+                <a href="{{ route('ideas.index') }}" class="text-indigo-600 hover:underline ml-1">Cancel</a>
+            </p>
+        @endif
         <label for="content" class="block text-sm font-medium text-gray-700">New thought</label>
         <textarea name="content" id="content" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required></textarea>
         <button type="submit" class="mt-2 px-4 py-2 bg-indigo-600 text-white rounded-md">Save</button>
@@ -23,7 +29,10 @@
         @forelse ($thoughts as $thought)
             <li class="border border-gray-200 rounded p-4">
                 <p class="text-gray-800">{{ Str::limit($thought->content, 200) }}</p>
-                <p class="text-sm text-gray-500 mt-1">{{ $thought->created_at->diffForHumans() }}</p>
+                <p class="text-sm text-gray-500 mt-1">
+                    {{ $thought->created_at->diffForHumans() }}
+                    <a href="{{ route('ideas.index', ['parent_id' => $thought->id]) }}" class="text-indigo-600 hover:underline ml-2">Reply</a>
+                </p>
             </li>
         @empty
             <li class="text-gray-500">No thoughts yet.</li>

@@ -10,7 +10,8 @@ use Illuminate\Http\RedirectResponse;
 class IdeaController extends Controller
 {
     /**
-     * Idea/thoughts index: recent thoughts and optional search.
+     * Idea/thoughts index: recent thoughts (top-level only) and optional search.
+     * Recent list uses Thought::topLevel() so only parent_id IS NULL thoughts are shown.
      */
     public function index(Request $request): View
     {
@@ -21,7 +22,18 @@ class IdeaController extends Controller
             ->take(20)
             ->get();
 
-        return view('idea.index', ['thoughts' => $thoughts]);
+        $replyingTo = null;
+        if ($request->filled('parent_id')) {
+            $parent = Thought::where('user_id', $request->user()->id)->find($request->parent_id);
+            if ($parent) {
+                $replyingTo = $parent;
+            }
+        }
+
+        return view('idea.index', [
+            'thoughts' => $thoughts,
+            'replyingTo' => $replyingTo,
+        ]);
     }
 
     /**
@@ -50,6 +62,6 @@ class IdeaController extends Controller
             'parent_id' => $parent?->id,
         ]);
 
-        return redirect()->back()->with('status', 'Thought saved.');
+        return redirect()->route('ideas.index')->with('status', 'Thought saved.');
     }
 }
