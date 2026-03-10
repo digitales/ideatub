@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Services\OpenRouterService;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
@@ -59,6 +60,31 @@ class OpenRouterServiceTest extends TestCase
     }
 
     #[Test]
+    public function embed_throws_on_http_error(): void
+    {
+        Http::fake([
+            'https://openrouter.ai/api/v1/embeddings' => Http::response(['error' => 'Server error'], 500),
+        ]);
+
+        $this->expectException(RequestException::class);
+
+        $this->service->embed('text');
+    }
+
+    #[Test]
+    public function embed_throws_when_response_missing_embedding(): void
+    {
+        Http::fake([
+            'https://openrouter.ai/api/v1/embeddings' => Http::response(['data' => []], 200),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('embedding');
+
+        $this->service->embed('text');
+    }
+
+    #[Test]
     public function extract_metadata_returns_structured_array_from_chat_completion(): void
     {
         $json = '{"type":"note","tags":["work"],"people":["Alice"],"action_items":["Follow up"]}';
@@ -95,6 +121,18 @@ class OpenRouterServiceTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('OPENROUTER_API_KEY is not set');
+
+        $this->service->extractMetadata('text');
+    }
+
+    #[Test]
+    public function extract_metadata_throws_on_http_error(): void
+    {
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response(['error' => 'Server error'], 500),
+        ]);
+
+        $this->expectException(RequestException::class);
 
         $this->service->extractMetadata('text');
     }
