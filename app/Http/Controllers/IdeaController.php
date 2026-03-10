@@ -60,24 +60,45 @@ class IdeaController extends Controller
 
     /**
      * Store a new thought: validate, embed, extract metadata, save. Redirect back with success or JSON.
+     * When parent_id is present, authorizes comment on the parent and sets parent_id on the new thought.
      */
     public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $validated = $request->validate([
             'content' => 'required|string|max:65535',
+            'parent_id' => 'sometimes|nullable|uuid|exists:thoughts,id',
         ]);
         $content = $validated['content'];
+        $parentId = $validated['parent_id'] ?? null;
+
+        $parent = null;
+        if ($parentId !== null) {
+            $parent = Thought::find($parentId);
+            if ($parent === null) {
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => 'Parent thought not found.'], 404);
+                }
+
+                return redirect()->back()->withInput()->with('error', 'Parent thought not found.');
+            }
+            $this->authorize('comment', $parent);
+        }
 
         try {
             $embedding = $this->openRouter->embed($content);
             $metadata = $this->openRouter->extractMetadata($content);
 
-            Thought::create([
+            $payload = [
                 'content' => $content,
                 'embedding' => $embedding,
                 'metadata' => $metadata,
                 'user_id' => auth()->id(),
-            ]);
+            ];
+            if ($parent !== null) {
+                $payload['parent_id'] = $parent->id;
+            }
+
+            Thought::create($payload);
         } catch (\Throwable $e) {
             report($e);
 

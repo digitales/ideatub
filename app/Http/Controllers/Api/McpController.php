@@ -178,7 +178,8 @@ class McpController extends Controller
     }
 
     /**
-     * capture_thought: embed + extractMetadata + save Thought. Params: content. Scoped to resolved user.
+     * capture_thought: embed + extractMetadata + save Thought. Params: content; optional parent_id or in_reply_to (UUID).
+     * When parent_id (or in_reply_to) is provided, parent must exist and belong to the resolved user.
      *
      * @param  array<string, mixed>  $params
      * @return array{id: string}
@@ -187,21 +188,43 @@ class McpController extends Controller
     {
         $v = Validator::make($params, [
             'content' => 'required|string',
+            'parent_id' => 'sometimes|nullable|uuid',
+            'in_reply_to' => 'sometimes|nullable|uuid',
         ]);
         if ($v->fails()) {
             throw new \InvalidArgumentException($v->errors()->first());
         }
         $content = (string) $params['content'];
+        $parentId = isset($params['parent_id']) && $params['parent_id'] !== '' ? (string) $params['parent_id'] : null;
+        if ($parentId === null && isset($params['in_reply_to']) && $params['in_reply_to'] !== '') {
+            $parentId = (string) $params['in_reply_to'];
+        }
+
+        $parent = null;
+        if ($parentId !== null) {
+            $parent = Thought::find($parentId);
+            if ($parent === null) {
+                throw new \InvalidArgumentException('Parent thought not found.');
+            }
+            if ($parent->user_id !== auth()->id()) {
+                throw new \InvalidArgumentException('Parent thought does not belong to you.');
+            }
+        }
 
         $embedding = $this->openRouter->embed($content);
         $metadata = $this->openRouter->extractMetadata($content);
 
-        $thought = Thought::create([
+        $payload = [
             'content' => $content,
             'embedding' => $embedding,
             'metadata' => $metadata,
             'user_id' => auth()->id(),
-        ]);
+        ];
+        if ($parent !== null) {
+            $payload['parent_id'] = $parent->id;
+        }
+
+        $thought = Thought::create($payload);
 
         return ['id' => $thought->id];
     }
