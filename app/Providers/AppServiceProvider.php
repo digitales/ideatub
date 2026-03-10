@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Providers;
+
+use App\Contracts\EvernoteApiGateway;
+use App\Services\Evernote\NullEvernoteApiGateway;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        $this->app->bind(EvernoteApiGateway::class, NullEvernoteApiGateway::class);
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        //
+    }
+}
