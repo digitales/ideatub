@@ -33,6 +33,16 @@
                     {{ $thought->created_at->diffForHumans() }}
                     <a href="{{ route('ideas.index', ['parent_id' => $thought->id]) }}" class="text-indigo-600 hover:underline ml-2">Reply</a>
                 </p>
+                @if ($thought->comments->isNotEmpty())
+                    <ul class="mt-3 ml-4 space-y-2 border-l-2 border-gray-200 pl-4">
+                        @foreach ($thought->comments as $comment)
+                            <li class="text-gray-700 text-sm">
+                                <p>{{ Str::limit($comment->content, 200) }}</p>
+                                <p class="text-gray-500 text-xs mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
             </li>
         @empty
             <li class="text-gray-500">No thoughts yet.</li>

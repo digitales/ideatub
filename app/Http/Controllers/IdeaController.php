@@ -18,6 +18,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', $request->user()->id)
             ->topLevel()
+            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->latest()
             ->take(20)
             ->get();
