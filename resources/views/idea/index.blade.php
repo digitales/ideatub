@@ -39,10 +39,11 @@
             @csrf
             <label for="content" class="block text-sm font-medium text-gray-700 mb-2">New thought</label>
             <textarea name="content" id="content" rows="3" required
+                      @if($errors->has('content')) aria-describedby="content-error" aria-invalid="true" @endif
                       class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 shadow-sm"
                       placeholder="Type a thought…">{{ old('content') }}</textarea>
             @error('content')
-                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                <p id="content-error" class="mt-2 text-sm text-red-600">{{ $message }}</p>
             @enderror
             <button type="submit"
                     class="mt-3 inline-flex items-center px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm">
