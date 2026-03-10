@@ -25,7 +25,7 @@ The app resolves the target Evernote notebook from a thought’s metadata:
 
 1. **Type:** If the thought has `metadata.type` (e.g. `idea`, `task`), that value is looked up in the notebook mapping. If found and the GUID is set, that notebook is used.
 2. **Tags:** If no type match, the first of `metadata.tags` that exists in the mapping (with a non-empty GUID) is used.
-3. **Default:** If nothing matches, the `default` mapping is used.
+3. **Default:** If nothing matches, the `default` mapping is used (if set). For reliable create behaviour, set `EVERNOTE_NOTEBOOK_GUID_DEFAULT` or ensure every thought has a type/tag that maps to a notebook.
 
 Mapping keys in config are lowercase; type and tags are compared case-insensitively. Set only the keys you need in `.env` (e.g. `EVERNOTE_NOTEBOOK_GUID_IDEA`, `EVERNOTE_NOTEBOOK_GUID_TASK`).
 
