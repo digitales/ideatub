@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\EvernoteApiGateway;
-use App\Services\Evernote\NullEvernoteApiGateway;
+use App\Services\Evernote\EvernoteSdkApiGateway;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -13,7 +13,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(EvernoteApiGateway::class, NullEvernoteApiGateway::class);
+        $this->app->bind(EvernoteApiGateway::class, EvernoteSdkApiGateway::class);
     }
 
     /**
