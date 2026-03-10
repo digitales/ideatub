@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Thought;
+use App\Models\UserMcpKey;
 use App\Services\OpenRouterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,20 +17,29 @@ class McpController extends Controller
     ) {}
 
     /**
-     * Handle MCP JSON-RPC request: authenticate by key, dispatch by method, return JSON-RPC response.
+     * Handle MCP JSON-RPC request: authenticate by per-user key, dispatch by method, return JSON-RPC response.
      */
     public function __invoke(Request $request): JsonResponse
     {
         $key = $request->query('key') ?? $request->header('x-brain-key');
-        $expected = config('services.mcp.access_key');
+        $key = $key !== null ? (string) $key : '';
 
-        if ($expected === null || $expected === '' || ! hash_equals((string) ($key ?? ''), $expected)) {
-            return response()->json([
-                'jsonrpc' => '2.0',
-                'error' => ['code' => -32001, 'message' => 'Unauthorized: invalid or missing MCP key'],
-                'id' => null,
-            ], 401);
+        if ($key === '') {
+            return $this->unauthorizedResponse();
         }
+
+        $mcpKey = UserMcpKey::findByPlainKey($key);
+        if ($mcpKey === null) {
+            return $this->unauthorizedResponse();
+        }
+
+        $user = $mcpKey->user;
+        if ($user === null) {
+            return $this->unauthorizedResponse();
+        }
+
+        $mcpKey->update(['last_used_at' => now()]);
+        $request->setUserResolver(fn () => $user);
 
         $body = $request->all();
         $method = $body['method'] ?? null;
@@ -62,8 +72,17 @@ class McpController extends Controller
         ]);
     }
 
+    private function unauthorizedResponse(): JsonResponse
+    {
+        return response()->json([
+            'jsonrpc' => '2.0',
+            'error' => ['code' => -32001, 'message' => 'Unauthorized: invalid or missing MCP key'],
+            'id' => null,
+        ], 401);
+    }
+
     /**
-     * Dispatch to tool by method name. Phase 0: no user_id filter.
+     * Dispatch to tool by method name. All tools are scoped to the resolved user.
      *
      * @param  array<string, mixed>  $params
      * @return array<string, mixed>
@@ -99,6 +118,7 @@ class McpController extends Controller
 
         $embedding = $this->openRouter->embed($query);
         $thoughts = Thought::query()
+            ->where('user_id', auth()->id())
             ->nearestTo($embedding, $limit)
             ->get(['id', 'content', 'metadata', 'created_at']);
 
@@ -129,6 +149,7 @@ class McpController extends Controller
         $limit = (int) ($params['limit'] ?? 10);
 
         $thoughts = Thought::query()
+            ->where('user_id', auth()->id())
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get(['id', 'content', 'metadata', 'created_at']);
@@ -151,13 +172,13 @@ class McpController extends Controller
      */
     private function thoughtStats(array $params): array
     {
-        $count = Thought::query()->count();
+        $count = Thought::query()->where('user_id', auth()->id())->count();
 
         return ['count' => $count];
     }
 
     /**
-     * capture_thought: embed + extractMetadata + save Thought. Params: content. Phase 0: user_id null.
+     * capture_thought: embed + extractMetadata + save Thought. Params: content. Scoped to resolved user.
      *
      * @param  array<string, mixed>  $params
      * @return array{id: string}
@@ -179,7 +200,7 @@ class McpController extends Controller
             'content' => $content,
             'embedding' => $embedding,
             'metadata' => $metadata,
-            'user_id' => null,
+            'user_id' => auth()->id(),
         ]);
 
         return ['id' => $thought->id];
