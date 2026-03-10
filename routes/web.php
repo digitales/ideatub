@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\IdeaController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\ToolController;
@@ -13,6 +14,12 @@ use Illuminate\Support\Facades\Route;
 
 // Homepage
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+// Ideas/thoughts (comment-on-thought)
+Route::middleware('auth')->group(function () {
+    Route::get('/ideas', [IdeaController::class, 'index'])->name('ideas.index');
+    Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
+});
 
 // Tool pages
 Route::get('/tools/{tool}', [ToolController::class, 'show'])
