@@ -17,12 +17,12 @@ This note links the project spec to the implementation plan and records where to
 
 ## Key Files (from plan)
 
-| Phase | Key files |
-|-------|-----------|
-| 0 | `app/Models/Thought.php`, `app/Services/OpenRouterService.php`, `app/Http/Controllers/Api/McpController.php`, `app/Http/Controllers/Api/SlackIngestController.php`, `routes/api.php` |
-| 1 | `app/Models/UserMcpKey.php`, migration `user_mcp_keys`, migration `user_id` on thoughts, MCP controller key resolution |
-| 2 | `app/Http/Controllers/IdeaController.php`, `resources/views/idea/index.blade.php`, `routes/web.php` |
-| 3 | `app/Services/EvernoteService.php`, `app/Jobs/SyncThoughtToEvernote.php`, migration `evernote_note_guid` |
+| Phase | Key files                                                                                                                                                                            |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0     | `app/Models/Thought.php`, `app/Services/OpenRouterService.php`, `app/Http/Controllers/Api/McpController.php`, `app/Http/Controllers/Api/SlackIngestController.php`, `routes/api.php` |
+| 1     | `app/Models/UserMcpKey.php`, migration `user_mcp_keys`, migration `user_id` on thoughts, MCP controller key resolution                                                               |
+| 2     | `app/Http/Controllers/IdeaController.php`, `resources/views/idea/index.blade.php`, `routes/web.php`                                                                                  |
+| 3     | `app/Services/EvernoteService.php`, `app/Jobs/SyncThoughtToEvernote.php`, migration `evernote_note_guid`                                                                             |
 
 ## Current codebase note
 
