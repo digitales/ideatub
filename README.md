@@ -81,7 +81,11 @@ Visit `http://localhost:8000` in your browser.
 
 ## Configuration
 
-See `.env.example` for all required environment variables:
+See `.env.example` for all required environment variables.
+
+### MCP keys (IdeaTub)
+
+For per-user MCP API access, create one key per user with `php artisan ideatub:create-mcp-keys`. Plain keys are shown once in the console; store them securely. See [dev/mcp-keys-implementation.md](dev/mcp-keys-implementation.md) for details.
 
 - Stripe keys (for payments)
 - OAuth credentials (Google, GitHub)
