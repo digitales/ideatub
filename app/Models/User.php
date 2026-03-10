@@ -60,6 +60,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the thoughts for the user.
+     */
+    public function thoughts()
+    {
+        return $this->hasMany(Thought::class);
+    }
+
+    /**
+     * Get the MCP keys for the user.
+     */
+    public function userMcpKeys()
+    {
+        return $this->hasMany(UserMcpKey::class);
+    }
+
+    /**
      * Check if user has unlimited access (Pro or Lifetime).
      */
     public function hasUnlimitedAccess(): bool

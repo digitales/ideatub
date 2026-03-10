@@ -1,0 +1,97 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Thought;
+use App\Services\OpenRouterService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+class IdeaController extends Controller
+{
+    private const RECENT_LIMIT = 20;
+
+    private const SEARCH_LIMIT = 20;
+
+    private const SEARCH_QUERY_MAX_LENGTH = 2000;
+
+    public function __construct(
+        private OpenRouterService $openRouter
+    ) {}
+
+    /**
+     * Idea index: semantic search when ?q= present, otherwise recent thoughts.
+     */
+    public function index(Request $request): View|RedirectResponse
+    {
+        $query = $request->input('q');
+        $query = is_string($query) ? trim($query) : '';
+        if (mb_strlen($query) > self::SEARCH_QUERY_MAX_LENGTH) {
+            $query = mb_substr($query, 0, self::SEARCH_QUERY_MAX_LENGTH);
+        }
+
+        if ($query !== '') {
+            try {
+                $embedding = $this->openRouter->embed($query);
+                $thoughts = Thought::query()
+                    ->where('user_id', auth()->id())
+                    ->nearestTo($embedding, self::SEARCH_LIMIT)
+                    ->get();
+            } catch (\Throwable $e) {
+                report($e);
+
+                return redirect()->route('idea.index')
+                    ->with('error', 'Search is temporarily unavailable. Please try again.');
+            }
+        } else {
+            $thoughts = Thought::query()
+                ->where('user_id', auth()->id())
+                ->orderByDesc('created_at')
+                ->limit(self::RECENT_LIMIT)
+                ->get();
+        }
+
+        return view('idea.index', [
+            'thoughts' => $thoughts,
+            'query' => $query !== '' ? $query : null,
+        ]);
+    }
+
+    /**
+     * Store a new thought: validate, embed, extract metadata, save. Redirect back with success or JSON.
+     */
+    public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'content' => 'required|string|max:65535',
+        ]);
+        $content = $validated['content'];
+
+        try {
+            $embedding = $this->openRouter->embed($content);
+            $metadata = $this->openRouter->extractMetadata($content);
+
+            Thought::create([
+                'content' => $content,
+                'embedding' => $embedding,
+                'metadata' => $metadata,
+                'user_id' => auth()->id(),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Unable to save thought. Please try again.'], 503);
+            }
+
+            return redirect()->back()->withInput()->with('error', 'Unable to save thought. Please try again.');
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Thought saved.']);
+        }
+
+        return redirect()->route('idea.index')->with('success', 'Thought saved.');
+    }
+}

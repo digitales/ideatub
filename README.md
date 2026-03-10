@@ -1,95 +1,119 @@
-# PDF Tool Suite
+# IdeaTub
 
-A freemium web application for PDF operations with client-side processing for maximum privacy.
+A Laravel app for your personal knowledge system: semantic search over thoughts, capture via web or MCP, and optional Evernote mirror. Part of the [Open Brain](https://promptkit.natebjones.com/20260224_uq1_guide_main) setup.
 
 ## Features
 
-- **7 PDF Tools**: Merge, split, compress, PDF to image, image to PDF, rotate, and reorder pages
-- **100% Client-Side Processing**: All PDF operations happen in the browser - files never leave your device
-- **Freemium Model**: Free tier (3 operations/day) or upgrade to Pro ($4.99/month) or Lifetime ($29)
-- **OAuth Authentication**: Sign in with Google, GitHub, or email/password
-- **SEO Optimized**: Each tool has dedicated landing page with schema markup
+- **Capture:** Web form and MCP tool `capture_thought` (e.g. “remember this” in Cursor/Claude/ChatGPT).
+- **Retrieval:** Semantic search and browse recent thoughts via web (`GET /?q=...`) or MCP tools (`search_thoughts`, `browse_recent`, `thought_stats`).
+- **Storage:** PostgreSQL with pgvector; thoughts are embedded and stored per user.
+- **Auth:** Per-user isolation; Laravel web login and per-user MCP keys.
 
-## Tech Stack
-
-- **Backend**: Laravel 12 (Latest version with AI-aware development features)
-- **Frontend**: Blade templates + Alpine.js + Tailwind CSS
-- **PDF Processing**: pdf-lib (JavaScript, client-side)
-- **Payments**: Laravel Cashier (Stripe)
-- **Authentication**: Laravel Breeze + Laravel Socialite
-- **Database**: SQLite
-- **AI Features (Optional)**: Laravel Boost/MCP for enhanced development experience
-
-## Installation
+## Setup
 
 ### Prerequisites
 
-- PHP 8.2+ (8.3 recommended for Laravel 12)
+- PHP 8.2+
 - Composer
-- Node.js & npm
-- SQLite
+- Node.js & npm (for frontend assets)
+- PostgreSQL with [pgvector](https://github.com/pgvector/pgvector) extension
 
-### Setup
+### Install
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/pdf-tools.git
-cd pdf-tools
-```
+1. Clone the repository and enter the project:
 
-2. Install PHP dependencies:
-```bash
-composer install
-```
+   ```bash
+   git clone <repo-url> ideatub && cd ideatub
+   ```
 
-3. Install frontend dependencies:
-```bash
-npm install
-```
+2. Install dependencies:
 
-4. Copy environment file:
-```bash
-cp .env.example .env
-```
+   ```bash
+   composer install
+   npm install && npm run build
+   ```
 
-5. Generate application key:
-```bash
-php artisan key:generate
-```
+3. Environment:
 
-6. Create SQLite database:
-```bash
-touch database/database.sqlite
-```
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
 
-7. Run migrations:
-```bash
-php artisan migrate
-```
+4. Configure `.env` (see [Configuration](#configuration)): at minimum set `OPENROUTER_API_KEY` and database (e.g. `DB_CONNECTION=pgsql`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`).
 
-8. Build frontend assets:
-```bash
-npm run build
-```
+5. Enable pgvector and run migrations:
 
-9. Start development server:
-```bash
-php artisan serve
-```
+   ```bash
+   php artisan migrate
+   ```
 
-Visit `http://localhost:8000` in your browser.
+6. (Optional) Create users (register via web or tinker), then create per-user MCP keys:
+
+   ```bash
+   php artisan ideatub:create-mcp-keys
+   ```
+
+   Plain keys are shown once in the console; copy and store them securely. See [MCP URL and per-user key](#mcp-url-and-per-user-key).
+
+7. Start the app:
+
+   ```bash
+   php artisan serve
+   ```
+
+   Visit `http://localhost:8000`. Log in (or register) to use the idea capture and search UI.
 
 ## Configuration
 
-See `.env.example` for all required environment variables:
+Do not commit `.env`; it is listed in `.gitignore` and is never sent to the client.
 
-- Stripe keys (for payments)
-- OAuth credentials (Google, GitHub)
-- Database configuration
+See `.env.example` for all variables. Key ones:
 
-## Deployment
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENROUTER_API_KEY` | Yes | OpenRouter API key for embeddings and metadata extraction. Server-only; never exposed to the client. |
+| `MCP_ACCESS_KEY` | No (legacy) | Optional single shared key for MCP; prefer per-user keys from `ideatub:create-mcp-keys`. |
+| `DB_CONNECTION` | Yes | e.g. `pgsql` (default). |
+| `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` | Yes (for pgsql) | PostgreSQL connection. |
+| `QUEUE_CONNECTION` | No | `sync` for no queue; `redis` (or similar) when using queued jobs (e.g. Evernote sync). |
+| `EVERNOTE_ACCESS_TOKEN` | No | Evernote API token; if set, thoughts are mirrored to Evernote (see [Evernote mirror](docs/evernote-mirror.md)). |
+| `EVERNOTE_NOTEBOOK_GUID_*` | No | Notebook GUIDs for mapping (e.g. `_DEFAULT`, `_IDEA`, `_TASK`). See [Evernote mirror](docs/evernote-mirror.md). |
 
-See [DEPLOY.md](DEPLOY.md) for detailed deployment instructions to Railway.app.
+## Evernote mirror
+
+Thoughts can be mirrored to Evernote as notes. Set `EVERNOTE_ACCESS_TOKEN` (and optional `EVERNOTE_NOTEBOOK_GUID_*` vars) to enable. Sync runs via a queued job—use `php artisan queue:work` when `QUEUE_CONNECTION` is not `sync`. Full setup, notebook mapping (type/tags → notebooks), and env reference: [docs/evernote-mirror.md](docs/evernote-mirror.md).
+
+## MCP URL and per-user key
+
+- **Endpoint:** `POST https://your-app-domain/api/mcp` (or `http://localhost:8000/api/mcp` in development.)
+- **Auth:** Send your **per-user MCP key** via query param `?key=YOUR_KEY` or header `x-brain-key: YOUR_KEY`. Prefer the header so the key is less likely to appear in logs.
+- **Getting a key:** Each user gets at least one key from:
+
+  ```bash
+  php artisan ideatub:create-mcp-keys
+  ```
+
+  Keys are shown once; store them securely. Use the same key in every AI client (Cursor, Claude, ChatGPT); it identifies the user, not the agent. See [dev/mcp-keys-implementation.md](dev/mcp-keys-implementation.md) for details.
+
+## Web login
+
+- Use Laravel’s built-in auth: register at `/register`, log in at `/login`.
+- After login, the home page (`/`) is the IdeaTub UI: search box, capture form, and recent thoughts. All data is scoped to the logged-in user.
+
+## Companion Prompt Kit
+
+IdeaTub is designed to work with the [Open Brain Companion Prompts](https://promptkit.natebjones.com/20260224_uq1_promptkit_1):
+
+- **Prompts 1 (Memory Migration), 2 (Second Brain Migration), 5 (Weekly Review):** Require the Open Brain MCP server. Point your AI client at the MCP URL above and use your per-user key; the AI will call `capture_thought`, `search_thoughts`, `browse_recent`, and `thought_stats` as needed.
+- **Prompt 4 (Quick Capture Templates):** Use the same templates in the web form or in chat (“save this”); metadata (type, tags, people, action items) is extracted the same way.
+
+## Tech stack
+
+- **Backend:** Laravel 12, PostgreSQL, pgvector
+- **Frontend:** Blade, Tailwind CSS
+- **AI:** OpenRouter (embeddings + metadata)
+- **Queues:** Optional (e.g. Redis) for Evernote sync
 
 ## License
 
