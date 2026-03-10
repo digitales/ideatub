@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'mcp' => [
+        'access_key' => env('MCP_ACCESS_KEY'),
+    ],
     'openrouter' => [
         'api_key' => env('OPENROUTER_API_KEY'),
         'embedding_model' => env('OPENROUTER_EMBEDDING_MODEL', 'openai/text-embedding-3-small'),
