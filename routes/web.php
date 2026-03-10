@@ -5,14 +5,15 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\IdeaController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\ToolController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
-// Homepage
-Route::get('/', [HomeController::class, 'index'])->name('home');
+// Guest landing (optional; IdeaTub primary UI is at / when authenticated)
+Route::get('/welcome', [HomeController::class, 'index'])->name('home');
 
 // Tool pages
 Route::get('/tools/{tool}', [ToolController::class, 'show'])
@@ -57,6 +58,10 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+    
+    // IdeaTub: primary capture — index (with optional ?q= search) and store thought
+    Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
+    Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
     
     // Dashboard (requires authentication)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
