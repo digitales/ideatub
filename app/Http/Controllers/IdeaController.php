@@ -10,18 +10,34 @@ use Illuminate\Http\RedirectResponse;
 class IdeaController extends Controller
 {
     /**
-     * Idea/thoughts index: recent thoughts (top-level only) and optional search.
-     * Recent list uses Thought::topLevel() so only parent_id IS NULL thoughts are shown.
+     * Idea/thoughts index: recent thoughts (top-level only) or search (all thoughts including comments).
+     * With ?q=: search over all thoughts (top-level + comments); results include parent context.
+     * Without q: recent list uses Thought::topLevel() only.
      */
     public function index(Request $request): View
     {
-        $thoughts = Thought::query()
-            ->where('user_id', $request->user()->id)
-            ->topLevel()
-            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
-            ->latest()
-            ->take(20)
-            ->get();
+        $query = $request->input('q');
+        $thoughts = null;
+        $isSearch = false;
+
+        if ($request->filled('q')) {
+            $isSearch = true;
+            $thoughts = Thought::query()
+                ->where('user_id', $request->user()->id)
+                ->with('parent')
+                ->where('content', 'like', '%'.addcslashes($query, '%_\\').'%')
+                ->latest()
+                ->take(50)
+                ->get();
+        } else {
+            $thoughts = Thought::query()
+                ->where('user_id', $request->user()->id)
+                ->topLevel()
+                ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+                ->latest()
+                ->take(20)
+                ->get();
+        }
 
         $replyingTo = null;
         if ($request->filled('parent_id')) {
@@ -34,6 +50,8 @@ class IdeaController extends Controller
         return view('idea.index', [
             'thoughts' => $thoughts,
             'replyingTo' => $replyingTo,
+            'query' => $query,
+            'isSearch' => $isSearch,
         ]);
     }
 
