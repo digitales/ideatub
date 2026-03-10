@@ -60,6 +60,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the thoughts for the user.
+     */
+    public function thoughts()
+    {
+        return $this->hasMany(Thought::class);
+    }
+
+    /**
      * Check if user has unlimited access (Pro or Lifetime).
      */
     public function hasUnlimitedAccess(): bool
