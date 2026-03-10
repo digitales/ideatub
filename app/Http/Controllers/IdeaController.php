@@ -14,6 +14,8 @@ class IdeaController extends Controller
 
     private const SEARCH_LIMIT = 20;
 
+    private const SEARCH_QUERY_MAX_LENGTH = 2000;
+
     public function __construct(
         private OpenRouterService $openRouter
     ) {}
@@ -21,17 +23,27 @@ class IdeaController extends Controller
     /**
      * Idea index: semantic search when ?q= present, otherwise recent thoughts.
      */
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
         $query = $request->input('q');
         $query = is_string($query) ? trim($query) : '';
+        if (mb_strlen($query) > self::SEARCH_QUERY_MAX_LENGTH) {
+            $query = mb_substr($query, 0, self::SEARCH_QUERY_MAX_LENGTH);
+        }
 
         if ($query !== '') {
-            $embedding = $this->openRouter->embed($query);
-            $thoughts = Thought::query()
-                ->where('user_id', auth()->id())
-                ->nearestTo($embedding, self::SEARCH_LIMIT)
-                ->get();
+            try {
+                $embedding = $this->openRouter->embed($query);
+                $thoughts = Thought::query()
+                    ->where('user_id', auth()->id())
+                    ->nearestTo($embedding, self::SEARCH_LIMIT)
+                    ->get();
+            } catch (\Throwable $e) {
+                report($e);
+
+                return redirect()->route('idea.index')
+                    ->with('error', 'Search is temporarily unavailable. Please try again.');
+            }
         } else {
             $thoughts = Thought::query()
                 ->where('user_id', auth()->id())
@@ -56,15 +68,25 @@ class IdeaController extends Controller
         ]);
         $content = $validated['content'];
 
-        $embedding = $this->openRouter->embed($content);
-        $metadata = $this->openRouter->extractMetadata($content);
+        try {
+            $embedding = $this->openRouter->embed($content);
+            $metadata = $this->openRouter->extractMetadata($content);
 
-        Thought::create([
-            'content' => $content,
-            'embedding' => $embedding,
-            'metadata' => $metadata,
-            'user_id' => auth()->id(),
-        ]);
+            Thought::create([
+                'content' => $content,
+                'embedding' => $embedding,
+                'metadata' => $metadata,
+                'user_id' => auth()->id(),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Unable to save thought. Please try again.'], 503);
+            }
+
+            return redirect()->back()->withInput()->with('error', 'Unable to save thought. Please try again.');
+        }
 
         if ($request->expectsJson()) {
             return response()->json(['message' => 'Thought saved.']);
