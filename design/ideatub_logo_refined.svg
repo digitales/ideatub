@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200" role="img" aria-labelledby="title desc">
+  <title id="title">IdeaTub logo</title>
+  <desc id="desc">A flowing speech-bubble style mark with a teal to violet gradient above the word IdeaTub.</desc>
+  <defs>
+    <linearGradient id="ideaGrad" x1="250" y1="300" x2="930" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22C7C7"/>
+      <stop offset="42%" stop-color="#1777D2"/>
+      <stop offset="100%" stop-color="#5F34C8"/>
+    </linearGradient>
+    <style>
+      .wordmark {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+        font-size: 150px;
+        font-weight: 500;
+        fill: #232A78;
+        letter-spacing: -2px;
+      }
+    </style>
+  </defs>
+
+  <rect width="1200" height="1200" fill="#F3F3F4"/>
+
+  <!-- Outer flowing speech / thought container -->
+  <path d="
+    M 275 470
+    C 275 355, 385 300, 520 305
+    C 625 309, 705 344, 800 420
+    C 880 484, 955 510, 1010 462
+    C 1038 438, 1040 401, 1022 371
+    C 992 319, 911 266, 819 246
+    C 713 223, 609 235, 507 289"
+    fill="none"
+    stroke="url(#ideaGrad)"
+    stroke-width="44"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <path d="
+    M 1007 463
+    C 1060 500, 1059 573, 1010 621
+    C 973 657, 926 679, 857 687
+    C 875 730, 865 773, 835 813
+    C 802 858, 756 888, 697 904
+    C 718 860, 727 825, 718 790
+    C 708 753, 678 726, 631 716
+    C 566 702, 496 721, 419 720
+    C 329 719, 269 694, 230 647
+    C 194 603, 181 543, 195 488
+    C 207 440, 240 403, 284 377"
+    fill="none"
+    stroke="url(#ideaGrad)"
+    stroke-width="44"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <!-- Inner channel -->
+  <path d="
+    M 435 445
+    C 445 520, 475 565, 539 585
+    C 609 607, 700 602, 792 571"
+    fill="none"
+    stroke="url(#ideaGrad)"
+    stroke-width="38"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <text x="600" y="1060" text-anchor="middle" class="wordmark">IdeaTub</text>
+</svg>

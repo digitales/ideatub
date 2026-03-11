@@ -1,0 +1,27 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+<defs>
+<linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#2A8C8C"/>
+<stop offset="50%" stop-color="#1777D2"/>
+<stop offset="100%" stop-color="#6D6AF7"/>
+</linearGradient>
+<style>
+.wordmark { font-family: Inter, Arial, sans-serif; font-size:150px; fill:#E6E8F2; font-weight:600;}
+</style>
+</defs>
+
+<rect width="1200" height="1200" fill="#0F1426"/>
+
+<path d="M300 420 C380 300, 580 300, 720 420 S980 520, 1020 420"
+stroke="url(#grad)" stroke-width="42" fill="none" stroke-linecap="round"/>
+
+<path d="M1020 420 C1080 470, 1040 600, 900 660 C930 740, 870 820, 720 870
+C750 820, 760 760, 700 720 C640 690, 520 720, 420 700 C320 680, 240 600, 280 460"
+stroke="url(#grad)" stroke-width="42" fill="none" stroke-linecap="round"/>
+
+<path d="M450 470 C470 540, 540 600, 740 560"
+stroke="url(#grad)" stroke-width="34" fill="none" stroke-linecap="round"/>
+
+<text x="600" y="1050" text-anchor="middle" class="wordmark">IdeaTub</text>
+</svg>

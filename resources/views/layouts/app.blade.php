@@ -18,7 +18,11 @@
     <!-- Schema.org WebApplication -->
     @yield('schema')
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @if (file_exists(public_path('build/manifest.json')))
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @else
+        {{-- Vite manifest missing: run "npm run build" (or "npm run dev") --}}
+    @endif
 </head>
 <body class="font-sans antialiased bg-gray-50">
     <div class="min-h-screen flex flex-col">
