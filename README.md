@@ -16,7 +16,7 @@ A Laravel app for your personal knowledge system: semantic search over thoughts,
 - PHP 8.2+
 - Composer
 - Node.js & npm (for frontend assets)
-- PostgreSQL with [pgvector](https://github.com/pgvector/pgvector) extension
+- PostgreSQL with [pgvector](https://github.com/pgvector/pgvector) extension (see [Local PostgreSQL setup](docs/local-postgres-setup.md) for schema permission or “extension not available” errors)
 
 ### Install
 

@@ -24,6 +24,9 @@ WORKDIR /var/www/html
 # Copy application files
 COPY . .
 
+# Ensure bootstrap/cache exists and is writable before composer runs package:discover
+RUN mkdir -p bootstrap/cache && chmod -R 775 bootstrap/cache
+
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
