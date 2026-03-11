@@ -22,3 +22,4 @@ yarn-error.log
 !/bootstrap/cache/.gitkeep
 /database/database.sqlite
 /storage
+.superpowers/
