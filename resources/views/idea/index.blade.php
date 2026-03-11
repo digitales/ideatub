@@ -1,110 +1,154 @@
-@extends('layouts.app')
+@extends('layouts.idea')
 
-@section('title', $query ? 'Search - IdeaTub' : 'IdeaTub')
+@section('title', $query ? 'Search — IdeaTub' : 'IdeaTub')
 
 @section('content')
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <h1 class="text-2xl font-bold text-gray-900 mb-8">Ideas</h1>
+<div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
 
+    {{-- Flash messages --}}
     @if (session('success'))
-        <div class="mb-6 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-green-700" role="alert">
+        <div class="mb-6 rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal">
             {{ session('success') }}
         </div>
     @endif
     @if (session('error'))
-        <div class="mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-red-700" role="alert">
+        <div class="mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
             {{ session('error') }}
         </div>
     @endif
 
-    {{-- Search: GET /?q= --}}
-    <section class="mb-8" aria-labelledby="search-heading">
-        <h2 id="search-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Search</h2>
-        <form method="GET" action="{{ route('idea.index') }}" class="flex flex-wrap items-end gap-3">
-            <label for="q" class="sr-only">Search thoughts</label>
-            <input type="search" name="q" id="q" value="{{ old('q', $query ?? '') }}" maxlength="2000"
-                   placeholder="Search thoughts…"
-                   class="flex-1 min-w-[200px] max-w-md rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 shadow-sm">
-            <button type="submit"
-                    class="inline-flex items-center px-4 py-2.5 rounded-lg bg-gray-800 text-white text-sm font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-800 shadow-sm">
-                Search
-            </button>
-        </form>
-    </section>
+    {{-- Hero --}}
+    <p class="text-center text-[11px] font-semibold tracking-[0.12em] uppercase text-memory-violet mb-2.5">Your thinking space</p>
+    <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-1.5">A calm archive for your ideas</h1>
+    <p class="text-center text-sm text-slate-brand mb-9">Capture thoughts before they disappear.</p>
 
-    {{-- Capture: POST /thoughts --}}
-    <section class="mb-10" aria-labelledby="capture-heading">
-        <h2 id="capture-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Capture</h2>
-        <form method="POST" action="{{ route('thoughts.store') }}" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    {{-- Capture box --}}
+    <div
+        x-data="{ content: '{{ old('content') }}' }"
+        class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
+    >
+        <form
+            method="POST"
+            action="{{ route('thoughts.store') }}"
+            @keydown.meta.enter.prevent="$el.submit()"
+        >
             @csrf
             <input type="hidden" name="parent_id" value="{{ isset($replyingTo) && $replyingTo ? $replyingTo->id : '' }}">
+
             @if (isset($replyingTo) && $replyingTo)
-                <p class="text-sm text-gray-600 mb-2">
-                    Replying to: {{ Str::limit($replyingTo->content, 80) }}
-                    <a href="{{ route('idea.index') }}" class="text-indigo-600 hover:underline ml-1">Cancel</a>
+                <p class="text-xs text-slate-brand mb-2">
+                    Replying to: <span class="text-deep-indigo">{{ Str::limit($replyingTo->content, 80) }}</span>
+                    <a href="{{ route('idea.index') }}" class="text-memory-violet hover:underline ml-1">Cancel</a>
                 </p>
             @endif
-            <label for="content" class="block text-sm font-medium text-gray-700 mb-2">New thought</label>
-            <textarea name="content" id="content" rows="3" required
-                      @if($errors->has('content')) aria-describedby="content-error" aria-invalid="true" @endif
-                      class="block w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 shadow-sm"
-                      placeholder="Type a thought…">{{ old('content') }}</textarea>
-            @error('content')
-                <p id="content-error" class="mt-2 text-sm text-red-600">{{ $message }}</p>
-            @enderror
-            <button type="submit"
-                    class="mt-3 inline-flex items-center px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-sm">
-                Save
-            </button>
-        </form>
-    </section>
 
-    {{-- Recent / Search results --}}
-    <section aria-labelledby="list-heading">
-        <h2 id="list-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+            <textarea
+                name="content"
+                id="content"
+                rows="3"
+                required
+                x-model="content"
+                @if($errors->has('content')) aria-describedby="content-error" aria-invalid="true" @endif
+                placeholder="What are you thinking?"
+                class="w-full bg-transparent border-none outline-none resize-none text-sm text-deep-indigo placeholder-slate-brand/40 leading-relaxed"
+            >{{ old('content') }}</textarea>
+
+            @error('content')
+                <p id="content-error" class="mt-1 text-xs text-red-500">{{ $message }}</p>
+            @enderror
+
+            <div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-memory-violet/8">
+                <span class="text-[11px] text-slate-brand/40">⌘ + Enter to store</span>
+                <button
+                    type="submit"
+                    class="text-xs font-medium text-white px-4 py-1.5 rounded-lg transition-opacity hover:opacity-90"
+                    style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
+                >
+                    Store thought
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {{-- Thoughts list --}}
+    <div class="flex items-center justify-between mt-9 mb-3.5">
+        <span class="text-[11px] font-semibold tracking-[0.1em] uppercase text-slate-brand/50">
             @if ($query)
-                Search results for "{{ e($query) }}"
+                Results for "{{ e($query) }}"
             @else
                 Recent thoughts
             @endif
-        </h2>
-        <ul class="space-y-3">
-            @forelse ($thoughts as $thought)
-                <li class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                    @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
-                        <p class="text-xs text-gray-500 mb-1">Comment on: {{ Str::limit($thought->parent->content, 80) }}</p>
-                    @endif
-                    <p class="text-gray-900">{{ e($thought->content) }}</p>
-                    @if (!empty($thought->metadata))
-                        <p class="mt-2 text-sm text-gray-500">{{ json_encode($thought->metadata) }}</p>
-                    @endif
-                    <p class="mt-2 text-xs text-gray-400">
-                        {{ $thought->created_at->diffForHumans() }}
-                        @if (!$thought->parent_id)
-                            <a href="{{ route('idea.index', ['parent_id' => $thought->id]) }}" class="text-indigo-600 hover:underline ml-2">Reply</a>
-                        @endif
-                    </p>
-                    @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
-                        <ul class="mt-3 ml-4 space-y-2 border-l-2 border-gray-200 pl-4">
-                            @foreach ($thought->comments as $comment)
-                                <li class="text-gray-700 text-sm">
-                                    <p>{{ e(Str::limit($comment->content, 200)) }}</p>
-                                    <p class="text-gray-500 text-xs mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </li>
-            @empty
-                <li class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-gray-500">
-                    @if ($query)
-                        No thoughts match your search. Try different words or add a new thought above.
-                    @else
-                        No thoughts yet. Add one above.
-                    @endif
-                </li>
-            @endforelse
-        </ul>
-    </section>
+        </span>
+        <span class="text-[11px] text-slate-brand/30">{{ $thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator ? $thoughts->total() : count($thoughts) }} stored</span>
+    </div>
+
+    @forelse ($thoughts as $thought)
+        @php
+            $tags = $thought->metadata['tags'] ?? [];
+            $tagColors = ['violet', 'teal', 'indigo'];
+            $tagMap = [
+                'violet' => 'bg-memory-violet/10 text-memory-violet',
+                'teal'   => 'bg-neural-teal/10 text-neural-teal',
+                'indigo' => 'bg-deep-indigo/8 text-slate-brand',
+            ];
+        @endphp
+
+        <div class="rounded-xl border border-memory-violet/10 bg-white/68 backdrop-blur px-4 py-3.5 mb-2 hover:bg-white/90 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all cursor-pointer">
+
+            @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
+                <p class="text-[11px] text-slate-brand/50 mb-1">
+                    Comment on: {{ Str::limit($thought->parent->content, 80) }}
+                </p>
+            @endif
+
+            <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2">{{ e($thought->content) }}</p>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
+
+                @foreach ($tags as $i => $tag)
+                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-full {{ $tagMap[$tagColors[$i % 3]] }}">
+                        #{{ $tag }}
+                    </span>
+                @endforeach
+
+                @if (!$thought->parent_id)
+                    <a href="{{ route('idea.index', ['parent_id' => $thought->id]) }}"
+                       class="text-[10.5px] text-memory-violet/60 hover:text-memory-violet transition-colors ml-auto">
+                        Reply
+                    </a>
+                @endif
+            </div>
+
+            {{-- Nested comments --}}
+            @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
+                <ul class="mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2">
+                    @foreach ($thought->comments as $comment)
+                        <li>
+                            <p class="text-[12.5px] text-slate-brand leading-relaxed">{{ e(Str::limit($comment->content, 200)) }}</p>
+                            <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+
+    @empty
+        <div class="rounded-xl border border-memory-violet/10 bg-white/50 px-4 py-8 text-center text-sm text-slate-brand/50">
+            @if ($query)
+                No thoughts match your search. Try different words or capture a new one above.
+            @else
+                No thoughts yet. What are you thinking?
+            @endif
+        </div>
+    @endforelse
+
+    {{-- Pagination / load more --}}
+    @if ($thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator && $thoughts->hasMorePages())
+        <div class="text-center pt-4">
+            {{ $thoughts->links() }}
+        </div>
+    @endif
+
 </div>
 @endsection

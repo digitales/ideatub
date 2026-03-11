@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Thought;
 use App\Models\User;
+use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -30,5 +32,40 @@ class IdeaPageTest extends TestCase
         $response = $this->get(route('idea.index'));
 
         $response->assertRedirect(route('login'));
+    }
+
+    public function test_idea_page_shows_stored_thoughts(): void
+    {
+        $user = User::factory()->create();
+        $thought = \App\Models\Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'This is a test thought about semantic search',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('This is a test thought about semantic search');
+        $response->assertSee('Recent thoughts');
+    }
+
+    public function test_idea_page_shows_search_results(): void
+    {
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->with('pgvector')->andReturn($fakeEmbedding);
+        });
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'pgvector is great for embeddings',
+            'embedding' => $fakeEmbedding,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index', ['q' => 'pgvector']));
+
+        $response->assertStatus(200);
+        $response->assertSee('pgvector is great for embeddings');
     }
 }
