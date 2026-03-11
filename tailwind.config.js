@@ -14,7 +14,14 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                sans: ['Inter', ...defaultTheme.fontFamily.sans],
+            },
+            colors: {
+                'deep-indigo':    '#1E2547',
+                'neural-teal':    '#2A8C8C',
+                'memory-violet':  '#6D6AF7',
+                'cloud-white':    '#F5F7FB',
+                'slate-brand':    '#5B6472',
             },
         },
     },
