@@ -21,7 +21,8 @@ class IdeaController extends Controller
     ) {}
 
     /**
-     * Idea index: semantic search when ?q= present, otherwise recent thoughts.
+     * Idea index: semantic search when ?q= present, otherwise recent top-level thoughts (with comments).
+     * When parent_id is in request, pass replyingTo for the capture form context.
      */
     public function index(Request $request): View|RedirectResponse
     {
@@ -47,14 +48,27 @@ class IdeaController extends Controller
         } else {
             $thoughts = Thought::query()
                 ->where('user_id', auth()->id())
+                ->topLevel()
+                ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
                 ->orderByDesc('created_at')
                 ->limit(self::RECENT_LIMIT)
                 ->get();
         }
 
+        $replyingTo = null;
+        if ($request->filled('parent_id')) {
+            $parent = Thought::query()
+                ->where('user_id', auth()->id())
+                ->find($request->parent_id);
+            if ($parent !== null) {
+                $replyingTo = $parent;
+            }
+        }
+
         return view('idea.index', [
             'thoughts' => $thoughts,
             'query' => $query !== '' ? $query : null,
+            'replyingTo' => $replyingTo,
         ]);
     }
 

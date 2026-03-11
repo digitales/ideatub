@@ -37,6 +37,13 @@
         <h2 id="capture-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Capture</h2>
         <form method="POST" action="{{ route('thoughts.store') }}" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             @csrf
+            <input type="hidden" name="parent_id" value="{{ isset($replyingTo) && $replyingTo ? $replyingTo->id : '' }}">
+            @if (isset($replyingTo) && $replyingTo)
+                <p class="text-sm text-gray-600 mb-2">
+                    Replying to: {{ Str::limit($replyingTo->content, 80) }}
+                    <a href="{{ route('idea.index') }}" class="text-indigo-600 hover:underline ml-1">Cancel</a>
+                </p>
+            @endif
             <label for="content" class="block text-sm font-medium text-gray-700 mb-2">New thought</label>
             <textarea name="content" id="content" rows="3" required
                       @if($errors->has('content')) aria-describedby="content-error" aria-invalid="true" @endif
@@ -56,7 +63,7 @@
     <section aria-labelledby="list-heading">
         <h2 id="list-heading" class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
             @if ($query)
-                Search results for “{{ e($query) }}”
+                Search results for "{{ e($query) }}"
             @else
                 Recent thoughts
             @endif
@@ -64,11 +71,29 @@
         <ul class="space-y-3">
             @forelse ($thoughts as $thought)
                 <li class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                    @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
+                        <p class="text-xs text-gray-500 mb-1">Comment on: {{ Str::limit($thought->parent->content, 80) }}</p>
+                    @endif
                     <p class="text-gray-900">{{ e($thought->content) }}</p>
                     @if (!empty($thought->metadata))
                         <p class="mt-2 text-sm text-gray-500">{{ json_encode($thought->metadata) }}</p>
                     @endif
-                    <p class="mt-2 text-xs text-gray-400">{{ $thought->created_at->diffForHumans() }}</p>
+                    <p class="mt-2 text-xs text-gray-400">
+                        {{ $thought->created_at->diffForHumans() }}
+                        @if (!$thought->parent_id)
+                            <a href="{{ route('idea.index', ['parent_id' => $thought->id]) }}" class="text-indigo-600 hover:underline ml-2">Reply</a>
+                        @endif
+                    </p>
+                    @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
+                        <ul class="mt-3 ml-4 space-y-2 border-l-2 border-gray-200 pl-4">
+                            @foreach ($thought->comments as $comment)
+                                <li class="text-gray-700 text-sm">
+                                    <p>{{ e(Str::limit($comment->content, 200)) }}</p>
+                                    <p class="text-gray-500 text-xs mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
                 </li>
             @empty
                 <li class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-gray-500">

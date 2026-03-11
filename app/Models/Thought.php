@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Jobs\SyncThoughtToEvernote;
 use App\Services\EvernoteService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Pgvector\Laravel\Distance;
 use Pgvector\Laravel\HasNeighbors;
 use Pgvector\Laravel\Vector;
@@ -77,5 +79,37 @@ class Thought extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the parent thought (for comments).
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Thought::class, 'parent_id');
+    }
+
+    /**
+     * Get child thoughts (comments on this thought).
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Thought::class, 'parent_id');
+    }
+
+    /**
+     * Scope to top-level thoughts only (no parent).
+     */
+    public function scopeTopLevel(Builder $query): Builder
+    {
+        return $query->whereNull('parent_id');
+    }
+
+    /**
+     * Scope to thoughts that are replies to the given thought.
+     */
+    public function scopeRepliesTo(Builder $query, Thought $thought): Builder
+    {
+        return $query->where('parent_id', $thought->id);
     }
 }
