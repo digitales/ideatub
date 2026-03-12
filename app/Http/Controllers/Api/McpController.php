@@ -155,6 +155,8 @@ class McpController extends Controller
                         'content' => ['type' => 'string', 'description' => 'The thought to save'],
                         'parent_id' => ['type' => 'string', 'description' => 'Optional UUID of parent thought (for comments)'],
                         'in_reply_to' => ['type' => 'string', 'description' => 'Alias for parent_id'],
+                        'source' => ['type' => 'string', 'description' => 'Optional source label (e.g. chatgpt, claude, cursor)'],
+                        'source_metadata' => ['type' => 'object', 'description' => 'Optional source-specific metadata'],
                     ],
                     'required' => ['content'],
                 ],
@@ -385,6 +387,8 @@ class McpController extends Controller
             'content' => 'required|string',
             'parent_id' => 'sometimes|nullable|uuid',
             'in_reply_to' => 'sometimes|nullable|uuid',
+            'source' => 'sometimes|nullable|string|max:64',
+            'source_metadata' => 'sometimes|nullable|array',
         ]);
         if ($v->fails()) {
             throw new \InvalidArgumentException($v->errors()->first());
@@ -394,6 +398,13 @@ class McpController extends Controller
         if ($parentId === null && isset($params['in_reply_to']) && $params['in_reply_to'] !== '') {
             $parentId = (string) $params['in_reply_to'];
         }
+
+        $source = isset($params['source']) && trim((string) $params['source']) !== ''
+            ? mb_substr(trim((string) $params['source']), 0, 64)
+            : 'mcp';
+        $sourceMetadata = isset($params['source_metadata']) && is_array($params['source_metadata'])
+            ? $params['source_metadata']
+            : null;
 
         $parent = null;
         if ($parentId !== null) {
@@ -414,6 +425,8 @@ class McpController extends Controller
             'embedding' => $embedding,
             'metadata' => $metadata,
             'user_id' => auth()->id(),
+            'source' => $source,
+            'source_metadata' => $sourceMetadata,
         ];
         if ($parent !== null) {
             $payload['parent_id'] = $parent->id;
