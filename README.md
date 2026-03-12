@@ -96,6 +96,8 @@ Thoughts can be mirrored to Evernote as notes. Set `EVERNOTE_ACCESS_TOKEN` (and 
 
   Keys are shown once; store them securely. Use the same key in every AI client (Cursor, Claude, ChatGPT); it identifies the user, not the agent. See [dev/mcp-keys-implementation.md](dev/mcp-keys-implementation.md) for details.
 
+**Connecting your AI client:** For step-by-step setup in Claude Desktop, ChatGPT, Cursor, Claude Code, and others, see **[docs/mcp-integration-guide.md](docs/mcp-integration-guide.md)**.
+
 ## Web login
 
 - Use Laravel’s built-in auth: register at `/register`, log in at `/login`.

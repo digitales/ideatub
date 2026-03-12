@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
     <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug mb-2">Help</h1>
-    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts for the thinking space.</p>
+    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts and MCP integration for your thinking space.</p>
 
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
         <h2 class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>
@@ -20,6 +20,85 @@
                 <tr><td class="py-2">Show shortcut list</td><td class="py-2 text-right text-slate-brand font-medium">?</td></tr>
             </tbody>
         </table>
+    </div>
+
+    {{-- MCP integration guide --}}
+    <div id="mcp" class="mt-8 space-y-6">
+        <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+            <h2 class="text-lg font-semibold text-deep-indigo mb-3">MCP integration</h2>
+            <p class="text-sm text-slate-brand mb-4">Connect Claude, Cursor, ChatGPT, or other MCP-capable tools to IdeaTub so they can search your thoughts and capture new ones. Authentication uses a <strong>per-user MCP key</strong>; the same key works in every client and identifies you.</p>
+            <p class="text-sm text-slate-brand mb-4">IdeaTub exposes four tools:</p>
+            <table class="w-full text-sm text-deep-indigo border-collapse">
+                <thead>
+                    <tr class="border-b border-memory-violet/15">
+                        <th class="text-left py-2 font-medium">Tool</th>
+                        <th class="text-left py-2 font-medium">Description</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-memory-violet/10">
+                    <tr><td class="py-2 font-mono text-xs">search_thoughts</td><td class="py-2 text-slate-brand">Semantic search over your thoughts</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">browse_recent</td><td class="py-2 text-slate-brand">List recent thoughts</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">thought_stats</td><td class="py-2 text-slate-brand">Count of your thoughts</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">capture_thought</td><td class="py-2 text-slate-brand">Save a new thought (or comment)</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+            <h3 class="text-base font-semibold text-deep-indigo mb-3">1. Get your MCP key</h3>
+            <p class="text-sm text-slate-brand mb-3">Open your profile menu (avatar, top right) → <strong>MCP key</strong>. Click <strong>Create MCP key</strong>. Your key is shown <strong>once</strong> — copy it and store it securely (e.g. password manager).</p>
+            <p class="text-sm text-slate-brand"><a href="{{ route('settings.mcp-keys.index') }}" class="text-memory-violet hover:underline font-medium">Go to MCP key →</a></p>
+        </div>
+
+        <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+            <h3 class="text-base font-semibold text-deep-indigo mb-3">2. Connection URL and auth</h3>
+            <p class="text-sm text-slate-brand mb-2"><strong>Endpoint:</strong> <code class="bg-memory-violet/10 px-1.5 py-0.5 rounded text-xs break-all">{{ url('/api/mcp') }}</code></p>
+            <p class="text-sm text-slate-brand mb-2">Send your key either as <code class="bg-memory-violet/10 px-1.5 py-0.5 rounded text-xs">?key=YOUR_MCP_KEY</code> in the URL or in the <code class="bg-memory-violet/10 px-1.5 py-0.5 rounded text-xs">x-brain-key</code> header (header is preferred so the key is less likely to appear in logs).</p>
+            <p class="text-sm text-slate-brand">Use the <strong>same key</strong> in every AI client.</p>
+        </div>
+
+        <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+            <h3 class="text-base font-semibold text-deep-indigo mb-3">3. Connect your AI client</h3>
+            <ul class="space-y-4 text-sm text-slate-brand">
+                <li>
+                    <strong class="text-deep-indigo">Claude Desktop</strong> — Settings → Connectors → Add custom connector. Name: IdeaTub. Remote MCP server URL: <code class="bg-memory-violet/10 px-1 rounded text-xs">{{ url('/api/mcp') }}?key=YOUR_KEY</code>. Enable the connector in each conversation (+ → Connectors).
+                </li>
+                <li>
+                    <strong class="text-deep-indigo">ChatGPT</strong> (web, paid) — Settings → Apps & Connectors → Advanced → Developer mode ON. Create → Name: IdeaTub, MCP endpoint URL: same URL with <code class="bg-memory-violet/10 px-1 rounded text-xs">?key=YOUR_KEY</code>, Authentication: None. If it doesn’t use tools automatically, say: “Use the IdeaTub search_thoughts tool to find my notes about …”.
+                </li>
+                <li>
+                    <strong class="text-deep-indigo">Cursor</strong> — Settings (⌘,) → Tools & MCP → Add new MCP server. Enter the full URL with <code class="bg-memory-violet/10 px-1 rounded text-xs">?key=YOUR_KEY</code>. Restart if needed.
+                </li>
+                <li>
+                    <strong class="text-deep-indigo">Claude Code (CLI)</strong> — <code class="bg-memory-violet/10 px-1 rounded text-xs">claude mcp add --transport http ideatub {{ url('/api/mcp') }} --header "x-brain-key: YOUR_KEY"</code>
+                </li>
+                <li>
+                    <strong class="text-deep-indigo">Other clients</strong> — If they support a remote MCP or custom connector URL, use <code class="bg-memory-violet/10 px-1 rounded text-xs">{{ url('/api/mcp') }}?key=YOUR_KEY</code>.
+                </li>
+            </ul>
+        </div>
+
+        <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+            <h3 class="text-base font-semibold text-deep-indigo mb-3">Troubleshooting</h3>
+            <table class="w-full text-sm">
+                <tbody class="divide-y divide-memory-violet/10">
+                    <tr>
+                        <td class="py-2 font-medium text-deep-indigo align-top w-36">401 Unauthorized</td>
+                        <td class="py-2 text-slate-brand">Key wrong or missing. Use <code class="bg-memory-violet/10 px-1 rounded text-xs">?key=...</code> or <code class="bg-memory-violet/10 px-1 rounded text-xs">x-brain-key</code> with no extra spaces. Create a new key on the <a href="{{ route('settings.mcp-keys.index') }}" class="text-memory-violet hover:underline">MCP key</a> page if you lost it.</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 font-medium text-deep-indigo align-top">Tools don’t appear</td>
+                        <td class="py-2 text-slate-brand">Some clients expect a different MCP transport. Try the full URL with key; if it still fails, your client may need a bridge (see project docs).</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 font-medium text-deep-indigo align-top">Search returns nothing</td>
+                        <td class="py-2 text-slate-brand">Capture some thoughts first (web or <code class="bg-memory-violet/10 px-1 rounded text-xs">capture_thought</code>). Ensure you’re using the key for the account that owns those thoughts.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p class="text-xs text-slate-brand/80">For prompt ideas (memory migration, second brain, weekly review), see the <a href="https://promptkit.natebjones.com/20260224_uq1_promptkit_1" class="text-memory-violet hover:underline" target="_blank" rel="noopener">Companion Prompt Kit</a> and Example Prompts in the app.</p>
     </div>
 </div>
 @endsection

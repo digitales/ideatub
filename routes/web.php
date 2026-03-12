@@ -4,9 +4,11 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ExamplePromptsController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IdeaController;
+use App\Http\Controllers\McpKeyController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\ToolController;
@@ -64,7 +66,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
 
+    Route::get('/example-prompts', [ExamplePromptsController::class, 'index'])->name('example-prompts');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
+    
+    // MCP key management (obtain / revoke auth key for AI clients)
+    Route::get('/settings/mcp-keys', [McpKeyController::class, 'index'])->name('settings.mcp-keys.index');
+    Route::post('/settings/mcp-keys', [McpKeyController::class, 'store'])->name('settings.mcp-keys.store');
+    Route::delete('/settings/mcp-keys/{mcpKey}', [McpKeyController::class, 'destroy'])->name('settings.mcp-keys.destroy');
     
     // Dashboard (requires authentication)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

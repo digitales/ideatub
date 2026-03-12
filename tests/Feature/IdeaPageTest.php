@@ -68,4 +68,20 @@ class IdeaPageTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('pgvector is great for embeddings');
     }
+
+    public function test_example_prompts_page_loads_with_prompt_kit_content(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('example-prompts'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Example Prompts');
+        $response->assertSee('Memory Migration');
+        $response->assertSee('Second Brain Migration');
+        $response->assertSee('Quick Capture Templates');
+        $response->assertSee('The Weekly Review');
+        $response->assertSee('Decision: [what was decided]');
+        $response->assertSee('promptkit.natebjones.com');
+    }
 }
