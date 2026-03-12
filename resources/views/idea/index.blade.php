@@ -150,6 +150,9 @@
 
             <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
+                @if ($thought->source)
+                    <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
+                @endif
 
                 @foreach ($tags as $i => $tag)
                     <span class="text-[10px] font-medium px-2 py-0.5 rounded-full {{ $tagMap[$tagColors[$i % 3]] }}">
