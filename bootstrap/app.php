@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
             'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
+            'postmark.inbound.secret' => \App\Http\Middleware\ValidatePostmarkInboundSecret::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

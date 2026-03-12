@@ -33,4 +33,8 @@ return [
             'task' => env('EVERNOTE_NOTEBOOK_GUID_TASK'),
         ],
     ],
+
+    'postmark_inbound' => [
+        'webhook_secret' => env('POSTMARK_INBOUND_WEBHOOK_SECRET'),
+    ],
 ];
