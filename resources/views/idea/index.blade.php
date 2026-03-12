@@ -30,13 +30,21 @@
         x-data="captureBox()"
         data-initial-content="{{ e($initialContent) }}"
         data-focus-reply="{{ (isset($replyingTo) && $replyingTo) ? '1' : '0' }}"
+        data-idea-index-url="{{ route('idea.index') }}"
         @focus-capture.window="focusCapture()"
         class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
     >
+        {{-- AJAX success/error message --}}
+        <div x-show="message" x-cloak class="mb-3 rounded-xl px-4 py-3 text-sm"
+            :class="messageType === 'success' ? 'bg-neural-teal/10 border border-neural-teal/25 text-neural-teal' : 'bg-red-50 border border-red-200 text-red-600'"
+            x-text="message">
+        </div>
+
         <form
             method="POST"
             action="{{ route('thoughts.store') }}"
-            @keydown.meta.enter.prevent="$el.submit()"
+            @submit.prevent="submitCapture()"
+            @keydown.meta.enter.prevent="submitCapture()"
         >
             @csrf
             <input type="hidden" name="parent_id" value="{{ isset($replyingTo) && $replyingTo ? $replyingTo->id : '' }}">
@@ -58,23 +66,24 @@
                 required
                 x-ref="captureTextarea"
                 x-model="content"
-                @if($errors->has('content')) aria-describedby="content-error" aria-invalid="true" @endif
+                :aria-invalid="!!errorField || {{ $errors->has('content') ? 'true' : 'false' }}"
+                aria-describedby="content-error"
                 placeholder="What are you thinking?"
                 class="w-full bg-transparent border-none outline-none resize-none text-sm text-deep-indigo placeholder-slate-brand/40 leading-relaxed"
             ></textarea>
 
-            @error('content')
-                <p id="content-error" class="mt-1 text-xs text-red-500">{{ $message }}</p>
-            @enderror
+            <p id="content-error" class="mt-1 text-xs text-red-500" x-show="errorField || {{ $errors->has('content') ? 'true' : 'false' }}" x-text="errorField">@if($errors->has('content')){{ $errors->first('content') }}@endif</p>
 
             <div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-memory-violet/8">
                 <span class="text-[11px] text-slate-brand/40">⌘ + Enter to store · ⌘/ to focus</span>
                 <button
                     type="submit"
-                    class="text-xs font-medium text-white px-4 py-1.5 rounded-lg transition-opacity hover:opacity-90"
+                    :disabled="saving"
+                    class="text-xs font-medium text-white px-4 py-1.5 rounded-lg transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                     style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
                 >
-                    Store thought
+                    <span x-show="!saving">Store thought</span>
+                    <span x-show="saving" x-cloak>Saving…</span>
                 </button>
             </div>
         </form>
@@ -134,6 +143,7 @@
         @endphp
 
         <div
+            data-thought-id="{{ $thought->id }}"
             data-index="{{ $loop->index }}"
             data-reply-href="{{ $replyHref }}"
             :class="{ 'ring-2 ring-memory-violet ring-offset-2': selectedThoughtIndex === {{ $thought->parent_id ? -1 : $replyableIndex }} }"
@@ -170,7 +180,7 @@
 
             {{-- Nested comments --}}
             @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
-                <ul class="mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2">
+                <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2" data-comments-list>
                     @foreach ($thought->comments as $comment)
                         <li>
                             <p class="text-[12.5px] text-slate-brand leading-relaxed">{{ e(Str::limit($comment->content, 200)) }}</p>
@@ -178,6 +188,8 @@
                         </li>
                     @endforeach
                 </ul>
+            @elseif(!$thought->parent_id)
+                <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2 hidden" data-comments-list aria-hidden="true"></ul>
             @endif
         </div>
 

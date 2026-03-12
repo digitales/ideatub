@@ -117,7 +117,7 @@ class IdeaController extends Controller
                 $payload['parent_id'] = $parent->id;
             }
 
-            Thought::create($payload);
+            $thought = Thought::create($payload);
         } catch (\Throwable $e) {
             report($e);
 
@@ -129,7 +129,17 @@ class IdeaController extends Controller
         }
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'Thought saved.']);
+            $thought->load('parent');
+            return response()->json([
+                'message' => 'Thought saved.',
+                'thought' => [
+                    'id' => $thought->id,
+                    'content' => $thought->content,
+                    'parent_id' => $thought->parent_id,
+                    'created_at' => $thought->created_at->toIso8601String(),
+                    'created_at_human' => $thought->created_at->diffForHumans(),
+                ],
+            ]);
         }
 
         return redirect()->route('idea.index')->with('success', 'Thought saved.');
