@@ -24,7 +24,14 @@
 
     {{-- Capture box --}}
     <div
-        x-data="{ content: '{{ old('content') }}' }"
+        x-data="{
+            content: @json(old('content', '')),
+            focusCapture() {
+                const el = this.$refs.captureTextarea;
+                if (el && el.focus) el.focus();
+            }
+        }"
+        @focus-capture.window="focusCapture()"
         class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
     >
         <form
@@ -50,18 +57,19 @@
                 id="content"
                 rows="3"
                 required
+                x-ref="captureTextarea"
                 x-model="content"
                 @if($errors->has('content')) aria-describedby="content-error" aria-invalid="true" @endif
                 placeholder="What are you thinking?"
                 class="w-full bg-transparent border-none outline-none resize-none text-sm text-deep-indigo placeholder-slate-brand/40 leading-relaxed"
-            >{{ old('content') }}</textarea>
+            ></textarea>
 
             @error('content')
                 <p id="content-error" class="mt-1 text-xs text-red-500">{{ $message }}</p>
             @enderror
 
             <div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-memory-violet/8">
-                <span class="text-[11px] text-slate-brand/40">⌘ + Enter to store</span>
+                <span class="text-[11px] text-slate-brand/40">⌘ + Enter to store · ⌘/ to focus</span>
                 <button
                     type="submit"
                     class="text-xs font-medium text-white px-4 py-1.5 rounded-lg transition-opacity hover:opacity-90"
@@ -74,6 +82,28 @@
     </div>
 
     {{-- Thoughts list --}}
+    <div
+        x-data="{
+            selectedThoughtIndex: 0,
+            handleThoughtNav(detail) {
+                if (!detail || !detail.direction) return;
+                const cards = this.$el.querySelectorAll('[data-reply-href]');
+                const max = Math.max(0, cards.length - 1);
+                if (detail.direction === 'next') this.selectedThoughtIndex = Math.min(this.selectedThoughtIndex + 1, max);
+                else this.selectedThoughtIndex = Math.max(this.selectedThoughtIndex - 1, 0);
+                const card = cards[this.selectedThoughtIndex];
+                if (card) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            },
+            handleThoughtReply() {
+                const cards = this.$el.querySelectorAll('[data-reply-href]');
+                const card = cards[this.selectedThoughtIndex];
+                const href = card?.dataset?.replyHref;
+                if (href) window.location.href = href;
+            }
+        }"
+        @thought-nav.window="handleThoughtNav($event.detail)"
+        @thought-reply.window="handleThoughtReply()"
+    >
     <div class="flex items-center justify-between mt-9 mb-3.5">
         <span class="text-[11px] font-semibold tracking-[0.1em] uppercase text-slate-brand/50">
             @if ($query)
@@ -84,9 +114,16 @@
         </span>
         <span class="text-[11px] text-slate-brand/30">{{ $thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator ? $thoughts->total() : count($thoughts) }} stored</span>
     </div>
+    @if (!$thoughts->isEmpty())
+        <p class="text-[11px] text-slate-brand/40 mb-2">↑↓ or j/k to move · Enter to reply</p>
+    @endif
 
+    @php $replyableIndex = -1; @endphp
     @forelse ($thoughts as $thought)
         @php
+            if (!$thought->parent_id) {
+                $replyableIndex++;
+            }
             $tags = $thought->metadata['tags'] ?? [];
             $tagColors = ['violet', 'teal', 'indigo'];
             $tagMap = [
@@ -94,9 +131,15 @@
                 'teal'   => 'bg-neural-teal/10 text-neural-teal',
                 'indigo' => 'bg-deep-indigo/8 text-slate-brand',
             ];
+            $replyHref = !$thought->parent_id ? route('idea.index', ['parent_id' => $thought->id]) : '';
         @endphp
 
-        <div class="rounded-xl border border-memory-violet/10 bg-white/68 backdrop-blur px-4 py-3.5 mb-2 hover:bg-white/90 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all cursor-pointer">
+        <div
+            data-index="{{ $loop->index }}"
+            data-reply-href="{{ $replyHref }}"
+            :class="{ 'ring-2 ring-memory-violet ring-offset-2': selectedThoughtIndex === {{ $thought->parent_id ? -1 : $replyableIndex }} }"
+            class="rounded-xl border border-memory-violet/10 bg-white/68 backdrop-blur px-4 py-3.5 mb-2 hover:bg-white/90 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all cursor-pointer"
+        >
 
             @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
                 <p class="text-[11px] text-slate-brand/50 mb-1">
@@ -152,6 +195,7 @@
             {{ $thoughts->links() }}
         </div>
     @endif
+    </div>
 
 </div>
 @endsection

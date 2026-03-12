@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IdeaController;
 use App\Http\Controllers\PricingController;
@@ -62,6 +63,8 @@ Route::middleware('auth')->group(function () {
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
+
+    Route::get('/help', [HelpController::class, 'index'])->name('help');
     
     // Dashboard (requires authentication)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

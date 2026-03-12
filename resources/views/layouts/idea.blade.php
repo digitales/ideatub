@@ -18,9 +18,15 @@
 </head>
 <body class="font-sans antialiased min-h-screen" style="background: linear-gradient(135deg, #eef2ff 0%, #f3f0ff 50%, #f0f5ff 100%);">
 
+    <div
+        x-data="ideaShortcuts({
+            query: @json(old('q', $query ?? '')),
+            ideaIndexUrl: @json(route('idea.index'))
+        })"
+        @keydown.window="handleKey($event)"
+    >
     {{-- Nav --}}
     <nav
-        x-data="{ searching: false, query: '{{ old('q', $query ?? '') }}' }"
         class="sticky top-0 z-20 flex items-center justify-between px-6 md:px-8 py-4 border-b border-memory-violet/10"
         style="background: rgba(238,242,255,0.82); backdrop-filter: blur(12px);"
     >
@@ -39,11 +45,12 @@
             style="background: rgba(238,242,255,0.95); backdrop-filter: blur(12px);"
             @click.away="searching = false"
         >
-            <div class="flex items-center gap-3 w-full max-w-lg mx-auto">
-                <svg class="w-4 h-4 text-neural-teal flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                </svg>
-                <input
+            <div class="flex flex-col gap-2 w-full max-w-lg mx-auto">
+                <div class="flex items-center gap-3">
+                    <svg class="w-4 h-4 text-neural-teal flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <input
                     type="search"
                     name="q"
                     x-model="query"
@@ -55,6 +62,8 @@
                 <button type="button" @click="searching = false" class="text-slate-brand/60 hover:text-slate-brand text-xs">
                     Cancel
                 </button>
+                </div>
+                <p class="text-[11px] text-slate-brand/50">Escape to close · ⌘K to focus search</p>
             </div>
         </form>
 
@@ -63,14 +72,18 @@
             <a href="#" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
                 Example Prompts
             </a>
-            <a href="#" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
+            <a href="{{ route('help') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
                 Help
             </a>
+            <button type="button" @click="shortcutsOpen = true" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
+                Keyboard shortcuts
+            </button>
 
             <div class="w-px h-4 bg-memory-violet/20 mx-2"></div>
 
             {{-- Search pill --}}
             <button
+                type="button"
                 @click="searching = true"
                 class="flex items-center gap-1.5 text-xs text-slate-brand bg-white/70 border border-neural-teal/20 rounded-full px-3.5 py-1.5 hover:bg-white hover:border-neural-teal/40 transition-all"
             >
@@ -78,6 +91,7 @@
                     <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                 </svg>
                 Find a memory
+                <span class="text-[10px] text-slate-brand/50">⌘K</span>
             </button>
 
             {{-- Avatar / logout --}}
@@ -112,6 +126,36 @@
     <main>
         @yield('content')
     </main>
+
+    {{-- Shortcut palette --}}
+    <div
+        x-show="shortcutsOpen"
+        x-transition
+        @keydown.escape.window="shortcutsOpen = false"
+        @click.away="shortcutsOpen = false"
+        class="fixed inset-0 z-40 flex items-center justify-center p-4"
+        style="background: rgba(0,0,0,0.2); backdrop-filter: blur(4px);"
+    >
+        <div
+            class="rounded-2xl border border-memory-violet/20 bg-white/95 backdrop-blur p-6 shadow-xl max-w-md w-full"
+            @click.stop
+        >
+            <h2 class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>
+            <table class="w-full text-sm text-deep-indigo">
+                <tbody class="divide-y divide-memory-violet/10">
+                    <tr><td class="py-1.5">Focus capture</td><td class="py-1.5 text-right text-slate-brand font-medium">⌘/ or Ctrl+/</td></tr>
+                    <tr><td class="py-1.5">Open search</td><td class="py-1.5 text-right text-slate-brand font-medium">⌘K or Ctrl+K</td></tr>
+                    <tr><td class="py-1.5">Move down / up thought</td><td class="py-1.5 text-right text-slate-brand font-medium">j / k or ↓ / ↑</td></tr>
+                    <tr><td class="py-1.5">Open reply</td><td class="py-1.5 text-right text-slate-brand font-medium">Enter</td></tr>
+                    <tr><td class="py-1.5">Cancel reply / close search</td><td class="py-1.5 text-right text-slate-brand font-medium">Escape</td></tr>
+                    <tr><td class="py-1.5">Submit thought</td><td class="py-1.5 text-right text-slate-brand font-medium">⌘+Enter or Ctrl+Enter</td></tr>
+                    <tr><td class="py-1.5">Show this list</td><td class="py-1.5 text-right text-slate-brand font-medium">?</td></tr>
+                </tbody>
+            </table>
+            <p class="mt-4 text-[11px] text-slate-brand/50">Press Escape or click outside to close</p>
+        </div>
+    </div>
+    </div>
 
 </body>
 </html>
