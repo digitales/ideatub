@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Thought;
 use App\Services\OpenRouterService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -148,10 +149,11 @@ class IdeaController extends Controller
     /**
      * Stream: all top-level thoughts for the user, optionally filtered by tag. Paginated.
      * Tag in URL is a slug (e.g. web_development); we resolve it to the canonical tag for querying.
+     * For AJAX requests (infinite scroll), returns JSON with HTML fragment and pagination state.
      */
-    public function stream(Request $request): View
+    public function stream(Request $request): View|JsonResponse
     {
-        $request->validate(['tag' => 'nullable|string|max:100']);
+        $request->validate(['tag' => 'nullable|string|max:100', 'page' => 'nullable|integer|min:1']);
         $tagSlug = $request->input('tag');
         $tagSlug = is_string($tagSlug) ? trim($tagSlug) : '';
         $tagSlug = $tagSlug !== '' ? $tagSlug : null;
@@ -170,11 +172,24 @@ class IdeaController extends Controller
             $query->whereRaw('0 = 1');
         }
 
-        $thoughts = $query->orderByDesc('created_at')->paginate(self::STREAM_PAGE_SIZE);
+        $page = (int) $request->input('page', 1);
+        $thoughts = $query->orderByDesc('created_at')->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
+
+        if ($request->ajax()) {
+            $html = view('idea.stream_thoughts', ['thoughts' => $thoughts])->render();
+
+            return response()->json([
+                'html' => $html,
+                'has_more' => $thoughts->hasMorePages(),
+                'next_page' => $thoughts->currentPage() + 1,
+                'count' => $thoughts->count(),
+            ]);
+        }
 
         return view('idea.stream', [
             'thoughts' => $thoughts,
             'tag' => $tagForDisplay,
+            'tagSlug' => $tagSlug,
         ]);
     }
 
