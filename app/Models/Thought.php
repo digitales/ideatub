@@ -47,6 +47,8 @@ class Thought extends Model
         'embedding',
         'metadata',
         'user_id',
+        'source',
+        'source_metadata',
         'parent_id',
         'evernote_note_guid',
     ];
@@ -60,6 +62,7 @@ class Thought extends Model
     {
         return [
             'metadata' => 'array',
+            'source_metadata' => 'array',
             'embedding' => Vector::class,
         ];
     }
