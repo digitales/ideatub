@@ -27,47 +27,63 @@
             @endif
         </div>
     @else
-        <p class="text-[11px] text-slate-brand/40 mb-2">{{ $thoughts->total() }} thoughts</p>
-        @foreach ($thoughts as $thought)
-            @php
-                $tags = $thought->metadata['tags'] ?? [];
-                $tagColors = ['violet', 'teal', 'indigo'];
-                $tagMap = [
-                    'violet' => 'bg-memory-violet/10 text-memory-violet',
-                    'teal'   => 'bg-neural-teal/10 text-neural-teal',
-                    'indigo' => 'bg-deep-indigo/8 text-slate-brand',
-                ];
-            @endphp
-            <div class="rounded-xl border border-memory-violet/10 bg-white/68 backdrop-blur px-4 py-3.5 mb-2 hover:bg-white/90 hover:border-memory-violet/20 transition-all">
-                <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ e($thought->content) }}</p>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
-                    @if ($thought->source)
-                        <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
-                    @endif
-                    @foreach ($tags as $i => $tag)
-                        <a href="{{ route('idea.stream', ['tag' => \Illuminate\Support\Str::slug($tag, '_')]) }}" class="text-[10px] font-medium px-2 py-0.5 rounded-full {{ $tagMap[$tagColors[$i % 3]] }} hover:opacity-90">
-                            #{{ $tag }}
-                        </a>
-                    @endforeach
-                </div>
-                @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
-                    <ul class="mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2">
-                        @foreach ($thought->comments as $comment)
-                            <li>
-                                <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line">{{ e(Str::limit($comment->content, 200)) }}</p>
-                                <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
-            </div>
-        @endforeach
+        <p class="text-[11px] text-slate-brand/40 mb-2" id="stream-count-line">
+            Showing <span id="stream-showing-count">{{ $thoughts->count() }}</span> of <span id="stream-total-count">{{ $thoughts->total() }}</span> thoughts
+        </p>
+        <div id="stream-thoughts-list">
+            @include('idea.stream_thoughts', ['thoughts' => $thoughts])
+        </div>
         @if ($thoughts->hasMorePages())
-            <div class="mt-4 text-center">
-                {{ $thoughts->links('pagination.idea') }}
-            </div>
+            <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{ $tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream') }}" data-stream-total="{{ $thoughts->total() }}"></div>
         @endif
     @endif
 </div>
+
+@push('scripts')
+@if (!$thoughts->isEmpty() && $thoughts->hasMorePages())
+<script>
+(function () {
+    var sentinel = document.getElementById('stream-load-more-sentinel');
+    var list = document.getElementById('stream-thoughts-list');
+    var showingEl = document.getElementById('stream-showing-count');
+    if (!sentinel || !list || !showingEl) return;
+
+    var baseUrl = sentinel.getAttribute('data-stream-base-url');
+    var nextPage = 2;
+    var loading = false;
+
+    function loadMore() {
+        if (loading) return;
+        loading = true;
+        var url = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'page=' + nextPage;
+        fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.html) {
+                    list.insertAdjacentHTML('beforeend', data.html);
+                    var current = parseInt(showingEl.textContent, 10) + (data.count || 0);
+                    showingEl.textContent = current;
+                }
+                if (data.has_more && data.next_page) {
+                    nextPage = data.next_page;
+                } else {
+                    if (sentinel.parentNode) sentinel.parentNode.removeChild(sentinel);
+                    observer.disconnect();
+                }
+            })
+            .catch(function () { loading = false; })
+            .finally(function () { loading = false; });
+    }
+
+    var observer = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting) loadMore();
+    }, { rootMargin: '200px', threshold: 0 });
+    observer.observe(sentinel);
+})();
+</script>
+@endif
+@endpush
 @endsection
