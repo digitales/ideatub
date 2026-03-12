@@ -14,6 +14,7 @@ use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\ToolController;
 use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
+use App\Http\Controllers\InboundEmailController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
@@ -92,7 +93,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/mcp-keys', [McpKeyController::class, 'index'])->name('settings.mcp-keys.index');
     Route::post('/settings/mcp-keys', [McpKeyController::class, 'store'])->name('settings.mcp-keys.store');
     Route::delete('/settings/mcp-keys/{mcpKey}', [McpKeyController::class, 'destroy'])->name('settings.mcp-keys.destroy');
-    
+
+    Route::get('/settings/inbound-emails', [InboundEmailController::class, 'index'])->name('settings.inbound-emails.index');
+    Route::post('/settings/inbound-emails', [InboundEmailController::class, 'store'])->name('settings.inbound-emails.store');
+    Route::delete('/settings/inbound-emails/{userInboundAddress}', [InboundEmailController::class, 'destroy'])->name('settings.inbound-emails.destroy');
+
     // Dashboard (requires authentication)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 });
