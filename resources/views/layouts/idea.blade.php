@@ -19,10 +19,9 @@
 <body class="font-sans antialiased min-h-screen" style="background: linear-gradient(135deg, #eef2ff 0%, #f3f0ff 50%, #f0f5ff 100%);">
 
     <div
-        x-data="ideaShortcuts({
-            query: @json(old('q', $query ?? '')),
-            ideaIndexUrl: @json(route('idea.index'))
-        })"
+        x-data="ideaShortcuts()"
+        data-query="{{ e(old('q', $query ?? '')) }}"
+        data-idea-index-url="{{ e(route('idea.index')) }}"
         @keydown.window="handleKey($event)"
     >
     {{-- Nav --}}
@@ -67,8 +66,8 @@
             </div>
         </form>
 
-        {{-- Right nav items --}}
-        <div class="flex items-center gap-1" x-show="!searching">
+        {{-- Right nav items (visible by default; :class so nav shows before Alpine inits) --}}
+        <div class="flex items-center gap-1" :class="{ 'hidden': searching }">
             <a href="#" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
                 Example Prompts
             </a>
@@ -127,25 +126,41 @@
         @yield('content')
     </main>
 
-    {{-- Shortcut palette --}}
+    {{-- Shortcut palette (modal) --}}
     <div
         x-show="shortcutsOpen"
-        x-transition
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
         @keydown.escape.window="shortcutsOpen = false"
         @click.away="shortcutsOpen = false"
         class="fixed inset-0 z-40 flex items-center justify-center p-4"
-        style="background: rgba(0,0,0,0.2); backdrop-filter: blur(4px);"
+        style="background: rgba(30, 37, 71, 0.4); backdrop-filter: blur(6px);"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="shortcuts-modal-title"
+        x-ref="shortcutsModal"
+        x-effect="shortcutsOpen && $nextTick(() => { const el = $refs.shortcutsModal && $refs.shortcutsModal.querySelector('[autofocus]'); if (el) el.focus(); })"
     >
         <div
-            class="rounded-2xl border border-memory-violet/20 bg-white/95 backdrop-blur p-6 shadow-xl max-w-md w-full"
+            class="rounded-2xl border border-memory-violet/25 bg-white shadow-2xl max-w-md w-full p-6"
             @click.stop
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
         >
-            <h2 class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>
+            <h2 id="shortcuts-modal-title" class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>
             <table class="w-full text-sm text-deep-indigo">
                 <tbody class="divide-y divide-memory-violet/10">
                     <tr><td class="py-1.5">Focus capture</td><td class="py-1.5 text-right text-slate-brand font-medium">⌘/ or Ctrl+/</td></tr>
                     <tr><td class="py-1.5">Open search</td><td class="py-1.5 text-right text-slate-brand font-medium">⌘K or Ctrl+K</td></tr>
-                    <tr><td class="py-1.5">Move down / up thought</td><td class="py-1.5 text-right text-slate-brand font-medium">j / k or ↓ / ↑</td></tr>
+                    <tr><td class="py-1.5">Move down / up thought</td><td class="py-1.5 text-right text-slate-brand font-medium">j / k</td></tr>
                     <tr><td class="py-1.5">Open reply</td><td class="py-1.5 text-right text-slate-brand font-medium">Enter</td></tr>
                     <tr><td class="py-1.5">Cancel reply / close search</td><td class="py-1.5 text-right text-slate-brand font-medium">Escape</td></tr>
                     <tr><td class="py-1.5">Submit thought</td><td class="py-1.5 text-right text-slate-brand font-medium">⌘+Enter or Ctrl+Enter</td></tr>
@@ -153,6 +168,15 @@
                 </tbody>
             </table>
             <p class="mt-4 text-[11px] text-slate-brand/50">Press Escape or click outside to close</p>
+            <button
+                type="button"
+                autofocus
+                @click="shortcutsOpen = false"
+                class="mt-5 w-full text-sm font-medium text-white py-2 rounded-lg transition-opacity hover:opacity-90"
+                style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
+            >
+                Close
+            </button>
         </div>
     </div>
     </div>

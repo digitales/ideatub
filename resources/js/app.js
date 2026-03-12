@@ -3,11 +3,29 @@ import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
 
-Alpine.data('ideaShortcuts', (config = {}) => ({
+Alpine.data('captureBox', () => ({
+  content: '',
+  init() {
+    const raw = this.$el.dataset.initialContent;
+    this.content = raw !== undefined ? raw : '';
+  },
+  focusCapture() {
+    const el = this.$refs.captureTextarea;
+    if (el && el.focus) el.focus();
+  },
+}));
+
+Alpine.data('ideaShortcuts', () => ({
   searching: false,
-  query: config.query ?? '',
+  query: '',
   shortcutsOpen: false,
-  ideaIndexUrl: config.ideaIndexUrl ?? '',
+  ideaIndexUrl: '',
+
+  init() {
+    const el = this.$el;
+    if (el?.dataset?.query !== undefined) this.query = el.dataset.query;
+    if (el?.dataset?.ideaIndexUrl !== undefined) this.ideaIndexUrl = el.dataset.ideaIndexUrl;
+  },
 
   handleKey(e) {
     const el = document.activeElement;
@@ -38,12 +56,12 @@ Alpine.data('ideaShortcuts', (config = {}) => ({
       e.preventDefault();
       return;
     }
-    if (e.key === 'j' || e.key === 'ArrowDown') {
+    if (e.key === 'j') {
       this.$dispatch('thought-nav', { direction: 'next' });
       e.preventDefault();
       return;
     }
-    if (e.key === 'k' || e.key === 'ArrowUp') {
+    if (e.key === 'k') {
       this.$dispatch('thought-nav', { direction: 'prev' });
       e.preventDefault();
       return;

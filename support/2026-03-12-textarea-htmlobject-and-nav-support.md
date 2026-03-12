@@ -34,12 +34,13 @@
   with a dedicated method that only focuses the element and does not touch `content`:
   - `x-data` now includes `focusCapture() { const el = this.$refs.captureTextarea; if (el && el.focus) el.focus(); }`
   - Listener is now `@focus-capture.window="focusCapture()"`.
-- **Removed** server-rendered `{{ old('content') }}` from inside the textarea body. The only initial value is now Alpine’s `content: @json(old('content', ''))`, so there is a single source of truth and no risk of the element or stray string being rendered into the field.
+- **Removed** server-rendered `{{ old('content') }}` from inside the textarea body. The only initial value is now Alpine’s `content: @json(...)`, so there is a single source of truth.
+- **Sanitize old input:** `content` is now `@json((old('content') === '[object HTMLTextAreaElement]' ? '' : old('content', '')))` so that if that string was ever submitted and flashed back via `old('content')`, it is never shown in the textarea.
 
-### 2. Nav visibility
+### 2. Nav visibility (resources/views/layouts/idea.blade.php)
 
-- No code change was required for the nav; the layout and `ideaShortcuts` already initialize `searching: false`.
-- **Recommendation:** If the nav is still missing, check: (1) browser console for JS errors (especially from `ideaShortcuts` or Alpine), (2) that the page uses the idea layout and (3) that the view passes `query` (e.g. `['query' => '']`) when rendering the idea layout.
+- **Cause:** The right nav used `x-show="!searching"`. Before Alpine initializes (or if it fails), `x-show` can leave the element hidden, so the nav never appeared.
+- **Fix:** Replaced `x-show="!searching"` with `:class="{ 'hidden': searching }"` on the right nav container. Without Alpine the container has no `hidden` class and is visible; once Alpine runs it only adds `hidden` when `searching` is true.
 
 ## Prevention & Follow-up
 

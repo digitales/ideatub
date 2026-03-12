@@ -13,7 +13,7 @@
             <tbody class="divide-y divide-memory-violet/10">
                 <tr><td class="py-2">Focus capture</td><td class="py-2 text-right text-slate-brand font-medium">⌘/ or Ctrl+/</td></tr>
                 <tr><td class="py-2">Open search</td><td class="py-2 text-right text-slate-brand font-medium">⌘K or Ctrl+K</td></tr>
-                <tr><td class="py-2">Move down / up thought</td><td class="py-2 text-right text-slate-brand font-medium">j / k or ↓ / ↑</td></tr>
+                <tr><td class="py-2">Move down / up thought</td><td class="py-2 text-right text-slate-brand font-medium">j / k</td></tr>
                 <tr><td class="py-2">Open reply</td><td class="py-2 text-right text-slate-brand font-medium">Enter</td></tr>
                 <tr><td class="py-2">Cancel reply / close search</td><td class="py-2 text-right text-slate-brand font-medium">Escape</td></tr>
                 <tr><td class="py-2">Submit thought</td><td class="py-2 text-right text-slate-brand font-medium">⌘+Enter or Ctrl+Enter</td></tr>

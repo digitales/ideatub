@@ -22,15 +22,13 @@
     <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-1.5">A calm archive for your ideas</h1>
     <p class="text-center text-sm text-slate-brand mb-9">Capture thoughts before they disappear.</p>
 
-    {{-- Capture box --}}
+    {{-- Capture box (initial content in data attr to avoid @json breaking the x-data attribute) --}}
+    @php
+        $initialContent = (old('content') === '[object HTMLTextAreaElement]' ? '' : old('content', ''));
+    @endphp
     <div
-        x-data="{
-            content: @json(old('content', '')),
-            focusCapture() {
-                const el = this.$refs.captureTextarea;
-                if (el && el.focus) el.focus();
-            }
-        }"
+        x-data="captureBox()"
+        data-initial-content="{{ e($initialContent) }}"
         @focus-capture.window="focusCapture()"
         class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
     >
@@ -115,7 +113,7 @@
         <span class="text-[11px] text-slate-brand/30">{{ $thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator ? $thoughts->total() : count($thoughts) }} stored</span>
     </div>
     @if (!$thoughts->isEmpty())
-        <p class="text-[11px] text-slate-brand/40 mb-2">↑↓ or j/k to move · Enter to reply</p>
+        <p class="text-[11px] text-slate-brand/40 mb-2">j / k to move · Enter to reply</p>
     @endif
 
     @php $replyableIndex = -1; @endphp
