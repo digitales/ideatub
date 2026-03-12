@@ -46,7 +46,7 @@
                         <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
                     @endif
                     @foreach ($tags as $i => $tag)
-                        <a href="{{ route('idea.stream', ['tag' => $tag]) }}" class="text-[10px] font-medium px-2 py-0.5 rounded-full {{ $tagMap[$tagColors[$i % 3]] }} hover:opacity-90">
+                        <a href="{{ route('idea.stream', ['tag' => \Illuminate\Support\Str::slug($tag, '_')]) }}" class="text-[10px] font-medium px-2 py-0.5 rounded-full {{ $tagMap[$tagColors[$i % 3]] }} hover:opacity-90">
                             #{{ $tag }}
                         </a>
                     @endforeach

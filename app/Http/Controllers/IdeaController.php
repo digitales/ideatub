@@ -6,6 +6,7 @@ use App\Models\Thought;
 use App\Services\OpenRouterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class IdeaController extends Controller
@@ -136,28 +137,59 @@ class IdeaController extends Controller
 
     /**
      * Stream: all top-level thoughts for the user, optionally filtered by tag. Paginated.
+     * Tag in URL is a slug (e.g. web_development); we resolve it to the canonical tag for querying.
      */
     public function stream(Request $request): View
     {
         $request->validate(['tag' => 'nullable|string|max:100']);
-        $tag = $request->input('tag');
-        $tag = is_string($tag) ? trim($tag) : '';
-        $tag = $tag !== '' ? $tag : null;
+        $tagSlug = $request->input('tag');
+        $tagSlug = is_string($tagSlug) ? trim($tagSlug) : '';
+        $tagSlug = $tagSlug !== '' ? $tagSlug : null;
+
+        $canonicalTag = $tagSlug !== null ? $this->resolveTagSlugToCanonical($tagSlug) : null;
+        $tagForDisplay = $tagSlug !== null ? ($canonicalTag ?? $tagSlug) : null;
 
         $query = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')]);
 
-        if ($tag !== null) {
-            $query->whereJsonContains('metadata->tags', $tag);
+        if ($canonicalTag !== null) {
+            $query->whereJsonContains('metadata->tags', $canonicalTag);
+        } elseif ($tagSlug !== null) {
+            $query->whereRaw('0 = 1');
         }
 
         $thoughts = $query->orderByDesc('created_at')->paginate(self::STREAM_PAGE_SIZE);
 
         return view('idea.stream', [
             'thoughts' => $thoughts,
-            'tag' => $tag,
+            'tag' => $tagForDisplay,
         ]);
+    }
+
+    /**
+     * Resolve a URL slug (e.g. web_development) to the canonical tag value stored in metadata (e.g. "web development").
+     */
+    private function resolveTagSlugToCanonical(string $tagSlug): ?string
+    {
+        $tags = Thought::query()
+            ->where('user_id', auth()->id())
+            ->select('metadata')
+            ->get()
+            ->pluck('metadata')
+            ->pluck('tags')
+            ->flatten()
+            ->unique()
+            ->filter()
+            ->values();
+
+        foreach ($tags as $t) {
+            if (Str::slug($t, '_') === $tagSlug) {
+                return $t;
+            }
+        }
+
+        return null;
     }
 }
