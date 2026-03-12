@@ -8,6 +8,9 @@ Alpine.data('captureBox', () => ({
   init() {
     const raw = this.$el.dataset.initialContent;
     this.content = raw !== undefined ? raw : '';
+    if (this.$el.dataset.focusReply === '1') {
+      this.$nextTick(() => this.focusCapture());
+    }
   },
   focusCapture() {
     const el = this.$refs.captureTextarea;

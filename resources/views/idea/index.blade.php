@@ -29,6 +29,7 @@
     <div
         x-data="captureBox()"
         data-initial-content="{{ e($initialContent) }}"
+        data-focus-reply="{{ (isset($replyingTo) && $replyingTo) ? '1' : '0' }}"
         @focus-capture.window="focusCapture()"
         class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
     >
