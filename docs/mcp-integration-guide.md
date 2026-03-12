@@ -171,12 +171,12 @@ Use this if you are scripting against IdeaTub or building a bridge.
 }
 ```
 
-**Success response:**
+**Success response:** Each thought in `search_thoughts` and `browse_recent` includes `source` and `source_metadata` (both may be null for older thoughts).
 
 ```json
 {
   "jsonrpc": "2.0",
-  "result": { "thoughts": [ { "id": "...", "content": "...", "metadata": {...}, "created_at": "..." } ] },
+  "result": { "thoughts": [ { "id": "...", "content": "...", "metadata": {...}, "created_at": "...", "source": "mcp", "source_metadata": null } ] },
   "id": 1
 }
 ```
@@ -198,7 +198,7 @@ Use this if you are scripting against IdeaTub or building a bridge.
 | `search_thoughts` | `query` (string) | `limit` (int, default 10, max 100) |
 | `browse_recent` | — | `limit` (int, default 10, max 100) |
 | `thought_stats` | — | — |
-| `capture_thought` | `content` (string) | `parent_id` or `in_reply_to` (UUID string for comments) |
+| `capture_thought` | `content` (string) | `parent_id` or `in_reply_to` (UUID); `source` (string, e.g. chatgpt/claude/cursor); `source_metadata` (object) |
 
 Example calls:
 

@@ -7,6 +7,8 @@ The `capture_thought` tool creates a new thought in IdeaTub. It can also create 
 - **content** (required): The thought or comment text.
 - **parent_id** (optional): ID of an existing thought. If provided, the new thought is stored as a comment on that thought (same user only).
 - **in_reply_to** (optional): Alias for `parent_id`.
+- **source** (optional): Client or origin label (e.g. `chatgpt`, `claude`, `cursor`). If omitted, stored as `mcp`. Max 64 characters.
+- **source_metadata** (optional): Arbitrary key-value object for source-specific data (e.g. for future calendar: `event_id`). Must be an object.
 
 ## Comment-on-thought
 
