@@ -107,6 +107,8 @@ class IdeaController extends Controller
                 'embedding' => $embedding,
                 'metadata' => $metadata,
                 'user_id' => auth()->id(),
+                'source' => 'web',
+                'source_metadata' => null,
             ];
             if ($parent !== null) {
                 $payload['parent_id'] = $parent->id;
