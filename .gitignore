@@ -22,4 +22,5 @@ yarn-error.log
 !/bootstrap/cache/.gitkeep
 /database/database.sqlite
 /storage
+/storage/app/oauth-mcp-*.pem
 .superpowers/

@@ -12,8 +12,20 @@ use App\Http\Controllers\McpKeyController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\ToolController;
+use App\Http\Controllers\OAuthServerController;
+use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
+
+// OAuth 2.1 / MCP well-known and OAuth server (ChatGPT connector)
+if (config('oauth-mcp.enabled', true)) {
+    Route::get('.well-known/oauth-protected-resource', [OAuthWellKnownController::class, 'protectedResource']);
+    Route::get('.well-known/oauth-authorization-server', [OAuthWellKnownController::class, 'authorizationServer']);
+    Route::get('.well-known/jwks.json', [OAuthWellKnownController::class, 'jwks']);
+    Route::post('oauth/register', [OAuthServerController::class, 'register']);
+    Route::get('oauth/authorize', [OAuthServerController::class, 'authorize'])->name('oauth.authorize');
+    Route::post('oauth/token', [OAuthServerController::class, 'token']);
+}
 
 // Guest landing (optional; IdeaTub primary UI is at / when authenticated)
 Route::get('/welcome', [HomeController::class, 'index'])->name('home');

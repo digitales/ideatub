@@ -4,16 +4,20 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Thought;
+use App\Models\User;
 use App\Models\UserMcpKey;
+use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class McpController extends Controller
 {
     public function __construct(
-        private OpenRouterService $openRouter
+        private OpenRouterService $openRouter,
+        private ?OAuthMcpJwtService $oauthJwt = null
     ) {}
 
     /**
@@ -36,25 +40,13 @@ class McpController extends Controller
      */
     public function __invoke(Request $request): JsonResponse
     {
-        $key = $request->query('key') ?? $request->header('x-ideatub-key');
-        $key = $key !== null ? (string) $key : '';
-
-        if ($key === '') {
-            return $this->unauthorizedResponse();
-        }
-
-        $mcpKey = UserMcpKey::findByPlainKey($key);
-        if ($mcpKey === null) {
-            return $this->unauthorizedResponse();
-        }
-
-        $user = $mcpKey->user;
+        $user = $this->resolveUser($request);
         if ($user === null) {
             return $this->unauthorizedResponse();
         }
 
-        $mcpKey->update(['last_used_at' => now()]);
         $request->setUserResolver(fn () => $user);
+        Auth::setUser($user);
 
         $body = $request->all();
         $method = $body['method'] ?? null;
@@ -225,13 +217,63 @@ class McpController extends Controller
         ]);
     }
 
+    private function resolveUser(Request $request): ?User
+    {
+        $auth = $request->header('Authorization');
+        if (is_string($auth) && str_starts_with(strtolower($auth), 'bearer ')) {
+            $token = trim(substr($auth, 7));
+            if ($token !== '' && $this->oauthJwt && config('oauth-mcp.enabled', true)) {
+                try {
+                    $payload = $this->oauthJwt->verifyAccessToken($token);
+
+                    return User::find($payload['user_id']);
+                } catch (\Throwable) {
+                    return null;
+                }
+            }
+        }
+
+        $key = $request->query('key') ?? $request->header('x-ideatub-key');
+        $key = is_string($key) ? trim($key) : '';
+        if ($key === '') {
+            return null;
+        }
+
+        $mcpKey = UserMcpKey::findByPlainKey($key);
+        if ($mcpKey === null) {
+            return null;
+        }
+
+        $user = $mcpKey->user;
+        if ($user !== null) {
+            $mcpKey->update(['last_used_at' => now()]);
+        }
+
+        return $user;
+    }
+
     private function unauthorizedResponse(): JsonResponse
     {
-        return response()->json([
+        $resourceMetadata = config('oauth-mcp.enabled', true)
+            ? rtrim(config('app.url'), '/').'/.well-known/oauth-protected-resource'
+            : null;
+
+        $response = response()->json([
             'jsonrpc' => '2.0',
-            'error' => ['code' => -32001, 'message' => 'Unauthorized: invalid or missing MCP key'],
+            'error' => ['code' => -32001, 'message' => 'Unauthorized: invalid or missing MCP key or token'],
             'id' => null,
         ], 401);
+
+        if ($resourceMetadata !== null) {
+            $scope = config('oauth-mcp.scope', 'ideatub:mcp');
+            $response->header('WWW-Authenticate', sprintf(
+                'Bearer resource_metadata="%s", scope="%s"',
+                $resourceMetadata,
+                $scope
+            ));
+        }
+
+        return $response;
     }
 
     /**
