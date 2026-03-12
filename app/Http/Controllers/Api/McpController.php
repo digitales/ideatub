@@ -317,7 +317,7 @@ class McpController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->nearestTo($embedding, $limit)
-            ->get(['id', 'content', 'metadata', 'created_at']);
+            ->get(['id', 'content', 'metadata', 'created_at', 'source', 'source_metadata']);
 
         return [
             'thoughts' => $thoughts->map(fn (Thought $t) => [
@@ -325,6 +325,8 @@ class McpController extends Controller
                 'content' => $t->content,
                 'metadata' => $t->metadata,
                 'created_at' => $t->created_at->toIso8601String(),
+                'source' => $t->source,
+                'source_metadata' => $t->source_metadata,
             ])->values()->all(),
         ];
     }
@@ -349,7 +351,7 @@ class McpController extends Controller
             ->where('user_id', auth()->id())
             ->orderByDesc('created_at')
             ->limit($limit)
-            ->get(['id', 'content', 'metadata', 'created_at']);
+            ->get(['id', 'content', 'metadata', 'created_at', 'source', 'source_metadata']);
 
         return [
             'thoughts' => $thoughts->map(fn (Thought $t) => [
@@ -357,6 +359,8 @@ class McpController extends Controller
                 'content' => $t->content,
                 'metadata' => $t->metadata,
                 'created_at' => $t->created_at->toIso8601String(),
+                'source' => $t->source,
+                'source_metadata' => $t->source_metadata,
             ])->values()->all(),
         ];
     }
