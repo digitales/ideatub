@@ -36,10 +36,13 @@
             <input type="hidden" name="parent_id" value="{{ isset($replyingTo) && $replyingTo ? $replyingTo->id : '' }}">
 
             @if (isset($replyingTo) && $replyingTo)
-                <p class="text-xs text-slate-brand mb-2">
-                    Replying to: <span class="text-deep-indigo">{{ Str::limit($replyingTo->content, 80) }}</span>
-                    <a href="{{ route('idea.index') }}" class="text-memory-violet hover:underline ml-1">Cancel</a>
-                </p>
+                <div class="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg border border-memory-violet/15 bg-memory-violet/5">
+                    <div class="flex-1 min-w-0">
+                        <span class="text-[11px] font-semibold uppercase tracking-wider text-memory-violet/80">Replying to</span>
+                        <p class="text-sm text-deep-indigo mt-0.5 line-clamp-2">{{ e(Str::limit($replyingTo->content, 80)) }}</p>
+                    </div>
+                    <a href="{{ route('idea.index') }}" class="shrink-0 text-xs font-medium text-slate-brand hover:text-deep-indigo px-2.5 py-1.5 rounded-md border border-slate-200 hover:border-slate-300 bg-white/80 transition-colors" title="Cancel reply">Cancel</a>
+                </div>
             @endif
 
             <textarea
