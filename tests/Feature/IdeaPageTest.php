@@ -89,6 +89,25 @@ class IdeaPageTest extends TestCase
         $this->assertSame('web', $thought->source);
     }
 
+    public function test_stored_thought_tags_are_normalized_to_lowercase(): void
+    {
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => ['Jira', 'Web Development']]);
+        });
+
+        $this->actingAs($user)->post(route('thoughts.store'), [
+            'content' => 'A thought with mixed-case tags',
+            '_token' => csrf_token(),
+        ]);
+
+        $thought = Thought::where('user_id', $user->id)->latest()->first();
+        $this->assertNotNull($thought);
+        $this->assertSame(['jira', 'web development'], $thought->metadata['tags'] ?? null);
+    }
+
     public function test_example_prompts_page_loads_with_prompt_kit_content(): void
     {
         $user = User::factory()->create();

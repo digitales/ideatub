@@ -103,7 +103,7 @@ class IdeaController extends Controller
 
         try {
             $embedding = $this->openRouter->embed($content);
-            $metadata = $this->openRouter->extractMetadata($content);
+            $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
 
             $payload = [
                 'content' => $content,

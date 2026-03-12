@@ -117,4 +117,23 @@ class Thought extends Model
     {
         return $query->where('parent_id', $thought->id);
     }
+
+    /**
+     * Normalize metadata so tags are lowercase (and trimmed). Returns a new array.
+     *
+     * @param  array<string, mixed>  $metadata
+     * @return array<string, mixed>
+     */
+    public static function normalizeMetadataTags(array $metadata): array
+    {
+        if (! isset($metadata['tags']) || ! is_array($metadata['tags'])) {
+            return $metadata;
+        }
+        $metadata['tags'] = array_values(array_map(
+            fn ($tag) => mb_strtolower(trim((string) $tag)),
+            array_filter($metadata['tags'], fn ($t) => trim((string) $t) !== '')
+        ));
+
+        return $metadata;
+    }
 }

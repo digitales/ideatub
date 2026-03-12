@@ -422,7 +422,7 @@ class McpController extends Controller
         }
 
         $embedding = $this->openRouter->embed($content);
-        $metadata = $this->openRouter->extractMetadata($content);
+        $metadata = \App\Models\Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
 
         $payload = [
             'content' => $content,
