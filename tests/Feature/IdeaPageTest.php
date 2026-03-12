@@ -69,6 +69,26 @@ class IdeaPageTest extends TestCase
         $response->assertSee('pgvector is great for embeddings');
     }
 
+    public function test_web_created_thought_has_source_web(): void
+    {
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->actingAs($user)->post(route('thoughts.store'), [
+            'content' => 'A thought from the web',
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect(route('idea.index'));
+        $thought = Thought::where('user_id', $user->id)->latest()->first();
+        $this->assertNotNull($thought);
+        $this->assertSame('web', $thought->source);
+    }
+
     public function test_example_prompts_page_loads_with_prompt_kit_content(): void
     {
         $user = User::factory()->create();
