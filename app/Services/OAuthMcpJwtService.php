@@ -54,7 +54,9 @@ class OAuthMcpJwtService
         $decoded = JWT::decode($token, $publicKey);
 
         $resource = config('oauth-mcp.resource');
-        if ($decoded->aud !== $resource) {
+        $resourceApi = config('oauth-mcp.resource_api');
+        $allowedAudiences = array_filter([$resource, $resourceApi]);
+        if (! in_array($decoded->aud, $allowedAudiences, true)) {
             throw new \Exception('Invalid audience');
         }
 

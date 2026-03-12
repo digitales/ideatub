@@ -19,6 +19,12 @@ return [
 
     'resource' => env('OAUTH_MCP_RESOURCE', rtrim(env('APP_URL', 'http://localhost:8000'), '/').'/api/mcp'),
 
+    /*
+    | REST API resource URL for Custom GPT Actions (OAuth audience).
+    | Use this as the "resource" when configuring Custom GPT OAuth so tokens work for /api/thoughts/*.
+    */
+    'resource_api' => env('OAUTH_MCP_RESOURCE_API', rtrim(env('APP_URL', 'http://localhost:8000'), '/').'/api/thoughts'),
+
     'scope' => 'ideatub:mcp',
 
     'authorization_code_ttl_seconds' => 600, // 10 minutes
@@ -31,6 +37,7 @@ return [
 
     'allowed_redirect_hosts' => [
         'chatgpt.com',
+        'chat.openai.com',
         'platform.openai.com',
     ],
 
