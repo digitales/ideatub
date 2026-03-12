@@ -16,6 +16,8 @@ class IdeaController extends Controller
 
     private const SEARCH_QUERY_MAX_LENGTH = 2000;
 
+    private const STREAM_PAGE_SIZE = 20;
+
     public function __construct(
         private OpenRouterService $openRouter
     ) {}
@@ -130,5 +132,32 @@ class IdeaController extends Controller
         }
 
         return redirect()->route('idea.index')->with('success', 'Thought saved.');
+    }
+
+    /**
+     * Stream: all top-level thoughts for the user, optionally filtered by tag. Paginated.
+     */
+    public function stream(Request $request): View
+    {
+        $request->validate(['tag' => 'nullable|string|max:100']);
+        $tag = $request->input('tag');
+        $tag = is_string($tag) ? trim($tag) : '';
+        $tag = $tag !== '' ? $tag : null;
+
+        $query = Thought::query()
+            ->where('user_id', auth()->id())
+            ->topLevel()
+            ->with(['comments' => fn ($q) => $q->orderBy('created_at')]);
+
+        if ($tag !== null) {
+            $query->whereJsonContains('metadata->tags', $tag);
+        }
+
+        $thoughts = $query->orderByDesc('created_at')->paginate(self::STREAM_PAGE_SIZE);
+
+        return view('idea.stream', [
+            'thoughts' => $thoughts,
+            'tag' => $tag,
+        ]);
     }
 }

@@ -77,6 +77,7 @@ Route::middleware('auth')->group(function () {
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
+    Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
 
     Route::get('/example-prompts', [ExamplePromptsController::class, 'index'])->name('example-prompts');
     Route::get('/help', [HelpController::class, 'index'])->name('help');

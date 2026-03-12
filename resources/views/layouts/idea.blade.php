@@ -68,6 +68,9 @@
 
         {{-- Right nav items (visible by default; :class so nav shows before Alpine inits) --}}
         <div class="flex items-center gap-1" :class="{ 'hidden': searching }">
+            <a href="{{ route('idea.stream') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
+                Stream
+            </a>
             <a href="{{ route('example-prompts') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
                 Example Prompts
             </a>
