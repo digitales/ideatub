@@ -76,6 +76,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the inbound email addresses for the user (for capture-by-email).
+     */
+    public function userInboundAddresses()
+    {
+        return $this->hasMany(UserInboundAddress::class);
+    }
+
+    /**
      * Check if user has unlimited access (Pro or Lifetime).
      */
     public function hasUnlimitedAccess(): bool

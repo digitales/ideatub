@@ -33,4 +33,9 @@ return [
             'task' => env('EVERNOTE_NOTEBOOK_GUID_TASK'),
         ],
     ],
+
+    'postmark_inbound' => [
+        'webhook_secret' => env('POSTMARK_INBOUND_WEBHOOK_SECRET'),
+        'capture_address' => env('POSTMARK_INBOUND_CAPTURE_ADDRESS', ''),
+    ],
 ];
