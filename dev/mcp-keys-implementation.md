@@ -5,7 +5,7 @@
 
 ## Overview
 
-Per-user MCP keys for IdeaTub. Keys are stored **hashed only** (never plain). Use header `x-brain-key` when possible (see [2025-03-10-mcp-auth-multi-agent.md](../decisions/2025-03-10-mcp-auth-multi-agent.md)).
+Per-user MCP keys for IdeaTub. Keys are stored **hashed only** (never plain). Use header `x-ideatub-key` when possible (see [2025-03-10-mcp-auth-multi-agent.md](../decisions/2025-03-10-mcp-auth-multi-agent.md)).
 
 ## Database
 

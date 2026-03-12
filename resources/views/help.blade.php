@@ -53,7 +53,7 @@
         <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
             <h3 class="text-base font-semibold text-deep-indigo mb-3">2. Connection URL and auth</h3>
             <p class="text-sm text-slate-brand mb-2"><strong>Endpoint:</strong> <code class="bg-memory-violet/10 px-1.5 py-0.5 rounded text-xs break-all">{{ url('/api/mcp') }}</code></p>
-            <p class="text-sm text-slate-brand mb-2">Send your key either as <code class="bg-memory-violet/10 px-1.5 py-0.5 rounded text-xs">?key=YOUR_MCP_KEY</code> in the URL or in the <code class="bg-memory-violet/10 px-1.5 py-0.5 rounded text-xs">x-brain-key</code> header (header is preferred so the key is less likely to appear in logs).</p>
+            <p class="text-sm text-slate-brand mb-2">Send your key either as <code class="bg-memory-violet/10 px-1.5 py-0.5 rounded text-xs">?key=YOUR_MCP_KEY</code> in the URL or in the <code class="bg-memory-violet/10 px-1.5 py-0.5 rounded text-xs">x-ideatub-key</code> header (header is preferred so the key is less likely to appear in logs).</p>
             <p class="text-sm text-slate-brand">Use the <strong>same key</strong> in every AI client.</p>
         </div>
 
@@ -70,7 +70,7 @@
                     <strong class="text-deep-indigo">Cursor</strong> — Settings (⌘,) → Tools & MCP → Add new MCP server. Enter the full URL with <code class="bg-memory-violet/10 px-1 rounded text-xs">?key=YOUR_KEY</code>. Restart if needed.
                 </li>
                 <li>
-                    <strong class="text-deep-indigo">Claude Code (CLI)</strong> — <code class="bg-memory-violet/10 px-1 rounded text-xs">claude mcp add --transport http ideatub {{ url('/api/mcp') }} --header "x-brain-key: YOUR_KEY"</code>
+                    <strong class="text-deep-indigo">Claude Code (CLI)</strong> — <code class="bg-memory-violet/10 px-1 rounded text-xs">claude mcp add --transport http ideatub {{ url('/api/mcp') }} --header "x-ideatub-key: YOUR_KEY"</code>
                 </li>
                 <li>
                     <strong class="text-deep-indigo">Other clients</strong> — If they support a remote MCP or custom connector URL, use <code class="bg-memory-violet/10 px-1 rounded text-xs">{{ url('/api/mcp') }}?key=YOUR_KEY</code>.
@@ -84,7 +84,7 @@
                 <tbody class="divide-y divide-memory-violet/10">
                     <tr>
                         <td class="py-2 font-medium text-deep-indigo align-top w-36">401 Unauthorized</td>
-                        <td class="py-2 text-slate-brand">Key wrong or missing. Use <code class="bg-memory-violet/10 px-1 rounded text-xs">?key=...</code> or <code class="bg-memory-violet/10 px-1 rounded text-xs">x-brain-key</code> with no extra spaces. Create a new key on the <a href="{{ route('settings.mcp-keys.index') }}" class="text-memory-violet hover:underline">MCP key</a> page if you lost it.</td>
+                        <td class="py-2 text-slate-brand">Key wrong or missing. Use <code class="bg-memory-violet/10 px-1 rounded text-xs">?key=...</code> or <code class="bg-memory-violet/10 px-1 rounded text-xs">x-ideatub-key</code> with no extra spaces. Create a new key on the <a href="{{ route('settings.mcp-keys.index') }}" class="text-memory-violet hover:underline">MCP key</a> page if you lost it.</td>
                     </tr>
                     <tr>
                         <td class="py-2 font-medium text-deep-indigo align-top">Tools don’t appear</td>

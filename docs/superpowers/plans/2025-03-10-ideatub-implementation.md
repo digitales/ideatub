@@ -101,7 +101,7 @@ Expected: thoughts table created.
 - Create: `app/Http/Controllers/Api/McpController.php`
 
 - [ ] **Step 1:** Create `routes/api.php`. In `bootstrap/app.php` add `api: __DIR__.'/../routes/api.php'` (or equivalent for Laravel 12).
-- [ ] **Step 2:** Add route `POST /api/mcp` to McpController. Auth: read `?key=...` or `x-brain-key` header; for Phase 0 use single env `MCP_ACCESS_KEY` and allow request if key matches.
+- [ ] **Step 2:** Add route `POST /api/mcp` to McpController. Auth: read `?key=...` or `x-ideatub-key` header; for Phase 0 use single env `MCP_ACCESS_KEY` and allow request if key matches.
 - [ ] **Step 3:** Implement MCP handler: parse JSON-RPC style body; tools `search_thoughts`, `browse_recent`, `thought_stats`, `capture_thought`. For Phase 0 query Thought without user_id filter. Implement each tool (search via vector similarity, browse recent, stats count, capture = embed + metadata + save).
 - [ ] **Step 4: Commit**
 
@@ -147,7 +147,7 @@ Slack ingest is **not** in scope. Primary capture is the web GUI (Phase 2). Skip
 - Modify: `app/Http/Controllers/Api/McpController.php`
 - Optional: Create: `app/Http/Middleware/ResolveMcpUser.php`
 
-- [ ] **Step 1:** Resolve key from query `key` or header `x-brain-key`. Look up UserMcpKey by plain key; get user. If not found, 401. Attach user to request (e.g. `$request->setUserResolver(fn () => $user)` or attribute).
+- [ ] **Step 1:** Resolve key from query `key` or header `x-ideatub-key`. Look up UserMcpKey by plain key; get user. If not found, 401. Attach user to request (e.g. `$request->setUserResolver(fn () => $user)` or attribute).
 - [ ] **Step 2:** All MCP tools: filter Thought by `user_id`; capture_thought sets thought.user_id to resolved user. Update last_used_at on the key.
 - [ ] **Step 3: Commit**
 

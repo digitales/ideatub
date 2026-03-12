@@ -21,7 +21,7 @@ class McpController extends Controller
      */
     public function __invoke(Request $request): JsonResponse
     {
-        $key = $request->query('key') ?? $request->header('x-brain-key');
+        $key = $request->query('key') ?? $request->header('x-ideatub-key');
         $key = $key !== null ? (string) $key : '';
 
         if ($key === '') {

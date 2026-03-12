@@ -30,7 +30,7 @@ This document is the single source of product decisions, planned features, and i
 ## 2. Current implementation (as built / target)
 
 - **Capture:** Simple web GUI — form for new thoughts; submit → embed + metadata (OpenRouter) → store in `thoughts` table. MCP tool `capture_thought` also writes thoughts (e.g. when user says “remember this” in chat). Comment-on-thought is future work; Slack is not in scope.
-- **Retrieval:** MCP over HTTP at `POST /api/mcp`. Auth: per-user key via `?key=...` or `x-brain-key` header (resolved via `user_mcp_keys`). Tools: `search_thoughts`, `browse_recent`, `thought_stats`, `capture_thought`, all scoped by user. Web: `GET /?q=...` (semantic search) and recent list on same page.
+- **Retrieval:** MCP over HTTP at `POST /api/mcp`. Auth: per-user key via `?key=...` or `x-ideatub-key` header (resolved via `user_mcp_keys`). Tools: `search_thoughts`, `browse_recent`, `thought_stats`, `capture_thought`, all scoped by user. Web: `GET /?q=...` (semantic search) and recent list on same page.
 - **Storage:** PostgreSQL with pgvector. Table `thoughts`: `id` (uuid), `user_id`, `content`, `embedding` (vector 1536), `metadata` (json), `evernote_note_guid` (nullable), `created_at`, `updated_at`. Table `user_mcp_keys`: per-user MCP keys (key_hash, label, last_used_at).
 - **Services:** `OpenRouterService` (embed + extract metadata); `Thought` model with `HasNeighbors` for cosine similarity search; `EvernoteService` (create/update note, notebook from type/tag); `SyncThoughtToEvernote` job on Thought::created/updated (queued, skip if Evernote not configured).
 
@@ -55,7 +55,7 @@ This document is the single source of product decisions, planned features, and i
 
 1. **Per-user MCP keys** — Each user has at least one MCP access key (e.g. generated in the web UI or via CLI, stored hashed). The key is a long, opaque secret (e.g. `ideatub_...` or UUID).
 2. **Same key in every agent** — The user configures **the same key** in each AI product they use (Cursor, Claude, ChatGPT). Same MCP server URL + same key.
-3. **Request flow** — Request hits `POST /api/mcp` with `?key=USER_MCP_KEY` or `x-brain-key: USER_MCP_KEY`. Backend resolves key → **User**. All MCP tools run in that user’s context: filter and write to that user’s thoughts only.
+3. **Request flow** — Request hits `POST /api/mcp` with `?key=USER_MCP_KEY` or `x-ideatub-key: USER_MCP_KEY`. Backend resolves key → **User**. All MCP tools run in that user’s context: filter and write to that user’s thoughts only.
 4. **No “per-agent” auth** — We do **not** require a different key per AI agent. The same key in Cursor and in ChatGPT means “same user, same thought store.” Optionally add per-key labels (e.g. “Cursor”, “Claude”) for audit or display only.
 
 **Optional: multiple keys per user** — User can create several MCP keys (e.g. “Cursor”, “Claude”, “ChatGPT”). Same permissions; revoke one without affecting others. Implementation: table `user_mcp_keys` (or similar) with `user_id`, `key_hash`, optional `label`, `last_used_at`.
@@ -65,7 +65,7 @@ This document is the single source of product decisions, planned features, and i
 | Who does the key identify? | The **user** (human account). |
 | Do different AI agents need different keys? | No. Same key everywhere = same user, same data. |
 | Can one user have multiple keys? | Optional; useful for revoking per client or labelling. |
-| Where is the key sent? | Query param `?key=...` or header `x-brain-key`. |
+| Where is the key sent? | Query param `?key=...` or header `x-ideatub-key`. |
 
 ### 3.2 API keys and visibility
 
@@ -80,7 +80,7 @@ This document is the single source of product decisions, planned features, and i
 **Per-user MCP key:**
 
 - The **owning user** must see their key once to copy it into Cursor/Claude (e.g. “Your MCP key” in settings, shown on creation). After that, show only a masked version (e.g. `ideatub_••••••••`) or “Regenerate” — never display the full secret again unless they regenerate.
-- Store only a **hash** of the key in the DB (`user_mcp_keys.key_hash`). Never store or log the plain key. Prefer **header** `x-brain-key` over query param for MCP auth so the key is less likely to appear in server access logs or referrers. If query param is supported, ensure request logging does not log query string or strip the key.
+- Store only a **hash** of the key in the DB (`user_mcp_keys.key_hash`). Never store or log the plain key. Prefer **header** `x-ideatub-key` over query param for MCP auth so the key is less likely to appear in server access logs or referrers. If query param is supported, ensure request logging does not log query string or strip the key.
 - Other users must never see another user’s MCP key (enforce by user scoping in the UI and API).
 
 **Implementation:** Use `.env` for all server secrets; never pass them to Blade/JS. In logging and error reporting, redact or omit keys and tokens. Document in README that `.env` must not be committed and is not sent to the client.

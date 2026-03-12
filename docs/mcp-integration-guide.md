@@ -60,7 +60,7 @@ If you deploy IdeaTub yourself, you can use either the web app (Option A) or the
 
 - **Auth (choose one):**
   - **Query parameter:** `?key=YOUR_MCP_KEY`
-  - **Header (preferred):** `x-brain-key: YOUR_MCP_KEY`  
+  - **Header (preferred):** `x-ideatub-key: YOUR_MCP_KEY`  
 
   Using the header avoids the key appearing in server or proxy logs.
 
@@ -84,7 +84,7 @@ Use the **same key** in every AI client (Cursor, Claude, ChatGPT, etc.). It alwa
 4. **Remote MCP server URL:** your IdeaTub MCP URL.  
    If Claude supports a URL with a query string, use:  
    `https://your-ideatub.com/api/mcp?key=YOUR_MCP_KEY`  
-   If it only accepts a base URL, use the base URL and add the key as a custom header if the UI allows (e.g. `x-brain-key: YOUR_MCP_KEY`).
+   If it only accepts a base URL, use the base URL and add the key as a custom header if the UI allows (e.g. `x-ideatub-key: YOUR_MCP_KEY`).
 5. Save and start a new conversation. Enable the IdeaTub connector via the "+" → Connectors menu.
 
 If tools do not appear, Claude may expect the standard MCP HTTP/SSE transport. IdeaTub uses JSON-RPC; see [Protocol note](#protocol-note) and consider using a small bridge.
@@ -110,7 +110,7 @@ If ChatGPT does not call the tools automatically, try: “Use the IdeaTub search
 2. Click **Add new MCP server**.
 3. If there is a **URL** or **Remote** type (e.g. `streamableHttp`), enter:  
    `https://your-ideatub.com/api/mcp?key=YOUR_MCP_KEY`  
-   If the UI allows custom headers, you can use the base URL and set `x-brain-key` to your key.
+   If the UI allows custom headers, you can use the base URL and set `x-ideatub-key` to your key.
 4. Save and restart Cursor if needed.
 
 Cursor’s MCP layer may expect the official MCP Streamable HTTP transport. IdeaTub speaks JSON-RPC; if tools do not show up, see [Protocol note](#protocol-note) and the [JSON-RPC API reference](#json-rpc-api-reference) to use or build a bridge.
@@ -124,7 +124,7 @@ If your Claude Code build supports remote MCP over HTTP:
 ```bash
 claude mcp add --transport http ideatub \
   https://your-ideatub.com/api/mcp \
-  --header "x-brain-key: YOUR_MCP_KEY"
+  --header "x-ideatub-key: YOUR_MCP_KEY"
 ```
 
 Use your real key in place of `YOUR_MCP_KEY`. If your client only supports URL-based key, use the full URL with `?key=...` if the tool allows.
@@ -139,7 +139,7 @@ Use your real key in place of `YOUR_MCP_KEY`. If your client only supports URL-b
 - **If the client only supports local (stdio) MCP servers:**  
   You need a small **bridge** that:
   - Listens as a local MCP server (stdio or HTTP).
-  - Forwards tool calls to IdeaTub’s JSON-RPC endpoint with your key (query or `x-brain-key` header).
+  - Forwards tool calls to IdeaTub’s JSON-RPC endpoint with your key (query or `x-ideatub-key` header).
 
   The [JSON-RPC API reference](#json-rpc-api-reference) below gives the exact request/response format for building such a bridge.
 
@@ -159,7 +159,7 @@ IdeaTub’s `/api/mcp` endpoint uses **JSON-RPC 2.0** with method names that mat
 Use this if you are scripting against IdeaTub or building a bridge.
 
 **Request:** `POST /api/mcp`  
-**Headers:** `Content-Type: application/json` and either `x-brain-key: YOUR_MCP_KEY` or use `?key=YOUR_MCP_KEY`.  
+**Headers:** `Content-Type: application/json` and either `x-ideatub-key: YOUR_MCP_KEY` or use `?key=YOUR_MCP_KEY`.  
 **Body (JSON-RPC 2.0):**
 
 ```json
@@ -218,7 +218,7 @@ For more on `capture_thought` and comments, see [MCP capture_thought](mcp-captur
 
 | Issue | What to check |
 |-------|----------------|
-| **401 Unauthorized** | Key is wrong or missing. Use `?key=...` or `x-brain-key`; ensure no extra spaces. Key is per-user and shown only once when created. |
+| **401 Unauthorized** | Key is wrong or missing. Use `?key=...` or `x-ideatub-key`; ensure no extra spaces. Key is per-user and shown only once when created. |
 | **Tools don’t appear** | Client may expect standard MCP transport. Try the URL with key; if it still fails, use or build a bridge (see [Protocol note](#protocol-note) and [JSON-RPC API reference](#json-rpc-api-reference)). |
 | **Search returns nothing** | Capture some thoughts first (web UI or `capture_thought`). Ensure you’re using the key for the user who owns those thoughts. |
 | **Key lost** | Keys are stored hashed; the plain key cannot be retrieved. An admin must create a new key with `ideatub:create-mcp-keys --force` for your user; use the new key everywhere. |
@@ -228,7 +228,7 @@ For more on `capture_thought` and comments, see [MCP capture_thought](mcp-captur
 ## Summary
 
 1. Get your **MCP key** (from an admin or `php artisan ideatub:create-mcp-keys`).
-2. Build the **connection URL**: `https://your-ideatub.com/api/mcp?key=YOUR_MCP_KEY` (or use base URL + `x-brain-key` header if the client supports it).
+2. Build the **connection URL**: `https://your-ideatub.com/api/mcp?key=YOUR_MCP_KEY` (or use base URL + `x-ideatub-key` header if the client supports it).
 3. Add IdeaTub as a **custom/remote MCP connector** in your AI client using that URL (and header if needed).
 4. Use the same key in every client; it always means “this user’s IdeaTub brain.”
 

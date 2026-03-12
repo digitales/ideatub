@@ -28,7 +28,7 @@
    - **ChatGPT (with MCP)**: Same MCP server URL + same key.
 
 3. **Request flow**  
-   - Request hits `POST /api/mcp` with `?key=USER_MCP_KEY` or `x-brain-key: USER_MCP_KEY`.
+   - Request hits `POST /api/mcp` with `?key=USER_MCP_KEY` or `x-ideatub-key: USER_MCP_KEY`.
    - Backend resolves key → **User** (e.g. `User` model, or lookup table `mcp_keys`: `key_hash`, `user_id`).
    - All MCP tools (`search_thoughts`, `browse_recent`, `thought_stats`, `capture_thought`) run in that user’s context: filter and write to that user’s thoughts only.
 
@@ -55,6 +55,6 @@ Implementation: table `user_mcp_keys` (or similar) with `user_id`, `key_hash`, o
 | Who does the key identify? | The **user** (human account). |
 | Do different AI agents need different keys? | No. Same key in Cursor, Claude, ChatGPT = same user, same data. |
 | Can one user have multiple keys? | Optional; useful for revoking per client or labelling. |
-| Where is the key sent? | Query param `?key=...` or header `x-brain-key` (or `x-tub-key` if we rename). |
+| Where is the key sent? | Query param `?key=...` or header `x-ideatub-key`. |
 
 All MCP tools are **user-scoped**: key → user → filter/write thoughts by `user_id`. The “agent” (Cursor vs Claude vs ChatGPT) is irrelevant to auth; it’s just which client is calling the tools.

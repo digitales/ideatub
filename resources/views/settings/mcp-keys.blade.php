@@ -78,7 +78,7 @@
     <div class="rounded-2xl border border-memory-violet/15 bg-white/60 p-4 text-sm text-slate-brand">
         <p class="font-medium text-deep-indigo mb-1">Endpoint</p>
         <code class="text-xs break-all">{{ $mcpUrl }}</code>
-        <p class="mt-2 text-[11px]">Send your key as <code class="bg-white/80 px-1 rounded">?key=YOUR_KEY</code> or in the <code class="bg-white/80 px-1 rounded">x-brain-key</code> header. Use the same key in every AI client.</p>
+        <p class="mt-2 text-[11px]">Send your key as <code class="bg-white/80 px-1 rounded">?key=YOUR_KEY</code> or in the <code class="bg-white/80 px-1 rounded">x-ideatub-key</code> header. Use the same key in every AI client.</p>
     </div>
 </div>
 @endsection
