@@ -1,0 +1,193 @@
+# IdeaTub Thoughts API — OpenAPI 3.0 for Custom GPT Actions
+# Replace {BASE_URL} with your IdeaTub base URL (e.g. https://ideatub.com) when configuring the Custom GPT.
+# Server URL in the GPT should be: {BASE_URL}
+# Authentication: OAuth2. Use the same IdeaTub OAuth (authorize + token) with resource = {BASE_URL}/api/thoughts
+
+openapi: 3.1.0
+info:
+  title: IdeaTub Thoughts API
+  description: |
+    Search, browse, and capture thoughts in IdeaTub. Use with Custom GPT Actions;
+    authenticate via OAuth so users sign in to IdeaTub and the GPT acts on their behalf.
+  version: 1.0.0
+
+servers:
+  - url: /
+    description: Set your IdeaTub base URL in the Custom GPT (e.g. https://ideatub.com). Paths below are relative.
+
+security:
+  - oauth2: []
+
+paths:
+  /api/thoughts/search:
+    get:
+      operationId: search_thoughts
+      summary: Search thoughts by meaning
+      description: Semantic search over the user's thoughts. Use when the user asks to find notes or ideas they previously captured.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Natural-language search (e.g. "notes about project X")
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: List of matching thoughts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  thoughts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Thought'
+        '401':
+          description: Unauthorized — user must complete OAuth
+        '422':
+          description: Validation error (e.g. missing query)
+
+  /api/thoughts/recent:
+    get:
+      operationId: browse_recent
+      summary: List recent thoughts
+      description: Return the user's most recently captured thoughts.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: List of recent thoughts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  thoughts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Thought'
+        '401':
+          description: Unauthorized
+
+  /api/thoughts/stats:
+    get:
+      operationId: thought_stats
+      summary: Get thought count
+      description: Return the total number of thoughts the user has stored.
+      responses:
+        '200':
+          description: Thought count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+
+  /api/thoughts:
+    post:
+      operationId: capture_thought
+      summary: Capture a thought
+      description: Save a new thought in the user's IdeaTub. Content is embedded for semantic search and optional metadata/tags are extracted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  description: The thought text to store
+                parent_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Optional parent thought ID (for comments/replies)
+                in_reply_to:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Alias for parent_id
+                source:
+                  type: string
+                  maxLength: 64
+                  nullable: true
+                  description: Optional source label (e.g. "chatgpt")
+                source_metadata:
+                  type: object
+                  nullable: true
+      responses:
+        '201':
+          description: Thought created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        '401':
+          description: Unauthorized
+        '404':
+          description: Parent thought not found
+        '422':
+          description: Validation error
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://your-ideatub-domain.com/oauth/authorize
+          tokenUrl: https://your-ideatub-domain.com/oauth/token
+          scopes:
+            ideatub:mcp: Access IdeaTub thoughts (search and capture)
+      description: |
+        Use IdeaTub OAuth. In the Custom GPT, set Authorization URL and Token URL to your IdeaTub base + /oauth/authorize and /oauth/token.
+        For OAuth 2.1, the resource parameter must be your IdeaTub API resource URL (e.g. {BASE_URL}/api/thoughts). Configure that in the GPT if the UI allows custom token parameters.
+
+  schemas:
+    Thought:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        metadata:
+          type: object
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        source:
+          type: string
+          nullable: true
+        source_metadata:
+          type: object
+          nullable: true

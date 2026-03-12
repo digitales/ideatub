@@ -156,7 +156,7 @@
                 </p>
             @endif
 
-            <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2">{{ e($thought->content) }}</p>
+            <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ e($thought->content) }}</p>
 
             <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
@@ -183,7 +183,7 @@
                 <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2" data-comments-list>
                     @foreach ($thought->comments as $comment)
                         <li>
-                            <p class="text-[12.5px] text-slate-brand leading-relaxed">{{ e(Str::limit($comment->content, 200)) }}</p>
+                            <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line">{{ e(Str::limit($comment->content, 200)) }}</p>
                             <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
                         </li>
                     @endforeach
@@ -206,7 +206,7 @@
     {{-- Pagination / load more --}}
     @if ($thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator && $thoughts->hasMorePages())
         <div class="text-center pt-4">
-            {{ $thoughts->links() }}
+            {{ $thoughts->links('pagination.idea') }}
         </div>
     @endif
     </div>

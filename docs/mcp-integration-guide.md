@@ -115,6 +115,8 @@ If ChatGPT does not call the tools automatically, try: “Use the IdeaTub search
 
 Cursor’s MCP layer may expect the official MCP Streamable HTTP transport. IdeaTub speaks JSON-RPC; if tools do not show up, see [Protocol note](#protocol-note) and the [JSON-RPC API reference](#json-rpc-api-reference) to use or build a bridge.
 
+**See also:** [Cursor MCP integration](cursor-mcp-integration.md) — setup and using `capture_thought` from Cursor.
+
 ---
 
 ### Claude Code (Claude CLI)
