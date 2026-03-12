@@ -37,5 +37,6 @@ return [
     'postmark_inbound' => [
         'webhook_secret' => env('POSTMARK_INBOUND_WEBHOOK_SECRET'),
         'capture_address' => env('POSTMARK_INBOUND_CAPTURE_ADDRESS', ''),
+        'log_emails' => env('POSTMARK_INBOUND_LOG_EMAILS', false),
     ],
 ];

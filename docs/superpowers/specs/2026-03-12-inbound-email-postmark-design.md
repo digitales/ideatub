@@ -151,7 +151,11 @@ When the “From” address does not match any user (primary or inbound addresse
 
 ## 7. Configuration and deployment
 
-- **Env:** `POSTMARK_INBOUND_WEBHOOK_SECRET` — long, random string used as the path segment. Example: `https://app.ideatub.com/webhooks/postmark/inbound/{{ POSTMARK_INBOUND_WEBHOOK_SECRET }}`.
+- **Webhook URL:** `{APP_URL}/webhooks/postmark/inbound/{POSTMARK_INBOUND_WEBHOOK_SECRET}`. Configure this exact URL in Postmark’s Inbound stream settings.
+- **Env:**
+  - `POSTMARK_INBOUND_WEBHOOK_SECRET` — long, random string used as the path segment.
+  - `POSTMARK_INBOUND_CAPTURE_ADDRESS` — (optional) address shown in Settings (e.g. `capture@ideatub.com`).
+  - `POSTMARK_INBOUND_LOG_EMAILS` — (optional) set to `true` to log incoming email payloads (sanitized: no attachment content, bodies truncated) to the default Laravel log. Set to `false` or leave unset when no longer needed.
 - **Postmark:** Create an Inbound stream; set the webhook URL to the full path above. Configure MX or inbound forwarding so that mail to your capture domain reaches Postmark.
 - **Fastmail (user side):** User adds a rule or alias to send (or forward) to the Postmark inbound address. No Postmark-specific config in Fastmail.
 
