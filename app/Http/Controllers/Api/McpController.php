@@ -31,7 +31,7 @@ class McpController extends Controller
             'version' => '1.0',
             'protocol' => 'json-rpc',
             'auth' => 'Send key via ?key=... or x-ideatub-key header',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought'],
+            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'],
         ]);
     }
 
@@ -72,7 +72,7 @@ class McpController extends Controller
         }
 
         // Legacy direct method names (search_thoughts, browse_recent, etc.)
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'];
         if (! in_array($method, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -161,6 +161,22 @@ class McpController extends Controller
                     'required' => ['content'],
                 ],
             ],
+            [
+                'name' => 'capture_plan',
+                'description' => 'Save a plan or plan section as a thought with source=plan. Use when syncing Cursor/superpowers plans into IdeaTub. Use plan_slug to tag all sections for long-form view (Stream filter by tag). Use parent_id to link sections to a plan root thought.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'content' => ['type' => 'string', 'description' => 'Plan content (full plan or one section)'],
+                        'file_path' => ['type' => 'string', 'description' => 'Optional path to the plan file (e.g. docs/superpowers/plans/2026-03-12-tag-and-stream.md)'],
+                        'plan_slug' => ['type' => 'string', 'description' => 'Optional slug for this plan (e.g. 2026-03-12-tag-and-stream). Adds tag plan:<slug> so Stream can show all sections.'],
+                        'parent_id' => ['type' => 'string', 'description' => 'Optional UUID of plan root thought to attach this section to (for hierarchy)'],
+                        'section_title' => ['type' => 'string', 'description' => 'Optional title of this section (stored in source_metadata)'],
+                        'tags' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Optional extra tags to merge with extracted and plan tag'],
+                    ],
+                    'required' => ['content'],
+                ],
+            ],
         ];
 
         return response()->json([
@@ -179,7 +195,7 @@ class McpController extends Controller
             return $this->jsonRpcError(-32602, 'tools/call requires "name"', $id);
         }
 
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'];
         if (! in_array($name, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -291,6 +307,7 @@ class McpController extends Controller
             'browse_recent' => $this->browseRecent($params),
             'thought_stats' => $this->thoughtStats($params),
             'capture_thought' => $this->captureThought($params),
+            'capture_plan' => $this->capturePlan($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
     }
@@ -439,6 +456,98 @@ class McpController extends Controller
         $thought = Thought::create($payload);
 
         return ['id' => $thought->id];
+    }
+
+    /**
+     * capture_plan: Save a plan or plan section with source=plan. Adds tag plan:<plan_slug> when plan_slug
+     * is provided so all sections can be viewed together via Stream ?tag=... (use slug form e.g. plan-2026-03-12-tag-and-stream).
+     * Optional parent_id links this thought to a plan root for hierarchy.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{id: string, plan_slug?: string}
+     */
+    private function capturePlan(array $params): array
+    {
+        $v = Validator::make($params, [
+            'content' => 'required|string',
+            'file_path' => 'sometimes|nullable|string|max:512',
+            'plan_slug' => 'sometimes|nullable|string|max:128',
+            'parent_id' => 'sometimes|nullable|uuid',
+            'section_title' => 'sometimes|nullable|string|max:256',
+            'tags' => 'sometimes|nullable|array',
+            'tags.*' => 'string|max:128',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $content = (string) $params['content'];
+        $filePath = isset($params['file_path']) && trim((string) $params['file_path']) !== ''
+            ? mb_substr(trim((string) $params['file_path']), 0, 512)
+            : null;
+        $planSlug = isset($params['plan_slug']) && trim((string) $params['plan_slug']) !== ''
+            ? mb_substr(trim((string) $params['plan_slug']), 0, 128)
+            : null;
+        $parentId = isset($params['parent_id']) && $params['parent_id'] !== '' ? (string) $params['parent_id'] : null;
+        $sectionTitle = isset($params['section_title']) && trim((string) $params['section_title']) !== ''
+            ? mb_substr(trim((string) $params['section_title']), 0, 256)
+            : null;
+        $extraTags = isset($params['tags']) && is_array($params['tags'])
+            ? array_values(array_filter(array_map(fn ($t) => is_string($t) ? trim($t) : '', $params['tags'])))
+            : [];
+
+        $sourceMetadata = array_filter([
+            'file_path' => $filePath,
+            'plan_slug' => $planSlug,
+            'section_title' => $sectionTitle,
+        ], fn ($v) => $v !== null && $v !== '');
+
+        $parent = null;
+        if ($parentId !== null) {
+            $parent = Thought::find($parentId);
+            if ($parent === null) {
+                throw new \InvalidArgumentException('Parent thought not found.');
+            }
+            if ($parent->user_id !== auth()->id()) {
+                throw new \InvalidArgumentException('Parent thought does not belong to you.');
+            }
+        }
+
+        $embedding = $this->openRouter->embed($content);
+        $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
+
+        $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
+        if ($planSlug !== null) {
+            $planTag = 'plan:'.mb_strtolower($planSlug);
+            if (! in_array($planTag, $tags, true)) {
+                $tags[] = $planTag;
+            }
+        }
+        foreach ($extraTags as $t) {
+            if ($t !== '' && ! in_array($t, $tags, true)) {
+                $tags[] = $t;
+            }
+        }
+        $metadata['tags'] = array_values(array_unique($tags));
+
+        $payload = [
+            'content' => $content,
+            'embedding' => $embedding,
+            'metadata' => $metadata,
+            'user_id' => auth()->id(),
+            'source' => 'plan',
+            'source_metadata' => $sourceMetadata ?: null,
+            'parent_id' => $parent?->id,
+        ];
+
+        $thought = Thought::create($payload);
+
+        $result = ['id' => $thought->id];
+        if ($planSlug !== null) {
+            $result['plan_slug'] = $planSlug;
+        }
+
+        return $result;
     }
 
     private function jsonRpcError(int $code, string $message, mixed $id): JsonResponse

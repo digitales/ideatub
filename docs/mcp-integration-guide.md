@@ -4,7 +4,7 @@ This guide explains how to connect your AI assistant (Cursor, Claude Desktop, Ch
 
 ## Overview
 
-IdeaTub exposes an **MCP-style API** at `POST /api/mcp`. It uses **JSON-RPC 2.0** with four tools:
+IdeaTub exposes an **MCP-style API** at `POST /api/mcp`. It uses **JSON-RPC 2.0** with five tools:
 
 | Tool | Description |
 |------|-------------|
@@ -12,6 +12,7 @@ IdeaTub exposes an **MCP-style API** at `POST /api/mcp`. It uses **JSON-RPC 2.0*
 | `browse_recent` | List recent thoughts (optional limit) |
 | `thought_stats` | Count of your thoughts |
 | `capture_thought` | Save a new thought (and optionally a comment on an existing one) |
+| `capture_plan` | Save a plan or plan section with source=plan; use tags and optional parent_id for long-form linking |
 
 Authentication is by **per-user MCP key**: you send your key via query parameter or header. The same key works in every client; it identifies **you**, not the app.
 
@@ -201,6 +202,7 @@ Use this if you are scripting against IdeaTub or building a bridge.
 | `browse_recent` | — | `limit` (int, default 10, max 100) |
 | `thought_stats` | — | — |
 | `capture_thought` | `content` (string) | `parent_id` or `in_reply_to` (UUID); `source` (string, e.g. chatgpt/claude/cursor); `source_metadata` (object) |
+| `capture_plan` | `content` (string) | `file_path`, `plan_slug`, `parent_id` (UUID), `section_title`, `tags` (array of strings) |
 
 Example calls:
 
@@ -210,9 +212,19 @@ Example calls:
 {"jsonrpc":"2.0","method":"thought_stats","params":{},"id":3}
 {"jsonrpc":"2.0","method":"capture_thought","params":{"content":"Decided to move the launch to March 15."},"id":4}
 {"jsonrpc":"2.0","method":"capture_thought","params":{"content":"Done.","parent_id":"uuid-of-parent-thought"},"id":5}
+{"jsonrpc":"2.0","method":"capture_plan","params":{"content":"## Chunk 1: Phase 0...","file_path":"docs/superpowers/plans/2026-03-12-tag-and-stream.md","plan_slug":"2026-03-12-tag-and-stream","section_title":"Chunk 1"},"id":6}
 ```
 
 For more on `capture_thought` and comments, see [MCP capture_thought](mcp-capture-thought.md).
+
+### Plans and long-form linking (`capture_plan`)
+
+Use **`capture_plan`** when syncing Cursor/superpowers plans (or other long-form plan documents) into IdeaTub. Each call creates one thought with `source=plan`.
+
+- **One thought per section:** Send one `capture_plan` per section or chunk. Use the same **`plan_slug`** for all sections of a plan (e.g. `2026-03-12-tag-and-stream`). IdeaTub adds a tag `plan:<slug>` (e.g. `plan:2026-03-12-tag-and-stream`) to each thought so they can be grouped.
+- **Long-form view via Stream:** In the IdeaTub web app, open **Stream** and filter by the plan tag. Use the URL slug form of the tag: e.g. `/stream?tag=plan-2026-03-12-tag-and-stream` shows all thoughts tagged `plan:2026-03-12-tag-and-stream` in one place.
+- **Linking sections to a plan root (optional):** To build a hierarchy, first create a “plan root” thought with `capture_plan` (e.g. title + summary, no `parent_id`). Then for each section call `capture_plan` with the same `plan_slug` and **`parent_id`** set to the root thought’s UUID. The root’s comment thread and the shared tag both represent the long-form plan.
+- **Document link:** Pass **`file_path`** (e.g. `docs/superpowers/plans/2026-03-12-tag-and-stream.md`) so `source_metadata` records the source document for reference.
 
 ---
 

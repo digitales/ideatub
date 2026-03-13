@@ -46,7 +46,7 @@ class McpApiTest extends TestCase
             'name' => 'ideatub',
             'version' => '1.0',
             'protocol' => 'json-rpc',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought'],
+            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'],
         ]);
     }
 
@@ -86,6 +86,7 @@ class McpApiTest extends TestCase
         $response->assertJsonPath('result.tools.1.name', 'browse_recent');
         $response->assertJsonPath('result.tools.2.name', 'thought_stats');
         $response->assertJsonPath('result.tools.3.name', 'capture_thought');
+        $response->assertJsonPath('result.tools.4.name', 'capture_plan');
     }
 
     public function test_post_without_key_returns_401(): void
@@ -168,5 +169,97 @@ class McpApiTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('result.thoughts.0.source', 'chatgpt');
         $response->assertJsonPath('result.thoughts.0.source_metadata.client_version', '1.0');
+    }
+
+    public function test_capture_plan_creates_thought_with_source_plan_and_plan_tag(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => ['implementation']]);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => '## Chunk 1: Phase 0 — Bootstrap',
+                'file_path' => 'docs/superpowers/plans/2026-03-12-tag-and-stream.md',
+                'plan_slug' => '2026-03-12-tag-and-stream',
+                'section_title' => 'Chunk 1',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.id', fn ($id) => is_string($id) && strlen($id) > 0);
+        $response->assertJsonPath('result.plan_slug', '2026-03-12-tag-and-stream');
+
+        $thought = Thought::where('user_id', $user->id)->latest()->first();
+        $this->assertNotNull($thought);
+        $this->assertSame('plan', $thought->source);
+        $this->assertSame('docs/superpowers/plans/2026-03-12-tag-and-stream.md', $thought->source_metadata['file_path'] ?? null);
+        $this->assertSame('2026-03-12-tag-and-stream', $thought->source_metadata['plan_slug'] ?? null);
+        $this->assertSame('Chunk 1', $thought->source_metadata['section_title'] ?? null);
+        $tags = $thought->metadata['tags'] ?? [];
+        $this->assertContains('plan:2026-03-12-tag-and-stream', $tags);
+        $this->assertContains('implementation', $tags);
+    }
+
+    public function test_capture_plan_with_parent_id_links_to_plan_root(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $root = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Plan root',
+            'source' => 'plan',
+        ]);
+
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => 'Section 2 content',
+                'plan_slug' => 'my-plan',
+                'parent_id' => $root->id,
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $thought = Thought::where('user_id', $user->id)->where('parent_id', $root->id)->first();
+        $this->assertNotNull($thought);
+        $this->assertSame($root->id, $thought->parent_id);
+        $this->assertSame('plan', $thought->source);
+    }
+
+    public function test_capture_plan_with_invalid_parent_returns_error(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->never();
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => 'Section content',
+                'parent_id' => '00000000-0000-0000-0000-000000000000',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('error.code', -32602);
+        $response->assertJsonPath('error.message', 'Parent thought not found.');
     }
 }

@@ -1,6 +1,6 @@
 # Cursor MCP integration (IdeaTub)
 
-How to connect Cursor to IdeaTub so you can **capture thoughts** (and search/browse) from chat. When you say things like “remember this” or “save this for later,” Cursor can call the IdeaTub MCP tool `capture_thought`.
+How to connect Cursor to IdeaTub so you can **capture thoughts** (and search/browse) from chat. When you say things like “remember this” or “save this for later,” Cursor can call the IdeaTub MCP tool `capture_thought`. To sync plan documents (e.g. `.cursor` plans or `docs/superpowers/plans/*.md`) into IdeaTub, use `capture_plan`.
 
 ## Setup in Cursor
 
@@ -19,7 +19,7 @@ How to connect Cursor to IdeaTub so you can **capture thoughts** (and search/bro
    - Save and restart Cursor if needed.
 
 3. **Verify tools**  
-   In a new chat, check that IdeaTub tools are available (e.g. `capture_thought`, `search_thoughts`, `browse_recent`, `thought_stats`). If they don’t appear, Cursor may expect the standard MCP transport; see [Protocol note](#protocol-note) in the main [MCP integration guide](mcp-integration-guide.md).
+   In a new chat, check that IdeaTub tools are available (e.g. `capture_thought`, `capture_plan`, `search_thoughts`, `browse_recent`, `thought_stats`). If they don’t appear, Cursor may expect the standard MCP transport; see [Protocol note](#protocol-note) in the main [MCP integration guide](mcp-integration-guide.md).
 
 ## Using capture_thought from Cursor
 
@@ -44,6 +44,25 @@ The **capture_thought** tool saves a new thought to your IdeaTub brain. Cursor c
 | `in_reply_to`      | No       | Alias for `parent_id`. |
 | `source`           | No       | Client label (e.g. `cursor`). Default `mcp`. |
 | `source_metadata`  | No       | Optional key-value object. |
+
+## Using capture_plan from Cursor (plans as thoughts)
+
+The **capture_plan** tool saves a plan or plan section with `source=plan`. Use it to sync Cursor/superpowers plan files into IdeaTub so they are searchable and viewable as a long-form stream.
+
+- **One thought per section:** Call `capture_plan` once per section or chunk. Use the same **`plan_slug`** for all sections (e.g. `2026-03-12-tag-and-stream`). IdeaTub adds tag `plan:<slug>` so you can view all sections together in IdeaTub **Stream** by filtering on that tag (e.g. `/stream?tag=plan-2026-03-12-tag-and-stream`).
+- **Linking via tags and parent:** Use **`plan_slug`** for tag-based grouping. Optionally create a plan root thought first, then pass its UUID as **`parent_id`** for section thoughts to link them in a hierarchy.
+- **Document link:** Pass **`file_path`** (e.g. `docs/superpowers/plans/2026-03-12-tag-and-stream.md`) so the thought’s `source_metadata` records the source file.
+
+**Parameters:**
+
+| Parameter        | Required | Description |
+|------------------|----------|-------------|
+| `content`        | Yes      | Plan content (full plan or one section). |
+| `file_path`      | No       | Path to the plan file. |
+| `plan_slug`      | No       | Slug for this plan; adds tag `plan:<slug>` for Stream filtering. |
+| `parent_id`      | No       | UUID of plan root thought to attach this section to. |
+| `section_title` | No       | Title of this section (stored in source_metadata). |
+| `tags`           | No       | Extra tags to merge with extracted and plan tag. |
 
 ## Protocol note
 
