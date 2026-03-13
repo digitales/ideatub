@@ -172,8 +172,12 @@ class IdeaController extends Controller
             $query->whereRaw('0 = 1');
         }
 
+        // Tag view = linked document: oldest first (section 1 at top). No tag = general stream: newest first.
+        $orderAsc = $canonicalTag !== null;
+        $query->orderBy('created_at', $orderAsc ? 'asc' : 'desc');
+
         $page = (int) $request->input('page', 1);
-        $thoughts = $query->orderByDesc('created_at')->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
+        $thoughts = $query->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
         if ($request->ajax()) {
             $html = view('idea.stream_thoughts', ['thoughts' => $thoughts])->render();

@@ -12,6 +12,7 @@ When the user wants to sync this document (or other plan/decision/dev/support/sp
 - **file_path**: The repo-relative path (e.g. `decisions/project-spec.md`, `docs/superpowers/plans/2026-03-12-tag-and-stream.md`).
 - **doc_type**: From the path — `plan` (docs/superpowers/plans), `decision` (decisions/), `dev` (dev/), `support` (support/), `spec` (specs/ or docs/superpowers/specs/).
 - **plan_slug**: A short slug for this doc (e.g. filename without .md: `project-spec`, `2026-03-12-tag-and-stream`). Same slug for all sections of one doc so Stream can show them together via tag `<doc_type>:<slug>`.
+- **project**: The **code project** name (e.g. workspace folder name, or repo name). Inject this for every capture_plan call during sync so thoughts are tagged with which project they came from. Use a consistent value for the whole sync (e.g. `ideatub`, `my-app`). Stored in source_metadata.
 
 **One thought per section:** For long docs, call capture_plan once per major section; use the same `file_path`, `doc_type`, and `plan_slug` for each; optionally set `section_title` and `parent_id` (root thought UUID) for hierarchy.
 

@@ -173,6 +173,7 @@ class McpController extends Controller
                         'plan_slug' => ['type' => 'string', 'description' => 'Optional slug for this document (e.g. project-spec). Adds tag <doc_type>:<slug> so Stream can show all sections.'],
                         'parent_id' => ['type' => 'string', 'description' => 'Optional UUID of root thought to attach this section to (for hierarchy)'],
                         'section_title' => ['type' => 'string', 'description' => 'Optional title of this section (stored in source_metadata)'],
+                        'project' => ['type' => 'string', 'description' => 'Optional code project name (e.g. workspace or repo name). Stored in source_metadata so you can filter by project.'],
                         'tags' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Optional extra tags to merge with extracted and doc tag'],
                     ],
                     'required' => ['content'],
@@ -478,6 +479,7 @@ class McpController extends Controller
             'plan_slug' => 'sometimes|nullable|string|max:128',
             'parent_id' => 'sometimes|nullable|uuid',
             'section_title' => 'sometimes|nullable|string|max:256',
+            'project' => 'sometimes|nullable|string|max:256',
             'tags' => 'sometimes|nullable|array',
             'tags.*' => 'string|max:128',
         ]);
@@ -499,6 +501,9 @@ class McpController extends Controller
         $sectionTitle = isset($params['section_title']) && trim((string) $params['section_title']) !== ''
             ? mb_substr(trim((string) $params['section_title']), 0, 256)
             : null;
+        $project = isset($params['project']) && trim((string) $params['project']) !== ''
+            ? mb_substr(trim((string) $params['project']), 0, 256)
+            : null;
         $extraTags = isset($params['tags']) && is_array($params['tags'])
             ? array_values(array_filter(array_map(fn ($t) => is_string($t) ? trim($t) : '', $params['tags'])))
             : [];
@@ -508,6 +513,7 @@ class McpController extends Controller
             'file_path' => $filePath,
             'plan_slug' => $planSlug,
             'section_title' => $sectionTitle,
+            'project' => $project,
         ], fn ($v) => $v !== null && $v !== '');
 
         $parent = null;

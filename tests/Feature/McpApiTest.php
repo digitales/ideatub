@@ -296,6 +296,33 @@ class McpApiTest extends TestCase
         $this->assertContains('decision:project-spec', $tags);
     }
 
+    public function test_capture_plan_stores_project_in_source_metadata(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => 'Plan section from my-app',
+                'doc_type' => 'plan',
+                'plan_slug' => 'my-plan',
+                'project' => 'my-app',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $thought = Thought::where('user_id', $user->id)->latest()->first();
+        $this->assertNotNull($thought);
+        $this->assertSame('my-app', $thought->source_metadata['project'] ?? null);
+    }
+
     public function test_capture_plan_rejects_invalid_doc_type(): void
     {
         [$key] = $this->validKeyAndUser();
