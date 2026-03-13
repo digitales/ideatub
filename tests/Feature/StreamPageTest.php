@@ -90,4 +90,75 @@ class StreamPageTest extends TestCase
         $response->assertSee('Stream', false);
         $response->assertSee(route('idea.stream'), false);
     }
+
+    public function test_stream_tag_filter_includes_parent_when_children_have_tag(): void
+    {
+        $user = User::factory()->create();
+        $parent = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Doc intro',
+            'metadata' => ['tags' => ['work']],
+            'parent_id' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $parent->id,
+            'content' => 'Section two content here',
+            'metadata' => ['tags' => ['work']],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream', ['tag' => 'work']));
+
+        $response->assertStatus(200);
+        $response->assertSee('Doc intro');
+        $response->assertSee('Section two content here');
+    }
+
+    public function test_stream_tag_filter_shows_parent_with_tag_only_in_children(): void
+    {
+        $user = User::factory()->create();
+        $parent = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Document root',
+            'metadata' => [], // root has no tag; only sections do
+            'parent_id' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $parent->id,
+            'content' => 'Section with doc tag',
+            'metadata' => ['tags' => ['doc sections']],
+        ]);
+
+        // Slug for "doc sections" is doc_sections
+        $response = $this->actingAs($user)->get(route('idea.stream', ['tag' => 'doc_sections']));
+
+        $response->assertStatus(200);
+        $response->assertSee('Document root');
+        $response->assertSee('Section with doc tag');
+    }
+
+    public function test_stream_tag_view_shows_full_section_content(): void
+    {
+        $user = User::factory()->create();
+        $parent = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Root',
+            'metadata' => ['tags' => ['full doc']],
+            'parent_id' => null,
+        ]);
+        $longSection = str_repeat('Paragraph content. ', 50);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $parent->id,
+            'content' => $longSection,
+            'metadata' => ['tags' => ['full doc']],
+        ]);
+
+        // Slug for "full doc" is full_doc
+        $response = $this->actingAs($user)->get(route('idea.stream', ['tag' => 'full_doc']));
+
+        $response->assertStatus(200);
+        $response->assertSee($longSection, false);
+    }
 }
