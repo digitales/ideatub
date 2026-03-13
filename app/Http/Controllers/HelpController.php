@@ -14,9 +14,15 @@ class HelpController extends Controller
             ? File::get($cursorRulePath)
             : null;
 
+        $researchRulePath = base_path('.cursor/rules/ideatub-sync-research.mdc');
+        $researchRuleContent = File::exists($researchRulePath)
+            ? File::get($researchRulePath)
+            : null;
+
         return view('help', [
             'query' => '',
             'cursorRuleContent' => $cursorRuleContent,
+            'researchRuleContent' => $researchRuleContent,
         ]);
     }
 }

@@ -66,23 +66,49 @@
             </div>
             <pre class="text-xs text-deep-indigo bg-slate-100/80 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap border border-memory-violet/10" style="max-height: 20rem;"><code>{{ e($cursorRuleContent) }}</code></pre>
         </div>
+        @endif
+
+        @if(isset($researchRuleContent) && $researchRuleContent !== null)
+        <div id="cursor-rule-research" class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+            <h3 class="text-base font-semibold text-deep-indigo mb-3">Cursor rule: save research to IdeaTub</h3>
+            <p class="text-sm text-slate-brand mb-3">Add this rule so Cursor (or Claude Desktop) knows how to save research agent output to IdeaTub via <code class="bg-memory-violet/10 px-1 rounded text-xs">capture_plan</code> with <code class="bg-memory-violet/10 px-1 rounded text-xs">doc_type</code> <code class="bg-memory-violet/10 px-1 rounded text-xs">research</code> and <code class="bg-memory-violet/10 px-1 rounded text-xs">project</code> for the research topic. Copy the file into the project’s <code class="bg-memory-violet/10 px-1 rounded text-xs">.cursor/rules/</code> (create the folder if needed). IdeaTub MCP must be configured for that project.</p>
+            <div class="mb-3 flex flex-wrap gap-2">
+                <a href="#" data-download-research-rule class="inline-flex items-center gap-1.5 rounded-lg bg-memory-violet/15 px-3 py-1.5 text-sm font-medium text-memory-violet hover:bg-memory-violet/25 transition-colors">Download ideatub-sync-research.mdc</a>
+            </div>
+            <pre class="text-xs text-deep-indigo bg-slate-100/80 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap border border-memory-violet/10" style="max-height: 20rem;"><code>{{ e($researchRuleContent) }}</code></pre>
+        </div>
+        @endif
+
         <script>
             (function () {
-                var content = @json($cursorRuleContent);
-                var btn = document.querySelector('[data-download-rule]');
-                if (!btn || !content) return;
-                btn.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    var blob = new Blob([content], { type: 'text/markdown' });
-                    var a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = 'ideatub-sync-docs.mdc';
-                    a.click();
-                    URL.revokeObjectURL(a.href);
-                });
+                var cursorContent = @json($cursorRuleContent ?? '');
+                var researchContent = @json($researchRuleContent ?? '');
+                if (cursorContent) {
+                    var btn = document.querySelector('[data-download-rule]');
+                    if (btn) btn.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        var blob = new Blob([cursorContent], { type: 'text/markdown' });
+                        var a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = 'ideatub-sync-docs.mdc';
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                    });
+                }
+                if (researchContent) {
+                    var researchBtn = document.querySelector('[data-download-research-rule]');
+                    if (researchBtn) researchBtn.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        var blob = new Blob([researchContent], { type: 'text/markdown' });
+                        var a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = 'ideatub-sync-research.mdc';
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                    });
+                }
             })();
         </script>
-        @endif
 
         <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
             <h3 class="text-base font-semibold text-deep-indigo mb-3">1. Get your MCP key</h3>
