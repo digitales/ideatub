@@ -17,6 +17,12 @@ return [
             'path' => storage_path('framework/cache/data'),
         ],
 
+        'database' => [
+            'driver' => 'database',
+            'connection' => null,
+            'table' => 'cache',
+        ],
+
     ],
 
     'prefix' => env('CACHE_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_cache_'),
