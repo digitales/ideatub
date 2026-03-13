@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
     <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug mb-2">Help</h1>
-    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts and MCP integration for your thinking space.</p>
+    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts, MCP integration, and syncing plans into your thinking space.</p>
 
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
         <h2 class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>
@@ -27,7 +27,7 @@
         <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
             <h2 class="text-lg font-semibold text-deep-indigo mb-3">MCP integration</h2>
             <p class="text-sm text-slate-brand mb-4">Connect Claude, Cursor, ChatGPT, or other MCP-capable tools to IdeaTub so they can search your thoughts and capture new ones. Authentication uses a <strong>per-user MCP key</strong>; the same key works in every client and identifies you.</p>
-            <p class="text-sm text-slate-brand mb-4">IdeaTub exposes four tools:</p>
+            <p class="text-sm text-slate-brand mb-4">IdeaTub exposes five tools:</p>
             <table class="w-full text-sm text-deep-indigo border-collapse">
                 <thead>
                     <tr class="border-b border-memory-violet/15">
@@ -40,9 +40,49 @@
                     <tr><td class="py-2 font-mono text-xs">browse_recent</td><td class="py-2 text-slate-brand">List recent thoughts</td></tr>
                     <tr><td class="py-2 font-mono text-xs">thought_stats</td><td class="py-2 text-slate-brand">Count of your thoughts</td></tr>
                     <tr><td class="py-2 font-mono text-xs">capture_thought</td><td class="py-2 text-slate-brand">Save a new thought (or comment)</td></tr>
+                    <tr><td class="py-2 font-mono text-xs">capture_plan</td><td class="py-2 text-slate-brand">Save a plan or plan section (source=plan); use tags and links for long-form view</td></tr>
                 </tbody>
             </table>
         </div>
+
+        <div id="plans" class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+            <h3 class="text-base font-semibold text-deep-indigo mb-3">Plans and docs as thoughts (<code class="bg-memory-violet/10 px-1.5 py-0.5 rounded text-xs font-mono">capture_plan</code>)</h3>
+            <p class="text-sm text-slate-brand mb-3">Use <strong>capture_plan</strong> to sync plans, decisions, dev notes, support docs, or specs into IdeaTub. Set <strong>doc_type</strong> to one of: <code class="bg-memory-violet/10 px-1 rounded text-xs">plan</code> (default), <code class="bg-memory-violet/10 px-1 rounded text-xs">decision</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">dev</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">support</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">spec</code>. The thought’s source and tag prefix match the doc type (e.g. <code class="bg-memory-violet/10 px-1 rounded text-xs">decision:project-spec</code>). Supported paths: <code class="bg-memory-violet/10 px-1 rounded text-xs">docs/superpowers/plans/*.md</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">decisions/*.md</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">dev/*.md</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">support/*.md</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">specs/*.md</code>.</p>
+            <ul class="text-sm text-slate-brand mb-4 space-y-2 list-disc list-inside">
+                <li><strong class="text-deep-indigo">One thought per section</strong> — Call <code class="bg-memory-violet/10 px-1 rounded text-xs">capture_plan</code> once per section. Use the same <strong>plan_slug</strong> for all sections. IdeaTub adds a tag <code class="bg-memory-violet/10 px-1 rounded text-xs">&lt;doc_type&gt;:&lt;slug&gt;</code> (e.g. <code class="bg-memory-violet/10 px-1 rounded text-xs">plan:2026-03-12-tag-and-stream</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">decision:project-spec</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">spec:tag-and-stream-design</code>).</li>
+                <li><strong class="text-deep-indigo">Long-form view in Stream</strong> — Open <a href="{{ route('idea.stream') }}" class="text-memory-violet hover:underline">Stream</a> and add <code class="bg-memory-violet/10 px-1 rounded text-xs">?tag=&lt;doc_type&gt;-&lt;slug&gt;</code> (e.g. <code class="bg-memory-violet/10 px-1 rounded text-xs">/stream?tag=decision-project-spec</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">/stream?tag=spec-tag-and-stream-design</code>). All thoughts with that tag appear together.</li>
+                <li><strong class="text-deep-indigo">Optional: file_path</strong> — Pass the path (e.g. <code class="bg-memory-violet/10 px-1 rounded text-xs">decisions/project-spec.md</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">support/example-investigation.md</code>) so source_metadata records the source file.</li>
+                <li><strong class="text-deep-indigo">Optional: hierarchy</strong> — Create a root thought first, then pass its ID as <strong>parent_id</strong> for section thoughts so they appear as replies and under the shared tag.</li>
+            </ul>
+            <p class="text-sm text-slate-brand">Parameters: <code class="bg-memory-violet/10 px-1 rounded text-xs">content</code> (required); <code class="bg-memory-violet/10 px-1 rounded text-xs">doc_type</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">file_path</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">plan_slug</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">parent_id</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">section_title</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">tags</code> (optional).</p>
+        </div>
+
+        @if(isset($cursorRuleContent) && $cursorRuleContent !== null)
+        <div id="cursor-rule" class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+            <h3 class="text-base font-semibold text-deep-indigo mb-3">Cursor rule: sync docs to IdeaTub</h3>
+            <p class="text-sm text-slate-brand mb-3">Add this rule to a project so Cursor knows how to sync plans, decisions, dev, support, and spec markdown to IdeaTub via <code class="bg-memory-violet/10 px-1 rounded text-xs">capture_plan</code>. Copy the file into that project’s <code class="bg-memory-violet/10 px-1 rounded text-xs">.cursor/rules/</code> (create the folder if needed). IdeaTub MCP must be configured in Cursor for that project.</p>
+            <div class="mb-3 flex flex-wrap gap-2">
+                <a href="#" data-download-rule class="inline-flex items-center gap-1.5 rounded-lg bg-memory-violet/15 px-3 py-1.5 text-sm font-medium text-memory-violet hover:bg-memory-violet/25 transition-colors">Download ideatub-sync-docs.mdc</a>
+            </div>
+            <pre class="text-xs text-deep-indigo bg-slate-100/80 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap border border-memory-violet/10" style="max-height: 20rem;"><code>{{ e($cursorRuleContent) }}</code></pre>
+        </div>
+        <script>
+            (function () {
+                var content = @json($cursorRuleContent);
+                var btn = document.querySelector('[data-download-rule]');
+                if (!btn || !content) return;
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var blob = new Blob([content], { type: 'text/markdown' });
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'ideatub-sync-docs.mdc';
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                });
+            })();
+        </script>
+        @endif
 
         <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
             <h3 class="text-base font-semibold text-deep-indigo mb-3">1. Get your MCP key</h3>

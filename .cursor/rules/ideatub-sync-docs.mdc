@@ -1,0 +1,20 @@
+---
+description: When syncing plans, decisions, dev, support, or specs to IdeaTub via MCP capture_plan
+globs: "**/{decisions,dev,support,specs,docs/superpowers/plans,docs/superpowers/specs}/**/*.md"
+alwaysApply: false
+---
+
+# IdeaTub: Sync docs via capture_plan
+
+When the user wants to sync this document (or other plan/decision/dev/support/spec markdown) to IdeaTub, use the MCP tool **capture_plan** with:
+
+- **content** (required): The file content. Read the file and send its text. The server cannot read local paths.
+- **file_path**: The repo-relative path (e.g. `decisions/project-spec.md`, `docs/superpowers/plans/2026-03-12-tag-and-stream.md`).
+- **doc_type**: From the path — `plan` (docs/superpowers/plans), `decision` (decisions/), `dev` (dev/), `support` (support/), `spec` (specs/ or docs/superpowers/specs/).
+- **plan_slug**: A short slug for this doc (e.g. filename without .md: `project-spec`, `2026-03-12-tag-and-stream`). Same slug for all sections of one doc so Stream can show them together via tag `<doc_type>:<slug>`.
+
+**One thought per section:** For long docs, call capture_plan once per major section; use the same `file_path`, `doc_type`, and `plan_slug` for each; optionally set `section_title` and `parent_id` (root thought UUID) for hierarchy.
+
+**Stream long-form view:** In IdeaTub, open Stream and filter by tag, e.g. `/stream?tag=decision-project-spec` or `/stream?tag=plan-2026-03-12-tag-and-stream`.
+
+IdeaTub MCP must be configured (MCP key, server URL). See project docs: `docs/cursor-mcp-integration.md`, `docs/mcp-integration-guide.md`, or Help in the app.

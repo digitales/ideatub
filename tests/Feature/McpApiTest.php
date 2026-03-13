@@ -262,4 +262,58 @@ class McpApiTest extends TestCase
         $response->assertJsonPath('error.code', -32602);
         $response->assertJsonPath('error.message', 'Parent thought not found.');
     }
+
+    public function test_capture_plan_with_doc_type_decision_sets_source_and_tag(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => '## Project spec summary',
+                'doc_type' => 'decision',
+                'file_path' => 'decisions/project-spec.md',
+                'plan_slug' => 'project-spec',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.doc_type', 'decision');
+
+        $thought = Thought::where('user_id', $user->id)->latest()->first();
+        $this->assertNotNull($thought);
+        $this->assertSame('decision', $thought->source);
+        $this->assertSame('decisions/project-spec.md', $thought->source_metadata['file_path'] ?? null);
+        $this->assertSame('decision', $thought->source_metadata['doc_type'] ?? null);
+        $tags = $thought->metadata['tags'] ?? [];
+        $this->assertContains('decision:project-spec', $tags);
+    }
+
+    public function test_capture_plan_rejects_invalid_doc_type(): void
+    {
+        [$key] = $this->validKeyAndUser();
+        $this->mock(OpenRouterService::class, function ($mock): void {
+            $mock->shouldReceive('embed')->never();
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => 'Some content',
+                'doc_type' => 'invalid',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('error.code', -32602);
+    }
 }

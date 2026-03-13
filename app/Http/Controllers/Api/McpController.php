@@ -163,16 +163,17 @@ class McpController extends Controller
             ],
             [
                 'name' => 'capture_plan',
-                'description' => 'Save a plan or plan section as a thought with source=plan. Use when syncing Cursor/superpowers plans into IdeaTub. Use plan_slug to tag all sections for long-form view (Stream filter by tag). Use parent_id to link sections to a plan root thought.',
+                'description' => 'Save a plan, decision, dev note, support doc, or spec as a thought. Use doc_type to set source (plan, decision, dev, support, spec). Use plan_slug to tag all sections for long-form view (Stream filter by tag). Supports docs in decisions/, dev/, support/, specs/, and docs/superpowers/plans/.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
-                        'content' => ['type' => 'string', 'description' => 'Plan content (full plan or one section)'],
-                        'file_path' => ['type' => 'string', 'description' => 'Optional path to the plan file (e.g. docs/superpowers/plans/2026-03-12-tag-and-stream.md)'],
-                        'plan_slug' => ['type' => 'string', 'description' => 'Optional slug for this plan (e.g. 2026-03-12-tag-and-stream). Adds tag plan:<slug> so Stream can show all sections.'],
-                        'parent_id' => ['type' => 'string', 'description' => 'Optional UUID of plan root thought to attach this section to (for hierarchy)'],
+                        'content' => ['type' => 'string', 'description' => 'Document content (full doc or one section)'],
+                        'doc_type' => ['type' => 'string', 'description' => 'One of: plan, decision, dev, support, spec. Default plan. Sets source and tag prefix (e.g. decision:slug).'],
+                        'file_path' => ['type' => 'string', 'description' => 'Optional path (e.g. decisions/project-spec.md, dev/notes.md, support/investigation.md, specs/example-feature-spec.md)'],
+                        'plan_slug' => ['type' => 'string', 'description' => 'Optional slug for this document (e.g. project-spec). Adds tag <doc_type>:<slug> so Stream can show all sections.'],
+                        'parent_id' => ['type' => 'string', 'description' => 'Optional UUID of root thought to attach this section to (for hierarchy)'],
                         'section_title' => ['type' => 'string', 'description' => 'Optional title of this section (stored in source_metadata)'],
-                        'tags' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Optional extra tags to merge with extracted and plan tag'],
+                        'tags' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Optional extra tags to merge with extracted and doc tag'],
                     ],
                     'required' => ['content'],
                 ],
@@ -459,17 +460,20 @@ class McpController extends Controller
     }
 
     /**
-     * capture_plan: Save a plan or plan section with source=plan. Adds tag plan:<plan_slug> when plan_slug
-     * is provided so all sections can be viewed together via Stream ?tag=... (use slug form e.g. plan-2026-03-12-tag-and-stream).
-     * Optional parent_id links this thought to a plan root for hierarchy.
+     * capture_plan: Save a document (plan, decision, dev, support, spec) or section as a thought.
+     * doc_type sets source and tag prefix (e.g. decision:slug, spec:slug). When plan_slug is provided,
+     * adds tag <doc_type>:<slug> so all sections can be viewed via Stream ?tag=... (slug form e.g. decision-project-spec).
+     * Optional parent_id links this thought to a root for hierarchy.
      *
      * @param  array<string, mixed>  $params
-     * @return array{id: string, plan_slug?: string}
+     * @return array{id: string, plan_slug?: string, doc_type?: string}
      */
     private function capturePlan(array $params): array
     {
+        $allowedDocTypes = ['plan', 'decision', 'dev', 'support', 'spec'];
         $v = Validator::make($params, [
             'content' => 'required|string',
+            'doc_type' => 'sometimes|nullable|string|in:'.implode(',', $allowedDocTypes),
             'file_path' => 'sometimes|nullable|string|max:512',
             'plan_slug' => 'sometimes|nullable|string|max:128',
             'parent_id' => 'sometimes|nullable|uuid',
@@ -482,6 +486,9 @@ class McpController extends Controller
         }
 
         $content = (string) $params['content'];
+        $docType = isset($params['doc_type']) && in_array($params['doc_type'], $allowedDocTypes, true)
+            ? $params['doc_type']
+            : 'plan';
         $filePath = isset($params['file_path']) && trim((string) $params['file_path']) !== ''
             ? mb_substr(trim((string) $params['file_path']), 0, 512)
             : null;
@@ -497,6 +504,7 @@ class McpController extends Controller
             : [];
 
         $sourceMetadata = array_filter([
+            'doc_type' => $docType,
             'file_path' => $filePath,
             'plan_slug' => $planSlug,
             'section_title' => $sectionTitle,
@@ -518,9 +526,9 @@ class McpController extends Controller
 
         $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
         if ($planSlug !== null) {
-            $planTag = 'plan:'.mb_strtolower($planSlug);
-            if (! in_array($planTag, $tags, true)) {
-                $tags[] = $planTag;
+            $docTag = $docType.':'.mb_strtolower($planSlug);
+            if (! in_array($docTag, $tags, true)) {
+                $tags[] = $docTag;
             }
         }
         foreach ($extraTags as $t) {
@@ -535,7 +543,7 @@ class McpController extends Controller
             'embedding' => $embedding,
             'metadata' => $metadata,
             'user_id' => auth()->id(),
-            'source' => 'plan',
+            'source' => $docType,
             'source_metadata' => $sourceMetadata ?: null,
             'parent_id' => $parent?->id,
         ];
@@ -545,6 +553,9 @@ class McpController extends Controller
         $result = ['id' => $thought->id];
         if ($planSlug !== null) {
             $result['plan_slug'] = $planSlug;
+        }
+        if ($docType !== 'plan') {
+            $result['doc_type'] = $docType;
         }
 
         return $result;

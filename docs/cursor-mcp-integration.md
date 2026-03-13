@@ -45,24 +45,25 @@ The **capture_thought** tool saves a new thought to your IdeaTub brain. Cursor c
 | `source`           | No       | Client label (e.g. `cursor`). Default `mcp`. |
 | `source_metadata`  | No       | Optional key-value object. |
 
-## Using capture_plan from Cursor (plans as thoughts)
+## Using capture_plan from Cursor (plans and docs as thoughts)
 
-The **capture_plan** tool saves a plan or plan section with `source=plan`. Use it to sync Cursor/superpowers plan files into IdeaTub so they are searchable and viewable as a long-form stream.
+The **capture_plan** tool saves a plan, decision, dev note, support doc, or spec as a thought. Set **`doc_type`** to one of: `plan` (default), `decision`, `dev`, `support`, `spec`. Use it to sync files from docs/superpowers/plans/, decisions/, dev/, support/, and specs/ so they are searchable and viewable as a long-form stream.
 
-- **One thought per section:** Call `capture_plan` once per section or chunk. Use the same **`plan_slug`** for all sections (e.g. `2026-03-12-tag-and-stream`). IdeaTub adds tag `plan:<slug>` so you can view all sections together in IdeaTub **Stream** by filtering on that tag (e.g. `/stream?tag=plan-2026-03-12-tag-and-stream`).
-- **Linking via tags and parent:** Use **`plan_slug`** for tag-based grouping. Optionally create a plan root thought first, then pass its UUID as **`parent_id`** for section thoughts to link them in a hierarchy.
-- **Document link:** Pass **`file_path`** (e.g. `docs/superpowers/plans/2026-03-12-tag-and-stream.md`) so the thought’s `source_metadata` records the source file.
+- **One thought per section:** Call `capture_plan` once per section. Use the same **`plan_slug`** for all sections. IdeaTub adds tag `<doc_type>:<slug>` (e.g. `decision:project-spec`) so you can view all sections in **Stream** (e.g. `/stream?tag=decision-project-spec`).
+- **Linking via tags and parent:** Use **`plan_slug`** for tag-based grouping. Optionally create a root thought first, then pass its UUID as **`parent_id`** for section thoughts.
+- **Document link:** Pass **`file_path`** (e.g. `decisions/project-spec.md`, `support/example-investigation.md`) so the thought’s `source_metadata` records the source file.
 
 **Parameters:**
 
 | Parameter        | Required | Description |
 |------------------|----------|-------------|
-| `content`        | Yes      | Plan content (full plan or one section). |
-| `file_path`      | No       | Path to the plan file. |
-| `plan_slug`      | No       | Slug for this plan; adds tag `plan:<slug>` for Stream filtering. |
-| `parent_id`      | No       | UUID of plan root thought to attach this section to. |
+| `content`        | Yes      | Document content (full doc or one section). |
+| `doc_type`       | No       | One of: plan, decision, dev, support, spec. Default plan. Sets source and tag prefix. |
+| `file_path`      | No       | Path (e.g. decisions/project-spec.md, support/investigation.md). |
+| `plan_slug`      | No       | Slug for this document; adds tag `<doc_type>:<slug>` for Stream filtering. |
+| `parent_id`      | No       | UUID of root thought to attach this section to. |
 | `section_title` | No       | Title of this section (stored in source_metadata). |
-| `tags`           | No       | Extra tags to merge with extracted and plan tag. |
+| `tags`           | No       | Extra tags to merge with extracted and doc tag. |
 
 ## Protocol note
 

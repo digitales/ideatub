@@ -202,7 +202,7 @@ Use this if you are scripting against IdeaTub or building a bridge.
 | `browse_recent` | — | `limit` (int, default 10, max 100) |
 | `thought_stats` | — | — |
 | `capture_thought` | `content` (string) | `parent_id` or `in_reply_to` (UUID); `source` (string, e.g. chatgpt/claude/cursor); `source_metadata` (object) |
-| `capture_plan` | `content` (string) | `file_path`, `plan_slug`, `parent_id` (UUID), `section_title`, `tags` (array of strings) |
+| `capture_plan` | `content` (string) | `doc_type` (plan \| decision \| dev \| support \| spec); `file_path`, `plan_slug`, `parent_id` (UUID), `section_title`, `tags` (array) |
 
 Example calls:
 
@@ -217,14 +217,14 @@ Example calls:
 
 For more on `capture_thought` and comments, see [MCP capture_thought](mcp-capture-thought.md).
 
-### Plans and long-form linking (`capture_plan`)
+### Plans and documents as thoughts (`capture_plan`)
 
-Use **`capture_plan`** when syncing Cursor/superpowers plans (or other long-form plan documents) into IdeaTub. Each call creates one thought with `source=plan`.
+Use **`capture_plan`** when syncing plans, decisions, dev notes, support docs, or specs into IdeaTub. Set **`doc_type`** to one of: `plan`, `decision`, `dev`, `support`, `spec` (default `plan`). The source and tag prefix match (e.g. `decision:project-spec`). Supported paths: `docs/superpowers/plans/*.md`, `decisions/*.md`, `dev/*.md`, `support/*.md`, `specs/*.md`.
 
-- **One thought per section:** Send one `capture_plan` per section or chunk. Use the same **`plan_slug`** for all sections of a plan (e.g. `2026-03-12-tag-and-stream`). IdeaTub adds a tag `plan:<slug>` (e.g. `plan:2026-03-12-tag-and-stream`) to each thought so they can be grouped.
-- **Long-form view via Stream:** In the IdeaTub web app, open **Stream** and filter by the plan tag. Use the URL slug form of the tag: e.g. `/stream?tag=plan-2026-03-12-tag-and-stream` shows all thoughts tagged `plan:2026-03-12-tag-and-stream` in one place.
-- **Linking sections to a plan root (optional):** To build a hierarchy, first create a “plan root” thought with `capture_plan` (e.g. title + summary, no `parent_id`). Then for each section call `capture_plan` with the same `plan_slug` and **`parent_id`** set to the root thought’s UUID. The root’s comment thread and the shared tag both represent the long-form plan.
-- **Document link:** Pass **`file_path`** (e.g. `docs/superpowers/plans/2026-03-12-tag-and-stream.md`) so `source_metadata` records the source document for reference.
+- **One thought per section:** Send one `capture_plan` per section. Use the same **`plan_slug`** for all sections. IdeaTub adds a tag `<doc_type>:<slug>` (e.g. `decision:project-spec`). View in Stream via `/stream?tag=decision-project-spec` etc.
+- **Long-form view via Stream:** Open **Stream** and filter by the tag using the URL slug form (e.g. `/stream?tag=decision-project-spec`).
+- **Linking sections to a root (optional):** Create a root thought first, then for each section set **`parent_id`** to the root's UUID.
+- **Document link:** Pass **`file_path`** (e.g. `decisions/project-spec.md`, `support/example-investigation.md`) so `source_metadata` records the source file.
 
 ---
 
