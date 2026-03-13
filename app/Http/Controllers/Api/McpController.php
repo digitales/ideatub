@@ -11,6 +11,7 @@ use App\Services\OpenRouterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class McpController extends Controller
@@ -82,6 +83,11 @@ class McpController extends Controller
         } catch (\InvalidArgumentException $e) {
             return $this->jsonRpcError(-32602, $e->getMessage(), $id);
         } catch (\Throwable $e) {
+            Log::error('MCP dispatch failed', [
+                'method' => $method,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
             report($e);
 
             return $this->jsonRpcError(-32603, 'Internal error', $id);
@@ -214,6 +220,11 @@ class McpController extends Controller
                 ],
             ]);
         } catch (\Throwable $e) {
+            Log::error('MCP tools/call failed', [
+                'tool' => $name,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
             report($e);
 
             return response()->json([
@@ -332,11 +343,17 @@ class McpController extends Controller
         $query = (string) $params['query'];
         $limit = (int) ($params['limit'] ?? 10);
 
+        Log::info('MCP search_thoughts start', ['query' => $query, 'limit' => $limit]);
+
         $embedding = $this->openRouter->embed($query);
+        Log::info('MCP search_thoughts embed ok', ['dims' => is_countable($embedding) ? count($embedding) : 0]);
+
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->nearestTo($embedding, $limit)
             ->get(['id', 'content', 'metadata', 'created_at', 'source', 'source_metadata']);
+
+        Log::info('MCP search_thoughts query ok', ['count' => $thoughts->count()]);
 
         return [
             'thoughts' => $thoughts->map(fn (Thought $t) => [

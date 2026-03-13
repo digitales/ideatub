@@ -75,6 +75,15 @@ Rate limiting will then use file or array storage instead of the database, and t
   - `CACHE_STORE=database` requires running migrations (so the cache table exists), or
   - Use `CACHE_STORE=file` if the cache table is not desired.
 
+## Diagnosing MCP search / tool failures (logging)
+
+If search still fails after fixing cache (or for other tools), check `storage/logs/laravel.log`:
+
+- **`MCP search_thoughts start`** — request reached search with query/limit. If you never see this, failure is earlier (auth, routing, or a different tool).
+- **`MCP search_thoughts embed ok`** — OpenRouter embedding succeeded. If you see "start" but not "embed ok", the failure is in `OpenRouterService::embed()` (e.g. missing `OPENROUTER_API_KEY`, timeout, or OpenRouter API error).
+- **`MCP search_thoughts query ok`** — vector search succeeded. If you see "embed ok" but not "query ok", the failure is in the DB / pgvector query (e.g. extension, column type, or connection).
+- **`MCP tools/call failed`** or **`MCP dispatch failed`** — includes `tool`/`method`, `exception` class, and `message` so you can see the exact error (e.g. `RuntimeException`, `OPENROUTER_API_KEY is not set` or a DB error message).
+
 ## References
 
 - `config/cache.php` — default store `env('CACHE_STORE', 'array')`; only `array` and `file` defined by default in this project
