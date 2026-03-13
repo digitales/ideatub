@@ -79,6 +79,21 @@ class Thought extends Model
     }
 
     /**
+     * Scope: nearest thoughts within a max cosine distance (only relevant results).
+     * Use for search so the list is not padded with low-relevance items.
+     * Caller should apply ->paginate() or ->take() as needed.
+     *
+     * @param  array<float>|Vector  $embedding
+     */
+    public function scopeNearestWithin(Builder $query, array|Vector $embedding, float $maxDistance): void
+    {
+        $vector = is_array($embedding) ? json_encode($embedding) : (string) $embedding;
+        $query->whereNotNull('embedding')
+            ->whereRaw('embedding <=> ?::vector <= ?', [$vector, $maxDistance])
+            ->orderByRaw('embedding <=> ?::vector', [$vector]);
+    }
+
+    /**
      * Get the user that owns the thought.
      */
     public function user(): BelongsTo

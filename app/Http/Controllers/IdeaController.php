@@ -14,7 +14,11 @@ class IdeaController extends Controller
 {
     private const RECENT_LIMIT = 20;
 
+    /** Max number of search results to return (only those within similarity threshold). */
     private const SEARCH_LIMIT = 20;
+
+    /** Max cosine distance for search results; only thoughts at least this similar are shown (no back-fill). */
+    private const SEARCH_MAX_DISTANCE = 0.5;
 
     private const SEARCH_QUERY_MAX_LENGTH = 2000;
 
@@ -39,10 +43,27 @@ class IdeaController extends Controller
         if ($query !== '') {
             try {
                 $embedding = $this->openRouter->embed($query);
+                $page = (int) $request->input('page', 1);
                 $thoughts = Thought::query()
                     ->where('user_id', auth()->id())
-                    ->nearestTo($embedding, self::SEARCH_LIMIT)
-                    ->get();
+                    ->nearestWithin($embedding, self::SEARCH_MAX_DISTANCE)
+                    ->with(['comments' => fn ($q) => $q->orderBy('created_at'), 'parent'])
+                    ->paginate(self::SEARCH_LIMIT, ['*'], 'page', $page);
+
+                if ($request->ajax()) {
+                    $replyableOffset = (int) $request->input('replyable_offset', 0);
+                    $html = view('idea.index_thought_cards', [
+                        'thoughts' => $thoughts,
+                        'replyableIndexStart' => $replyableOffset,
+                    ])->render();
+
+                    return response()->json([
+                        'html' => $html,
+                        'has_more' => $thoughts->hasMorePages(),
+                        'next_page' => $thoughts->currentPage() + 1,
+                        'count' => $thoughts->count(),
+                    ]);
+                }
             } catch (\Throwable $e) {
                 report($e);
 

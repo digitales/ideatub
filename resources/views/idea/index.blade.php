@@ -112,7 +112,7 @@
         @thought-nav.window="handleThoughtNav($event.detail)"
         @thought-reply.window="handleThoughtReply()"
     >
-    <div class="flex items-center justify-between mt-9 mb-3.5">
+    <div id="search-results" class="flex items-center justify-between mt-9 mb-3.5 scroll-mt-[5rem]" role="region" aria-label="{{ $query ? 'Search results' : 'Recent thoughts' }}">
         <span class="text-[11px] font-semibold tracking-[0.1em] uppercase text-slate-brand/50">
             @if ($query)
                 Results for "{{ e($query) }}"
@@ -126,74 +126,11 @@
         <p class="text-[11px] text-slate-brand/40 mb-2">j / k to move · Enter to reply</p>
     @endif
 
-    @php $replyableIndex = -1; @endphp
-    @forelse ($thoughts as $thought)
-        @php
-            if (!$thought->parent_id) {
-                $replyableIndex++;
-            }
-            $tags = $thought->metadata['tags'] ?? [];
-            $tagColors = ['violet', 'teal', 'indigo'];
-            $tagMap = [
-                'violet' => 'bg-memory-violet/10 text-memory-violet',
-                'teal'   => 'bg-neural-teal/10 text-neural-teal',
-                'indigo' => 'bg-deep-indigo/8 text-slate-brand',
-            ];
-            $replyHref = !$thought->parent_id ? route('idea.index', ['parent_id' => $thought->id]) : '';
-        @endphp
-
-        <div
-            data-thought-id="{{ $thought->id }}"
-            data-index="{{ $loop->index }}"
-            data-reply-href="{{ $replyHref }}"
-            :class="{ 'ring-2 ring-memory-violet ring-offset-2': selectedThoughtIndex === {{ $thought->parent_id ? -1 : $replyableIndex }} }"
-            class="rounded-xl border border-memory-violet/10 bg-white/68 backdrop-blur px-4 py-3.5 mb-2 hover:bg-white/90 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all cursor-pointer"
-        >
-
-            @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
-                <p class="text-[11px] text-slate-brand/50 mb-1">
-                    Comment on: {{ Str::limit($thought->parent->content, 80) }}
-                </p>
-            @endif
-
-            <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ e($thought->content) }}</p>
-
-            <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
-                @if ($thought->source)
-                    <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
-                @endif
-
-                @foreach ($tags as $i => $tag)
-                    <a href="{{ route('idea.stream', ['tag' => \Illuminate\Support\Str::slug($tag, '_')]) }}" class="text-[10px] font-medium px-2 py-0.5 rounded-full {{ $tagMap[$tagColors[$i % 3]] }} hover:opacity-90">
-                        #{{ $tag }}
-                    </a>
-                @endforeach
-
-                @if (!$thought->parent_id)
-                    <a href="{{ route('idea.index', ['parent_id' => $thought->id]) }}"
-                       class="text-[10.5px] text-memory-violet/60 hover:text-memory-violet transition-colors ml-auto">
-                        Reply
-                    </a>
-                @endif
-            </div>
-
-            {{-- Nested comments --}}
-            @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
-                <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2" data-comments-list>
-                    @foreach ($thought->comments as $comment)
-                        <li>
-                            <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line">{{ e(Str::limit($comment->content, 200)) }}</p>
-                            <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
-                        </li>
-                    @endforeach
-                </ul>
-            @elseif(!$thought->parent_id)
-                <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2 hidden" data-comments-list aria-hidden="true"></ul>
-            @endif
+    @if (!$thoughts->isEmpty())
+        <div id="index-thoughts-list">
+            @include('idea.index_thought_cards', ['thoughts' => $thoughts, 'replyableIndexStart' => 0])
         </div>
-
-    @empty
+    @else
         <div class="rounded-xl border border-memory-violet/10 bg-white/50 px-4 py-8 text-center text-sm text-slate-brand/50">
             @if ($query)
                 No thoughts match your search. Try different words or capture a new one above.
@@ -201,10 +138,12 @@
                 No thoughts yet. What are you thinking?
             @endif
         </div>
-    @endforelse
+    @endif
 
-    {{-- Pagination / load more --}}
-    @if ($thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator && $thoughts->hasMorePages())
+    {{-- Search: infinite scroll sentinel; non-search or single-page: pagination links --}}
+    @if ($query && $thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator && $thoughts->hasMorePages())
+        <div id="index-load-more-sentinel" class="h-4 mt-4" data-index-search-url="{{ route('idea.index', ['q' => $query]) }}" data-index-total="{{ $thoughts->total() }}"></div>
+    @elseif($thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator && $thoughts->hasMorePages())
         <div class="text-center pt-4">
             {{ $thoughts->links('pagination.idea') }}
         </div>
@@ -212,4 +151,64 @@
     </div>
 
 </div>
+
+@if($query)
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var el = document.getElementById('search-results');
+    if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' });
+});
+</script>
+@endpush
+@endif
+
+@if($query && $thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator && $thoughts->hasMorePages())
+@push('scripts')
+<script>
+(function () {
+    var sentinel = document.getElementById('index-load-more-sentinel');
+    var list = document.getElementById('index-thoughts-list');
+    if (!sentinel || !list) return;
+
+    var baseUrl = sentinel.getAttribute('data-index-search-url');
+    var nextPage = 2;
+    var loading = false;
+
+    function replyableCount() {
+        return Array.from(list.querySelectorAll('[data-reply-href]')).filter(function (el) { return el.getAttribute('data-reply-href'); }).length;
+    }
+
+    function loadMore() {
+        if (loading) return;
+        loading = true;
+        var url = baseUrl + (baseUrl.indexOf('?') >= 0 ? '&' : '?') + 'page=' + nextPage + '&replyable_offset=' + replyableCount();
+        fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.html) {
+                list.insertAdjacentHTML('beforeend', data.html);
+            }
+            if (data.has_more && data.next_page) {
+                nextPage = data.next_page;
+            } else {
+                if (sentinel.parentNode) sentinel.parentNode.removeChild(sentinel);
+                if (typeof observer !== 'undefined') observer.disconnect();
+            }
+        })
+        .catch(function () {})
+        .finally(function () { loading = false; });
+    }
+
+    var observer = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting) loadMore();
+    }, { rootMargin: '200px', threshold: 0 });
+    observer.observe(sentinel);
+})();
+</script>
+@endpush
+@endif
 @endsection
