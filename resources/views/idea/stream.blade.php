@@ -33,7 +33,7 @@
                     Showing <span id="stream-showing-count">{{$thoughts->count()}}</span> of <span id="stream-total-count">{{$thoughts->total()}}</span> thoughts
                 </p>
                 <div id="stream-thoughts-list">
-                    @include('idea.stream_thoughts', ['thoughts' => $thoughts]) 
+                    @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag]) 
                 </div>
                 @if($thoughts->hasMorePages())
                     <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{$tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')}}" data-stream-total="{{$thoughts->total()}}"></div>

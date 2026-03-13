@@ -171,7 +171,7 @@ class IdeaController extends Controller
                 'message' => 'Thought saved.',
                 'thought' => [
                     'id' => $thought->id,
-                    'content' => $thought->content,
+                    'content' => $thought->getDecodedContent(),
                     'parent_id' => $thought->parent_id,
                     'created_at' => $thought->created_at->toIso8601String(),
                     'created_at_human' => $thought->created_at->diffForHumans(),
@@ -203,7 +203,12 @@ class IdeaController extends Controller
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')]);
 
         if ($canonicalTag !== null) {
-            $query->whereJsonContains('metadata->tags', $canonicalTag);
+            // Include top-level thoughts that have the tag OR that have any child (section) with the tag,
+            // so document roots show even if only section thoughts were tagged.
+            $query->where(function ($q) use ($canonicalTag) {
+                $q->whereJsonContains('metadata->tags', $canonicalTag)
+                    ->orWhereHas('comments', fn ($cq) => $cq->whereJsonContains('metadata->tags', $canonicalTag));
+            });
         } elseif ($tagSlug !== null) {
             $query->whereRaw('0 = 1');
         }
@@ -216,7 +221,10 @@ class IdeaController extends Controller
         $thoughts = $query->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
         if ($request->ajax()) {
-            $html = view('idea.stream_thoughts', ['thoughts' => $thoughts])->render();
+            $html = view('idea.stream_thoughts', [
+                'thoughts' => $thoughts,
+                'showFullSections' => $tagForDisplay !== null,
+            ])->render();
 
             return response()->json([
                 'html' => $html,

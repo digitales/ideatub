@@ -38,11 +38,15 @@ The Blade templates correctly use `e()` to escape for safe HTML output, but they
 2. **Views**: Updated thought and comment content output to use `e($thought->getDecodedContent())` (and equivalent for parent preview and comments) so that:
    - Stored entities are decoded to real characters.
    - Then `e()` re-escapes for safe HTML, so output remains XSS-safe.
+3. **JSON / AJAX**: IdeaController was returning raw `$thought->content` in the save-thought JSON response. When a new comment is appended via AJAX, the frontend used that content and showed literal `&quot;`. Fixed by returning `$thought->getDecodedContent()` in the JSON so appended comments display correctly.
+4. **MCP API**: McpController’s `browse_recent` and search results returned raw `$t->content`. MCP clients (and any thought content shown from those responses) now receive decoded content via `$t->getDecodedContent()`.
 
 Files changed:
 - `app/Models/Thought.php` — added `getDecodedContent()`.
 - `resources/views/idea/index_thought_cards.blade.php` — use decoded content for thought, parent preview, and comments.
 - `resources/views/idea/stream_thoughts.blade.php` — use decoded content for thought and comments.
+- `app/Http/Controllers/IdeaController.php` — return decoded content in save-thought JSON response.
+- `app/Http/Controllers/Api/McpController.php` — return decoded content in browse_recent and search thought lists.
 
 ## Prevention & Follow-up
 
