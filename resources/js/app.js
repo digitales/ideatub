@@ -11,9 +11,10 @@ Alpine.data('captureBox', () => ({
   errorField: '',
 
   init() {
-    const raw = this.$el.dataset.initialContent;
+    this._rootEl = this.$el;
+    const raw = this._rootEl.dataset.initialContent;
     this.content = raw !== undefined ? raw : '';
-    if (this.$el.dataset.focusReply === '1') {
+    if (this._rootEl.dataset.focusReply === '1') {
       this.$nextTick(() => this.focusCapture());
     }
   },
@@ -24,8 +25,10 @@ Alpine.data('captureBox', () => ({
   },
 
   async submitCapture() {
-    const form = this.$el.querySelector('form');
-    if (!form || this.saving) return;
+    const root = this._rootEl || this.$el;
+    const form = root.tagName === 'FORM' ? root : root.querySelector('form');
+    if (!form) return;
+    if (this.saving) return;
     const content = (this.content || '').trim();
     if (!content) {
       this.message = 'Add some text to save.';
@@ -82,11 +85,11 @@ Alpine.data('captureBox', () => ({
         if (data.thought.parent_id) {
           this.appendCommentToParent(data.thought);
         } else {
-          window.location = this.$el.dataset.ideaIndexUrl || window.location.pathname;
+          window.location = (this._rootEl && this._rootEl.dataset.ideaIndexUrl) || window.location.pathname;
         }
       } else {
         // Server may have returned HTML (e.g. redirect); refresh so the list updates
-        window.location = this.$el.dataset.ideaIndexUrl || window.location.pathname;
+        window.location = (this._rootEl && this._rootEl.dataset.ideaIndexUrl) || window.location.pathname;
       }
 
       setTimeout(() => { this.message = ''; }, 4000);
