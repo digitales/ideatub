@@ -34,6 +34,10 @@ Alpine.data('captureBox', () => ({
     this.messageType = 'success';
     this.errorField = '';
 
+    // Ensure textarea value is in sync with Alpine model before building FormData
+    const textarea = form.querySelector('[name="content"]');
+    if (textarea) textarea.value = content;
+
     const body = new FormData(form);
     const url = form.action;
     const csrf = body.get('_token');
@@ -71,6 +75,9 @@ Alpine.data('captureBox', () => ({
         } else {
           window.location = this.$el.dataset.ideaIndexUrl || window.location.pathname;
         }
+      } else {
+        // Server may have returned HTML (e.g. redirect); refresh so the list updates
+        window.location = this.$el.dataset.ideaIndexUrl || window.location.pathname;
       }
 
       setTimeout(() => { this.message = ''; }, 4000);
