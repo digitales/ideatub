@@ -14,7 +14,11 @@ When the user wants to sync this document (or other plan/decision/dev/support/sp
 - **plan_slug**: A short slug for this doc (e.g. filename without .md: `project-spec`, `2026-03-12-tag-and-stream`). Same slug for all sections of one doc so Stream can show them together via tag `<doc_type>:<slug>`.
 - **project**: The **code project** name (e.g. workspace folder name, or repo name). Inject this for every capture_plan call during sync so thoughts are tagged with which project they came from. Use a consistent value for the whole sync (e.g. `ideatub`, `my-app`). Stored in source_metadata.
 
-**One thought per section:** For long docs, call capture_plan once per major section; use the same `file_path`, `doc_type`, and `plan_slug` for each; optionally set `section_title` and `parent_id` (root thought UUID) for hierarchy.
+**Split at section titles:** Split the document at markdown section headings (lines starting with `##`, `###`, etc.). Content before the first such heading is the first section (use a short **section_title** like "Intro" or the doc title if useful). For each section:
+1. **content** = the text for that section only (from the heading line through the next heading or end of file). Include the heading line in the content.
+2. **section_title** = the heading text only, without `#` and without extra spaces (e.g. `## Chunk 1: Phase 0` → section_title `Chunk 1: Phase 0`).
+3. Use the same `file_path`, `doc_type`, `plan_slug`, and `project` for every section.
+4. Call capture_plan once per section, in document order (first section first), so they appear in the right order in IdeaTub Stream. Optionally create a root thought first (e.g. doc title) and pass its UUID as `parent_id` for section thoughts.
 
 **Stream long-form view:** In IdeaTub, open Stream and filter by tag, e.g. `/stream?tag=decision-project-spec` or `/stream?tag=plan-2026-03-12-tag-and-stream`.
 
