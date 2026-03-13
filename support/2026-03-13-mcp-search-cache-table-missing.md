@@ -7,7 +7,7 @@
 
 ## Issue Description
 
-When calling MCP `search_thoughts` (e.g. from Cursor, ChatGPT, or another MCP client), the request fails with:
+When calling MCP `search_thoughts` (e.g. query "Dezeen" from Cursor, ChatGPT, or another MCP client), the request fails with:
 
 - **Client**: `{"error": "Error occurred during tool execution", "request_id": "…"}`
 - **Server logs**:  
