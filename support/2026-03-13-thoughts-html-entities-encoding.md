@@ -40,6 +40,8 @@ The Blade templates correctly use `e()` to escape for safe HTML output, but they
    - Then `e()` re-escapes for safe HTML, so output remains XSS-safe.
 3. **JSON / AJAX**: IdeaController was returning raw `$thought->content` in the save-thought JSON response. When a new comment is appended via AJAX, the frontend used that content and showed literal `&quot;`. Fixed by returning `$thought->getDecodedContent()` in the JSON so appended comments display correctly.
 4. **MCP API**: McpController’s `browse_recent` and search results returned raw `$t->content`. MCP clients (and any thought content shown from those responses) now receive decoded content via `$t->getDecodedContent()`.
+5. **REST API** (follow-up): `ThoughtsApiController::search()` and `::recent()` were still returning raw `$t->content`. Clients using `GET /api/thoughts/search` or `GET /api/thoughts/recent` could see literal `&quot;` in search results. Fixed to return `$t->getDecodedContent()`.
+6. **Replying-to preview** (follow-up): Idea index "Replying to" block used `$replyingTo->content`; fixed to `$replyingTo->getDecodedContent()`.
 
 Files changed:
 - `app/Models/Thought.php` — added `getDecodedContent()`.
@@ -47,6 +49,8 @@ Files changed:
 - `resources/views/idea/stream_thoughts.blade.php` — use decoded content for thought and comments.
 - `app/Http/Controllers/IdeaController.php` — return decoded content in save-thought JSON response.
 - `app/Http/Controllers/Api/McpController.php` — return decoded content in browse_recent and search thought lists.
+- `app/Http/Controllers/Api/ThoughtsApiController.php` — return decoded content in search and recent JSON responses.
+- `resources/views/idea/index.blade.php` — use getDecodedContent() for "Replying to" preview.
 
 ## Prevention & Follow-up
 

@@ -41,7 +41,7 @@ class ThoughtsApiController extends Controller
         return response()->json([
             'thoughts' => $thoughts->map(fn (Thought $t) => [
                 'id' => $t->id,
-                'content' => $t->content,
+                'content' => $t->getDecodedContent(),
                 'metadata' => $t->metadata,
                 'created_at' => $t->created_at->toIso8601String(),
                 'source' => $t->source,
@@ -74,7 +74,7 @@ class ThoughtsApiController extends Controller
         return response()->json([
             'thoughts' => $thoughts->map(fn (Thought $t) => [
                 'id' => $t->id,
-                'content' => $t->content,
+                'content' => $t->getDecodedContent(),
                 'metadata' => $t->metadata,
                 'created_at' => $t->created_at->toIso8601String(),
                 'source' => $t->source,

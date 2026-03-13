@@ -19,7 +19,7 @@ class IdeaController extends Controller
     private const SEARCH_LIMIT = 20;
 
     /** Max cosine distance for search results; only thoughts within this distance are shown. If none match, we fall back to top N by distance. */
-    private const SEARCH_MAX_DISTANCE = 0.9;
+    private const SEARCH_MAX_DISTANCE = 0.5;
 
     private const SEARCH_QUERY_MAX_LENGTH = 2000;
 

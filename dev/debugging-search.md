@@ -4,7 +4,7 @@ When search returns no results or fewer than expected, use these steps.
 
 ## 1. Check the distance threshold
 
-Search uses **cosine distance** and only shows thoughts with `distance <= SEARCH_MAX_DISTANCE` (see `IdeaController::SEARCH_MAX_DISTANCE`, default `0.9`). Cosine distance: **0** = identical, **2** = opposite. If the threshold is too low, every thought can be filtered out.
+Search uses **cosine distance** and only shows thoughts with `distance <= SEARCH_MAX_DISTANCE` (see `IdeaController::SEARCH_MAX_DISTANCE`, default `0.5`). Cosine distance: **0** = identical, **2** = opposite. If the threshold is too low, every thought can be filtered out.
 
 - **Temporarily raise the threshold** in `app/Http/Controllers/IdeaController.php`: e.g. set `SEARCH_MAX_DISTANCE` to `1.5` or `2.0`. If results appear, the threshold was too strict.
 - **Fallback**: If no thoughts pass the threshold, the app now falls back to the top 20 by distance (no threshold) so something always shows when thoughts exist.
