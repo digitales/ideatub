@@ -143,6 +143,22 @@ class Thought extends Model
     }
 
     /**
+     * Scope to thoughts that have no tags (metadata null, or tags missing/empty).
+     * Used by the periodic extract-untagged command so only untagged content is reprocessed.
+     */
+    public function scopeWithoutTags(Builder $query): Builder
+    {
+        $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+
+        if ($driver === 'pgsql') {
+            return $query->whereRaw("metadata IS NULL OR metadata->'tags' IS NULL OR (metadata->'tags')::jsonb = '[]'::jsonb");
+        }
+
+        // SQLite: json_array_length() takes the JSON value, not the column + path
+        return $query->whereRaw("metadata IS NULL OR json_extract(metadata, '$.tags') IS NULL OR json_array_length(json_extract(metadata, '$.tags')) = 0");
+    }
+
+    /**
      * Normalize metadata so tags are lowercase (and trimmed). Returns a new array.
      *
      * @param  array<string, mixed>  $metadata

@@ -58,7 +58,7 @@ The **capture_plan** tool saves a plan, decision, dev note, support doc, or spec
 | Parameter        | Required | Description |
 |------------------|----------|-------------|
 | `content`        | Yes      | Document content (full doc or one section). |
-| `doc_type`       | No       | One of: plan, decision, dev, support, spec. Default plan. Sets source and tag prefix. |
+| `doc_type`       | No       | One of: plan, decision, dev, support, spec, research. Default plan. Sets source and tag prefix. |
 | `file_path`      | No       | Path (e.g. decisions/project-spec.md, support/investigation.md). |
 | `plan_slug`      | No       | Slug for this document; adds tag `<doc_type>:<slug>` for Stream filtering. |
 | `parent_id`      | No       | UUID of root thought to attach this section to. |

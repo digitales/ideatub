@@ -1,0 +1,26 @@
+---
+description: When saving research agent output (or any research) to IdeaTub via MCP capture_plan
+globs: "**/research/**/*.md"
+alwaysApply: false
+---
+
+# IdeaTub: Save research via capture_plan
+
+When the user or a research agent has research output to save to IdeaTub, use the MCP tool **capture_plan** with:
+
+- **content** (required): The research text (full output or one section). The server cannot read local paths; send the text.
+- **doc_type**: `research`.
+- **plan_slug**: A short slug for this research run (e.g. `2026-03-13-vehicle-valuation`, `competitor-analysis-Q1`). Same slug for all sections of the same research so Stream can show them together via tag `research:<slug>`.
+- **project**: The **research project** or topic name (e.g. workspace/repo name, or the research question: `vehicle-valuation`, `ideatub-mcp`). Use a consistent value for the whole research save so thoughts are tagged with which project they belong to. Stored in source_metadata.
+- **file_path**: Optional; if research was read from a file, use repo-relative path (e.g. `research/2026-03-13-vehicle-valuation.md`). Otherwise omit or use a logical path.
+- **section_title**: For each section, the heading or a short title (e.g. "Summary", "Findings", "Sources").
+
+**Split at section titles:** If the research is long, split at markdown headings (`##`, `###`). For each section:
+1. **content** = that section’s text (including the heading line).
+2. **section_title** = the heading text only.
+3. Use the same `doc_type`, `plan_slug`, and `project` for every section.
+4. Call capture_plan once per section in order.
+
+**Stream long-form view:** In IdeaTub, open Stream and filter by tag, e.g. `/stream?tag=research-2026-03-13-vehicle-valuation`.
+
+IdeaTub MCP must be configured (MCP key, server URL). See `docs/cursor-mcp-integration.md`, `docs/mcp-integration-guide.md`, or Help in the app.

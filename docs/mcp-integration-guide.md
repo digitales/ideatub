@@ -219,7 +219,7 @@ For more on `capture_thought` and comments, see [MCP capture_thought](mcp-captur
 
 ### Plans and documents as thoughts (`capture_plan`)
 
-Use **`capture_plan`** when syncing plans, decisions, dev notes, support docs, or specs into IdeaTub. Set **`doc_type`** to one of: `plan`, `decision`, `dev`, `support`, `spec` (default `plan`). The source and tag prefix match (e.g. `decision:project-spec`). Supported paths: `docs/superpowers/plans/*.md`, `decisions/*.md`, `dev/*.md`, `support/*.md`, `specs/*.md`.
+Use **`capture_plan`** when syncing plans, decisions, dev notes, support docs, specs, or research into IdeaTub. Set **`doc_type`** to one of: `plan`, `decision`, `dev`, `support`, `spec`, `research` (default `plan`). The source and tag prefix match (e.g. `decision:project-spec`, `research:2026-03-13-vehicle-valuation`). Supported paths: `docs/superpowers/plans/*.md`, `decisions/*.md`, `dev/*.md`, `support/*.md`, `specs/*.md`; for research use any logical path or omit. Use **`project`** to record which code project or research topic the content belongs to.
 
 - **One thought per section:** Send one `capture_plan` per section. Use the same **`plan_slug`** for all sections. IdeaTub adds a tag `<doc_type>:<slug>` (e.g. `decision:project-spec`). View in Stream via `/stream?tag=decision-project-spec` etc.
 - **Long-form view via Stream:** Open **Stream** and filter by the tag using the URL slug form (e.g. `/stream?tag=decision-project-spec`).

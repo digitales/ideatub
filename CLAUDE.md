@@ -1,0 +1,40 @@
+# IdeaTub – Claude project instructions
+
+When the project is opened in Claude Desktop or Claude Code, this file is read automatically.
+
+## IdeaTub: Sync docs via capture_plan
+
+When the user wants to sync this document (or other plan/decision/dev/support/spec markdown) to IdeaTub, use the MCP tool **capture_plan** with:
+
+- **content** (required): The file content. Read the file and send its text. The server cannot read local paths.
+- **file_path**: The repo-relative path (e.g. `decisions/project-spec.md`, `docs/superpowers/plans/2026-03-12-tag-and-stream.md`).
+- **doc_type**: From the path — `plan` (docs/superpowers/plans), `decision` (decisions/), `dev` (dev/), `support` (support/), `spec` (specs/ or docs/superpowers/specs/).
+- **plan_slug**: A short slug for this doc (e.g. filename without .md: `project-spec`, `2026-03-12-tag-and-stream`). Same slug for all sections of one doc so Stream can show them together via tag `<doc_type>:<slug>`.
+- **project**: The **code project** name (e.g. workspace folder name, or repo name). Inject this for every capture_plan call during sync so thoughts are tagged with which project they came from. Use a consistent value for the whole sync (e.g. `ideatub`, `my-app`). Stored in source_metadata.
+
+**Split at section titles:** Split the document at markdown section headings (lines starting with `##`, `###`, etc.). Content before the first such heading is the first section (use a short **section_title** like "Intro" or the doc title if useful). For each section:
+1. **content** = the text for that section only (from the heading line through the next heading or end of file). Include the heading line in the content.
+2. **section_title** = the heading text only, without `#` and without extra spaces (e.g. `## Chunk 1: Phase 0` → section_title `Chunk 1: Phase 0`).
+3. Use the same `file_path`, `doc_type`, `plan_slug`, and `project` for every section.
+4. Call capture_plan once per section, in document order (first section first), so they appear in the right order in IdeaTub Stream. Optionally create a root thought first (e.g. doc title) and pass its UUID as `parent_id` for section thoughts.
+
+**Stream long-form view:** In IdeaTub, open Stream and filter by tag, e.g. `/stream?tag=decision-project-spec` or `/stream?tag=plan-2026-03-12-tag-and-stream`.
+
+IdeaTub MCP must be configured (MCP key, server URL). See project docs: `docs/cursor-mcp-integration.md`, `docs/mcp-integration-guide.md`, or Help in the app.
+
+---
+
+## IdeaTub: Save research via capture_plan
+
+When the user or a research agent has research output to save to IdeaTub, use the MCP tool **capture_plan** with:
+
+- **content** (required): The research text (full output or one section). Send the text; the server cannot read local paths.
+- **doc_type**: `research`.
+- **plan_slug**: A short slug for this research run (e.g. `2026-03-13-vehicle-valuation`, `competitor-analysis-Q1`). Same slug for all sections so Stream can show them together via tag `research:<slug>`.
+- **project**: The **research project** or topic name (e.g. workspace/repo name, or the research question). Use a consistent value for the whole save. Stored in source_metadata.
+- **file_path**: Optional; if from a file, use repo-relative path (e.g. `research/2026-03-13-vehicle-valuation.md`).
+- **section_title**: For each section, the heading or a short title.
+
+**Split at section titles:** If the research is long, split at markdown headings (`##`, `###`). For each section: use the same `doc_type`, `plan_slug`, and `project`; call capture_plan once per section in order.
+
+**Stream:** In IdeaTub, filter by tag, e.g. `/stream?tag=research-2026-03-13-vehicle-valuation`.
