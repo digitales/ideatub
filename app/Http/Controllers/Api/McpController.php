@@ -199,6 +199,8 @@ class McpController extends Controller
         $name = $params['name'] ?? null;
         $arguments = is_array($params['arguments'] ?? null) ? $params['arguments'] : [];
 
+        Log::warning('MCP tools/call', ['tool' => $name]);
+
         if (! is_string($name) || $name === '') {
             return $this->jsonRpcError(-32602, 'tools/call requires "name"', $id);
         }
@@ -343,17 +345,17 @@ class McpController extends Controller
         $query = (string) $params['query'];
         $limit = (int) ($params['limit'] ?? 10);
 
-        Log::info('MCP search_thoughts start', ['query' => $query, 'limit' => $limit]);
+        Log::warning('MCP search_thoughts start', ['query' => $query, 'limit' => $limit]);
 
         $embedding = $this->openRouter->embed($query);
-        Log::info('MCP search_thoughts embed ok', ['dims' => is_countable($embedding) ? count($embedding) : 0]);
+        Log::warning('MCP search_thoughts embed ok', ['dims' => is_countable($embedding) ? count($embedding) : 0]);
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->nearestTo($embedding, $limit)
             ->get(['id', 'content', 'metadata', 'created_at', 'source', 'source_metadata']);
 
-        Log::info('MCP search_thoughts query ok', ['count' => $thoughts->count()]);
+        Log::warning('MCP search_thoughts query ok', ['count' => $thoughts->count()]);
 
         return [
             'thoughts' => $thoughts->map(fn (Thought $t) => [

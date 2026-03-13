@@ -77,7 +77,14 @@ Rate limiting will then use file or array storage instead of the database, and t
 
 ## Diagnosing MCP search / tool failures (logging)
 
-If search still fails after fixing cache (or for other tools), check `storage/logs/laravel.log`:
+Search/tool failures are logged so you can see where they break. Log lines use **warning** or **error** level so they appear in production (e.g. when `LOG_LEVEL=warning`).
+
+**Where to look:**
+
+- **Laravel Cloud**: Dashboard → **Logs** tab → filter by **Application logs** (not Deploy/Build or process output). Cloud uses the `stderr` channel; application `Log::warning` / `Log::error` appear there.
+- **Self-hosted**: `storage/logs/laravel.log` (or your configured log channel).
+
+**What to look for:**
 
 - **`MCP search_thoughts start`** — request reached search with query/limit. If you never see this, failure is earlier (auth, routing, or a different tool).
 - **`MCP search_thoughts embed ok`** — OpenRouter embedding succeeded. If you see "start" but not "embed ok", the failure is in `OpenRouterService::embed()` (e.g. missing `OPENROUTER_API_KEY`, timeout, or OpenRouter API error).
