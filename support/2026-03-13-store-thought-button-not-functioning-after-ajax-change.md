@@ -52,10 +52,17 @@ if (data.thought) {
 }
 ```
 
+## Follow-up (2026-03-13): Save still not working on homepage
+
+- **Layout conditional**: The idea layout only loaded Vite when `public/build/manifest.json` existed. In many dev setups that file is missing (e.g. before first `npm run build`), so no JS ran and the capture form relied on a normal POST; in some cases the AJAX path was never used. **Fix:** Removed the `file_exists(public_path('build/manifest.json'))` check in `resources/views/layouts/idea.blade.php` so `@vite()` is always called. Scripts then load whenever the build exists (run `npm run build` or use `npm run dev` with a prior build).
+- **CSRF:** Use CSRF token from form body or from `<meta name="csrf-token">` for the `X-CSRF-TOKEN` header so the token is always sent.
+- **419:** When the server returns 419 (CSRF/session), show: "Session expired. Please refresh the page and try again."
+
 ## Prevention & Follow-up
 
 - [ ] When using `fetch()` with form data and a framework model (e.g. Alpine `x-model`), explicitly set the form field values from the model before building `FormData(form)` to avoid sync issues.
 - [ ] For endpoints that can return either JSON or redirect, client should handle both: on success without a JSON body, consider redirecting or reloading so the UI reflects the new state.
+- [ ] Ensure the idea layout always loads the capture script (avoid conditionals that skip `@vite()` unless there is a deliberate no-JS fallback). Run `npm run build` (or `npm run dev` after an initial build) so the manifest exists and the capture form runs.
 
 ## Related Issues
 

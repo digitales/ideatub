@@ -40,7 +40,7 @@ Alpine.data('captureBox', () => ({
 
     const body = new FormData(form);
     const url = form.action;
-    const csrf = body.get('_token');
+    const csrf = body.get('_token') || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
     try {
       const res = await fetch(url, {
@@ -56,7 +56,10 @@ Alpine.data('captureBox', () => ({
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        if (res.status === 422 && data.errors && data.errors.content) {
+        if (res.status === 419) {
+          this.message = 'Session expired. Please refresh the page and try again.';
+          this.messageType = 'error';
+        } else if (res.status === 422 && data.errors && data.errors.content) {
           this.errorField = data.errors.content[0] || 'Invalid content.';
         } else {
           this.message = data.message || 'Something went wrong. Please try again.';
