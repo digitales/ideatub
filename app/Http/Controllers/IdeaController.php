@@ -7,6 +7,7 @@ use App\Services\OpenRouterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -17,8 +18,8 @@ class IdeaController extends Controller
     /** Max number of search results to return (only those within similarity threshold). */
     private const SEARCH_LIMIT = 20;
 
-    /** Max cosine distance for search results; only thoughts at least this similar are shown (no back-fill). */
-    private const SEARCH_MAX_DISTANCE = 0.5;
+    /** Max cosine distance for search results; only thoughts within this distance are shown. If none match, we fall back to top N by distance. */
+    private const SEARCH_MAX_DISTANCE = 0.9;
 
     private const SEARCH_QUERY_MAX_LENGTH = 2000;
 
@@ -44,11 +45,25 @@ class IdeaController extends Controller
             try {
                 $embedding = $this->openRouter->embed($query);
                 $page = (int) $request->input('page', 1);
-                $thoughts = Thought::query()
+                $baseQuery = Thought::query()
                     ->where('user_id', auth()->id())
+                    ->with(['comments' => fn ($q) => $q->orderBy('created_at'), 'parent']);
+
+                $thoughts = (clone $baseQuery)
                     ->nearestWithin($embedding, self::SEARCH_MAX_DISTANCE)
-                    ->with(['comments' => fn ($q) => $q->orderBy('created_at'), 'parent'])
                     ->paginate(self::SEARCH_LIMIT, ['*'], 'page', $page);
+
+                // If threshold filtered everything out, fall back to top N by distance (no threshold)
+                if ($thoughts->total() === 0) {
+                    $fallback = (clone $baseQuery)->nearestTo($embedding, self::SEARCH_LIMIT)->get();
+                    $thoughts = new LengthAwarePaginator(
+                        $fallback,
+                        $fallback->count(),
+                        self::SEARCH_LIMIT,
+                        1,
+                        ['path' => $request->url(), 'query' => $request->query()]
+                    );
+                }
 
                 if ($request->ajax()) {
                     $replyableOffset = (int) $request->input('replyable_offset', 0);
