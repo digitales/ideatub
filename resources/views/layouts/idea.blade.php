@@ -54,7 +54,7 @@
                     x-ref="searchInput"
                     x-init="$watch('searching', v => v && $nextTick(() => $refs.searchInput.focus()))"
                     placeholder="Find a memory…"
-                    class="flex-1 bg-transparent border-none outline-none text-deep-indigo placeholder-slate-brand/50 text-sm"
+                    class="flex-1 bg-white rounded-md px-3 py-2 border border-slate-200/80 outline-none text-deep-indigo placeholder-slate-brand/50 text-sm focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50"
                 >
                 <button type="button" @click="searching = false" class="text-slate-brand/60 hover:text-slate-brand text-xs">
                     Cancel

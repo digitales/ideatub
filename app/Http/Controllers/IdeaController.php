@@ -33,7 +33,7 @@ class IdeaController extends Controller
      * Idea index: semantic search when ?q= present, otherwise recent top-level thoughts (with comments).
      * When parent_id is in request, pass replyingTo for the capture form context.
      */
-    public function index(Request $request): View|RedirectResponse
+    public function index(Request $request): View|RedirectResponse|JsonResponse
     {
         $query = $request->input('q');
         $query = is_string($query) ? trim($query) : '';

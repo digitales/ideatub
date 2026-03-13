@@ -27,7 +27,13 @@ Alpine.data('captureBox', () => ({
     const form = this.$el.querySelector('form');
     if (!form || this.saving) return;
     const content = (this.content || '').trim();
-    if (!content) return;
+    if (!content) {
+      this.message = 'Add some text to save.';
+      this.messageType = 'error';
+      this.errorField = '';
+      setTimeout(() => { this.message = ''; }, 3000);
+      return;
+    }
 
     this.saving = true;
     this.message = '';

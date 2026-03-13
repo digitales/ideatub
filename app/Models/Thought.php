@@ -94,6 +94,15 @@ class Thought extends Model
     }
 
     /**
+     * Get content with HTML entities decoded for display.
+     * Use with e() in views to avoid showing literal &quot;, &#039;, etc.
+     */
+    public function getDecodedContent(): string
+    {
+        return html_entity_decode($this->content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    /**
      * Get the user that owns the thought.
      */
     public function user(): BelongsTo

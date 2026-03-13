@@ -63,9 +63,10 @@
                 name="content"
                 id="content"
                 rows="3"
-                required
                 x-ref="captureTextarea"
                 x-model="content"
+                @keydown.meta.enter.prevent="submitCapture()"
+                @keydown.ctrl.enter.prevent="submitCapture()"
                 :aria-invalid="!!errorField || {{ $errors->has('content') ? 'true' : 'false' }}"
                 aria-describedby="content-error"
                 placeholder="What are you thinking?"
