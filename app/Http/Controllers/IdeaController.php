@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Thought;
 use App\Services\OpenRouterService;
+use App\Services\ThoughtCaptureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,8 @@ class IdeaController extends Controller
     private const STREAM_PAGE_SIZE = 20;
 
     public function __construct(
-        private OpenRouterService $openRouter
+        private OpenRouterService $openRouter,
+        private ThoughtCaptureService $captureService
     ) {}
 
     /**
@@ -121,9 +123,11 @@ class IdeaController extends Controller
         $validated = $request->validate([
             'content' => 'required|string|max:65535',
             'parent_id' => 'sometimes|nullable|uuid|exists:thoughts,id',
+            'no_chunking' => 'sometimes|nullable|boolean',
         ]);
         $content = $validated['content'];
         $parentId = $validated['parent_id'] ?? null;
+        $noChunking = ! empty($validated['no_chunking']);
 
         $parent = null;
         if ($parentId !== null) {
@@ -139,25 +143,16 @@ class IdeaController extends Controller
         }
 
         try {
-            $embedding = $this->openRouter->embed($content);
-            $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
-
-            $payload = [
+            $result = $this->captureService->create([
                 'content' => $content,
-                'embedding' => $embedding,
-                'metadata' => $metadata,
                 'user_id' => auth()->id(),
+                'parent_id' => $parent?->id,
                 'source' => 'web',
                 'source_metadata' => null,
-            ];
-            if ($parent !== null) {
-                $payload['parent_id'] = $parent->id;
-            }
-
-            $thought = Thought::create($payload);
+                'no_chunking' => $noChunking,
+            ]);
         } catch (\Throwable $e) {
             report($e);
-
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'Unable to save thought. Please try again.'], 503);
             }
@@ -165,8 +160,33 @@ class IdeaController extends Controller
             return redirect()->back()->withInput()->with('error', 'Unable to save thought. Please try again.');
         }
 
+        if ($result['chunked']) {
+            $root = $result['root'];
+            if ($request->expectsJson()) {
+                $root->load('parent');
+
+                return response()->json([
+                    'message' => 'Thought saved as '.$result['count'].' sections.',
+                    'thought' => [
+                        'id' => $root->id,
+                        'content' => $root->getDecodedContent(),
+                        'parent_id' => null,
+                        'created_at' => $root->created_at->toIso8601String(),
+                        'created_at_human' => $root->created_at->diffForHumans(),
+                    ],
+                    'chunked' => true,
+                    'section_ids' => $result['section_ids'],
+                ]);
+            }
+
+            return redirect()->route('idea.index')
+                ->with('success', 'Saved as '.$result['count'].' sections.');
+        }
+
+        $thought = $result['thought'];
         if ($request->expectsJson()) {
             $thought->load('parent');
+
             return response()->json([
                 'message' => 'Thought saved.',
                 'thought' => [

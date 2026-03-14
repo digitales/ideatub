@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Thought;
 use App\Services\OpenRouterService;
+use App\Services\ThoughtCaptureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -12,7 +13,8 @@ use Illuminate\Support\Facades\Validator;
 class ThoughtsApiController extends Controller
 {
     public function __construct(
-        private OpenRouterService $openRouter
+        private OpenRouterService $openRouter,
+        private ThoughtCaptureService $captureService,
     ) {}
 
     /**
@@ -95,7 +97,8 @@ class ThoughtsApiController extends Controller
 
     /**
      * POST /api/thoughts — Create a thought (capture_thought).
-     * Body: content (required); parent_id or in_reply_to (optional UUID); source, source_metadata (optional).
+     * Body: content (required); parent_id or in_reply_to (optional UUID); source, source_metadata, no_chunking (optional).
+     * When content is over 500 words and no_chunking is not set, creates chunked thoughts (root + sections).
      */
     public function store(Request $request): JsonResponse
     {
@@ -105,6 +108,7 @@ class ThoughtsApiController extends Controller
             'in_reply_to' => 'sometimes|nullable|uuid',
             'source' => 'sometimes|nullable|string|max:64',
             'source_metadata' => 'sometimes|nullable|array',
+            'no_chunking' => 'sometimes|nullable|boolean',
         ]);
         if ($v->fails()) {
             return response()->json(['error' => 'validation_error', 'message' => $v->errors()->first()], 422);
@@ -124,6 +128,7 @@ class ThoughtsApiController extends Controller
         if (! is_array($sourceMetadata)) {
             $sourceMetadata = null;
         }
+        $noChunking = $request->boolean('no_chunking');
 
         $parent = null;
         if ($parentId !== null) {
@@ -137,28 +142,30 @@ class ThoughtsApiController extends Controller
         }
 
         try {
-            $embedding = $this->openRouter->embed($content);
-            $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
+            $result = $this->captureService->create([
+                'content' => $content,
+                'user_id' => auth()->id(),
+                'parent_id' => $parent?->id,
+                'source' => $source,
+                'source_metadata' => $sourceMetadata,
+                'no_chunking' => $noChunking,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => 'validation_error', 'message' => $e->getMessage()], 422);
         } catch (\Throwable $e) {
             report($e);
 
             return response()->json(['error' => 'Unable to save thought. Please try again.'], 503);
         }
 
-        $payload = [
-            'content' => $content,
-            'embedding' => $embedding,
-            'metadata' => $metadata,
-            'user_id' => auth()->id(),
-            'source' => $source,
-            'source_metadata' => $sourceMetadata,
-        ];
-        if ($parent !== null) {
-            $payload['parent_id'] = $parent->id;
+        if ($result['chunked']) {
+            return response()->json([
+                'id' => $result['root']->id,
+                'chunked' => true,
+                'section_ids' => $result['section_ids'],
+            ], 201);
         }
 
-        $thought = Thought::create($payload);
-
-        return response()->json(['id' => $thought->id], 201);
+        return response()->json(['id' => $result['thought']->id], 201);
     }
 }

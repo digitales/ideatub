@@ -108,6 +108,58 @@ class IdeaPageTest extends TestCase
         $this->assertSame(['jira', 'web development'], $thought->metadata['tags'] ?? null);
     }
 
+    public function test_web_capture_chunks_when_over_500_words(): void
+    {
+        $user = User::factory()->create();
+        $intro = implode(' ', array_fill(0, 300, 'word'));
+        $part2 = implode(' ', array_fill(0, 250, 'more'));
+        $content = $intro."\n\n## Part one\n\n".$part2;
+
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->twice()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->actingAs($user)->post(route('thoughts.store'), [
+            'content' => $content,
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect(route('idea.index'));
+        $response->assertSessionHas('success', 'Saved as 2 sections.');
+        $root = Thought::where('user_id', $user->id)->whereNull('parent_id')->latest()->first();
+        $this->assertNotNull($root);
+        $this->assertSame('web', $root->source);
+        $this->assertSame(0, $root->source_metadata['section_index'] ?? -1);
+        $child = Thought::where('user_id', $user->id)->where('parent_id', $root->id)->first();
+        $this->assertNotNull($child);
+        $this->assertSame('Part one', $child->source_metadata['section_title'] ?? null);
+        $this->assertSame(2, Thought::where('user_id', $user->id)->count());
+    }
+
+    public function test_web_capture_no_chunking_keeps_single_thought(): void
+    {
+        $user = User::factory()->create();
+        $long = implode(' ', array_fill(0, 501, 'word'));
+        $content = $long."\n\n## Section\n\nMore text.";
+
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->actingAs($user)->post(route('thoughts.store'), [
+            'content' => $content,
+            'no_chunking' => '1',
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect(route('idea.index'));
+        $this->assertSame(1, Thought::where('user_id', $user->id)->count());
+    }
+
     public function test_example_prompts_page_loads_with_prompt_kit_content(): void
     {
         $user = User::factory()->create();

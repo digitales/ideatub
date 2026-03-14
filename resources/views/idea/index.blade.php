@@ -75,6 +75,12 @@
 
             <p id="content-error" class="mt-1 text-xs text-red-500" x-show="errorField || {{ $errors->has('content') ? 'true' : 'false' }}" x-text="errorField">@if($errors->has('content')){{ $errors->first('content') }}@endif</p>
 
+            <div class="mt-2 flex items-center gap-2">
+                <input type="checkbox" name="no_chunking" id="no_chunking" value="1" class="rounded border-slate-300 text-memory-violet focus:ring-memory-violet/30"
+                    {{ old('no_chunking') ? 'checked' : '' }}>
+                <label for="no_chunking" class="text-[11px] text-slate-brand/70">Don't split into sections (long docs are normally split at headings)</label>
+            </div>
+
             <div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-memory-violet/8">
                 <span class="text-[11px] text-slate-brand/40">⌘ + Enter to store · ⌘/ to focus</span>
                 <button

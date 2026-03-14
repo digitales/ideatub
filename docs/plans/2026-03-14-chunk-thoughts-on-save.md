@@ -36,6 +36,20 @@ So: **linking and tags already work** when the client splits and calls multiple 
 
 ---
 
+## Other methods for saving thoughts (entry points)
+
+| Entry point | Source | Chunking | Opt-out |
+|-------------|--------|----------|--------|
+| **Web form** | `IdeaController::store()` | ✅ Yes | Paste in capture box; >500 words → split at headings; optional “Don’t split” checkbox. |
+| **MCP capture_plan** | `McpController::capturePlan()` | ✅ Yes | >500 words → split; `no_chunking` / `no-chunking` to opt out. |
+| **MCP capture_thought** | `McpController::captureThought()` | ✅ Yes | Params `no_chunking` / `no-chunking` |
+| **REST API** | `ThoughtsApiController::store()` (POST /api/thoughts) | ✅ Yes | Body `no_chunking` (boolean) |
+| **Inbound email** | `PostmarkInboundService::process()` | ✅ Yes | Subject or body contains `[no-chunk]` or `[no_chunking]` (case-insensitive) |
+
+All use **ThoughtCaptureService::create()**. Chunking is not in the Thought model; the service is the single place for create-one vs create-chunked.
+
+---
+
 ## Recommendations
 
 ### 1. Add server-side “chunk on save” for documents (high value)

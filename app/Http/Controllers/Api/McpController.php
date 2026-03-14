@@ -8,7 +8,7 @@ use App\Models\User;
 use App\Models\UserMcpKey;
 use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
-use App\Services\ThoughtChunkingService;
+use App\Services\ThoughtCaptureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,7 +19,7 @@ class McpController extends Controller
 {
     public function __construct(
         private OpenRouterService $openRouter,
-        private ThoughtChunkingService $chunkingService,
+        private ThoughtCaptureService $captureService,
         private ?OAuthMcpJwtService $oauthJwt = null
     ) {}
 
@@ -165,6 +165,7 @@ class McpController extends Controller
                         'in_reply_to' => ['type' => 'string', 'description' => 'Alias for parent_id'],
                         'source' => ['type' => 'string', 'description' => 'Optional source label (e.g. chatgpt, claude, cursor)'],
                         'source_metadata' => ['type' => 'object', 'description' => 'Optional source-specific metadata'],
+                        'no_chunking' => ['type' => 'boolean', 'description' => 'If true, do not auto-chunk long content (default: content over 500 words is split at markdown headings)'],
                     ],
                     'required' => ['content'],
                 ],
@@ -434,6 +435,8 @@ class McpController extends Controller
             'in_reply_to' => 'sometimes|nullable|uuid',
             'source' => 'sometimes|nullable|string|max:64',
             'source_metadata' => 'sometimes|nullable|array',
+            'no_chunking' => 'sometimes|nullable|boolean',
+            'no-chunking' => 'sometimes|nullable|boolean',
         ]);
         if ($v->fails()) {
             throw new \InvalidArgumentException($v->errors()->first());
@@ -450,36 +453,26 @@ class McpController extends Controller
         $sourceMetadata = isset($params['source_metadata']) && is_array($params['source_metadata'])
             ? $params['source_metadata']
             : null;
+        $noChunking = ! empty($params['no_chunking']) || ! empty($params['no-chunking']);
 
-        $parent = null;
-        if ($parentId !== null) {
-            $parent = Thought::find($parentId);
-            if ($parent === null) {
-                throw new \InvalidArgumentException('Parent thought not found.');
-            }
-            if ($parent->user_id !== auth()->id()) {
-                throw new \InvalidArgumentException('Parent thought does not belong to you.');
-            }
-        }
-
-        $embedding = $this->openRouter->embed($content);
-        $metadata = \App\Models\Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
-
-        $payload = [
+        $result = $this->captureService->create([
             'content' => $content,
-            'embedding' => $embedding,
-            'metadata' => $metadata,
             'user_id' => auth()->id(),
+            'parent_id' => $parentId,
             'source' => $source,
             'source_metadata' => $sourceMetadata,
-        ];
-        if ($parent !== null) {
-            $payload['parent_id'] = $parent->id;
+            'no_chunking' => $noChunking,
+        ]);
+
+        if ($result['chunked']) {
+            return [
+                'id' => $result['root']->id,
+                'chunked' => true,
+                'section_ids' => $result['section_ids'],
+            ];
         }
 
-        $thought = Thought::create($payload);
-
-        return ['id' => $thought->id];
+        return ['id' => $result['thought']->id];
     }
 
     /**
@@ -551,148 +544,32 @@ class McpController extends Controller
             }
         }
 
-        $chunkOptions = [
-            'no_chunking' => ! empty($params['no_chunking']),
-            'no-chunking' => ! empty($params['no-chunking']),
-            'source_metadata' => $sourceMetadata,
-        ];
-        if ($this->chunkingService->shouldChunk($content, $chunkOptions)) {
-            return $this->capturePlanChunked(
-                $content,
-                $docType,
-                $filePath,
-                $planSlug,
-                $project,
-                $extraTags,
-            );
-        }
-
-        $embedding = $this->openRouter->embed($content);
-        $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
-
-        $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
-        if ($planSlug !== null) {
-            $docTag = $docType.':'.mb_strtolower($planSlug);
-            if (! in_array($docTag, $tags, true)) {
-                $tags[] = $docTag;
-            }
-        }
-        foreach ($extraTags as $t) {
-            if ($t !== '' && ! in_array($t, $tags, true)) {
-                $tags[] = $t;
-            }
-        }
-        $metadata['tags'] = array_values(array_unique($tags));
-
-        $payload = [
+        $noChunking = ! empty($params['no_chunking']) || ! empty($params['no-chunking']);
+        $result = $this->captureService->create([
             'content' => $content,
-            'embedding' => $embedding,
-            'metadata' => $metadata,
             'user_id' => auth()->id(),
+            'parent_id' => $parent?->id,
             'source' => $docType,
             'source_metadata' => $sourceMetadata ?: null,
-            'parent_id' => $parent?->id,
-        ];
-
-        $thought = Thought::create($payload);
-
-        $result = ['id' => $thought->id];
-        if ($planSlug !== null) {
-            $result['plan_slug'] = $planSlug;
-        }
-        if ($docType !== 'plan') {
-            $result['doc_type'] = $docType;
-        }
-
-        return $result;
-    }
-
-    /**
-     * Create a root thought and section thoughts from chunked content. Same tags and doc metadata on all.
-     *
-     * @param  array<int, string>  $extraTags
-     * @return array{id: string, chunked: true, section_ids: array<int, string>, plan_slug?: string, doc_type?: string}
-     */
-    private function capturePlanChunked(
-        string $content,
-        string $docType,
-        ?string $filePath,
-        ?string $planSlug,
-        ?string $project,
-        array $extraTags,
-    ): array {
-        $sections = $this->chunkingService->splitAtHeadings($content);
-        $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
-        $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
-        if ($planSlug !== null) {
-            $docTag = $docType.':'.mb_strtolower($planSlug);
-            if (! in_array($docTag, $tags, true)) {
-                $tags[] = $docTag;
-            }
-        }
-        foreach ($extraTags as $t) {
-            if ($t !== '' && ! in_array($t, $tags, true)) {
-                $tags[] = $t;
-            }
-        }
-        $metadata['tags'] = array_values(array_unique($tags));
-
-        $baseSourceMetadata = array_filter([
+            'no_chunking' => $noChunking,
+            'plan_slug' => $planSlug,
             'doc_type' => $docType,
             'file_path' => $filePath,
-            'plan_slug' => $planSlug,
             'project' => $project,
-        ], fn ($v) => $v !== null && $v !== '');
-
-        $rootContent = $sections[0]['content'];
-        $rootSourceMetadata = array_merge($baseSourceMetadata, [
-            'section_title' => $sections[0]['title'],
-            'section_index' => 0,
+            'extra_tags' => $extraTags,
         ]);
-        $rootEmbedding = $this->openRouter->embed($rootContent);
-        $root = Thought::create([
-            'content' => $rootContent,
-            'embedding' => $rootEmbedding,
-            'metadata' => $metadata,
-            'user_id' => auth()->id(),
-            'source' => $docType,
-            'source_metadata' => $rootSourceMetadata,
-            'parent_id' => null,
-        ]);
-        $sectionIds = [$root->id];
 
-        foreach (array_slice($sections, 1) as $index => $section) {
-            $sectionContent = $section['content'];
-            $sectionEmbedding = $this->openRouter->embed($sectionContent);
-            $sectionSourceMetadata = array_merge($baseSourceMetadata, [
-                'section_title' => $section['title'],
-                'section_index' => $index + 1,
-            ]);
-            $child = Thought::create([
-                'content' => $sectionContent,
-                'embedding' => $sectionEmbedding,
-                'metadata' => $metadata,
-                'user_id' => auth()->id(),
-                'source' => $docType,
-                'source_metadata' => $sectionSourceMetadata,
-                'parent_id' => $root->id,
-            ]);
-            $sectionIds[] = $child->id;
-        }
-
-        $result = [
-            'id' => $root->id,
-            'chunked' => true,
-            'section_ids' => $sectionIds,
-        ];
+        $out = $result['chunked']
+            ? ['id' => $result['root']->id, 'chunked' => true, 'section_ids' => $result['section_ids']]
+            : ['id' => $result['thought']->id];
         if ($planSlug !== null) {
-            $result['plan_slug'] = $planSlug;
+            $out['plan_slug'] = $planSlug;
         }
         if ($docType !== 'plan') {
-            $result['doc_type'] = $docType;
+            $out['doc_type'] = $docType;
         }
 
-        return $result;
+        return $out;
     }
 
     private function jsonRpcError(int $code, string $message, mixed $id): JsonResponse

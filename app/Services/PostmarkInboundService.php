@@ -11,7 +11,7 @@ use Carbon\Carbon;
 class PostmarkInboundService
 {
     public function __construct(
-        private OpenRouterService $openRouter
+        private ThoughtCaptureService $captureService
     ) {}
 
     /**
@@ -61,17 +61,27 @@ class PostmarkInboundService
             $sourceMetadata['reply_to'] = $payload['ReplyTo'];
         }
 
-        $embedding = $this->openRouter->embed($bodyText);
-        $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($bodyText));
+        $subject = isset($payload['Subject']) && is_string($payload['Subject']) ? $payload['Subject'] : '';
+        $noChunking = $this->emailRequestsNoChunking($subject, $bodyText);
 
-        Thought::create([
+        $this->captureService->create([
             'content' => $bodyText,
-            'embedding' => $embedding,
-            'metadata' => $metadata,
             'user_id' => $user->id,
+            'parent_id' => null,
             'source' => 'email',
             'source_metadata' => $sourceMetadata,
+            'no_chunking' => $noChunking,
         ]);
+    }
+
+    /**
+     * Opt-out convention: subject or body contains [no-chunk] or [no_chunking] (case-insensitive).
+     */
+    private function emailRequestsNoChunking(string $subject, string $bodyText): bool
+    {
+        $haystack = $subject."\n".$bodyText;
+
+        return stripos($haystack, '[no-chunk]') !== false || stripos($haystack, '[no_chunking]') !== false;
     }
 
     private function extractBodyText(array $payload): string
