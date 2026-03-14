@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\UserMcpKey;
 use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
+use App\Services\ThoughtChunkingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +19,7 @@ class McpController extends Controller
 {
     public function __construct(
         private OpenRouterService $openRouter,
+        private ThoughtChunkingService $chunkingService,
         private ?OAuthMcpJwtService $oauthJwt = null
     ) {}
 
@@ -181,6 +183,7 @@ class McpController extends Controller
                         'section_title' => ['type' => 'string', 'description' => 'Optional title of this section (stored in source_metadata)'],
                         'project' => ['type' => 'string', 'description' => 'Optional code project name (e.g. workspace or repo name). Stored in source_metadata so you can filter by project.'],
                         'tags' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Optional extra tags to merge with extracted and doc tag'],
+                        'no_chunking' => ['type' => 'boolean', 'description' => 'If true, do not auto-chunk long documents (default: documents over 500 words are split at markdown headings into linked sections).'],
                     ],
                     'required' => ['content'],
                 ],
@@ -501,6 +504,8 @@ class McpController extends Controller
             'project' => 'sometimes|nullable|string|max:256',
             'tags' => 'sometimes|nullable|array',
             'tags.*' => 'string|max:128',
+            'no_chunking' => 'sometimes|nullable|boolean',
+            'no-chunking' => 'sometimes|nullable|boolean',
         ]);
         if ($v->fails()) {
             throw new \InvalidArgumentException($v->errors()->first());
@@ -546,6 +551,22 @@ class McpController extends Controller
             }
         }
 
+        $chunkOptions = [
+            'no_chunking' => ! empty($params['no_chunking']),
+            'no-chunking' => ! empty($params['no-chunking']),
+            'source_metadata' => $sourceMetadata,
+        ];
+        if ($this->chunkingService->shouldChunk($content, $chunkOptions)) {
+            return $this->capturePlanChunked(
+                $content,
+                $docType,
+                $filePath,
+                $planSlug,
+                $project,
+                $extraTags,
+            );
+        }
+
         $embedding = $this->openRouter->embed($content);
         $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
 
@@ -576,6 +597,94 @@ class McpController extends Controller
         $thought = Thought::create($payload);
 
         $result = ['id' => $thought->id];
+        if ($planSlug !== null) {
+            $result['plan_slug'] = $planSlug;
+        }
+        if ($docType !== 'plan') {
+            $result['doc_type'] = $docType;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Create a root thought and section thoughts from chunked content. Same tags and doc metadata on all.
+     *
+     * @param  array<int, string>  $extraTags
+     * @return array{id: string, chunked: true, section_ids: array<int, string>, plan_slug?: string, doc_type?: string}
+     */
+    private function capturePlanChunked(
+        string $content,
+        string $docType,
+        ?string $filePath,
+        ?string $planSlug,
+        ?string $project,
+        array $extraTags,
+    ): array {
+        $sections = $this->chunkingService->splitAtHeadings($content);
+        $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
+        $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
+        if ($planSlug !== null) {
+            $docTag = $docType.':'.mb_strtolower($planSlug);
+            if (! in_array($docTag, $tags, true)) {
+                $tags[] = $docTag;
+            }
+        }
+        foreach ($extraTags as $t) {
+            if ($t !== '' && ! in_array($t, $tags, true)) {
+                $tags[] = $t;
+            }
+        }
+        $metadata['tags'] = array_values(array_unique($tags));
+
+        $baseSourceMetadata = array_filter([
+            'doc_type' => $docType,
+            'file_path' => $filePath,
+            'plan_slug' => $planSlug,
+            'project' => $project,
+        ], fn ($v) => $v !== null && $v !== '');
+
+        $rootContent = $sections[0]['content'];
+        $rootSourceMetadata = array_merge($baseSourceMetadata, [
+            'section_title' => $sections[0]['title'],
+            'section_index' => 0,
+        ]);
+        $rootEmbedding = $this->openRouter->embed($rootContent);
+        $root = Thought::create([
+            'content' => $rootContent,
+            'embedding' => $rootEmbedding,
+            'metadata' => $metadata,
+            'user_id' => auth()->id(),
+            'source' => $docType,
+            'source_metadata' => $rootSourceMetadata,
+            'parent_id' => null,
+        ]);
+        $sectionIds = [$root->id];
+
+        foreach (array_slice($sections, 1) as $index => $section) {
+            $sectionContent = $section['content'];
+            $sectionEmbedding = $this->openRouter->embed($sectionContent);
+            $sectionSourceMetadata = array_merge($baseSourceMetadata, [
+                'section_title' => $section['title'],
+                'section_index' => $index + 1,
+            ]);
+            $child = Thought::create([
+                'content' => $sectionContent,
+                'embedding' => $sectionEmbedding,
+                'metadata' => $metadata,
+                'user_id' => auth()->id(),
+                'source' => $docType,
+                'source_metadata' => $sectionSourceMetadata,
+                'parent_id' => $root->id,
+            ]);
+            $sectionIds[] = $child->id;
+        }
+
+        $result = [
+            'id' => $root->id,
+            'chunked' => true,
+            'section_ids' => $sectionIds,
+        ];
         if ($planSlug !== null) {
             $result['plan_slug'] = $planSlug;
         }

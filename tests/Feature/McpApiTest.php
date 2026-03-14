@@ -343,4 +343,82 @@ class McpApiTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('error.code', -32602);
     }
+
+    public function test_capture_plan_chunks_when_over_500_words(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $words = array_fill(0, 300, 'word');
+        $intro = implode(' ', $words);
+        $part2 = implode(' ', array_fill(0, 250, 'more'));
+        $content = $intro."\n\n## Part one\n\n".$part2;
+
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->twice()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => $content,
+                'plan_slug' => 'long-doc',
+                'doc_type' => 'plan',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.chunked', true);
+        $response->assertJsonPath('result.plan_slug', 'long-doc');
+        $sectionIds = $response->json('result.section_ids');
+        $this->assertIsArray($sectionIds);
+        $this->assertCount(2, $sectionIds);
+
+        $root = Thought::find($sectionIds[0]);
+        $this->assertNotNull($root);
+        $this->assertNull($root->parent_id);
+        $this->assertSame('plan', $root->source);
+        $this->assertSame(0, $root->source_metadata['section_index'] ?? -1);
+        $child = Thought::find($sectionIds[1]);
+        $this->assertNotNull($child);
+        $this->assertSame($root->id, $child->parent_id);
+        $this->assertSame(1, $child->source_metadata['section_index'] ?? -1);
+        $this->assertSame('Part one', $child->source_metadata['section_title'] ?? null);
+        $rootTags = $root->metadata['tags'] ?? [];
+        $this->assertContains('plan:long-doc', $rootTags);
+        $childTags = $child->metadata['tags'] ?? [];
+        $this->assertContains('plan:long-doc', $childTags);
+    }
+
+    public function test_capture_plan_no_chunking_opt_out_keeps_single_thought(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $long = implode(' ', array_fill(0, 501, 'word'));
+        $content = $long."\n\n## Section\n\nMore text.";
+
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => $content,
+                'plan_slug' => 'no-chunk-doc',
+                'no_chunking' => true,
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.id', fn ($id) => is_string($id));
+        $this->assertArrayNotHasKey('chunked', $response->json('result'));
+        $count = Thought::where('user_id', $user->id)->count();
+        $this->assertSame(1, $count);
+    }
 }
