@@ -9,6 +9,7 @@ use App\Models\UserMcpKey;
 use App\Services\IdeasToRevisitService;
 use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
+use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class McpController extends Controller
         private OpenRouterService $openRouter,
         private ThoughtCaptureService $captureService,
         private IdeasToRevisitService $ideasToRevisit,
+        private ResearchService $researchService,
         private ?OAuthMcpJwtService $oauthJwt = null
     ) {}
 
@@ -37,7 +39,7 @@ class McpController extends Controller
             'version' => '1.0',
             'protocol' => 'json-rpc',
             'auth' => 'Send key via ?key=... or x-ideatub-key header',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas'],
+            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'],
         ]);
     }
 
@@ -78,7 +80,7 @@ class McpController extends Controller
         }
 
         // Legacy direct method names (search_thoughts, browse_recent, etc.)
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'];
         if (! in_array($method, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -214,6 +216,18 @@ class McpController extends Controller
                     ],
                 ],
             ],
+            [
+                'name' => 'research_idea',
+                'description' => 'Run AI research for an idea. Provide idea_id (UUID of existing idea) or content (new idea text); creates linked research thought.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'idea_id' => ['type' => 'string', 'description' => 'UUID of an existing idea thought to run research for'],
+                        'content' => ['type' => 'string', 'description' => 'New idea text; creates idea and runs research (use when no idea_id)'],
+                    ],
+                    'required' => [],
+                ],
+            ],
         ];
 
         return response()->json([
@@ -234,7 +248,7 @@ class McpController extends Controller
             return $this->jsonRpcError(-32602, 'tools/call requires "name"', $id);
         }
 
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'];
         if (! in_array($name, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -354,6 +368,7 @@ class McpController extends Controller
             'capture_plan' => $this->capturePlan($params),
             'capture_idea' => $this->captureIdea($params),
             'get_ideas' => $this->getIdeas($params),
+            'research_idea' => $this->researchIdea($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
     }
@@ -467,6 +482,63 @@ class McpController extends Controller
         }, $thoughts);
 
         return ['ideas' => $ideas];
+    }
+
+    /**
+     * research_idea: Run AI research for an idea. Either idea_id (existing idea) or content (new idea), or both (content creates new idea+research).
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{idea_id: string, research_id: string|null}
+     */
+    private function researchIdea(array $params): array
+    {
+        $ideaId = isset($params['idea_id']) && trim((string) $params['idea_id']) !== ''
+            ? trim((string) $params['idea_id'])
+            : null;
+        $content = isset($params['content']) && trim((string) $params['content']) !== ''
+            ? trim((string) $params['content'])
+            : null;
+
+        if ($ideaId === null && $content === null) {
+            throw new \InvalidArgumentException('At least one of idea_id or content is required.');
+        }
+
+        if ($ideaId !== null) {
+            $uuidValidator = Validator::make(['idea_id' => $ideaId], ['idea_id' => 'uuid']);
+            if ($uuidValidator->fails()) {
+                throw new \InvalidArgumentException('idea_id must be a valid UUID.');
+            }
+        }
+
+        // If content provided, create idea and run research (idea_id is ignored when content is present).
+        if ($content !== null) {
+            $result = $this->researchService->createIdeaAndResearch($content, 'mcp');
+
+            return [
+                'idea_id' => $result['idea']->id,
+                'research_id' => $result['research']?->id,
+            ];
+        }
+
+        // idea_id only: run research for existing idea.
+        $thought = Thought::find($ideaId);
+        if ($thought === null) {
+            throw new \InvalidArgumentException('Idea not found.');
+        }
+        if ($thought->user_id !== auth()->id()) {
+            throw new \InvalidArgumentException('Idea not found.');
+        }
+        $type = $thought->metadata['type'] ?? null;
+        if ($type !== 'idea') {
+            throw new \InvalidArgumentException('Thought is not an idea.');
+        }
+
+        $researchThought = $this->researchService->runResearchForIdea($thought, 'mcp');
+
+        return [
+            'idea_id' => $thought->id,
+            'research_id' => $researchThought->id,
+        ];
     }
 
     /**
