@@ -606,7 +606,8 @@ class McpController extends Controller
     {
         $v = Validator::make($params, [
             'content' => 'required|string',
-            'logged_date' => 'sometimes|nullable|string|date',
+            'logged_date' => 'sometimes|nullable|string|date_format:Y-m-d',
+            'completed' => 'sometimes|boolean',
         ]);
         if ($v->fails()) {
             throw new \InvalidArgumentException($v->errors()->first());
@@ -614,6 +615,7 @@ class McpController extends Controller
         $loggedDate = isset($params['logged_date']) && trim((string) $params['logged_date']) !== ''
             ? trim((string) $params['logged_date'])
             : now()->toDateString();
+        $completed = isset($params['completed']) ? (bool) $params['completed'] : false;
 
         $result = $this->captureService->create([
             'content' => $params['content'],
@@ -621,7 +623,7 @@ class McpController extends Controller
             'source' => 'mcp',
             'idea_metadata' => [
                 'type' => 'idea',
-                'completed' => false,
+                'completed' => $completed,
                 'logged_date' => $loggedDate,
             ],
         ]);

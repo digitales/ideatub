@@ -310,16 +310,17 @@ class IdeaController extends Controller
     }
 
     /**
-     * Store a new idea (thought with metadata.type = 'idea'). Validates content and optional logged_date.
+     * Store a new idea (thought with metadata.type = 'idea'). Validates content, optional logged_date (Y-m-d), and optional completed (boolean).
      */
     public function storeIdea(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'content' => 'required|string|max:65535',
-            'logged_date' => 'nullable|date',
+            'logged_date' => 'nullable|date_format:Y-m-d',
+            'completed' => 'sometimes|boolean',
         ]);
         $content = $validated['content'];
-        $loggedDate = $request->input('logged_date') ?? now()->toDateString();
+        $loggedDate = $validated['logged_date'] ?? now()->toDateString();
 
         try {
             $this->captureService->create([
@@ -330,7 +331,7 @@ class IdeaController extends Controller
                 'source_metadata' => null,
                 'idea_metadata' => [
                     'type' => 'idea',
-                    'completed' => false,
+                    'completed' => $validated['completed'] ?? false,
                     'logged_date' => $loggedDate,
                 ],
             ]);
@@ -408,8 +409,16 @@ class IdeaController extends Controller
         ]);
         $content = $validated['content'];
 
-        $result = $this->researchService->createIdeaAndResearch($content, 'web');
-        $idea = $result['idea'];
+        try {
+            $result = $this->researchService->createIdeaAndResearch($content, 'web');
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()->route('idea.ideas')
+                ->withInput()
+                ->with('error', 'Unable to save idea. Please try again.');
+        }
+
         $research = $result['research'];
 
         if ($research === null) {

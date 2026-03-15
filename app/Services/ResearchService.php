@@ -24,6 +24,7 @@ class ResearchService
      */
     public function runResearchForIdea(Thought $idea, string $source = 'web'): Thought
     {
+        // Rate-limit can be applied here when config('research.rate_limit_enabled') is true (e.g. throttle by user_id).
         $researchText = $this->openRouter->researchNote($idea->content);
 
         return Thought::create([
