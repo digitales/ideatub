@@ -193,6 +193,14 @@ class Thought extends Model
     }
 
     /**
+     * Whether research is currently running for this idea (metadata.research_pending === true).
+     */
+    public function isResearchPending(): bool
+    {
+        return ($this->metadata['research_pending'] ?? false) === true;
+    }
+
+    /**
      * Scope to top-level thoughts only (no parent).
      */
     public function scopeTopLevel(Builder $query): Builder

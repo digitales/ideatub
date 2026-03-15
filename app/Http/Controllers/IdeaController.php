@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\IdeaResearchRequested;
 use App\Models\Thought;
 use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
@@ -378,7 +379,7 @@ class IdeaController extends Controller
     }
 
     /**
-     * Run research for an existing idea. Authorizes that the user owns the thought.
+     * Run research for an existing idea in the background. Authorizes that the user owns the thought.
      */
     public function research(Thought $thought): RedirectResponse
     {
@@ -388,19 +389,16 @@ class IdeaController extends Controller
             return redirect()->route('idea.ideas')->with('error', 'Not an idea.');
         }
 
-        try {
-            $this->researchService->runResearchForIdea($thought, 'web');
+        $metadata = array_merge($thought->metadata ?? [], ['research_pending' => true]);
+        $thought->update(['metadata' => $metadata]);
 
-            return redirect()->back()->with('success', 'Research saved.');
-        } catch (\Throwable $e) {
-            report($e);
+        IdeaResearchRequested::dispatch($thought, 'web');
 
-            return redirect()->back()->with('error', 'Research failed — try again.');
-        }
+        return redirect()->back()->with('success', 'Research started. This may take a moment — refresh to see results.');
     }
 
     /**
-     * Create a new idea and run research (body: content). If research fails, the idea is still saved.
+     * Create a new idea and run research in the background (body: content).
      */
     public function researchNew(Request $request): RedirectResponse
     {
@@ -410,7 +408,7 @@ class IdeaController extends Controller
         $content = $validated['content'];
 
         try {
-            $result = $this->researchService->createIdeaAndResearch($content, 'web');
+            $idea = $this->researchService->createIdeaOnly($content, 'web');
         } catch (\Throwable $e) {
             report($e);
 
@@ -419,15 +417,13 @@ class IdeaController extends Controller
                 ->with('error', 'Unable to save idea. Please try again.');
         }
 
-        $research = $result['research'];
+        $metadata = array_merge($idea->metadata ?? [], ['research_pending' => true]);
+        $idea->update(['metadata' => $metadata]);
 
-        if ($research === null) {
-            return redirect()->route('idea.ideas')
-                ->with('error', 'Research failed — try again.')
-                ->with('success', 'Idea saved. You can run research from the ideas list.');
-        }
+        IdeaResearchRequested::dispatch($idea, 'web');
 
-        return redirect()->route('idea.ideas')->with('success', 'Idea and research saved.');
+        return redirect()->route('idea.ideas')
+            ->with('success', 'Idea saved. Research started — refresh in a moment to see results.');
     }
 
     /**

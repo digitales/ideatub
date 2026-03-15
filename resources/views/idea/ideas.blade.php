@@ -114,7 +114,24 @@
                         <p class="text-[11px] text-slate-brand/50 mt-1">{{ $thought->getLoggedDate() }}</p>
                         {{-- Research block --}}
                         <div class="mt-2 pt-2 border-t border-memory-violet/10">
-                            @if ($researchList->isEmpty())
+                            @if ($thought->isResearchPending())
+                                <p class="text-xs text-slate-brand/70 flex items-center gap-1.5">
+                                    <span class="inline-block size-3.5 rounded-full border-2 border-neural-teal/50 border-t-neural-teal animate-spin" aria-hidden="true"></span>
+                                    Researching…
+                                </p>
+                                @if ($researchList->isNotEmpty())
+                                    <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-2">Research</p>
+                                    @foreach ($researchList as $research)
+                                        <div class="text-sm text-slate-brand/80 mb-2">
+                                            <p>{{ e(Str::limit($research->getDecodedContent(), 120)) }}</p>
+                                            <details class="mt-1">
+                                                <summary class="text-xs text-neural-teal cursor-pointer hover:underline">View full</summary>
+                                                <div class="mt-1 p-2 rounded-lg bg-slate-50/80 text-sm text-deep-indigo whitespace-pre-wrap">{{ e($research->getDecodedContent()) }}</div>
+                                            </details>
+                                        </div>
+                                    @endforeach
+                                @endif
+                            @elseif ($researchList->isEmpty())
                                 <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
                                     @csrf
                                     <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">
@@ -122,7 +139,11 @@
                                     </button>
                                 </form>
                             @else
-                                <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1">Research</p>
+                                <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
+                                    @csrf
+                                    <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">Regenerate</button>
+                                </form>
+                                <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-1">Research</p>
                                 @foreach ($researchList as $research)
                                     <div class="text-sm text-slate-brand/80 mb-2">
                                         <p>{{ e(Str::limit($research->getDecodedContent(), 120)) }}</p>
@@ -132,10 +153,6 @@
                                         </details>
                                     </div>
                                 @endforeach
-                                <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
-                                    @csrf
-                                    <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">Regenerate</button>
-                                </form>
                             @endif
                         </div>
                     </div>

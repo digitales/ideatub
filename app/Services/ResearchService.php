@@ -40,13 +40,11 @@ class ResearchService
     }
 
     /**
-     * Create an idea thought then run research and link the research thought.
-     * If research fails, the idea is still created; research will be null.
+     * Create an idea thought only (no research). Use when research will run in the background via event.
      *
      * @param  string  $source  'web' or 'mcp'
-     * @return array{idea: Thought, research: Thought|null}
      */
-    public function createIdeaAndResearch(string $ideaContent, string $source = 'web'): array
+    public function createIdeaOnly(string $ideaContent, string $source = 'web'): Thought
     {
         $ideaMetadata = [
             'type' => 'idea',
@@ -65,6 +63,20 @@ class ResearchService
         if (! $idea instanceof Thought) {
             throw new \RuntimeException('ThoughtCaptureService did not return an idea thought.');
         }
+
+        return $idea;
+    }
+
+    /**
+     * Create an idea thought then run research and link the research thought.
+     * If research fails, the idea is still created; research will be null.
+     *
+     * @param  string  $source  'web' or 'mcp'
+     * @return array{idea: Thought, research: Thought|null}
+     */
+    public function createIdeaAndResearch(string $ideaContent, string $source = 'web'): array
+    {
+        $idea = $this->createIdeaOnly($ideaContent, $source);
 
         try {
             $research = $this->runResearchForIdea($idea, $source);

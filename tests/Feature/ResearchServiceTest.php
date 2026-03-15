@@ -80,6 +80,27 @@ class ResearchServiceTest extends TestCase
         $this->assertSame($researchText, $research->content);
     }
 
+    public function test_create_idea_only_creates_idea_without_research(): void
+    {
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+            $mock->shouldNotReceive('researchNote');
+        });
+
+        $this->actingAs($user);
+        $service = app(ResearchService::class);
+        $idea = $service->createIdeaOnly('An idea without research', 'web');
+
+        $this->assertInstanceOf(Thought::class, $idea);
+        $this->assertSame('idea', $idea->metadata['type']);
+        $this->assertSame('An idea without research', $idea->getDecodedContent());
+
+        $this->assertSame(0, Thought::where('metadata->type', 'research')->count());
+    }
+
     public function test_create_idea_and_research_when_research_fails_keeps_idea_returns_null_research(): void
     {
         $user = User::factory()->create();
