@@ -38,6 +38,7 @@ class ResearchServiceTest extends TestCase
         $this->assertSame($researchText, $research->content);
         $this->assertSame('research', $research->metadata['type']);
         $this->assertSame($idea->id, $research->metadata['idea_id']);
+        $this->assertSame(['research'], $research->metadata['tags'] ?? []);
         $this->assertSame((string) $idea->user_id, (string) $research->user_id);
         $this->assertSame('web', $research->source);
         $this->assertNull($research->embedding);
@@ -77,6 +78,7 @@ class ResearchServiceTest extends TestCase
         $this->assertInstanceOf(Thought::class, $research);
         $this->assertSame('research', $research->metadata['type']);
         $this->assertSame($idea->id, $research->metadata['idea_id']);
+        $this->assertSame(['research'], $research->metadata['tags'] ?? []);
         $this->assertSame($researchText, $research->content);
     }
 

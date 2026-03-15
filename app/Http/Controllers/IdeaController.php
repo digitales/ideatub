@@ -96,6 +96,7 @@ class IdeaController extends Controller
             $thoughts = Thought::query()
                 ->where('user_id', auth()->id())
                 ->topLevel()
+                ->excludingResearch()
                 ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
                 ->orderByDesc('created_at')
                 ->limit(self::RECENT_LIMIT)

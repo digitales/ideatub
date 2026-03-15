@@ -45,6 +45,11 @@ class IdeasToRevisitService
         $query->orderByRaw($effectiveDateSql . ' ASC');
         $query->take(max(1, $limit));
 
-        return $query->get()->all();
+        $thoughts = $query->get()->all();
+
+        // Restrict to only ideas (defensive: in case DB JSON query includes edge cases).
+        return array_values(array_filter($thoughts, function (Thought $thought): bool {
+            return ($thought->metadata['type'] ?? null) === 'idea';
+        }));
     }
 }

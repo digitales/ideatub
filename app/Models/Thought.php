@@ -169,6 +169,17 @@ class Thought extends Model
     }
 
     /**
+     * Scope to exclude thoughts with metadata type 'research' (e.g. from recent/feed).
+     */
+    public function scopeExcludingResearch(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->where('metadata->type', '!=', 'research')
+                ->orWhereNull('metadata->type');
+        });
+    }
+
+    /**
      * Scope to research thoughts linked to the given idea (metadata type research, idea_id = $ideaId).
      */
     public function scopeResearchForIdea(Builder $query, string $ideaId): Builder

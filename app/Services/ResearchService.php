@@ -27,13 +27,16 @@ class ResearchService
         // Rate-limit can be applied here when config('research.rate_limit_enabled') is true (e.g. throttle by user_id).
         $researchText = $this->openRouter->researchNote($idea->content);
 
+        $metadata = Thought::normalizeMetadataTags([
+            'type' => 'research',
+            'idea_id' => $idea->id,
+            'tags' => ['research'],
+        ]);
+
         return Thought::create([
             'content' => $researchText,
             'embedding' => null,
-            'metadata' => [
-                'type' => 'research',
-                'idea_id' => $idea->id,
-            ],
+            'metadata' => $metadata,
             'user_id' => $idea->user_id,
             'source' => $source,
         ]);

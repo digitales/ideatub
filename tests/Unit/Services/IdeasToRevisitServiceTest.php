@@ -114,4 +114,34 @@ class IdeasToRevisitServiceTest extends TestCase
         $this->assertContains($noFlag->id, $ids);
         $this->assertCount(2, $result);
     }
+
+    #[Test]
+    public function returns_only_ideas_excludes_research_and_other_thought_types(): void
+    {
+        $user = User::factory()->create();
+        UserPreference::set($user, 'ideas_to_revisit_limit', 15);
+
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-01-01'],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'research', 'idea_id' => $idea->id],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'note'],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['completed' => false, 'logged_date' => '2025-01-01'],
+        ]);
+
+        $service = new IdeasToRevisitService;
+        $result = $service->forUser($user);
+
+        $this->assertCount(1, $result);
+        $this->assertSame($idea->id, $result[0]->id);
+    }
 }
