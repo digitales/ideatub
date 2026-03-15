@@ -6,20 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
+use App\Services\IdeasToRevisitService;
 use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
+use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class McpController extends Controller
 {
     public function __construct(
         private OpenRouterService $openRouter,
         private ThoughtCaptureService $captureService,
+        private IdeasToRevisitService $ideasToRevisit,
+        private ResearchService $researchService,
         private ?OAuthMcpJwtService $oauthJwt = null
     ) {}
 
@@ -34,7 +39,7 @@ class McpController extends Controller
             'version' => '1.0',
             'protocol' => 'json-rpc',
             'auth' => 'Send key via ?key=... or x-ideatub-key header',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'],
+            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'],
         ]);
     }
 
@@ -75,7 +80,7 @@ class McpController extends Controller
         }
 
         // Legacy direct method names (search_thoughts, browse_recent, etc.)
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'];
         if (! in_array($method, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -189,6 +194,40 @@ class McpController extends Controller
                     'required' => ['content'],
                 ],
             ],
+            [
+                'name' => 'capture_idea',
+                'description' => 'Save an idea (thought with type idea, optional logged_date). Same as capture_thought plus idea metadata.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'content' => ['type' => 'string', 'description' => 'The idea to save'],
+                        'logged_date' => ['type' => 'string', 'description' => 'Optional ISO date (YYYY-MM-DD) for when the idea was logged'],
+                    ],
+                    'required' => ['content'],
+                ],
+            ],
+            [
+                'name' => 'get_ideas',
+                'description' => 'Return the same list as the Ideas to revisit page: incomplete ideas weighted by age, bounded by user preferences.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'limit' => ['type' => 'integer', 'description' => 'Optional max number of ideas to return (overrides user preference)'],
+                    ],
+                ],
+            ],
+            [
+                'name' => 'research_idea',
+                'description' => 'Run AI research for an idea. Provide idea_id (UUID of existing idea) or content (new idea text); creates linked research thought.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'idea_id' => ['type' => 'string', 'description' => 'UUID of an existing idea thought to run research for'],
+                        'content' => ['type' => 'string', 'description' => 'New idea text; creates idea and runs research (use when no idea_id)'],
+                    ],
+                    'required' => [],
+                ],
+            ],
         ];
 
         return response()->json([
@@ -209,7 +248,7 @@ class McpController extends Controller
             return $this->jsonRpcError(-32602, 'tools/call requires "name"', $id);
         }
 
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'];
         if (! in_array($name, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -327,6 +366,9 @@ class McpController extends Controller
             'thought_stats' => $this->thoughtStats($params),
             'capture_thought' => $this->captureThought($params),
             'capture_plan' => $this->capturePlan($params),
+            'capture_idea' => $this->captureIdea($params),
+            'get_ideas' => $this->getIdeas($params),
+            'research_idea' => $this->researchIdea($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
     }
@@ -421,6 +463,85 @@ class McpController extends Controller
     }
 
     /**
+     * get_ideas: incomplete ideas to revisit (same as Ideas to revisit page), age-ordered, bounded by user preferences.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{ideas: array<int, array{id: string, content: string, logged_date: string, created_at: string}>}
+     */
+    private function getIdeas(array $params): array
+    {
+        $thoughts = $this->ideasToRevisit->forUser(auth()->user());
+
+        $ideas = array_map(function (Thought $thought): array {
+            return [
+                'id' => $thought->id,
+                'content' => Str::limit($thought->getDecodedContent(), 200),
+                'logged_date' => $thought->getLoggedDate(),
+                'created_at' => $thought->created_at->toIso8601String(),
+            ];
+        }, $thoughts);
+
+        return ['ideas' => $ideas];
+    }
+
+    /**
+     * research_idea: Run AI research for an idea. Either idea_id (existing idea) or content (new idea), or both (content creates new idea+research).
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{idea_id: string, research_id: string|null}
+     */
+    private function researchIdea(array $params): array
+    {
+        $ideaId = isset($params['idea_id']) && trim((string) $params['idea_id']) !== ''
+            ? trim((string) $params['idea_id'])
+            : null;
+        $content = isset($params['content']) && trim((string) $params['content']) !== ''
+            ? trim((string) $params['content'])
+            : null;
+
+        if ($ideaId === null && $content === null) {
+            throw new \InvalidArgumentException('At least one of idea_id or content is required.');
+        }
+
+        if ($ideaId !== null) {
+            $uuidValidator = Validator::make(['idea_id' => $ideaId], ['idea_id' => 'uuid']);
+            if ($uuidValidator->fails()) {
+                throw new \InvalidArgumentException('idea_id must be a valid UUID.');
+            }
+        }
+
+        // If content provided, create idea and run research (idea_id is ignored when content is present).
+        if ($content !== null) {
+            $result = $this->researchService->createIdeaAndResearch($content, 'mcp');
+
+            return [
+                'idea_id' => $result['idea']->id,
+                'research_id' => $result['research']?->id,
+            ];
+        }
+
+        // idea_id only: run research for existing idea.
+        $thought = Thought::find($ideaId);
+        if ($thought === null) {
+            throw new \InvalidArgumentException('Idea not found.');
+        }
+        if ($thought->user_id !== auth()->id()) {
+            throw new \InvalidArgumentException('Idea not found.');
+        }
+        $type = $thought->metadata['type'] ?? null;
+        if ($type !== 'idea') {
+            throw new \InvalidArgumentException('Thought is not an idea.');
+        }
+
+        $researchThought = $this->researchService->runResearchForIdea($thought, 'mcp');
+
+        return [
+            'idea_id' => $thought->id,
+            'research_id' => $researchThought->id,
+        ];
+    }
+
+    /**
      * capture_thought: embed + extractMetadata + save Thought. Params: content; optional parent_id or in_reply_to (UUID).
      * When parent_id (or in_reply_to) is provided, parent must exist and belong to the resolved user.
      *
@@ -462,6 +583,49 @@ class McpController extends Controller
             'source' => $source,
             'source_metadata' => $sourceMetadata,
             'no_chunking' => $noChunking,
+        ]);
+
+        if ($result['chunked']) {
+            return [
+                'id' => $result['root']->id,
+                'chunked' => true,
+                'section_ids' => $result['section_ids'],
+            ];
+        }
+
+        return ['id' => $result['thought']->id];
+    }
+
+    /**
+     * capture_idea: Save an idea (thought with type idea, optional logged_date). Same as capture_thought plus idea metadata.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{id: string, chunked?: bool, section_ids?: array<int, string>}
+     */
+    private function captureIdea(array $params): array
+    {
+        $v = Validator::make($params, [
+            'content' => 'required|string',
+            'logged_date' => 'sometimes|nullable|string|date_format:Y-m-d',
+            'completed' => 'sometimes|boolean',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+        $loggedDate = isset($params['logged_date']) && trim((string) $params['logged_date']) !== ''
+            ? trim((string) $params['logged_date'])
+            : now()->toDateString();
+        $completed = isset($params['completed']) ? (bool) $params['completed'] : false;
+
+        $result = $this->captureService->create([
+            'content' => $params['content'],
+            'user_id' => auth()->id(),
+            'source' => 'mcp',
+            'idea_metadata' => [
+                'type' => 'idea',
+                'completed' => $completed,
+                'logged_date' => $loggedDate,
+            ],
         ]);
 
         if ($result['chunked']) {

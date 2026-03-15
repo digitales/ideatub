@@ -136,4 +136,43 @@ class OpenRouterServiceTest extends TestCase
 
         $this->service->extractMetadata('text');
     }
+
+    #[Test]
+    public function research_note_sends_prompt_to_chat_url_and_returns_plain_text(): void
+    {
+        $mockedNote = 'Relevant: SaaS trends. Considerations: MVP scope. Next steps: validate idea, pick stack, ship landing.';
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => $mockedNote,
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $result = $this->service->researchNote('Given this idea: build a small SaaS.');
+
+        $this->assertNotEmpty($result);
+        $this->assertSame($mockedNote, $result);
+        Http::assertSent(function ($request) {
+            if ($request->url() !== 'https://openrouter.ai/api/v1/chat/completions') {
+                return false;
+            }
+            $messages = $request['messages'] ?? [];
+            $userMessage = null;
+            foreach ($messages as $m) {
+                if (($m['role'] ?? '') === 'user') {
+                    $userMessage = $m['content'] ?? '';
+                    break;
+                }
+            }
+            return $userMessage !== null
+                && str_contains($userMessage, 'Given this idea')
+                && str_contains($userMessage, 'research note')
+                && str_contains($userMessage, 'next steps');
+        });
+    }
 }

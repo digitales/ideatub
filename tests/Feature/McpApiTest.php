@@ -46,7 +46,7 @@ class McpApiTest extends TestCase
             'name' => 'ideatub',
             'version' => '1.0',
             'protocol' => 'json-rpc',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'],
+            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'],
         ]);
     }
 
@@ -87,6 +87,9 @@ class McpApiTest extends TestCase
         $response->assertJsonPath('result.tools.2.name', 'thought_stats');
         $response->assertJsonPath('result.tools.3.name', 'capture_thought');
         $response->assertJsonPath('result.tools.4.name', 'capture_plan');
+        $response->assertJsonPath('result.tools.5.name', 'capture_idea');
+        $response->assertJsonPath('result.tools.6.name', 'get_ideas');
+        $response->assertJsonPath('result.tools.7.name', 'research_idea');
     }
 
     public function test_post_without_key_returns_401(): void
@@ -420,5 +423,216 @@ class McpApiTest extends TestCase
         $this->assertArrayNotHasKey('chunked', $response->json('result'));
         $count = Thought::where('user_id', $user->id)->count();
         $this->assertSame(1, $count);
+    }
+
+    public function test_capture_idea_creates_thought_with_idea_metadata(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_idea',
+            'params' => ['content' => 'An idea from MCP'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.id', fn ($id) => is_string($id) && strlen($id) > 0);
+        $id = $response->json('result.id');
+        $thought = Thought::find($id);
+        $this->assertNotNull($thought);
+        $this->assertSame($user->id, $thought->user_id);
+        $metadata = $thought->metadata ?? [];
+        $this->assertSame('idea', $metadata['type'] ?? null);
+        $this->assertSame(false, $metadata['completed'] ?? null);
+        $this->assertNotEmpty($metadata['logged_date'] ?? null);
+    }
+
+    public function test_capture_idea_with_logged_date_stores_date_in_metadata(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_idea',
+            'params' => [
+                'content' => 'Idea with specific date',
+                'logged_date' => '2025-03-14',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $id = $response->json('result.id');
+        $thought = Thought::find($id);
+        $this->assertNotNull($thought);
+        $metadata = $thought->metadata ?? [];
+        $this->assertSame('idea', $metadata['type'] ?? null);
+        $this->assertSame('2025-03-14', $metadata['logged_date'] ?? null);
+    }
+
+    public function test_get_ideas_returns_ideas_array(): void
+    {
+        $key = $this->validKey();
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_ideas',
+            'params' => [],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.ideas', []);
+    }
+
+    public function test_get_ideas_returns_empty_when_user_has_no_incomplete_ideas(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'idea', 'completed' => true],
+        ]);
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_ideas',
+            'params' => [],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.ideas', []);
+    }
+
+    public function test_get_ideas_returns_incomplete_ideas_with_expected_shape(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'An incomplete idea to revisit',
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-03-01'],
+        ]);
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_ideas',
+            'params' => [],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['result' => ['ideas' => [['id', 'content', 'logged_date', 'created_at']]]]);
+        $ideas = $response->json('result.ideas');
+        $this->assertNotEmpty($ideas);
+        $first = $ideas[0];
+        $this->assertArrayHasKey('id', $first);
+        $this->assertArrayHasKey('content', $first);
+        $this->assertArrayHasKey('logged_date', $first);
+        $this->assertArrayHasKey('created_at', $first);
+        $this->assertSame('An incomplete idea to revisit', $first['content']);
+        $this->assertSame('2025-03-01', $first['logged_date']);
+    }
+
+    public function test_research_idea_with_content_creates_idea_and_research(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $researchText = 'Research: validate demand, then build MVP.';
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding, $researchText): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+            $mock->shouldReceive('researchNote')
+                ->once()
+                ->with('Ship a side project this quarter')
+                ->andReturn($researchText);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'research_idea',
+            'params' => ['content' => 'Ship a side project this quarter'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.idea_id', fn ($id) => is_string($id) && strlen($id) > 0);
+        $response->assertJsonPath('result.research_id', fn ($id) => is_string($id) && strlen($id) > 0);
+
+        $ideaId = $response->json('result.idea_id');
+        $researchId = $response->json('result.research_id');
+
+        $idea = Thought::find($ideaId);
+        $this->assertNotNull($idea);
+        $this->assertSame($user->id, $idea->user_id);
+        $this->assertSame('idea', $idea->metadata['type'] ?? null);
+
+        $research = Thought::find($researchId);
+        $this->assertNotNull($research);
+        $this->assertSame($ideaId, $research->metadata['idea_id'] ?? null);
+        $this->assertSame('research', $research->metadata['type'] ?? null);
+        $this->assertSame($researchText, $research->content);
+    }
+
+    public function test_research_idea_with_idea_id_runs_research_returns_ids(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Build a small SaaS for vehicle analytics',
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => now()->toDateString()],
+            'embedding' => null,
+        ]);
+
+        $researchText = 'Key considerations: market size, MVP scope.';
+        $this->mock(OpenRouterService::class, function ($mock) use ($researchText): void {
+            $mock->shouldReceive('researchNote')
+                ->once()
+                ->with('Build a small SaaS for vehicle analytics')
+                ->andReturn($researchText);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'research_idea',
+            'params' => ['idea_id' => $idea->id],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.idea_id', $idea->id);
+        $response->assertJsonPath('result.research_id', fn ($id) => is_string($id) && strlen($id) > 0);
+
+        $researchId = $response->json('result.research_id');
+        $research = Thought::find($researchId);
+        $this->assertNotNull($research);
+        $this->assertSame($idea->id, $research->metadata['idea_id']);
+        $this->assertSame('research', $research->metadata['type']);
+    }
+
+    public function test_research_idea_requires_idea_id_or_content(): void
+    {
+        $key = $this->validKey();
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'research_idea',
+            'params' => [],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('error.code', -32602);
+        $response->assertJsonPath('error.message', 'At least one of idea_id or content is required.');
     }
 }

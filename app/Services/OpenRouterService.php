@@ -99,4 +99,46 @@ class OpenRouterService
             'action_items' => isset($decoded['action_items']) && is_array($decoded['action_items']) ? array_values($decoded['action_items']) : [],
         ];
     }
+
+    /**
+     * Produce a short research note for the given idea (plain text).
+     *
+     * @throws \Illuminate\Http\Client\RequestException On HTTP errors
+     * @throws \RuntimeException If OPENROUTER_API_KEY is not set or response missing content
+     */
+    public function researchNote(string $ideaContent, ?string $existingResearch = null): string
+    {
+        $apiKey = config('services.openrouter.api_key');
+        if (empty($apiKey)) {
+            throw new \RuntimeException('OPENROUTER_API_KEY is not set.');
+        }
+
+        $model = config('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
+
+        $userMessage = 'Given this idea: ' . trim($ideaContent) . '. Produce a short research note: 2–4 sentences on what\'s relevant, key considerations, and 2–3 concrete next steps. Be concise.';
+        if ($existingResearch !== null && $existingResearch !== '') {
+            $userMessage .= ' Existing research: ' . trim($existingResearch) . '. You may extend or refresh it.';
+        }
+
+        $payload = [
+            'model' => $model,
+            'messages' => [
+                ['role' => 'user', 'content' => $userMessage],
+            ],
+            'max_tokens' => 512,
+        ];
+
+        $response = Http::withToken($apiKey)
+            ->timeout(30)
+            ->post(self::CHAT_URL, $payload);
+
+        $response->throw();
+
+        $content = $response->json('choices.0.message.content');
+        if ($content === null || $content === '') {
+            throw new \RuntimeException('OpenRouter research note response missing choices[0].message.content.');
+        }
+
+        return (string) $content;
+    }
 }

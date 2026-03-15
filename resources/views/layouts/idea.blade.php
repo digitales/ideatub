@@ -66,6 +66,12 @@
 
         {{-- Right nav items (visible by default; :class so nav shows before Alpine inits) --}}
         <div class="flex items-center gap-1" :class="{ 'hidden': searching }">
+            <a href="{{ route('idea.ideas') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
+                Ideas
+            </a>
+            <a href="{{ route('idea.revisit') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
+                Ideas to revisit
+            </a>
             <a href="{{ route('idea.stream') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
                 Stream
             </a>
@@ -115,6 +121,9 @@
                         </a>
                         <a href="{{ route('settings.inbound-emails.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                             Inbound email
+                        </a>
+                        <a href="{{ route('settings.ideas-revisit.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                            Ideas to revisit
                         </a>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf

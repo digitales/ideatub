@@ -14,6 +14,7 @@ use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\ToolController;
 use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
+use App\Http\Controllers\IdeasRevisitSettingsController;
 use App\Http\Controllers\InboundEmailController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\WebhookController;
@@ -86,6 +87,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
 
+    // Ideas list and store
+    Route::get('/ideas', [IdeaController::class, 'ideas'])->name('idea.ideas');
+    Route::get('/ideas/revisit', [IdeaController::class, 'revisit'])->name('idea.revisit');
+    Route::post('/ideas', [IdeaController::class, 'storeIdea'])->name('ideas.store');
+    Route::patch('/ideas/{thought}/completed', [IdeaController::class, 'toggleCompleted'])->name('ideas.toggle-completed');
+    Route::post('/ideas/research', [IdeaController::class, 'researchNew'])->name('ideas.research-new');
+    Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');
+
     Route::get('/example-prompts', [ExamplePromptsController::class, 'index'])->name('example-prompts');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
     
@@ -93,6 +102,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/mcp-keys', [McpKeyController::class, 'index'])->name('settings.mcp-keys.index');
     Route::post('/settings/mcp-keys', [McpKeyController::class, 'store'])->name('settings.mcp-keys.store');
     Route::delete('/settings/mcp-keys/{mcpKey}', [McpKeyController::class, 'destroy'])->name('settings.mcp-keys.destroy');
+
+    Route::get('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'index'])->name('settings.ideas-revisit.index');
+    Route::put('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'update'])->name('settings.ideas-revisit.update');
 
     Route::get('/settings/inbound-emails', [InboundEmailController::class, 'index'])->name('settings.inbound-emails.index');
     Route::post('/settings/inbound-emails', [InboundEmailController::class, 'store'])->name('settings.inbound-emails.store');

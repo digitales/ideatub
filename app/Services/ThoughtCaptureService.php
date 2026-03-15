@@ -20,7 +20,7 @@ class ThoughtCaptureService
      * Create one thought or chunked thoughts. When parent_id is set, always creates a single thought.
      * Otherwise chunks when content has >500 words and no_chunking is not set.
      *
-     * @param  array{content: string, user_id: int, parent_id?: string|null, source: string, source_metadata?: array|null, no_chunking?: bool, plan_slug?: string|null, doc_type?: string|null, file_path?: string|null, project?: string|null, extra_tags?: array}  $options
+     * @param  array{content: string, user_id: int, parent_id?: string|null, source: string, source_metadata?: array|null, no_chunking?: bool, plan_slug?: string|null, doc_type?: string|null, file_path?: string|null, project?: string|null, extra_tags?: array, idea_metadata?: array}  $options
      * @return array{thought?: Thought, root?: Thought, chunked: bool, section_ids?: array<int, string>, count?: int}
      */
     public function create(array $options): array
@@ -58,6 +58,9 @@ class ThoughtCaptureService
         $extraTags = isset($options['extra_tags']) && is_array($options['extra_tags'])
             ? array_values(array_filter(array_map(fn ($t) => is_string($t) ? trim($t) : '', $options['extra_tags'])))
             : [];
+        $ideaMetadata = isset($options['idea_metadata']) && is_array($options['idea_metadata'])
+            ? $options['idea_metadata']
+            : null;
 
         $parent = null;
         if ($parentId !== null) {
@@ -79,10 +82,10 @@ class ThoughtCaptureService
         $shouldChunk = $parent === null && $this->chunkingService->shouldChunk($content, $chunkOptions);
 
         if ($shouldChunk) {
-            return $this->createChunked($content, $userId, $source, $sourceMetadata, $planSlug, $docType, $filePath, $project, $extraTags);
+            return $this->createChunked($content, $userId, $source, $sourceMetadata, $planSlug, $docType, $filePath, $project, $extraTags, $ideaMetadata);
         }
 
-        $thought = $this->createOne($content, $userId, $parent?->id, $source, $sourceMetadata, $planSlug, $docType, $extraTags);
+        $thought = $this->createOne($content, $userId, $parent?->id, $source, $sourceMetadata, $planSlug, $docType, $extraTags, $ideaMetadata);
 
         return [
             'thought' => $thought,
@@ -93,6 +96,7 @@ class ThoughtCaptureService
     /**
      * @param  array<string, mixed>|null  $sourceMetadata
      * @param  array<int, string>  $extraTags
+     * @param  array<string, mixed>|null  $ideaMetadata
      */
     private function createOne(
         string $content,
@@ -103,6 +107,7 @@ class ThoughtCaptureService
         ?string $planSlug,
         ?string $docType,
         array $extraTags,
+        ?array $ideaMetadata = null,
     ): Thought {
         $embedding = $this->openRouter->embed($content);
         $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
@@ -119,6 +124,9 @@ class ThoughtCaptureService
             }
         }
         $metadata['tags'] = array_values(array_unique($tags));
+        if ($ideaMetadata !== null && $ideaMetadata !== []) {
+            $metadata = array_merge($metadata, $ideaMetadata);
+        }
 
         $payload = [
             'content' => $content,
@@ -136,6 +144,7 @@ class ThoughtCaptureService
     /**
      * @param  array<string, mixed>|null  $baseSourceMetadata
      * @param  array<int, string>  $extraTags
+     * @param  array<string, mixed>|null  $ideaMetadata
      * @return array{root: Thought, chunked: true, section_ids: array<int, string>, count: int}
      */
     private function createChunked(
@@ -148,6 +157,7 @@ class ThoughtCaptureService
         ?string $filePath,
         ?string $project,
         array $extraTags,
+        ?array $ideaMetadata = null,
     ): array {
         $sections = $this->chunkingService->splitAtHeadings($content);
         $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
@@ -164,6 +174,9 @@ class ThoughtCaptureService
             }
         }
         $metadata['tags'] = array_values(array_unique($tags));
+        if ($ideaMetadata !== null && $ideaMetadata !== []) {
+            $metadata = array_merge($metadata, $ideaMetadata);
+        }
 
         $base = array_filter([
             'doc_type' => $docType,
