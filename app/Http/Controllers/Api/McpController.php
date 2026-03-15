@@ -34,7 +34,7 @@ class McpController extends Controller
             'version' => '1.0',
             'protocol' => 'json-rpc',
             'auth' => 'Send key via ?key=... or x-ideatub-key header',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'],
+            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea'],
         ]);
     }
 
@@ -75,7 +75,7 @@ class McpController extends Controller
         }
 
         // Legacy direct method names (search_thoughts, browse_recent, etc.)
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea'];
         if (! in_array($method, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -189,6 +189,18 @@ class McpController extends Controller
                     'required' => ['content'],
                 ],
             ],
+            [
+                'name' => 'capture_idea',
+                'description' => 'Save an idea (thought with type idea, optional logged_date). Same as capture_thought plus idea metadata.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'content' => ['type' => 'string', 'description' => 'The idea to save'],
+                        'logged_date' => ['type' => 'string', 'description' => 'Optional ISO date (YYYY-MM-DD) for when the idea was logged'],
+                    ],
+                    'required' => ['content'],
+                ],
+            ],
         ];
 
         return response()->json([
@@ -209,7 +221,7 @@ class McpController extends Controller
             return $this->jsonRpcError(-32602, 'tools/call requires "name"', $id);
         }
 
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea'];
         if (! in_array($name, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -327,6 +339,7 @@ class McpController extends Controller
             'thought_stats' => $this->thoughtStats($params),
             'capture_thought' => $this->captureThought($params),
             'capture_plan' => $this->capturePlan($params),
+            'capture_idea' => $this->captureIdea($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
     }
@@ -462,6 +475,47 @@ class McpController extends Controller
             'source' => $source,
             'source_metadata' => $sourceMetadata,
             'no_chunking' => $noChunking,
+        ]);
+
+        if ($result['chunked']) {
+            return [
+                'id' => $result['root']->id,
+                'chunked' => true,
+                'section_ids' => $result['section_ids'],
+            ];
+        }
+
+        return ['id' => $result['thought']->id];
+    }
+
+    /**
+     * capture_idea: Save an idea (thought with type idea, optional logged_date). Same as capture_thought plus idea metadata.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{id: string, chunked?: bool, section_ids?: array<int, string>}
+     */
+    private function captureIdea(array $params): array
+    {
+        $v = Validator::make($params, [
+            'content' => 'required|string',
+            'logged_date' => 'sometimes|nullable|string|date',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+        $loggedDate = isset($params['logged_date']) && trim((string) $params['logged_date']) !== ''
+            ? trim((string) $params['logged_date'])
+            : now()->toDateString();
+
+        $result = $this->captureService->create([
+            'content' => $params['content'],
+            'user_id' => auth()->id(),
+            'source' => 'mcp',
+            'idea_metadata' => [
+                'type' => 'idea',
+                'completed' => false,
+                'logged_date' => $loggedDate,
+            ],
         ]);
 
         if ($result['chunked']) {
