@@ -94,13 +94,12 @@ class Thought extends Model
     }
 
     /**
-     * Get content with HTML entities decoded for display.
-     * Decodes repeatedly so double-encoded entities (e.g. &amp;#039;) also render correctly.
-     * Use with e() in views to avoid showing literal &quot;, &#039;, etc.
+     * Decode HTML entities in a string (e.g. &#039; → ', &quot; → ").
+     * Decodes repeatedly so double-encoded entities (e.g. &amp;#039;) are normalized.
      */
-    public function getDecodedContent(): string
+    public static function decodeContentEntities(string $content): string
     {
-        $decoded = $this->content;
+        $decoded = $content;
         $flags = ENT_QUOTES | ENT_HTML5;
         while (true) {
             $prev = $decoded;
@@ -111,6 +110,23 @@ class Thought extends Model
         }
 
         return $decoded;
+    }
+
+    /**
+     * Normalize content before saving: decode HTML entities so we store plain text.
+     */
+    protected function setContentAttribute(mixed $value): void
+    {
+        $this->attributes['content'] = static::decodeContentEntities((string) $value);
+    }
+
+    /**
+     * Get content with HTML entities decoded for display.
+     * Use with e() in views to avoid showing literal &quot;, &#039;, etc.
+     */
+    public function getDecodedContent(): string
+    {
+        return static::decodeContentEntities($this->content);
     }
 
     /**

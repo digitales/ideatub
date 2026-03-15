@@ -63,4 +63,23 @@ class ThoughtTest extends TestCase
         $this->assertFalse($incomplete->isIdeaCompleted());
         $this->assertFalse($noFlag->isIdeaCompleted());
     }
+
+    public function test_content_is_normalized_on_save_html_entities_decoded(): void
+    {
+        $user = User::factory()->create();
+
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => "Daphne&#039;s breathing was 30 per minute.",
+        ]);
+
+        $this->assertSame("Daphne's breathing was 30 per minute.", $thought->content);
+        $this->assertSame("Daphne's breathing was 30 per minute.", $thought->getDecodedContent());
+    }
+
+    public function test_decode_content_entities_handles_double_encoding(): void
+    {
+        $this->assertSame("Daphne's", Thought::decodeContentEntities("Daphne&amp;#039;s"));
+        $this->assertSame("foo \"bar\"", Thought::decodeContentEntities("foo &quot;bar&quot;"));
+    }
 }
