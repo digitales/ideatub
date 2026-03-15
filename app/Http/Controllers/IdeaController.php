@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Thought;
+use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Http\JsonResponse;
@@ -260,6 +261,16 @@ class IdeaController extends Controller
             'tag' => $tagForDisplay,
             'tagSlug' => $tagSlug,
         ]);
+    }
+
+    /**
+     * Ideas to revisit: incomplete ideas ordered by age (oldest first), limited by user preferences.
+     */
+    public function revisit(IdeasToRevisitService $revisitService): View
+    {
+        $ideas = $revisitService->forUser(auth()->user());
+
+        return view('idea.revisit', ['ideas' => $ideas]);
     }
 
     /**
