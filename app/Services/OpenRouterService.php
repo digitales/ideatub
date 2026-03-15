@@ -123,7 +123,7 @@ class OpenRouterService
             'messages' => [
                 ['role' => 'user', 'content' => $userMessage],
             ],
-            'max_tokens' => 512,
+            'max_tokens' => config('research.max_tokens', 2048),
         ];
 
         $response = Http::withToken($apiKey)
@@ -162,12 +162,13 @@ class OpenRouterService
         );
 
         if ($existing === '') {
+            // Remove the "Existing research..." line when there is no prior research (any wording)
             $userMessage = preg_replace(
-                '/\s*Existing research: \.?\s*You may extend or refresh it\.?\s*/',
-                ' ',
+                '/\n\s*Existing research[^\n]*: \s*\.?\s*\n?/',
+                "\n",
                 $userMessage
             );
-            $userMessage = trim(preg_replace('/\s+/', ' ', $userMessage));
+            $userMessage = trim($userMessage);
         }
 
         return $userMessage;

@@ -12,4 +12,10 @@ return [
      * Placeholders: {{idea}}, {{existing_research}}. Override via RESEARCH_PROMPT_PATH.
      */
     'prompt_path' => env('RESEARCH_PROMPT_PATH', resource_path('prompts/research.md')),
+
+    /*
+     * Max tokens for the research completion (longer prompts need more room for the brief).
+     * Override via RESEARCH_MAX_TOKENS.
+     */
+    'max_tokens' => env('RESEARCH_MAX_TOKENS', 2048),
 ];

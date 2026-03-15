@@ -153,7 +153,7 @@ class OpenRouterServiceTest extends TestCase
             ], 200),
         ]);
 
-        $result = $this->service->researchNote('Given this idea: build a small SaaS.');
+        $result = $this->service->researchNote('build a small SaaS.');
 
         $this->assertNotEmpty($result);
         $this->assertSame($mockedNote, $result);
@@ -163,9 +163,9 @@ class OpenRouterServiceTest extends TestCase
             }
             $userMessage = $this->getUserMessageContent($request);
             return $userMessage !== null
-                && str_contains($userMessage, 'Given this idea')
-                && str_contains($userMessage, 'research note')
-                && str_contains($userMessage, 'next steps');
+                && str_contains($userMessage, 'Topic/idea to research')
+                && str_contains($userMessage, 'build a small SaaS.')
+                && str_contains($userMessage, 'research agent');
         });
     }
 
