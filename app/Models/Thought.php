@@ -138,6 +138,30 @@ class Thought extends Model
     }
 
     /**
+     * Scope to thoughts with metadata type 'idea'.
+     */
+    public function scopeIdeas(Builder $query): Builder
+    {
+        return $query->where('metadata->type', 'idea');
+    }
+
+    /**
+     * Get logged date: metadata.logged_date if set, otherwise created_at date.
+     */
+    public function getLoggedDate(): string
+    {
+        return $this->metadata['logged_date'] ?? $this->created_at->toDateString();
+    }
+
+    /**
+     * Whether this idea is completed (metadata.completed === true).
+     */
+    public function isIdeaCompleted(): bool
+    {
+        return ($this->metadata['completed'] ?? false) === true;
+    }
+
+    /**
      * Scope to top-level thoughts only (no parent).
      */
     public function scopeTopLevel(Builder $query): Builder
