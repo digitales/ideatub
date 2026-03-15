@@ -96,11 +96,18 @@ class Thought extends Model
     /**
      * Decode HTML entities in a string (e.g. &#039; → ', &quot; → ").
      * Decodes repeatedly so double-encoded entities (e.g. &amp;#039;) are normalized.
+     * Normalizes numeric entities missing a trailing semicolon (e.g. &#039s → &#039;s) so PHP can decode them.
      */
     public static function decodeContentEntities(string $content): string
     {
         $decoded = $content;
         $flags = ENT_QUOTES | ENT_HTML5;
+
+        // PHP's html_entity_decode does not decode numeric entities without trailing semicolon (e.g. &#039s, &#x27s).
+        // Add semicolon so they decode (e.g. &#039s → &#039;s → ').
+        $decoded = preg_replace_callback('/&#(\d+)(?![;\d])/u', fn ($m) => '&#'.$m[1].';', $decoded);
+        $decoded = preg_replace_callback('/&#x([0-9a-fA-F]+)(?![;0-9a-fA-F])/u', fn ($m) => '&#x'.$m[1].';', $decoded);
+
         while (true) {
             $prev = $decoded;
             $decoded = html_entity_decode($decoded, $flags, 'UTF-8');

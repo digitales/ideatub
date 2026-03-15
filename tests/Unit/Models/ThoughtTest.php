@@ -82,4 +82,11 @@ class ThoughtTest extends TestCase
         $this->assertSame("Daphne's", Thought::decodeContentEntities("Daphne&amp;#039;s"));
         $this->assertSame("foo \"bar\"", Thought::decodeContentEntities("foo &quot;bar&quot;"));
     }
+
+    public function test_decode_content_entities_handles_numeric_entity_without_semicolon(): void
+    {
+        // PHP's html_entity_decode does not decode &#039s (no semicolon); we normalize so it decodes.
+        $this->assertSame("Daphne's breathing", Thought::decodeContentEntities("Daphne&#039s breathing"));
+        $this->assertSame("Daphne's", Thought::decodeContentEntities("Daphne&#039;s"));
+    }
 }

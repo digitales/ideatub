@@ -24,12 +24,14 @@ Root cause: **content was still being stored with HTML entities** (e.g. from MCP
 
 - Some sources (MCP, APIs, pasted content) send content that already contains HTML entities (`&#039;`, `&quot;`, etc.).
 - The previous fix decoded only at **display** time. Stored content remained entity-encoded.
-- Any code path that ever exposed raw `content` (or that decoded inconsistently) could still show entities. Normalizing at save ensures a single source of truth.
+- **Numeric entities without a trailing semicolon** (e.g. `&#039s` instead of `&#039;s`): PHP’s `html_entity_decode()` does **not** decode these. So `Daphne&#039s` stayed as-is; then `e()` escaped `&` to `&amp;`, so the browser showed the literal text `Daphne&#039s`. Fix: normalize before decoding by inserting the missing semicolon (e.g. `&#039s` → `&#039;s`) so PHP can decode.
+- Normalizing at save ensures a single source of truth for new data; the semicolon fix ensures both display and save handle all common entity forms.
 
 ## Resolution
 
 1. **Thought model**
    - Extracted **`Thought::decodeContentEntities(string): string`** (same loop as before) for reuse.
+   - **Normalize numeric entities without semicolon** before decoding: PHP does not decode e.g. `&#039s`; we rewrite to `&#039;s` (and same for `&#x27s` → `&#x27;s`) so `html_entity_decode` can decode them.
    - Added **`setContentAttribute` mutator** so whenever `content` is set (create/update), it is decoded before being stored. New and updated thoughts now store plain text (e.g. `Daphne's`).
    - **`getDecodedContent()`** now calls `decodeContentEntities($this->content)` so existing rows that already had encoded content in the DB still display correctly.
 
