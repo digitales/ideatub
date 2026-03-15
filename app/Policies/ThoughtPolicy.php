@@ -22,4 +22,12 @@ class ThoughtPolicy
     {
         return $thought->user_id === $user->id;
     }
+
+    /**
+     * Whether the user can update the thought (e.g. toggle idea completed).
+     */
+    public function update(User $user, Thought $thought): bool
+    {
+        return $thought->user_id === $user->id;
+    }
 }

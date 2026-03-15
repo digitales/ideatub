@@ -86,6 +86,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
 
+    // Ideas list and store
+    Route::get('/ideas', [IdeaController::class, 'ideas'])->name('idea.ideas');
+    Route::post('/ideas', [IdeaController::class, 'storeIdea'])->name('ideas.store');
+    Route::patch('/ideas/{thought}/completed', [IdeaController::class, 'toggleCompleted'])->name('ideas.toggle-completed');
+
     Route::get('/example-prompts', [ExamplePromptsController::class, 'index'])->name('example-prompts');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
     

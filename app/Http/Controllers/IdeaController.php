@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class IdeaController extends Controller
 {
@@ -259,6 +260,87 @@ class IdeaController extends Controller
             'tag' => $tagForDisplay,
             'tagSlug' => $tagSlug,
         ]);
+    }
+
+    /**
+     * Ideas list: thoughts with metadata.type = 'idea', paginated. Add-idea form at top.
+     */
+    public function ideas(): View
+    {
+        $ideas = Thought::query()
+            ->where('user_id', auth()->id())
+            ->ideas()
+            ->orderByDesc('created_at')
+            ->paginate(20);
+
+        return view('idea.ideas', ['ideas' => $ideas]);
+    }
+
+    /**
+     * Store a new idea (thought with metadata.type = 'idea'). Validates content and optional logged_date.
+     */
+    public function storeIdea(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'content' => 'required|string|max:65535',
+            'logged_date' => 'nullable|date',
+        ]);
+        $content = $validated['content'];
+        $loggedDate = $request->input('logged_date') ?? now()->toDateString();
+
+        try {
+            $this->captureService->create([
+                'content' => $content,
+                'user_id' => auth()->id(),
+                'parent_id' => null,
+                'source' => 'web',
+                'source_metadata' => null,
+                'idea_metadata' => [
+                    'type' => 'idea',
+                    'completed' => false,
+                    'logged_date' => $loggedDate,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()->route('idea.ideas')->withInput()->with('error', 'Unable to save idea. Please try again.');
+        }
+
+        return redirect()->route('idea.ideas')->with('success', 'Idea saved.');
+    }
+
+    /**
+     * Toggle idea completed state. Authorizes update on thought; returns 404 if not an idea.
+     */
+    public function toggleCompleted(Request $request, Thought $thought): RedirectResponse|JsonResponse
+    {
+        $this->authorize('update', $thought);
+
+        if (($thought->metadata['type'] ?? null) !== 'idea') {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Not an idea.'], 422);
+            }
+
+            return redirect()->route('idea.ideas')->with('error', 'Not an idea.')->setStatusCode(Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $completed = ! ($thought->metadata['completed'] ?? false);
+        $metadata = array_merge($thought->metadata ?? [], [
+            'type' => 'idea',
+            'completed' => $completed,
+            'logged_date' => $thought->metadata['logged_date'] ?? $thought->created_at->toDateString(),
+        ]);
+        if (isset($thought->metadata['tags']) && is_array($thought->metadata['tags'])) {
+            $metadata['tags'] = $thought->metadata['tags'];
+        }
+        $thought->update(['metadata' => $metadata]);
+
+        if ($request->expectsJson()) {
+            return response()->json(['completed' => $completed]);
+        }
+
+        return redirect()->route('idea.ideas')->with('success', $completed ? 'Marked as complete.' : 'Marked as incomplete.');
     }
 
     /**
