@@ -84,6 +84,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's preferences (key-value).
+     */
+    public function preferences()
+    {
+        return $this->hasMany(UserPreference::class);
+    }
+
+    /**
      * Check if user has unlimited access (Pro or Lifetime).
      */
     public function hasUnlimitedAccess(): bool
