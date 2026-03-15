@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class OpenRouterService
 {
@@ -115,10 +116,7 @@ class OpenRouterService
 
         $model = config('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
 
-        $userMessage = 'Given this idea: ' . trim($ideaContent) . '. Produce a short research note: 2–4 sentences on what\'s relevant, key considerations, and 2–3 concrete next steps. Be concise.';
-        if ($existingResearch !== null && $existingResearch !== '') {
-            $userMessage .= ' Existing research: ' . trim($existingResearch) . '. You may extend or refresh it.';
-        }
+        $userMessage = $this->buildResearchPrompt(trim($ideaContent), $existingResearch);
 
         $payload = [
             'model' => $model,
@@ -140,5 +138,38 @@ class OpenRouterService
         }
 
         return (string) $content;
+    }
+
+    /**
+     * Build the user message for research: load template from file or fall back to hardcoded prompt.
+     */
+    private function buildResearchPrompt(string $ideaContent, ?string $existingResearch): string
+    {
+        $path = config('research.prompt_path');
+        $existing = ($existingResearch !== null && $existingResearch !== '') ? trim($existingResearch) : '';
+
+        if ($path !== null && $path !== '' && is_readable($path)) {
+            $template = trim((string) file_get_contents($path));
+        } else {
+            Log::warning('Research prompt file not used.', ['path' => $path ?? 'empty']);
+            $template = 'Given this idea: {{idea}}. Produce a short research note: 2–4 sentences on what\'s relevant, key considerations, and 2–3 concrete next steps. Be concise.' . "\n" . 'Existing research: {{existing_research}}. You may extend or refresh it.';
+        }
+
+        $userMessage = str_replace(
+            ['{{idea}}', '{{existing_research}}'],
+            [$ideaContent, $existing],
+            $template
+        );
+
+        if ($existing === '') {
+            $userMessage = preg_replace(
+                '/\s*Existing research: \.?\s*You may extend or refresh it\.?\s*/',
+                ' ',
+                $userMessage
+            );
+            $userMessage = trim(preg_replace('/\s+/', ' ', $userMessage));
+        }
+
+        return $userMessage;
     }
 }

@@ -6,4 +6,10 @@ return [
      * (e.g. by user_id in cache) in ResearchService::runResearchForIdea.
      */
     'rate_limit_enabled' => env('RESEARCH_RATE_LIMIT_ENABLED', false),
+
+    /*
+     * Path to the research prompt template file (Markdown or plain text).
+     * Placeholders: {{idea}}, {{existing_research}}. Override via RESEARCH_PROMPT_PATH.
+     */
+    'prompt_path' => env('RESEARCH_PROMPT_PATH', resource_path('prompts/research.md')),
 ];

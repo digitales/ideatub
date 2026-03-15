@@ -161,18 +161,100 @@ class OpenRouterServiceTest extends TestCase
             if ($request->url() !== 'https://openrouter.ai/api/v1/chat/completions') {
                 return false;
             }
-            $messages = $request['messages'] ?? [];
-            $userMessage = null;
-            foreach ($messages as $m) {
-                if (($m['role'] ?? '') === 'user') {
-                    $userMessage = $m['content'] ?? '';
-                    break;
-                }
-            }
+            $userMessage = $this->getUserMessageContent($request);
             return $userMessage !== null
                 && str_contains($userMessage, 'Given this idea')
                 && str_contains($userMessage, 'research note')
                 && str_contains($userMessage, 'next steps');
         });
+    }
+
+    #[Test]
+    public function research_note_uses_template_file_when_available(): void
+    {
+        $template = 'Idea to research: {{idea}}. Prior: {{existing_research}}.';
+        $tempPath = sys_get_temp_dir() . '/ideatub_research_prompt_' . uniqid() . '.md';
+        file_put_contents($tempPath, $template);
+
+        try {
+            config(['research.prompt_path' => $tempPath]);
+
+            Http::fake([
+                'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                    'choices' => [['message' => ['content' => 'Done.']]],
+                ], 200),
+            ]);
+
+            $this->service->researchNote('Build a small SaaS.', 'Some prior notes.');
+
+            Http::assertSent(function ($request) {
+                $userMessage = $this->getUserMessageContent($request);
+
+                return $userMessage !== null
+                    && str_contains($userMessage, 'Idea to research: Build a small SaaS.')
+                    && str_contains($userMessage, 'Prior: Some prior notes.');
+            });
+        } finally {
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+        }
+    }
+
+    #[Test]
+    public function research_note_falls_back_to_hardcoded_prompt_when_file_missing(): void
+    {
+        config(['research.prompt_path' => '/nonexistent/path/research.md']);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => 'OK']]],
+            ], 200),
+        ]);
+
+        $this->service->researchNote('My idea.');
+
+        Http::assertSent(function ($request) {
+            $userMessage = $this->getUserMessageContent($request);
+
+            return $userMessage !== null
+                && str_contains($userMessage, 'Given this idea')
+                && str_contains($userMessage, 'My idea.')
+                && str_contains($userMessage, 'research note');
+        });
+    }
+
+    #[Test]
+    public function research_note_omits_existing_research_sentence_when_empty(): void
+    {
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => 'OK']]],
+            ], 200),
+        ]);
+
+        $this->service->researchNote('An idea.', null);
+
+        Http::assertSent(function ($request) {
+            $userMessage = $this->getUserMessageContent($request);
+
+            return $userMessage !== null
+                && ! str_contains($userMessage, 'Existing research: .');
+        });
+    }
+
+    private function getUserMessageContent($request): ?string
+    {
+        if ($request->url() !== 'https://openrouter.ai/api/v1/chat/completions') {
+            return null;
+        }
+        $messages = $request['messages'] ?? [];
+        foreach ($messages as $m) {
+            if (($m['role'] ?? '') === 'user') {
+                return $m['content'] ?? null;
+            }
+        }
+
+        return null;
     }
 }

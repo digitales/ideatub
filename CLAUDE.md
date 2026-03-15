@@ -38,3 +38,5 @@ When the user or a research agent has research output to save to IdeaTub, use th
 **Split at section titles:** If the research is long, split at markdown headings (`##`, `###`). For each section: use the same `doc_type`, `plan_slug`, and `project`; call capture_plan once per section in order.
 
 **Stream:** In IdeaTub, filter by tag, e.g. `/stream?tag=research-2026-03-13-vehicle-valuation`.
+
+**Research agent prompt (ideas):** The in-app “Research this idea” prompt is loaded from `resources/prompts/research.md` (placeholders: `{{idea}}`, `{{existing_research}}`). Override path via `RESEARCH_PROMPT_PATH`. See `docs/superpowers/specs/2026-03-15-research-prompt-from-file-design.md`.
