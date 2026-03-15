@@ -95,11 +95,22 @@ class Thought extends Model
 
     /**
      * Get content with HTML entities decoded for display.
+     * Decodes repeatedly so double-encoded entities (e.g. &amp;#039;) also render correctly.
      * Use with e() in views to avoid showing literal &quot;, &#039;, etc.
      */
     public function getDecodedContent(): string
     {
-        return html_entity_decode($this->content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $decoded = $this->content;
+        $flags = ENT_QUOTES | ENT_HTML5;
+        while (true) {
+            $prev = $decoded;
+            $decoded = html_entity_decode($decoded, $flags, 'UTF-8');
+            if ($decoded === $prev) {
+                break;
+            }
+        }
+
+        return $decoded;
     }
 
     /**
