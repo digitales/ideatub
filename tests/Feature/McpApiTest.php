@@ -46,7 +46,7 @@ class McpApiTest extends TestCase
             'name' => 'ideatub',
             'version' => '1.0',
             'protocol' => 'json-rpc',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea'],
+            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas'],
         ]);
     }
 
@@ -88,6 +88,7 @@ class McpApiTest extends TestCase
         $response->assertJsonPath('result.tools.3.name', 'capture_thought');
         $response->assertJsonPath('result.tools.4.name', 'capture_plan');
         $response->assertJsonPath('result.tools.5.name', 'capture_idea');
+        $response->assertJsonPath('result.tools.6.name', 'get_ideas');
     }
 
     public function test_post_without_key_returns_401(): void
@@ -477,5 +478,68 @@ class McpApiTest extends TestCase
         $metadata = $thought->metadata ?? [];
         $this->assertSame('idea', $metadata['type'] ?? null);
         $this->assertSame('2025-03-14', $metadata['logged_date'] ?? null);
+    }
+
+    public function test_get_ideas_returns_ideas_array(): void
+    {
+        $key = $this->validKey();
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_ideas',
+            'params' => [],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.ideas', []);
+    }
+
+    public function test_get_ideas_returns_empty_when_user_has_no_incomplete_ideas(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'idea', 'completed' => true],
+        ]);
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_ideas',
+            'params' => [],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.ideas', []);
+    }
+
+    public function test_get_ideas_returns_incomplete_ideas_with_expected_shape(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'An incomplete idea to revisit',
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-03-01'],
+        ]);
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_ideas',
+            'params' => [],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['result' => ['ideas' => [['id', 'content', 'logged_date', 'created_at']]]]);
+        $ideas = $response->json('result.ideas');
+        $this->assertNotEmpty($ideas);
+        $first = $ideas[0];
+        $this->assertArrayHasKey('id', $first);
+        $this->assertArrayHasKey('content', $first);
+        $this->assertArrayHasKey('logged_date', $first);
+        $this->assertArrayHasKey('created_at', $first);
+        $this->assertSame('An incomplete idea to revisit', $first['content']);
+        $this->assertSame('2025-03-01', $first['logged_date']);
     }
 }

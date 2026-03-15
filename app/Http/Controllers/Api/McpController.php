@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
+use App\Services\IdeasToRevisitService;
 use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
 use App\Services\ThoughtCaptureService;
@@ -14,12 +15,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class McpController extends Controller
 {
     public function __construct(
         private OpenRouterService $openRouter,
         private ThoughtCaptureService $captureService,
+        private IdeasToRevisitService $ideasToRevisit,
         private ?OAuthMcpJwtService $oauthJwt = null
     ) {}
 
@@ -34,7 +37,7 @@ class McpController extends Controller
             'version' => '1.0',
             'protocol' => 'json-rpc',
             'auth' => 'Send key via ?key=... or x-ideatub-key header',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea'],
+            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas'],
         ]);
     }
 
@@ -75,7 +78,7 @@ class McpController extends Controller
         }
 
         // Legacy direct method names (search_thoughts, browse_recent, etc.)
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas'];
         if (! in_array($method, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -201,6 +204,16 @@ class McpController extends Controller
                     'required' => ['content'],
                 ],
             ],
+            [
+                'name' => 'get_ideas',
+                'description' => 'Return the same list as the Ideas to revisit page: incomplete ideas weighted by age, bounded by user preferences.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'limit' => ['type' => 'integer', 'description' => 'Optional max number of ideas to return (overrides user preference)'],
+                    ],
+                ],
+            ],
         ];
 
         return response()->json([
@@ -221,7 +234,7 @@ class McpController extends Controller
             return $this->jsonRpcError(-32602, 'tools/call requires "name"', $id);
         }
 
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea'];
+        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas'];
         if (! in_array($name, $knownMethods, true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -340,6 +353,7 @@ class McpController extends Controller
             'capture_thought' => $this->captureThought($params),
             'capture_plan' => $this->capturePlan($params),
             'capture_idea' => $this->captureIdea($params),
+            'get_ideas' => $this->getIdeas($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
     }
@@ -431,6 +445,28 @@ class McpController extends Controller
         $count = Thought::query()->where('user_id', auth()->id())->count();
 
         return ['count' => $count];
+    }
+
+    /**
+     * get_ideas: incomplete ideas to revisit (same as Ideas to revisit page), age-ordered, bounded by user preferences.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{ideas: array<int, array{id: string, content: string, logged_date: string, created_at: string}>}
+     */
+    private function getIdeas(array $params): array
+    {
+        $thoughts = $this->ideasToRevisit->forUser(auth()->user());
+
+        $ideas = array_map(function (Thought $thought): array {
+            return [
+                'id' => $thought->id,
+                'content' => Str::limit($thought->getDecodedContent(), 200),
+                'logged_date' => $thought->getLoggedDate(),
+                'created_at' => $thought->created_at->toIso8601String(),
+            ];
+        }, $thoughts);
+
+        return ['ideas' => $ideas];
     }
 
     /**
