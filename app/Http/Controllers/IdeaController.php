@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Thought;
 use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
+use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -30,7 +31,8 @@ class IdeaController extends Controller
 
     public function __construct(
         private OpenRouterService $openRouter,
-        private ThoughtCaptureService $captureService
+        private ThoughtCaptureService $captureService,
+        private ResearchService $researchService
     ) {}
 
     /**
@@ -275,6 +277,7 @@ class IdeaController extends Controller
 
     /**
      * Ideas list: thoughts with metadata.type = 'idea', paginated. Add-idea form at top.
+     * Loads research thoughts for each idea (newest first) for display.
      */
     public function ideas(): View
     {
@@ -284,7 +287,26 @@ class IdeaController extends Controller
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        return view('idea.ideas', ['ideas' => $ideas]);
+        $ideaIds = $ideas->pluck('id');
+        $researchByIdea = collect();
+        if ($ideaIds->isNotEmpty()) {
+            $researchThoughts = Thought::query()
+                ->where('user_id', auth()->id())
+                ->where('metadata->type', 'research')
+                ->where(function ($q) use ($ideaIds) {
+                    foreach ($ideaIds as $id) {
+                        $q->orWhere('metadata->idea_id', $id);
+                    }
+                })
+                ->orderByDesc('created_at')
+                ->get();
+            $researchByIdea = $researchThoughts->groupBy(fn (Thought $t) => $t->metadata['idea_id'] ?? '');
+        }
+
+        return view('idea.ideas', [
+            'ideas' => $ideas,
+            'researchByIdea' => $researchByIdea,
+        ]);
     }
 
     /**
@@ -352,6 +374,51 @@ class IdeaController extends Controller
         }
 
         return redirect()->route('idea.ideas')->with('success', $completed ? 'Marked as complete.' : 'Marked as incomplete.');
+    }
+
+    /**
+     * Run research for an existing idea. Authorizes that the user owns the thought.
+     */
+    public function research(Thought $thought): RedirectResponse
+    {
+        $this->authorize('update', $thought);
+
+        if (($thought->metadata['type'] ?? null) !== 'idea') {
+            return redirect()->route('idea.ideas')->with('error', 'Not an idea.');
+        }
+
+        try {
+            $this->researchService->runResearchForIdea($thought, 'web');
+
+            return redirect()->back()->with('success', 'Research saved.');
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()->back()->with('error', 'Research failed — try again.');
+        }
+    }
+
+    /**
+     * Create a new idea and run research (body: content). If research fails, the idea is still saved.
+     */
+    public function researchNew(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'content' => 'required|string|max:65535',
+        ]);
+        $content = $validated['content'];
+
+        $result = $this->researchService->createIdeaAndResearch($content, 'web');
+        $idea = $result['idea'];
+        $research = $result['research'];
+
+        if ($research === null) {
+            return redirect()->route('idea.ideas')
+                ->with('error', 'Research failed — try again.')
+                ->with('success', 'Idea saved. You can run research from the ideas list.');
+        }
+
+        return redirect()->route('idea.ideas')->with('success', 'Idea and research saved.');
     }
 
     /**
