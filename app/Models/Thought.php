@@ -254,6 +254,51 @@ class Thought extends Model
     }
 
     /**
+     * Scope to thoughts that have at least one tag equal to the normalized query or containing it (substring).
+     * Query must be normalized (trimmed, lowercase) by the caller.
+     * Null-safe for missing metadata or metadata->tags.
+     *
+     * @param  Builder<Thought>  $query
+     * @return Builder<Thought>
+     */
+    public function scopeTagMatchesQuery(Builder $query, string $normalizedQuery): Builder
+    {
+        $normalizedQuery = mb_strtolower(trim($normalizedQuery));
+        if ($normalizedQuery === '') {
+            return $query->whereRaw('0 = 1');
+        }
+
+        $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+        $likePattern = '%'.static::escapeForLike($normalizedQuery).'%';
+
+        if ($driver === 'pgsql') {
+            // Exact: jsonb array contains the string. Contains: any element LIKE %query%.
+            $query->where(function (Builder $q) use ($normalizedQuery, $likePattern): void {
+                $q->whereJsonContains('metadata->tags', $normalizedQuery)
+                    ->orWhereRaw(
+                        "EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE((metadata->'tags')::jsonb, '[]'::jsonb)) AS t WHERE t LIKE ?)",
+                        [$likePattern]
+                    );
+            });
+
+            return $query;
+        }
+
+        // SQLite: json_each(metadata, '$.tags') exposes key, value; use value for match.
+        $query->where(function (Builder $q) use ($normalizedQuery, $likePattern): void {
+            $q->whereRaw(
+                "EXISTS (SELECT 1 FROM json_each(COALESCE(json_extract(metadata, '$.tags'), '[]')) WHERE value = ?)",
+                [$normalizedQuery]
+            )->orWhereRaw(
+                "EXISTS (SELECT 1 FROM json_each(COALESCE(json_extract(metadata, '$.tags'), '[]')) WHERE value LIKE ?)",
+                [$likePattern]
+            );
+        });
+
+        return $query;
+    }
+
+    /**
      * Scope to thoughts that have no tags (metadata null, or tags missing/empty).
      * Used by the periodic extract-untagged command so only untagged content is reprocessed.
      */
@@ -286,5 +331,13 @@ class Thought extends Model
         ));
 
         return $metadata;
+    }
+
+    /**
+     * Escape % and _ for safe use in LIKE patterns. Use with parameter binding.
+     */
+    public static function escapeForLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 }
