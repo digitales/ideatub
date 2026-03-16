@@ -36,6 +36,7 @@
             type="text"
             x-ref="addInput"
             placeholder="Add tag…"
+            aria-label="Add tag"
             @keydown.enter.prevent="addFromInput()"
             class="text-[10px] font-medium px-2 py-0.5 rounded-full border border-memory-violet/20 w-24 min-w-0"
         >
@@ -43,6 +44,7 @@
             type="button"
             @click="addFromInput()"
             class="text-[10px] font-medium text-memory-violet hover:opacity-90"
+            aria-label="Add tag"
         >+ Tag</button>
         <p x-show="error" x-text="error" class="text-xs text-red-500"></p>
     @endif
