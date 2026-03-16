@@ -14,7 +14,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="font-sans antialiased min-h-screen" style="background: linear-gradient(135deg, #eef2ff 0%, #f3f0ff 50%, #f0f5ff 100%); padding-top: env(safe-area-inset-top, 0px);">
+<body class="font-sans antialiased min-h-screen" style="background: linear-gradient(135deg, #eef2ff 0%, #f3f0ff 50%, #f0f5ff 100%); padding-top: max(0.5rem, env(safe-area-inset-top, 0px));">
 
     <div
         x-data="ideaShortcuts()"
@@ -42,7 +42,7 @@
             style="background: rgba(238,242,255,0.95); backdrop-filter: blur(12px);"
             @click.away="searching = false"
         >
-            <div class="flex flex-col gap-2 w-full max-w-lg mx-auto">
+            <div class="flex flex-col w-full max-w-lg mx-auto gap-4">
                 <div class="flex items-center gap-3">
                     <svg class="w-4 h-4 text-neural-teal flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -60,7 +60,7 @@
                     Cancel
                 </button>
                 </div>
-                <p class="text-[11px] text-slate-brand/50">Escape to close · ⌘K to focus search</p>
+                <p class="text-[11px] text-slate-brand/50 mt-0.5">Escape to close · ⌘K to focus search</p>
             </div>
         </form>
 
