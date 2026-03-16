@@ -205,8 +205,8 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl) => ({
     return String(tag)
       .toLowerCase()
       .trim()
-      .replace(/\s+/g, '_')
-      .replace(/[^a-z0-9_-]/g, '');
+      .replace(/[^a-z0-9]+/gi, '_')
+      .replace(/^_+|_+$/g, '');
   },
 
   async remove(index) {
