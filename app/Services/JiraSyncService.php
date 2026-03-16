@@ -86,7 +86,8 @@ class JiraSyncService
             $fields = $issue['fields'] ?? [];
             $summary = $fields['summary'] ?? $key;
             $projectKey = $fields['project']['key'] ?? 'unknown';
-            $projectTag = mb_strtolower(trim($projectKey));
+            $projectName = $fields['project']['name'] ?? null;
+            $projectTags = $this->projectTags($projectKey, $projectName);
             $created = $fields['created'] ?? null;
             $updated = $fields['updated'] ?? $created;
             $issueLink = "{$baseUrl}/browse/{$key}";
@@ -100,10 +101,11 @@ class JiraSyncService
             $events[] = $this->event(
                 $createdEventId,
                 "Created {$key}: {$summary}",
-                $projectTag,
+                $projectTags,
                 $key,
                 $summary,
                 $projectKey,
+                $projectName,
                 'created',
                 $created ?? $updated,
                 $issueLink
@@ -132,10 +134,11 @@ class JiraSyncService
                 $events[] = $this->event(
                     "{$key}:changelog:{$historyId}",
                     $content,
-                    $projectTag,
+                    $projectTags,
                     $key,
                     $summary,
                     $projectKey,
+                    $projectName,
                     'updated',
                     $createdAt,
                     $issueLink
@@ -161,10 +164,11 @@ class JiraSyncService
                 $events[] = $this->event(
                     "{$key}:comment:{$commentId}",
                     "Commented on {$key}: {$preview}",
-                    $projectTag,
+                    $projectTags,
                     $key,
                     $summary,
                     $projectKey,
+                    $projectName,
                     'comment',
                     $commentCreated,
                     "{$issueLink}#comment-{$commentId}"
@@ -176,21 +180,40 @@ class JiraSyncService
     }
 
     /**
-     * @param  array<string, mixed>  $metadata
+     * Build tags for a Jira project: jira, project key (lowercase), and slugified project name if present.
+     *
+     * @return array<int, string>
+     */
+    private function projectTags(string $projectKey, ?string $projectName): array
+    {
+        $tags = ['jira', mb_strtolower(trim($projectKey))];
+        if ($projectName !== null && trim($projectName) !== '') {
+            $slug = mb_strtolower(trim(preg_replace('/\s+/', '_', $projectName), '_'));
+            if ($slug !== '' && ! in_array($slug, $tags, true)) {
+                $tags[] = $slug;
+            }
+        }
+
+        return $tags;
+    }
+
+    /**
+     * @param  array<int, string>  $projectTags
      * @return array{jira_event_id: string, content: string, metadata: array{type: string, tags: array<int, string>}, source_metadata: array<string, mixed>}
      */
     private function event(
         string $jiraEventId,
         string $content,
-        string $projectTag,
+        array $projectTags,
         string $issueKey,
         string $issueSummary,
         string $projectKey,
+        ?string $projectName,
         string $eventType,
         ?string $at,
         string $link
     ): array {
-        $tags = ['jira', $projectTag];
+        $tags = $projectTags;
         $normalized = Thought::normalizeMetadataTags(['tags' => $tags]);
         $tags = $normalized['tags'] ?? $tags;
 
@@ -201,15 +224,16 @@ class JiraSyncService
                 'type' => 'jira',
                 'tags' => $tags,
             ],
-            'source_metadata' => [
+            'source_metadata' => array_filter([
                 'jira_event_id' => $jiraEventId,
                 'jira_issue_key' => $issueKey,
                 'jira_issue_summary' => $issueSummary,
                 'jira_project_key' => $projectKey,
+                'jira_project_name' => $projectName !== null && trim($projectName) !== '' ? trim($projectName) : null,
                 'jira_event_type' => $eventType,
                 'jira_updated_at' => $at,
                 'jira_link' => $link,
-            ],
+            ], fn ($v) => $v !== null),
         ];
     }
 }
