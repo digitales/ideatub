@@ -1,8 +1,9 @@
 @foreach ($thoughts as $thought)
-    <div data-thought-id="{{ $thought->id }}" class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all">
-        <div class="flex justify-end -mt-0.5 -mr-0.5 mb-0.5">
+    <div data-thought-id="{{ $thought->id }}" class="relative rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all">
+        <div class="absolute top-3 right-3">
             @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
         </div>
+        <div class="pr-8">
         <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ $thought->content }}</p>
         <div class="flex items-center gap-2 flex-wrap">
             <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
@@ -21,5 +22,6 @@
                 @endforeach
             </ul>
         @endif
+        </div>
     </div>
 @endforeach
