@@ -101,6 +101,17 @@ class IdeaController extends Controller
                 ->orderByDesc('created_at')
                 ->limit(self::RECENT_LIMIT)
                 ->get();
+
+            if ($request->ajax()) {
+                $html = view('idea.index_thought_cards', ['thoughts' => $thoughts, 'replyableIndexStart' => 0])->render();
+                $latest = $thoughts->isEmpty() ? null : $thoughts->first()->created_at->toIso8601String();
+
+                return response()->json([
+                    'html' => $html,
+                    'total' => $thoughts->count(),
+                    'latest_created_at' => $latest,
+                ]);
+            }
         }
 
         $replyingTo = null;
@@ -287,8 +298,9 @@ class IdeaController extends Controller
     /**
      * Ideas list: thoughts with metadata.type = 'idea', paginated. Add-idea form at top.
      * Loads research thoughts for each idea (newest first) for display.
+     * For AJAX requests, returns JSON with first-page HTML for realtime refetch.
      */
-    public function ideas(): View
+    public function ideas(Request $request): View|JsonResponse
     {
         $ideas = Thought::query()
             ->where('user_id', auth()->id())
@@ -310,6 +322,13 @@ class IdeaController extends Controller
                 ->orderByDesc('created_at')
                 ->get();
             $researchByIdea = $researchThoughts->groupBy(fn (Thought $t) => $t->metadata['idea_id'] ?? '');
+        }
+
+        if ($request->ajax()) {
+            $html = view('idea.partials.ideas_list', ['ideas' => $ideas, 'researchByIdea' => $researchByIdea])->render();
+            $latest = $ideas->isEmpty() ? null : $ideas->first()->created_at->toIso8601String();
+
+            return response()->json(['html' => $html, 'latest_created_at' => $latest]);
         }
 
         return view('idea.ideas', [

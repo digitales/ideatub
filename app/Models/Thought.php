@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\ThoughtCreated;
 use App\Jobs\SyncThoughtToEvernote;
 use App\Services\EvernoteService;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,6 +39,12 @@ class Thought extends Model
 
         static::created($dispatchSync);
         static::updated($dispatchSync);
+
+        static::created(function (Thought $thought): void {
+            if (config('realtime.driver') === 'reverb') {
+                broadcast(new ThoughtCreated($thought))->toOthers();
+            }
+        });
     }
 
     /**

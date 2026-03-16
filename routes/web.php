@@ -82,7 +82,9 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
-    
+
+    Route::get('/api/thoughts/realtime-check', [App\Http\Controllers\Api\RealtimeCheckController::class, 'realtimeCheck'])->name('api.thoughts.realtime-check');
+
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');

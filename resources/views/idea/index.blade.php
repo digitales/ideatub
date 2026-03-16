@@ -134,7 +134,10 @@
     @endif
 
     @if (!$thoughts->isEmpty())
-        <div id="index-thoughts-list">
+        <div id="index-thoughts-list"
+            @if(!$query) data-index-refetch-url="{{ route('idea.index') }}"
+                data-index-since="{{ $thoughts->first()->created_at->toIso8601String() }}"
+            @endif>
             @include('idea.index_thought_cards', ['thoughts' => $thoughts, 'replyableIndexStart' => 0])
         </div>
     @else
@@ -158,6 +161,47 @@
     </div>
 
 </div>
+
+@if(!$query && !$thoughts->isEmpty())
+@push('scripts')
+<script>
+(function() {
+    var list = document.getElementById('index-thoughts-list');
+    if (!list || !window.ideatub || !window.ideatub.realtime) return;
+    var cfg = window.ideatub.realtime;
+    var refetchUrl = list.getAttribute('data-index-refetch-url');
+    if (!refetchUrl) return;
+    function refetchIndex() {
+        fetch(refetchUrl, { method: 'GET', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.html) list.innerHTML = data.html;
+                if (data.latest_created_at) list.setAttribute('data-index-since', data.latest_created_at);
+            })
+            .catch(function() {});
+    }
+    if (cfg.driver === 'polling' || !cfg.reverb_key) {
+        setInterval(function() {
+            var since = list.getAttribute('data-index-since');
+            if (!since || !cfg.realtime_check_url) return;
+            fetch(cfg.realtime_check_url + '?since=' + encodeURIComponent(since), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function(r) { return r.json(); })
+                .then(function(data) { if (data.has_new) refetchIndex(); })
+                .catch(function() {});
+        }, 20000);
+    } else if (cfg.driver === 'reverb' && cfg.reverb_key && cfg.user_id) {
+        function trySubscribe() {
+            if (!window.Echo) { setTimeout(trySubscribe, 100); return; }
+            try {
+                window.Echo.private('App.Models.User.' + cfg.user_id).listen('.ThoughtCreated', refetchIndex);
+            } catch (e) { console.warn('Echo subscribe failed:', e); }
+        }
+        trySubscribe();
+    }
+})();
+</script>
+@endpush
+@endif
 
 @if($query)
 @push('scripts')

@@ -44,6 +44,49 @@
         </div>
 
         @push('scripts')
+            @if(!$thoughts->isEmpty())
+                <script>
+                (function() {
+                    var list = document.getElementById('stream-thoughts-list');
+                    if (!list || !window.ideatub || !window.ideatub.realtime) return;
+                    var cfg = window.ideatub.realtime;
+                    var refetchUrl = list.getAttribute('data-stream-refetch-url');
+                    if (!refetchUrl) return;
+                    function refetchStream() {
+                        fetch(refetchUrl, { method: 'GET', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                if (data.html) list.innerHTML = data.html;
+                                var showing = document.getElementById('stream-showing-count');
+                                var total = document.getElementById('stream-total-count');
+                                if (showing && data.count !== undefined) showing.textContent = data.count;
+                                if (total && data.total !== undefined) total.textContent = data.total;
+                                if (data.latest_created_at) list.setAttribute('data-stream-since', data.latest_created_at);
+                            })
+                            .catch(function() {});
+                    }
+                    if (cfg.driver === 'polling' || !cfg.reverb_key) {
+                        var sinceEl = list;
+                        setInterval(function() {
+                            var since = sinceEl.getAttribute('data-stream-since');
+                            if (!since || !cfg.realtime_check_url) return;
+                            fetch(cfg.realtime_check_url + '?since=' + encodeURIComponent(since), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                                .then(function(r) { return r.json(); })
+                                .then(function(data) { if (data.has_new) refetchStream(); })
+                                .catch(function() {});
+                        }, 20000);
+                    } else if (cfg.driver === 'reverb' && cfg.reverb_key && cfg.user_id) {
+                        function trySubscribe() {
+                            if (!window.Echo) { setTimeout(trySubscribe, 100); return; }
+                            try {
+                                window.Echo.private('App.Models.User.' + cfg.user_id).listen('.ThoughtCreated', refetchStream);
+                            } catch (e) { console.warn('Echo subscribe failed:', e); }
+                        }
+                        trySubscribe();
+                    }
+                })();
+                </script>
+            @endif
             @if(!$thoughts->isEmpty() && $thoughts->hasMorePages())
                 <script>
                 (function() {
