@@ -22,7 +22,6 @@ class IdeaPageTest extends TestCase
         $response->assertSee('IdeaTub');
         $response->assertSee('What are you thinking?');
         $response->assertSee('Store thought');
-        $response->assertSee('Example Prompts');
         $response->assertSee('Help');
         $response->assertSee('Find a memory');
     }
@@ -160,19 +159,29 @@ class IdeaPageTest extends TestCase
         $this->assertSame(1, Thought::where('user_id', $user->id)->count());
     }
 
-    public function test_example_prompts_page_loads_with_prompt_kit_content(): void
+    public function test_help_page_includes_example_prompts(): void
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get(route('example-prompts'));
+        $response = $this->actingAs($user)->get(route('help'));
 
         $response->assertStatus(200);
-        $response->assertSee('Example Prompts');
+        $response->assertSee('Help');
+        $response->assertSee('Example prompts');
         $response->assertSee('Memory Migration');
         $response->assertSee('Second Brain Migration');
         $response->assertSee('Quick Capture Templates');
         $response->assertSee('The Weekly Review');
         $response->assertSee('Decision: [what was decided]');
         $response->assertSee('promptkit.natebjones.com');
+    }
+
+    public function test_example_prompts_route_redirects_to_help(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('example-prompts'));
+
+        $response->assertRedirect('/help#example-prompts');
     }
 }

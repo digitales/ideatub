@@ -4,7 +4,6 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ExamplePromptsController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IdeaController;
@@ -99,7 +98,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/ideas/research', [IdeaController::class, 'researchNew'])->name('ideas.research-new');
     Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');
 
-    Route::get('/example-prompts', [ExamplePromptsController::class, 'index'])->name('example-prompts');
+    Route::redirect('/example-prompts', '/help#example-prompts')->name('example-prompts');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
     
     // MCP key management (obtain / revoke auth key for AI clients)

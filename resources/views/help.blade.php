@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
     <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug mb-2">Help</h1>
-    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts, MCP integration, and syncing plans into your thinking space.</p>
+    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts, MCP integration, example prompts, and syncing plans into your thinking space.</p>
 
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
         <h2 class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>
@@ -20,6 +20,27 @@
                 <tr><td class="py-2">Show shortcut list</td><td class="py-2 text-right text-slate-brand font-medium">?</td></tr>
             </tbody>
         </table>
+    </div>
+
+    {{-- Example prompts (Companion Prompt Kit) --}}
+    <div id="example-prompts" class="mt-8">
+        <h2 class="text-lg font-semibold text-deep-indigo mb-2">Example prompts</h2>
+        <p class="text-sm text-slate-brand mb-4">
+            Companion prompts for your Open Brain: migrate memories, bring over your second brain, discover use cases, use quick-capture templates, and run a weekly review.
+            <a href="{{ $examplePromptsSourceUrl ?? '#' }}" target="_blank" rel="noopener noreferrer" class="text-memory-violet hover:underline">Prompt Kit source</a>
+        </p>
+        @foreach($prompts ?? [] as $prompt)
+        <section class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-6">
+            <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-headings:font-semibold prose-p:text-slate-brand prose-li:text-slate-brand prose-strong:text-deep-indigo prose-pre:bg-slate-100 prose-pre:text-deep-indigo prose-code:text-deep-indigo">
+                {!! $prompt['body_html'] !!}
+            </div>
+        </section>
+        @endforeach
+        @if(!empty($prompts))
+        <p class="text-xs text-slate-brand/70 mt-2">
+            From <a href="{{ $examplePromptsSourceUrl }}" target="_blank" rel="noopener noreferrer" class="text-memory-violet hover:underline">Open Brain: Companion Prompts</a> (Prompt Kit by Nate B. Jones).
+        </p>
+        @endif
     </div>
 
     {{-- MCP integration guide --}}
@@ -164,7 +185,7 @@
             </table>
         </div>
 
-        <p class="text-xs text-slate-brand/80">For prompt ideas (memory migration, second brain, weekly review), see the <a href="https://promptkit.natebjones.com/20260224_uq1_promptkit_1" class="text-memory-violet hover:underline" target="_blank" rel="noopener">Companion Prompt Kit</a> and Example Prompts in the app.</p>
+        <p class="text-xs text-slate-brand/80">For more prompt ideas (memory migration, second brain, weekly review), see the <a href="{{ route('help') }}#example-prompts" class="text-memory-violet hover:underline">Example prompts</a> section above and the <a href="https://promptkit.natebjones.com/20260224_uq1_promptkit_1" class="text-memory-violet hover:underline" target="_blank" rel="noopener">Companion Prompt Kit</a>.</p>
     </div>
 </div>
 @endsection
