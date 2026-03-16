@@ -32,6 +32,16 @@ class ThoughtCreated implements ShouldBroadcast
     }
 
     /**
+     * The event's broadcast name (Echo listens for .ThoughtCreated).
+     *
+     * @return string
+     */
+    public function broadcastAs(): string
+    {
+        return 'ThoughtCreated';
+    }
+
+    /**
      * Get the data to broadcast.
      *
      * @return array<string, mixed>
