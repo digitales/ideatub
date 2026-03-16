@@ -161,4 +161,49 @@ class StreamPageTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee($longSection, false);
     }
+
+    public function test_stream_excludes_jira_thoughts(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Normal thought',
+            'parent_id' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Jira ticket PROJ-123',
+            'parent_id' => null,
+            'source' => 'jira',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Normal thought');
+        $response->assertDontSee('Jira ticket PROJ-123');
+    }
+
+    public function test_jira_stream_shows_only_jira_thoughts(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Normal thought',
+            'parent_id' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Jira ticket PROJ-123',
+            'parent_id' => null,
+            'source' => 'jira',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.jira'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Jira');
+        $response->assertSee('Jira ticket PROJ-123');
+        $response->assertDontSee('Normal thought');
+    }
 }

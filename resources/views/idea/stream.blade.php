@@ -1,27 +1,32 @@
 @extends('layouts.idea') 
 
-@section('title', $tag ? 'Tag: ' . e($tag) . ' — IdeaTub' : 'Stream — IdeaTub')
+@section('title', isset($streamJira) && $streamJira ? 'Jira — IdeaTub' : ($tag ? 'Tag: ' . e($tag) . ' — IdeaTub' : 'Stream — IdeaTub'))
 
     @section('content')
         <div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
             <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-6">
-                @if($tag)
+                @if(isset($streamJira) && $streamJira)
+                    Jira
+                @elseif($tag)
                     Tag: {{e($tag)}}
                 @else
                     Your Stream
                 @endif
             </h1>
 
-            @if($tag)
+            @if($tag || (isset($streamJira) && $streamJira))
                 <p class="text-center mb-4">
-                    <a href="{{route('idea.stream')}}" class="text-[12px] font-medium text-memory-violet hover:underline">All
-                        thoughts</a>
+                    <a href="{{ route('idea.stream') }}" class="text-[12px] font-medium text-memory-violet hover:underline">
+                        {{ (isset($streamJira) && $streamJira) ? 'All thoughts' : 'All thoughts' }}
+                    </a>
                 </p>
             @endif
 
             @if($thoughts->isEmpty())
                 <div class="rounded-xl border border-memory-violet/10 bg-white/50 px-4 py-8 text-center text-sm text-slate-brand/50">
-                    @if($tag)
+                    @if(isset($streamJira) && $streamJira)
+                        No Jira activity yet. @if(config('services.jira.enabled', true))<a href="{{ route('settings.jira.index') }}" class="text-memory-violet hover:underline">Sync from Jira settings</a>.@endif
+                    @elseif($tag)
                         No thoughts with tag ‘{{e($tag)}}’. <a href="{{route('idea.stream')}}" class="text-memory-violet hover:underline">All thoughts</a>
                     @else
                         No thoughts yet. <a href="{{route('idea.index')}}" class="text-memory-violet hover:underline">Capture
@@ -33,12 +38,12 @@
                     Showing <span id="stream-showing-count">{{$thoughts->count()}}</span> of <span id="stream-total-count">{{$thoughts->total()}}</span> thoughts
                 </p>
                 <div id="stream-thoughts-list"
-                    data-stream-refetch-url="{{ ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
+                    data-stream-refetch-url="{{ (isset($streamJira) && $streamJira) ? route('idea.stream.jira') : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
                     data-stream-since="{{ $thoughts->first()->created_at->toIso8601String() }}">
                     @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag]) 
                 </div>
                 @if($thoughts->hasMorePages())
-                    <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{$tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')}}" data-stream-total="{{$thoughts->total()}}"></div>
+                    <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{ (isset($streamJira) && $streamJira) ? route('idea.stream.jira') : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}" data-stream-total="{{$thoughts->total()}}"></div>
                 @endif
             @endif
         </div>

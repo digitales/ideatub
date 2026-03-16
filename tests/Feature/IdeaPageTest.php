@@ -48,6 +48,28 @@ class IdeaPageTest extends TestCase
         $response->assertSee('Recent thoughts');
     }
 
+    public function test_idea_page_recent_thoughts_exclude_jira(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Normal recent thought',
+            'parent_id' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Jira synced ticket',
+            'parent_id' => null,
+            'source' => 'jira',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Normal recent thought');
+        $response->assertDontSee('Jira synced ticket');
+    }
+
     public function test_idea_page_shows_search_results(): void
     {
         $user = User::factory()->create();

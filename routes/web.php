@@ -87,6 +87,7 @@ Route::middleware('auth')->group(function () {
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
+    Route::get('/stream/jira', [IdeaController::class, 'streamJira'])->name('idea.stream.jira');
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
 
     // Ideas list and store

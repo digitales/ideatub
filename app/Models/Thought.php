@@ -206,6 +206,16 @@ class Thought extends Model
     }
 
     /**
+     * Scope to exclude Jira-sourced thoughts (e.g. from homepage recent and main stream).
+     */
+    public function scopeExcludingJira(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereNull('source')->orWhere('source', '!=', 'jira');
+        });
+    }
+
+    /**
      * Scope to research thoughts linked to the given idea (metadata type research, idea_id = $ideaId).
      */
     public function scopeResearchForIdea(Builder $query, string $ideaId): Builder

@@ -92,6 +92,7 @@ class IdeaController extends Controller
                 ->where('user_id', auth()->id())
                 ->topLevel()
                 ->excludingResearch()
+                ->excludingJira()
                 ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
                 ->orderByDesc('created_at')
                 ->limit(self::RECENT_LIMIT)
@@ -232,6 +233,7 @@ class IdeaController extends Controller
         $query = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
+            ->excludingJira()
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')]);
 
         if ($canonicalTag !== null) {
@@ -277,6 +279,50 @@ class IdeaController extends Controller
             'thoughts' => $thoughts,
             'tag' => $tagForDisplay,
             'tagSlug' => $tagSlug,
+            'streamJira' => false,
+        ]);
+    }
+
+    /**
+     * Jira stream: top-level thoughts with source = 'jira' only. Paginated; same view as stream.
+     */
+    public function streamJira(Request $request): View|JsonResponse
+    {
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
+
+        $thoughts = Thought::query()
+            ->where('user_id', auth()->id())
+            ->topLevel()
+            ->where('source', 'jira')
+            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
+
+        if ($request->ajax()) {
+            $html = view('idea.stream_thoughts', [
+                'thoughts' => $thoughts,
+                'showFullSections' => false,
+            ])->render();
+            $latestCreatedAt = $thoughts->isNotEmpty()
+                ? $thoughts->first()->created_at->toIso8601String()
+                : null;
+
+            return response()->json([
+                'html' => $html,
+                'has_more' => $thoughts->hasMorePages(),
+                'next_page' => $thoughts->currentPage() + 1,
+                'count' => $thoughts->count(),
+                'total' => $thoughts->total(),
+                'latest_created_at' => $latestCreatedAt,
+            ]);
+        }
+
+        return view('idea.stream', [
+            'thoughts' => $thoughts,
+            'tag' => null,
+            'tagSlug' => null,
+            'streamJira' => true,
         ]);
     }
 
