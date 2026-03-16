@@ -25,7 +25,7 @@
 | `resources/views/settings/jira.blade.php` | Form: site URL, API token (password), email (for Jira auth); Connect / Disconnect / Sync now |
 | `app/Http/Controllers/Api/McpController.php` | Add sync_jira to tools list, knownMethods, dispatch; handler dispatches job and returns message |
 | `app/Models/Thought.php` | In boot: skip dispatching SyncThoughtToEvernote when `$thought->source === 'jira'` |
-| `config/services.php` | Add `jira.default_days` (e.g. 14) |
+| `config/services.php` | Add `jira.enabled` (env JIRA_ENABLED, default true), `jira.default_days` (e.g. 14) |
 | `tests/Unit/JiraSyncServiceTest.php` | Mock HTTP; assert fetchEvents return shape and event keys |
 | `tests/Feature/JiraSyncJobTest.php` | Sync creates thoughts with type jira and tags; idempotency (run twice, same count) |
 | `tests/Feature/JiraSettingsTest.php` | Store credentials, disconnect, sync dispatches job |
@@ -109,7 +109,7 @@ git add app/Models/UserJiraCredential.php app/Models/User.php
 git commit -m "feat(jira): add UserJiraCredential model with encrypted token"
 ```
 
-### Task 1.3: Config
+### Task 1.3: Config and feature toggle
 
 **Files:**
 - Modify: `config/services.php`
@@ -120,9 +120,12 @@ Append to `config/services.php`:
 
 ```php
 'jira' => [
+    'enabled' => filter_var(env('JIRA_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
     'default_days' => (int) env('JIRA_SYNC_DAYS', 14),
 ],
 ```
+
+When `jira.enabled` is false: do not show Jira in the UI (nav, settings page) and do not expose `sync_jira` in MCP (see Chunks 4 and 5).
 
 - [ ] **Step 2: Commit**
 
@@ -273,26 +276,28 @@ Implement:
 - `destroy(Request $request)`: Delete user’s jiraCredential; redirect with success.
 - `sync(Request $request)`: Dispatch SyncUserJiraActivity for current user (with optional days from request or config). Redirect to index with flash “Jira sync started.”
 
-- [ ] **Step 2: Add routes**
+- [ ] **Step 2: Add routes (only when Jira enabled)**
 
-In `routes/web.php` inside auth group:
+In `routes/web.php` inside auth group, register Jira routes only when `config('services.jira.enabled', true)`:
 
 ```php
-Route::get('/settings/jira', [JiraSettingsController::class, 'index'])->name('settings.jira.index');
-Route::post('/settings/jira', [JiraSettingsController::class, 'store'])->name('settings.jira.store');
-Route::delete('/settings/jira', [JiraSettingsController::class, 'destroy'])->name('settings.jira.destroy');
-Route::post('/settings/jira/sync', [JiraSettingsController::class, 'sync'])->name('settings.jira.sync');
+if (config('services.jira.enabled', true)) {
+    Route::get('/settings/jira', [JiraSettingsController::class, 'index'])->name('settings.jira.index');
+    Route::post('/settings/jira', [JiraSettingsController::class, 'store'])->name('settings.jira.store');
+    Route::delete('/settings/jira', [JiraSettingsController::class, 'destroy'])->name('settings.jira.destroy');
+    Route::post('/settings/jira/sync', [JiraSettingsController::class, 'sync'])->name('settings.jira.sync');
+}
 ```
 
-Add use for JiraSettingsController.
+Add use for JiraSettingsController. When disabled, these routes are not registered (direct URL hits will 404).
 
 - [ ] **Step 3: Create view**
 
 Copy structure from `resources/views/settings/inbound-emails.blade.php`: card, title “Jira”, form for store (site URL, email, API token password), “Connect” / “Save”; if connected show “Disconnect” (form to destroy) and “Sync Jira now” (form POST to settings.jira.sync). Show flash success/error. Use same layout and styling.
 
-- [ ] **Step 4: Add nav link**
+- [ ] **Step 4: Add nav link (only when Jira enabled)**
 
-In `resources/views/layouts/idea.blade.php` (or wherever settings dropdown is), add link to `route('settings.jira.index')`: “Jira”.
+In `resources/views/layouts/idea.blade.php` (or wherever settings dropdown is), add the Jira link only when config('services.jira.enabled', true); e.g. @if(config('services.jira.enabled', true)) ... link to `route('settings.jira.index')`: “Jira”.
 
 - [ ] **Step 5: Policy (optional)**
 
@@ -313,9 +318,11 @@ git commit -m "feat(jira): add Jira settings page and sync trigger"
 - Modify: `app/Http/Controllers/Api/McpController.php`
 - Modify: `tests/Feature/McpApiTest.php`
 
-- [ ] **Step 1: Add sync_jira to methods list**
+When `config('services.jira.enabled', true)` is false: do not include `sync_jira` in the methods list or tools list; if a client calls it anyway, return method not found or "Jira integration is disabled".
 
-In McpController, in all places that list methods (e.g. line 42, 83, 251, 364), add `'sync_jira'`.
+- [ ] **Step 1: Add sync_jira to methods list (only when Jira enabled)**
+
+In McpController, in all places that list methods (e.g. initialize response, legacy knownMethods, tools/call knownMethods, dispatch match), include `'sync_jira'` only when `config('services.jira.enabled', true)`. Build the methods array conditionally (e.g. merge base methods with `config('services.jira.enabled') ? ['sync_jira'] : []`) so when disabled, sync_jira is not advertised and not callable.
 
 - [ ] **Step 2: Add tool definition in respondToolsList**
 
@@ -359,12 +366,14 @@ Add:
 
 ```
 # Jira sync (optional): default days to fetch on sync
+# Set to false to hide Jira from the interface and MCP
+JIRA_ENABLED=true
 JIRA_SYNC_DAYS=14
 ```
 
 - [ ] **Step 2: Short doc**
 
-Create `docs/jira-integration.md`: Jira integration uses per-user credentials (Settings → Jira). Store site URL and API token; sync creates thoughts with type jira and project tag. Search and Stream show them. MCP tool sync_jira triggers sync.
+Create `docs/jira-integration.md`: Jira integration uses per-user credentials (Settings → Jira). Store site URL and API token; sync creates thoughts with type jira and project tag. Search and Stream show them. MCP tool sync_jira triggers sync. The integration can be turned off with `JIRA_ENABLED=false`; when off, Jira is removed from the UI and MCP.
 
 - [ ] **Step 3: Commit**
 

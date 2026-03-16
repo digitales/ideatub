@@ -11,6 +11,12 @@
 - **Credentials:** Per-user Jira site URL + API token, stored encrypted. No server-wide Jira key.
 - **Data model:** Each Jira “event” (issue created, updated, commented, status/field change) becomes one **Thought** with `metadata.type = 'jira'`, **project key as tag** (plus `jira` tag), and rich `source_metadata` for display and idempotency.
 
+### Feature toggle (on/off)
+
+- **Config:** One app-level switch controls whether Jira is available: `config('services.jira.enabled', true)` from env `JIRA_ENABLED`. Default: enabled.
+- **When off:** Jira is hidden everywhere: no Jira entry in settings nav or elsewhere; Jira settings routes return 404 (or redirect). MCP: `sync_jira` is not in `tools/list` and is not callable (method not found or "Jira integration is disabled").
+- **When on:** Behaviour as in the rest of this spec. Existing Jira thoughts remain searchable and visible in Stream regardless of the toggle.
+
 ## 1. User credentials and storage
 
 ### 1.1 What we store
