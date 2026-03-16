@@ -17,12 +17,13 @@
         data-index="{{ $loop->index }}"
         data-reply-href="{{ $replyHref }}"
         :class="{ 'ring-2 ring-memory-violet ring-offset-2': selectedThoughtIndex === {{ $currentReplyableIndex }} }"
-        class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all cursor-pointer"
+        class="relative rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all cursor-pointer"
     >
-        <div class="flex justify-end -mt-0.5 -mr-0.5 mb-0.5">
+        <div class="absolute top-3 right-3">
             @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
         </div>
 
+        <div class="pr-8">
         @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
             <p class="text-[11px] text-slate-brand/50 mb-1">
                 Comment on: {{ Str::limit($thought->parent->content, 80) }}
@@ -57,5 +58,6 @@
         @elseif(!$thought->parent_id)
             <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2 hidden" data-comments-list aria-hidden="true"></ul>
         @endif
+        </div>
     </div>
 @endforeach
