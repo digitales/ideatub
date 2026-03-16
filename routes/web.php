@@ -15,6 +15,7 @@ use App\Http\Controllers\ToolController;
 use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\IdeasRevisitSettingsController;
+use App\Http\Controllers\Api\RealtimeCheckController;
 use App\Http\Controllers\InboundEmailController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\WebhookController;
@@ -81,7 +82,9 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
-    
+
+    Route::get('/api/thoughts/realtime-check', [RealtimeCheckController::class, 'realtimeCheck'])->name('api.thoughts.realtime-check');
+
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
