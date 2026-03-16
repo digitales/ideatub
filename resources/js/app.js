@@ -184,4 +184,89 @@ Alpine.data('ideaShortcuts', () => ({
   },
 }));
 
+Alpine.data('thoughtTagRow', (initialTags, updateUrl) => ({
+  tags: [],
+  updateUrl: '',
+  streamBaseUrl: '',
+  error: '',
+  tagPillClasses: [
+    'bg-memory-violet/10 text-memory-violet',
+    'bg-neural-teal/10 text-neural-teal',
+    'bg-deep-indigo/8 text-slate-brand',
+  ],
+
+  init() {
+    this.tags = Array.isArray(initialTags) ? [...initialTags] : [];
+    this.updateUrl = updateUrl || '';
+    this.streamBaseUrl = this.$el.dataset.streamBaseUrl || '';
+  },
+
+  slugify(tag) {
+    return String(tag)
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_-]/g, '');
+  },
+
+  async remove(index) {
+    const previous = [...this.tags];
+    this.tags.splice(index, 1);
+    this.error = '';
+    try {
+      const res = await fetch(this.updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN':
+            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: JSON.stringify({ tags: this.tags }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        this.error = data.message || (data.errors && JSON.stringify(data.errors)) || 'Failed to update tags.';
+        this.tags = previous;
+      }
+    } catch {
+      this.error = 'Unable to update tags. Please try again.';
+      this.tags = previous;
+    }
+  },
+
+  async addFromInput() {
+    const input = this.$refs.addInput;
+    const value = (input?.value || '').trim().toLowerCase();
+    if (!value || this.tags.includes(value)) {
+      if (input) input.value = '';
+      return;
+    }
+    this.tags.push(value);
+    if (input) input.value = '';
+    this.error = '';
+    const previous = [...this.tags];
+    try {
+      const res = await fetch(this.updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN':
+            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: JSON.stringify({ tags: this.tags }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        this.error = data.message || (data.errors && JSON.stringify(data.errors)) || 'Failed to add tag.';
+        this.tags = previous.slice(0, -1);
+      }
+    } catch {
+      this.error = 'Unable to add tag. Please try again.';
+      this.tags = previous.slice(0, -1);
+    }
+  },
+}));
+
 Alpine.start();
