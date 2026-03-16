@@ -323,8 +323,9 @@ class IdeaController extends Controller
 
         if ($request->ajax()) {
             $html = view('idea.partials.ideas_list', ['ideas' => $ideas, 'researchByIdea' => $researchByIdea])->render();
+            $latest = $ideas->isEmpty() ? null : $ideas->first()->created_at->toIso8601String();
 
-            return response()->json(['html' => $html]);
+            return response()->json(['html' => $html, 'latest_created_at' => $latest]);
         }
 
         return view('idea.ideas', [
