@@ -228,6 +228,8 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl) => ({
       if (!res.ok) {
         this.error = data.message || (data.errors && JSON.stringify(data.errors)) || 'Failed to update tags.';
         this.tags = previous;
+      } else if (data.tags) {
+        this.tags = data.tags;
       }
     } catch {
       this.error = 'Unable to update tags. Please try again.';
@@ -261,6 +263,8 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl) => ({
       if (!res.ok) {
         this.error = data.message || (data.errors && JSON.stringify(data.errors)) || 'Failed to add tag.';
         this.tags = previous.slice(0, -1);
+      } else if (data.tags) {
+        this.tags = data.tags;
       }
     } catch {
       this.error = 'Unable to add tag. Please try again.';
