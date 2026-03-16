@@ -184,10 +184,12 @@ Alpine.data('ideaShortcuts', () => ({
   },
 }));
 
-Alpine.data('thoughtTagRow', (initialTags, updateUrl) => ({
+Alpine.data('thoughtTagRow', (initialTags, updateUrl, editable = false) => ({
   tags: [],
   updateUrl: '',
   streamBaseUrl: '',
+  editable: !!editable,
+  editing: false,
   error: '',
   tagPillClasses: [
     'bg-memory-violet/10 text-memory-violet',
@@ -199,6 +201,7 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl) => ({
     this.tags = Array.isArray(initialTags) ? [...initialTags] : [];
     this.updateUrl = updateUrl || '';
     this.streamBaseUrl = this.$el.dataset.streamBaseUrl || '';
+    this.editable = editable !== undefined ? !!editable : false;
   },
 
   slugify(tag) {
