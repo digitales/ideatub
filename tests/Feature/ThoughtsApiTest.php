@@ -2,6 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Thought;
+use App\Models\User;
+use App\Services\OpenRouterService;
+use App\Services\OAuthMcpJwtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,5 +48,33 @@ class ThoughtsApiTest extends TestCase
             ->getJson('/api/thoughts/search?query=test');
 
         $response->assertStatus(401);
+    }
+
+    public function test_thoughts_search_with_tag_query_returns_tagged_thought_first(): void
+    {
+        $user = User::factory()->create();
+        $embedding = array_fill(0, 1536, 0.01);
+
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Decision about project spec',
+            'embedding' => $embedding,
+            'metadata' => ['tags' => ['decision:project-spec']],
+        ]);
+
+        $this->mock(OpenRouterService::class, function ($mock) use ($embedding): void {
+            $mock->shouldReceive('embed')->once()->with('decision:project-spec')->andReturn($embedding);
+        });
+
+        $token = app(OAuthMcpJwtService::class)->issueAccessToken($user, config('oauth-mcp.resource_api'));
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/thoughts/search?query=decision:project-spec');
+
+        $response->assertStatus(200);
+        $result = $response->json();
+        $this->assertArrayHasKey('thoughts', $result);
+        $thoughtIds = array_column($result['thoughts'], 'id');
+        $this->assertContains($thought->id, $thoughtIds);
+        $this->assertSame($thought->id, $result['thoughts'][0]['id'], 'Tag-matched thought should be first');
     }
 }
