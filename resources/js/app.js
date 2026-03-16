@@ -306,4 +306,61 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl, editable = false) => ({
   },
 }));
 
+Alpine.data('thoughtCardActions', (deleteUrl, thoughtId) => ({
+  menuOpen: false,
+  confirmOpen: false,
+  deleting: false,
+  error: '',
+  deleteUrl,
+  thoughtId,
+
+  get cardEl() {
+    return this.$el?.closest('[data-thought-id]') ?? null;
+  },
+
+  openMenu() { this.menuOpen = true; this.confirmOpen = false; this.error = ''; },
+  closeMenu() { this.menuOpen = false; },
+  showConfirm() { this.menuOpen = false; this.confirmOpen = true; this.error = ''; },
+  cancelConfirm() { this.confirmOpen = false; this.error = ''; },
+
+  async submitDelete() {
+    this.deleting = true;
+    this.error = '';
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    try {
+      const res = await fetch(this.deleteUrl, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+        },
+      });
+      if (res.status === 204) {
+        const el = this.cardEl;
+        if (el) el.remove();
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 422) {
+        this.error = data.message || 'This thought has comments. Remove them first.';
+        return;
+      }
+      this.error = "Couldn't delete. Try again.";
+    } catch {
+      this.error = "Couldn't delete. Try again.";
+    } finally {
+      this.deleting = false;
+    }
+  },
+
+  init() {
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      this.closeMenu();
+      this.cancelConfirm();
+    });
+  },
+}));
+
 Alpine.start();
