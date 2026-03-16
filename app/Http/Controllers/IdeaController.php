@@ -101,6 +101,15 @@ class IdeaController extends Controller
                 ->orderByDesc('created_at')
                 ->limit(self::RECENT_LIMIT)
                 ->get();
+
+            if ($request->ajax()) {
+                $html = view('idea.index_thought_cards', ['thoughts' => $thoughts, 'replyableIndexStart' => 0])->render();
+
+                return response()->json([
+                    'html' => $html,
+                    'total' => $thoughts->count(),
+                ]);
+            }
         }
 
         $replyingTo = null;
