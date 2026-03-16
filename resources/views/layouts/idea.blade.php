@@ -197,6 +197,24 @@
     </div>
     </div>
 
+    @auth
+    <script>
+        window.ideatub = window.ideatub || {};
+        window.ideatub.realtime = @json([
+            'driver' => config('realtime.driver'),
+            'reverb_key' => config('broadcasting.connections.reverb.key') ?? null,
+            'reverb_host' => config('broadcasting.connections.reverb.options.host') ?? null,
+            'reverb_port' => config('broadcasting.connections.reverb.options.port') ?? null,
+            'reverb_scheme' => config('broadcasting.connections.reverb.options.scheme') ?? null,
+            'user_id' => auth()->id(),
+            'recent_url' => route('idea.index'),
+            'stream_url' => route('idea.stream'),
+            'ideas_url' => route('idea.ideas'),
+            'realtime_check_url' => route('api.thoughts.realtime-check'),
+        ]);
+    </script>
+    @endauth
+
     @stack('scripts')
 </body>
 </html>
