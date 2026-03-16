@@ -341,6 +341,16 @@ Alpine.data('thoughtCardActions', (deleteUrl, thoughtId) => ({
         if (el) el.remove();
         return;
       }
+      if (res.status === 404) {
+        const el = this.cardEl;
+        if (el) el.remove();
+        return;
+      }
+      if (res.status === 401 || res.status === 403) {
+        this.error = 'Please sign in again.';
+        this.confirmOpen = false;
+        return;
+      }
       const data = await res.json().catch(() => ({}));
       if (res.status === 422) {
         this.error = data.message || 'This thought has comments. Remove them first.';
