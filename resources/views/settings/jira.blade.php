@@ -68,6 +68,7 @@
                     <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                 @enderror
             </div>
+            <p class="text-[11px] text-slate-brand/70">Credentials are checked when you save. If they’re invalid, we’ll show an error and won’t save.</p>
             <button
                 type="submit"
                 class="text-xs font-medium text-white px-4 py-2 rounded-lg transition-opacity hover:opacity-90"
@@ -78,7 +79,25 @@
         </form>
 
         @if ($connected)
-            <div class="mt-6 pt-6 border-t border-memory-violet/10 flex flex-wrap gap-3">
+            <div class="mt-6 pt-6 border-t border-memory-violet/10 space-y-3">
+                @if ($syncStatus)
+                    <div id="jira-sync-status" class="rounded-lg border border-memory-violet/15 bg-white/60 px-3 py-2 text-sm text-slate-brand">
+                        @if (($syncStatus['status'] ?? '') === 'running')
+                            <span class="text-neural-teal font-medium">Syncing…</span> Started {{ \Carbon\Carbon::parse($syncStatus['started_at'] ?? 'now')->diffForHumans() }}. This may take a minute.
+                        @elseif (($syncStatus['status'] ?? '') === 'completed')
+                            <span class="text-neural-teal font-medium">Last sync:</span> {{ $syncStatus['completed_at'] ? \Carbon\Carbon::parse($syncStatus['completed_at'])->diffForHumans() : '—' }}
+                            @if (!empty($syncStatus['message']))
+                                — {{ $syncStatus['message'] }}
+                            @endif
+                        @elseif (($syncStatus['status'] ?? '') === 'failed')
+                            <span class="text-red-600 font-medium">Sync failed</span>
+                            @if (!empty($syncStatus['message']))
+                                — {{ $syncStatus['message'] }}
+                            @endif
+                        @endif
+                    </div>
+                @endif
+                <div class="flex flex-wrap gap-3">
                 <form method="POST" action="{{ route('settings.jira.sync') }}" class="inline">
                     @csrf
                     <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">Sync Jira now</button>
@@ -88,8 +107,30 @@
                     @method('DELETE')
                     <button type="submit" class="text-xs font-medium text-red-600 hover:underline">Disconnect</button>
                 </form>
+                </div>
             </div>
         @endif
     </div>
 </div>
+
+@if ($connected && ($syncStatus['status'] ?? '') === 'running')
+<script>
+(function () {
+    const el = document.getElementById('jira-sync-status');
+    if (!el) return;
+    const url = '{{ route('settings.jira.status') }}';
+    const interval = setInterval(function () {
+        fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.status === 'completed' || d.status === 'failed') {
+                    clearInterval(interval);
+                    window.location.reload();
+                }
+            })
+            .catch(function () {});
+    }, 3000);
+})();
+</script>
+@endif
 @endsection

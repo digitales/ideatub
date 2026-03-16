@@ -115,6 +115,7 @@ Route::middleware('auth')->group(function () {
 
     if (config('services.jira.enabled', true)) {
         Route::get('/settings/jira', [JiraSettingsController::class, 'index'])->name('settings.jira.index');
+        Route::get('/settings/jira/status', [JiraSettingsController::class, 'status'])->name('settings.jira.status');
         Route::post('/settings/jira', [JiraSettingsController::class, 'store'])->name('settings.jira.store');
         Route::delete('/settings/jira', [JiraSettingsController::class, 'destroy'])->name('settings.jira.destroy');
         Route::post('/settings/jira/sync', [JiraSettingsController::class, 'sync'])->name('settings.jira.sync');

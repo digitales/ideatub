@@ -10,6 +10,27 @@ use Illuminate\Support\Facades\Http;
 class JiraSyncService
 {
     /**
+     * Verify that the given Jira credentials work by calling GET /rest/api/3/myself.
+     *
+     * @throws InvalidJiraCredentialsException On 401/403
+     */
+    public function validateCredentials(string $baseUrl, string $email, string $token): void
+    {
+        $baseUrl = rtrim($baseUrl, '/');
+        if ($baseUrl === '' || $email === '' || $token === '') {
+            throw new InvalidJiraCredentialsException('Jira site URL, email, and API token are required.');
+        }
+        $response = Http::withBasicAuth($email, $token)
+            ->accept('application/json')
+            ->timeout(15)
+            ->get("{$baseUrl}/rest/api/3/myself");
+        if ($response->status() === 401 || $response->status() === 403) {
+            throw new InvalidJiraCredentialsException('Invalid Jira credentials. Please check your site URL, email, and API token.');
+        }
+        $response->throw();
+    }
+
+    /**
      * Fetch Jira activity events for the user (issues created/updated/commented) for the last N days.
      * Returns array of event arrays suitable for creating thoughts: jira_event_id, content, metadata, source_metadata.
      *

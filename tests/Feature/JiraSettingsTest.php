@@ -8,6 +8,7 @@ use App\Models\UserJiraCredential;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class JiraSettingsTest extends TestCase
@@ -37,6 +38,7 @@ class JiraSettingsTest extends TestCase
 
     public function test_store_creates_credential_and_redirects(): void
     {
+        Http::fake(['*rest/api/3/myself' => Http::response(['accountId' => 'acc-1'], 200)]);
         $user = User::factory()->create();
         $response = $this->actingAs($user)->post(route('settings.jira.store'), [
             'jira_site_url' => 'https://example.atlassian.net',
@@ -65,7 +67,21 @@ class JiraSettingsTest extends TestCase
         $this->assertDatabaseMissing('user_jira_credentials', ['user_id' => $user->id]);
     }
 
-    public function test_sync_dispatches_job(): void
+    public function test_store_fails_validation_when_jira_returns_401(): void
+    {
+        Http::fake(['*rest/api/3/myself' => Http::response([], 401)]);
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->post(route('settings.jira.store'), [
+            'jira_site_url' => 'https://example.atlassian.net',
+            'jira_api_token' => 'bad-token',
+            'jira_email' => 'dev@example.com',
+        ]);
+        $response->assertRedirect(route('settings.jira.index'));
+        $response->assertSessionHas('error');
+        $this->assertDatabaseMissing('user_jira_credentials', ['user_id' => $user->id]);
+    }
+
+    public function test_sync_dispatches_job_and_sets_status(): void
     {
         Bus::fake();
         $user = User::factory()->create();
@@ -78,5 +94,16 @@ class JiraSettingsTest extends TestCase
         $response->assertRedirect(route('settings.jira.index'));
         $response->assertSessionHas('success');
         Bus::assertDispatched(SyncUserJiraActivity::class);
+        $status = \App\Models\UserPreference::get($user, 'jira_sync_status');
+        $this->assertIsArray($status);
+        $this->assertSame('running', $status['status'] ?? null);
+    }
+
+    public function test_status_endpoint_returns_json(): void
+    {
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->getJson(route('settings.jira.status'));
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['status']);
     }
 }

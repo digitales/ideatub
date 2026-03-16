@@ -92,4 +92,27 @@ class JiraSyncServiceTest extends TestCase
 
         $service->fetchEvents($user, 14);
     }
+
+    #[Test]
+    public function validate_credentials_throws_on_401(): void
+    {
+        Http::fake(['*rest/api/3/myself' => Http::response([], 401)]);
+        $service = new JiraSyncService;
+
+        $this->expectException(InvalidJiraCredentialsException::class);
+        $this->expectExceptionMessage('Invalid Jira credentials');
+
+        $service->validateCredentials('https://example.atlassian.net', 'dev@example.com', 'bad-token');
+    }
+
+    #[Test]
+    public function validate_credentials_succeeds_on_200(): void
+    {
+        Http::fake(['*rest/api/3/myself' => Http::response(['accountId' => 'acc-1'], 200)]);
+        $service = new JiraSyncService;
+
+        $service->validateCredentials('https://example.atlassian.net', 'dev@example.com', 'secret');
+
+        $this->addToAssertionCount(1);
+    }
 }
