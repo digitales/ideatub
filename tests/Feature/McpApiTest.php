@@ -659,4 +659,31 @@ class McpApiTest extends TestCase
         $response->assertJsonPath('result.content.0.text', fn ($text) => str_contains($text, 'Jira sync started'));
         Bus::assertDispatched(SyncUserJiraActivity::class);
     }
+
+    public function test_search_thoughts_with_tag_query_returns_tagged_thought_first(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $embedding = array_fill(0, 1536, 0.01);
+
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Decision about project spec',
+            'embedding' => $embedding,
+            'metadata' => ['tags' => ['decision:project-spec']],
+        ]);
+
+        $this->mock(OpenRouterService::class, function ($mock) use ($embedding): void {
+            $mock->shouldReceive('embed')->once()->with('decision:project-spec')->andReturn($embedding);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'search_thoughts',
+            'params' => ['query' => 'decision:project-spec'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.thoughts.0.id', $thought->id);
+    }
 }

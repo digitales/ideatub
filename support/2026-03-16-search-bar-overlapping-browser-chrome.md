@@ -28,13 +28,14 @@ The sticky nav and the search overlay were aligned to the viewport top (`top-0`)
 
 1. **Body top padding**  
    In `resources/views/layouts/idea.blade.php`, added to `<body>`:
-   - `padding-top: env(safe-area-inset-top, 0px);`  
-   So the whole page (including the sticky nav and search overlay) starts below the safe area when the browser reports one.
+   - `padding-top: max(0.5rem, env(safe-area-inset-top, 0px));`  
+   So the whole page starts below the safe area when reported, and **at least 0.5rem (8px)** when it isn’t, avoiding the nav/search bar sitting flush against the browser chrome.
 
 2. **Viewport meta**  
-   Set viewport to include `viewport-fit=cover` so supported browsers (e.g. PWA, standalone, notched devices) report safe-area insets and `env(safe-area-inset-top)` is used where appropriate.
+   Set viewport to include `viewport-fit=cover` so supported browsers (e.g. PWA, standalone, notched devices) report safe-area insets.
 
-No change to the overlay’s own positioning; it remains full-height within the nav, which is now laid out below the safe area.
+3. **Help text vs search input (follow-up)**  
+   The help line “Escape to close · ⌘K to focus search” was overlapping the search input’s bottom border. In the search overlay, the column gap was increased from `gap-2` to `gap-4`, and the help `<p>` was given `mt-0.5`, so it sits clearly below the input with no overlap.
 
 ## Prevention & Follow-up
 

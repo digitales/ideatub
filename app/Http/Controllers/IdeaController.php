@@ -8,6 +8,7 @@ use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
+use App\Services\ThoughtSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,7 +34,8 @@ class IdeaController extends Controller
     public function __construct(
         private OpenRouterService $openRouter,
         private ThoughtCaptureService $captureService,
-        private ResearchService $researchService
+        private ResearchService $researchService,
+        private ThoughtSearchService $searchService
     ) {}
 
     /**
@@ -50,27 +52,20 @@ class IdeaController extends Controller
 
         if ($query !== '') {
             try {
-                $embedding = $this->openRouter->embed($query);
+                $result = $this->searchService->search($query, (int) auth()->id(), [
+                    'max_distance' => self::SEARCH_MAX_DISTANCE,
+                    'tag_limit' => 100,
+                    'semantic_limit' => 100,
+                ]);
+                $all = $result['thoughts'];
+                $total = $result['total'];
                 $page = (int) $request->input('page', 1);
-                $baseQuery = Thought::query()
-                    ->where('user_id', auth()->id())
-                    ->with(['comments' => fn ($q) => $q->orderBy('created_at'), 'parent']);
-
-                $thoughts = (clone $baseQuery)
-                    ->nearestWithin($embedding, self::SEARCH_MAX_DISTANCE)
-                    ->paginate(self::SEARCH_LIMIT, ['*'], 'page', $page);
-
-                // If threshold filtered everything out, fall back to top N by distance (no threshold)
-                if ($thoughts->total() === 0) {
-                    $fallback = (clone $baseQuery)->nearestTo($embedding, self::SEARCH_LIMIT)->get();
-                    $thoughts = new LengthAwarePaginator(
-                        $fallback,
-                        $fallback->count(),
-                        self::SEARCH_LIMIT,
-                        1,
-                        ['path' => $request->url(), 'query' => $request->query()]
-                    );
-                }
+                $pageItems = $all->slice(($page - 1) * self::SEARCH_LIMIT, self::SEARCH_LIMIT)->values();
+                $thoughts = new LengthAwarePaginator($pageItems, $total, self::SEARCH_LIMIT, $page, [
+                    'path' => $request->url(),
+                    'query' => $request->query(),
+                ]);
+                $thoughts->getCollection()->load(['comments' => fn ($q) => $q->orderBy('created_at'), 'parent']);
 
                 if ($request->ajax()) {
                     $replyableOffset = (int) $request->input('replyable_offset', 0);
