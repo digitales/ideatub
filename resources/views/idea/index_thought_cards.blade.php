@@ -24,7 +24,7 @@
         data-index="{{ $loop->index }}"
         data-reply-href="{{ $replyHref }}"
         :class="{ 'ring-2 ring-memory-violet ring-offset-2': selectedThoughtIndex === {{ $currentReplyableIndex }} }"
-        class="rounded-xl border border-memory-violet/10 bg-white/68 backdrop-blur px-4 py-3.5 mb-2 hover:bg-white/90 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all cursor-pointer"
+        class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all cursor-pointer"
     >
 
         @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)

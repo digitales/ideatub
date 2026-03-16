@@ -23,7 +23,7 @@ class NormalizeThoughtContentEntitiesCommandTest extends TestCase
             ->expectsOutputToContain('would be updated');
 
         $thought->refresh();
-        $this->assertSame("Daphne&#039;s breathing", $thought->content);
+        $this->assertSame("Daphne&#039;s breathing", $thought->getRawContent());
     }
 
     public function test_normalizes_encoded_content(): void

@@ -128,12 +128,28 @@ class Thought extends Model
     }
 
     /**
-     * Get content with HTML entities decoded for display.
-     * Use with e() in views to avoid showing literal &quot;, &#039;, etc.
+     * Return content with HTML entities decoded (plain text). Never exposes raw DB value.
+     * Use with e() in views: {{ e($thought->content) }} so output is safe for HTML.
+     */
+    protected function getContentAttribute(mixed $value): string
+    {
+        return static::decodeContentEntities((string) ($value ?? ''));
+    }
+
+    /**
+     * Raw stored value (for migrations, normalize command, debugging). Do not use for display.
+     */
+    public function getRawContent(): string
+    {
+        return (string) ($this->attributes['content'] ?? '');
+    }
+
+    /**
+     * @deprecated Use $thought->content (accessor now returns decoded). Kept for compatibility.
      */
     public function getDecodedContent(): string
     {
-        return static::decodeContentEntities($this->content);
+        return $this->content;
     }
 
     /**

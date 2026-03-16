@@ -26,13 +26,14 @@ class NormalizeThoughtContentEntitiesCommand extends Command
         $query->when($limit !== null, fn ($q) => $q->limit($limit))
             ->chunk($chunkSize, function ($thoughts) use ($dryRun, &$updated) {
                 foreach ($thoughts as $thought) {
-                    $decoded = Thought::decodeContentEntities($thought->content);
-                    if ($decoded === $thought->content) {
+                    $raw = $thought->getRawContent();
+                    $decoded = Thought::decodeContentEntities($raw);
+                    if ($decoded === $raw) {
                         continue;
                     }
 
                     if ($dryRun) {
-                        $this->line(sprintf('  %s: %s… → %s…', $thought->id, mb_substr($thought->content, 0, 40), mb_substr($decoded, 0, 40)));
+                        $this->line(sprintf('  %s: %s… → %s…', $thought->id, mb_substr($raw, 0, 40), mb_substr($decoded, 0, 40)));
                         $updated++;
                         continue;
                     }
