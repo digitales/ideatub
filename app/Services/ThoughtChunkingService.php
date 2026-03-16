@@ -93,6 +93,14 @@ class ThoughtChunkingService
         $finalChunk = trim(substr($content, $lastEnd));
         $sections[] = ['title' => $lastTitle, 'content' => $finalChunk];
 
+        // If the document starts with a heading (e.g. # Title), the first section is empty.
+        // Merge it with the next so the root thought is never blank.
+        if (count($sections) > 1 && trim($sections[0]['content']) === '') {
+            $sections[1]['title'] = $sections[0]['title'] !== 'Intro' ? $sections[0]['title'] : $sections[1]['title'];
+            $sections[1]['content'] = $sections[0]['content'].$sections[1]['content'];
+            array_shift($sections);
+        }
+
         return $sections;
     }
 }

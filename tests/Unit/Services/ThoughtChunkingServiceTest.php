@@ -73,6 +73,17 @@ class ThoughtChunkingServiceTest extends TestCase
     }
 
     #[Test]
+    public function split_at_headings_merges_empty_first_section_when_doc_starts_with_heading(): void
+    {
+        $content = "# Made by ON - Competitive Profile\n\n**Generated**: 2025-01-20\n\n---\n\n## Summary\n\nFirst paragraph of summary.";
+        $sections = $this->service->splitAtHeadings($content);
+        $this->assertGreaterThanOrEqual(2, count($sections));
+        $this->assertNotEmpty(trim($sections[0]['content']), 'Root section must not be blank so the Stream card shows content.');
+        $this->assertStringContainsString('Made by ON', $sections[0]['content']);
+        $this->assertStringContainsString('Summary', $sections[1]['title']);
+    }
+
+    #[Test]
     public function should_chunk_returns_false_when_under_word_threshold(): void
     {
         $short = implode(' ', array_fill(0, 100, 'word'));

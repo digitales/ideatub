@@ -35,7 +35,9 @@ When the user or a research agent has research output to save to IdeaTub, use th
 - **file_path**: Optional; if from a file, use repo-relative path (e.g. `research/2026-03-13-vehicle-valuation.md`).
 - **section_title**: For each section, the heading or a short title.
 
-**Split at section titles:** If the research is long, split at markdown headings (`##`, `###`). For each section: use the same `doc_type`, `plan_slug`, and `project`; call capture_plan once per section in order.
+**Preferred: one call with full content.** Send the **entire research** in a **single** capture_plan call (no `parent_id`). IdeaTub will auto-chunk at markdown headings so the research appears as a top-level thought with section children. Do not create a root thought first and then attach the full document as one child — that produces a blank card and one unchunked entry.
+
+**Alternative: one call per section.** If you split at section titles yourself, call capture_plan once per section **without** `parent_id`, in order, with the same `doc_type`, `plan_slug`, and `project`.
 
 **Stream:** In IdeaTub, filter by tag, e.g. `/stream?tag=research-2026-03-13-vehicle-valuation`.
 
