@@ -30,4 +30,12 @@ class ThoughtPolicy
     {
         return $thought->user_id === $user->id;
     }
+
+    /**
+     * Whether the user can delete the thought. Only the owner can.
+     */
+    public function delete(User $user, Thought $thought): bool
+    {
+        return $thought->user_id === $user->id;
+    }
 }
