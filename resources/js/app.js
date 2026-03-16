@@ -1,7 +1,37 @@
 import './bootstrap';
 import Alpine from 'alpinejs';
+import Pusher from 'pusher-js';
+import Echo from 'laravel-echo';
 
 window.Alpine = Alpine;
+window.Pusher = Pusher;
+
+document.addEventListener('DOMContentLoaded', function () {
+  const rt = window.ideatub?.realtime;
+  if (rt?.driver === 'reverb' && rt?.reverb_key) {
+    try {
+      window.Echo = new Echo({
+        broadcaster: 'reverb',
+        key: rt.reverb_key,
+        wsHost: rt.reverb_host || window.location.hostname,
+        wsPort: rt.reverb_port || 80,
+        wssPort: rt.reverb_port || 443,
+        forceTLS: (rt.reverb_scheme || 'https') === 'https',
+        enabledTransports: ['ws', 'wss'],
+        authEndpoint: '/broadcasting/auth',
+        auth: {
+          headers: {
+            'X-CSRF-TOKEN':
+              document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            Accept: 'application/json',
+          },
+        },
+      });
+    } catch (e) {
+      console.warn('Reverb Echo init failed:', e);
+    }
+  }
+});
 
 Alpine.data('captureBox', () => ({
   content: '',

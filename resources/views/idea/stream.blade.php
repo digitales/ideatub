@@ -75,6 +75,14 @@
                                 .then(function(data) { if (data.has_new) refetchStream(); })
                                 .catch(function() {});
                         }, 20000);
+                    } else if (cfg.driver === 'reverb' && cfg.reverb_key && cfg.user_id) {
+                        function trySubscribe() {
+                            if (!window.Echo) { setTimeout(trySubscribe, 100); return; }
+                            try {
+                                window.Echo.private('App.Models.User.' + cfg.user_id).listen('.ThoughtCreated', refetchStream);
+                            } catch (e) { console.warn('Echo subscribe failed:', e); }
+                        }
+                        trySubscribe();
                     }
                 })();
                 </script>
