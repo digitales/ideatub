@@ -7,6 +7,7 @@ use App\Events\IdeaResearchRequested;
 use App\Listeners\RunResearchForIdeaListener;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -27,6 +28,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Broadcast::routes(['middleware' => ['web', 'auth']]);
+
+        $channelsPath = base_path('routes/channels.php');
+        if (file_exists($channelsPath)) {
+            require $channelsPath;
+        }
+
         Event::listen(IdeaResearchRequested::class, RunResearchForIdeaListener::class);
     }
 }
