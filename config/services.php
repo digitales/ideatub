@@ -39,4 +39,9 @@ return [
         'capture_address' => env('POSTMARK_INBOUND_CAPTURE_ADDRESS', ''),
         'log_emails' => env('POSTMARK_INBOUND_LOG_EMAILS', false),
     ],
+
+    'jira' => [
+        'enabled' => filter_var(env('JIRA_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        'default_days' => (int) env('JIRA_SYNC_DAYS', 14),
+    ],
 ];

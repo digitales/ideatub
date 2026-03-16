@@ -16,6 +16,7 @@ use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\IdeasRevisitSettingsController;
 use App\Http\Controllers\InboundEmailController;
+use App\Http\Controllers\JiraSettingsController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
@@ -112,6 +113,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/inbound-emails', [InboundEmailController::class, 'index'])->name('settings.inbound-emails.index');
     Route::post('/settings/inbound-emails', [InboundEmailController::class, 'store'])->name('settings.inbound-emails.store');
     Route::delete('/settings/inbound-emails/{userInboundAddress}', [InboundEmailController::class, 'destroy'])->name('settings.inbound-emails.destroy');
+
+    if (config('services.jira.enabled', true)) {
+        Route::get('/settings/jira', [JiraSettingsController::class, 'index'])->name('settings.jira.index');
+        Route::post('/settings/jira', [JiraSettingsController::class, 'store'])->name('settings.jira.store');
+        Route::delete('/settings/jira', [JiraSettingsController::class, 'destroy'])->name('settings.jira.destroy');
+        Route::post('/settings/jira/sync', [JiraSettingsController::class, 'sync'])->name('settings.jira.sync');
+    }
 
     // Dashboard (requires authentication)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

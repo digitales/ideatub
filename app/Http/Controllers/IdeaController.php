@@ -263,7 +263,10 @@ class IdeaController extends Controller
                 'showFullSections' => $tagForDisplay !== null,
             ])->render();
 
-            $latest = $thoughts->isEmpty() ? null : $thoughts->first()->created_at->toIso8601String();
+            $orderAsc = $canonicalTag !== null;
+            $latestCreatedAt = $thoughts->isNotEmpty()
+                ? ($orderAsc ? $thoughts->last() : $thoughts->first())->created_at->toIso8601String()
+                : null;
 
             return response()->json([
                 'html' => $html,
@@ -271,7 +274,7 @@ class IdeaController extends Controller
                 'next_page' => $thoughts->currentPage() + 1,
                 'count' => $thoughts->count(),
                 'total' => $thoughts->total(),
-                'latest_created_at' => $latest,
+                'latest_created_at' => $latestCreatedAt,
             ]);
         }
 
