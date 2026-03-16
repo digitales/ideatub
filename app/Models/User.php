@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Cashier\Billable;
@@ -81,6 +82,14 @@ class User extends Authenticatable
     public function userInboundAddresses()
     {
         return $this->hasMany(UserInboundAddress::class);
+    }
+
+    /**
+     * Get the user's Jira credentials (one per user when connected).
+     */
+    public function jiraCredential(): HasOne
+    {
+        return $this->hasOne(UserJiraCredential::class);
     }
 
     /**
