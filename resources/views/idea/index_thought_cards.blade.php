@@ -1,11 +1,5 @@
 @php
     $replyableIndex = (int) ($replyableIndexStart ?? 0);
-    $tagColors = ['violet', 'teal', 'indigo'];
-    $tagMap = [
-        'violet' => 'bg-memory-violet/10 text-memory-violet',
-        'teal'   => 'bg-neural-teal/10 text-neural-teal',
-        'indigo' => 'bg-deep-indigo/8 text-slate-brand',
-    ];
 @endphp
 @foreach ($thoughts as $thought)
     @php
@@ -15,7 +9,6 @@
         } else {
             $currentReplyableIndex = -1;
         }
-        $tags = $thought->metadata['tags'] ?? [];
         $replyHref = !$thought->parent_id ? route('idea.index', ['parent_id' => $thought->id]) : '';
     @endphp
 
@@ -40,13 +33,7 @@
             @if ($thought->source)
                 <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
             @endif
-
-            @foreach ($tags as $i => $tag)
-                <a href="{{ route('idea.stream', ['tag' => \Illuminate\Support\Str::slug($tag, '_')]) }}" class="text-[10px] font-medium px-2 py-0.5 rounded-full {{ $tagMap[$tagColors[$i % 3]] }} hover:opacity-90">
-                    #{{ $tag }}
-                </a>
-            @endforeach
-
+            @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
             @if (!$thought->parent_id)
                 <a href="{{ route('idea.index', ['parent_id' => $thought->id]) }}"
                    class="text-[10.5px] text-memory-violet/60 hover:text-memory-violet transition-colors ml-auto">
