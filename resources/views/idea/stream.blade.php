@@ -32,7 +32,9 @@
                 <p class="text-[11px] text-slate-brand/40 mb-2" id="stream-count-line">
                     Showing <span id="stream-showing-count">{{$thoughts->count()}}</span> of <span id="stream-total-count">{{$thoughts->total()}}</span> thoughts
                 </p>
-                <div id="stream-thoughts-list">
+                <div id="stream-thoughts-list"
+                    data-stream-refetch-url="{{ ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
+                    data-stream-since="{{ $thoughts->first()->created_at->toIso8601String() }}">
                     @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag]) 
                 </div>
                 @if($thoughts->hasMorePages())
@@ -42,6 +44,41 @@
         </div>
 
         @push('scripts')
+            @if(!$thoughts->isEmpty())
+                <script>
+                (function() {
+                    var list = document.getElementById('stream-thoughts-list');
+                    if (!list || !window.ideatub || !window.ideatub.realtime) return;
+                    var cfg = window.ideatub.realtime;
+                    var refetchUrl = list.getAttribute('data-stream-refetch-url');
+                    if (!refetchUrl) return;
+                    function refetchStream() {
+                        fetch(refetchUrl, { method: 'GET', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                if (data.html) list.innerHTML = data.html;
+                                var showing = document.getElementById('stream-showing-count');
+                                var total = document.getElementById('stream-total-count');
+                                if (showing && data.count !== undefined) showing.textContent = data.count;
+                                if (total && data.total !== undefined) total.textContent = data.total;
+                                if (data.latest_created_at) list.setAttribute('data-stream-since', data.latest_created_at);
+                            })
+                            .catch(function() {});
+                    }
+                    if (cfg.driver === 'polling' || !cfg.reverb_key) {
+                        var sinceEl = list;
+                        setInterval(function() {
+                            var since = sinceEl.getAttribute('data-stream-since');
+                            if (!since || !cfg.realtime_check_url) return;
+                            fetch(cfg.realtime_check_url + '?since=' + encodeURIComponent(since), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                                .then(function(r) { return r.json(); })
+                                .then(function(data) { if (data.has_new) refetchStream(); })
+                                .catch(function() {});
+                        }, 20000);
+                    }
+                })();
+                </script>
+            @endif
             @if(!$thoughts->isEmpty() && $thoughts->hasMorePages())
                 <script>
                 (function() {

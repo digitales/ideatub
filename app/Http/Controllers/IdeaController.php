@@ -261,11 +261,15 @@ class IdeaController extends Controller
                 'showFullSections' => $tagForDisplay !== null,
             ])->render();
 
+            $latest = $thoughts->isEmpty() ? null : $thoughts->first()->created_at->toIso8601String();
+
             return response()->json([
                 'html' => $html,
                 'has_more' => $thoughts->hasMorePages(),
                 'next_page' => $thoughts->currentPage() + 1,
                 'count' => $thoughts->count(),
+                'total' => $thoughts->total(),
+                'latest_created_at' => $latest,
             ]);
         }
 
