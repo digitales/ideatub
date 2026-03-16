@@ -6,6 +6,7 @@ use App\Exceptions\InvalidJiraCredentialsException;
 use App\Models\Thought;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use DateTimeInterface;
 
 class JiraSyncService
 {
@@ -31,14 +32,16 @@ class JiraSyncService
     }
 
     /**
-     * Fetch Jira activity events for the user (issues created/updated/commented) for the last N days.
+     * Fetch Jira activity events for the user (issues created/updated/commented).
+     * When $since is set, only issues updated on or after that time are fetched (for incremental sync).
+     * Otherwise uses the last $days.
      * Returns array of event arrays suitable for creating thoughts: jira_event_id, content, metadata, source_metadata.
      *
      * @return array<int, array{jira_event_id: string, content: string, metadata: array{type: string, tags: array<int, string>}, source_metadata: array<string, mixed>}>
      *
      * @throws InvalidJiraCredentialsException On 401/403
      */
-    public function fetchEvents(User $user, int $days = 14): array
+    public function fetchEvents(User $user, int $days = 14, ?DateTimeInterface $since = null): array
     {
         $credential = $user->jiraCredential;
         if ($credential === null) {
@@ -65,10 +68,17 @@ class JiraSyncService
         $myself->throw();
         $accountId = $myself->json('accountId');
 
-        $jql = sprintf(
-            '(reporter = currentUser() OR assignee = currentUser()) AND updated >= -%dd',
-            $days
-        );
+        if ($since !== null) {
+            $jql = sprintf(
+                '(reporter = currentUser() OR assignee = currentUser()) AND updated >= "%s"',
+                $since->format('Y/m/d H:i')
+            );
+        } else {
+            $jql = sprintf(
+                '(reporter = currentUser() OR assignee = currentUser()) AND updated >= -%dd',
+                $days
+            );
+        }
         // Use the current search/jql endpoint (legacy /rest/api/3/search returns 410 Gone)
         $search = $client()->get("{$baseUrl}/rest/api/3/search/jql", [
             'jql' => $jql,

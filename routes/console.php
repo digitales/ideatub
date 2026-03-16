@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote')->hourly();
 
 Schedule::command('thoughts:extract-untagged')->hourly();
+Schedule::command('jira:sync-all')->hourly()->when(fn () => config('services.jira.enabled', true));

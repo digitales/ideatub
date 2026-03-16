@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\UserPreference;
 use App\Services\JiraSyncService;
 use App\Services\OpenRouterService;
+use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -44,11 +45,30 @@ class SyncUserJiraActivity implements ShouldQueue
             return;
         }
 
+        $existing = UserPreference::get($user, JiraSettingsController::getSyncStatusKey());
+        $since = null;
+        if ($this->days === 0 && is_array($existing) && ($existing['status'] ?? '') === 'completed' && ! empty($existing['started_at'] ?? '')) {
+            try {
+                $since = Carbon::parse($existing['started_at']);
+            } catch (\Throwable) {
+                // ignore parse errors; fall back to scheduled_sync_days
+            }
+        }
+
+        $this->setSyncStatusRunning($user);
+
         $days = $this->days > 0 ? $this->days : (int) config('services.jira.default_days', 14);
+        $scheduledDays = (int) config('services.jira.scheduled_sync_days', 1);
         $newCount = 0;
 
         try {
-            $events = $jiraSync->fetchEvents($user, $days);
+            if ($this->days > 0) {
+                $events = $jiraSync->fetchEvents($user, $days, null);
+            } elseif ($since !== null) {
+                $events = $jiraSync->fetchEvents($user, 0, $since);
+            } else {
+                $events = $jiraSync->fetchEvents($user, $scheduledDays, null);
+            }
 
             foreach ($events as $event) {
                 $eventId = $event['source_metadata']['jira_event_id'] ?? null;
@@ -78,11 +98,27 @@ class SyncUserJiraActivity implements ShouldQueue
                 $newCount++;
             }
 
-            $this->setSyncStatus($user, 'completed', $newCount > 0 ? "Synced {$newCount} new event(s)." : 'No new activity in the last ' . $days . ' days.');
+            $message = $newCount > 0
+                ? "Synced {$newCount} new event(s)."
+                : ($since !== null ? 'No new activity since last sync.' : 'No new activity in the last ' . ($this->days > 0 ? $days : $scheduledDays) . ' days.');
+            $this->setSyncStatus($user, 'completed', $message);
         } catch (Throwable $e) {
             $this->setSyncStatus($user, 'failed', $e->getMessage());
             throw $e;
         }
+    }
+
+    private function setSyncStatusRunning(?User $user): void
+    {
+        if ($user === null) {
+            return;
+        }
+        UserPreference::set($user, JiraSettingsController::getSyncStatusKey(), [
+            'status' => 'running',
+            'started_at' => now()->toIso8601String(),
+            'completed_at' => null,
+            'message' => null,
+        ]);
     }
 
     private function setSyncStatus(?User $user, string $status, ?string $message): void
