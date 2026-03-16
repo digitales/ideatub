@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Thought;
 use App\Services\OpenRouterService;
 use App\Services\ThoughtCaptureService;
+use App\Services\ThoughtSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -15,6 +16,7 @@ class ThoughtsApiController extends Controller
     public function __construct(
         private OpenRouterService $openRouter,
         private ThoughtCaptureService $captureService,
+        private ThoughtSearchService $searchService,
     ) {}
 
     /**
@@ -34,11 +36,12 @@ class ThoughtsApiController extends Controller
         $query = $request->input('query');
         $limit = (int) $request->input('limit', 10);
 
-        $embedding = $this->openRouter->embed($query);
-        $thoughts = Thought::query()
-            ->where('user_id', auth()->id())
-            ->nearestTo($embedding, $limit)
-            ->get(['id', 'content', 'metadata', 'created_at', 'source', 'source_metadata']);
+        $result = $this->searchService->search($query, (int) auth()->id(), [
+            'max_distance' => 0.5,
+            'tag_limit' => 100,
+            'semantic_limit' => 100,
+        ]);
+        $thoughts = $result['thoughts']->take($limit);
 
         return response()->json([
             'thoughts' => $thoughts->map(fn (Thought $t) => [

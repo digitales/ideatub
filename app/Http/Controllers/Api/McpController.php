@@ -12,6 +12,7 @@ use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
+use App\Services\ThoughtSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,6 +27,7 @@ class McpController extends Controller
         private ThoughtCaptureService $captureService,
         private IdeasToRevisitService $ideasToRevisit,
         private ResearchService $researchService,
+        private ThoughtSearchService $searchService,
         private ?OAuthMcpJwtService $oauthJwt = null
     ) {}
 
@@ -438,13 +440,12 @@ class McpController extends Controller
 
         Log::warning('MCP search_thoughts start', ['query' => $query, 'limit' => $limit]);
 
-        $embedding = $this->openRouter->embed($query);
-        Log::warning('MCP search_thoughts embed ok', ['dims' => is_countable($embedding) ? count($embedding) : 0]);
-
-        $thoughts = Thought::query()
-            ->where('user_id', auth()->id())
-            ->nearestTo($embedding, $limit)
-            ->get(['id', 'content', 'metadata', 'created_at', 'source', 'source_metadata']);
+        $result = $this->searchService->search($query, (int) auth()->id(), [
+            'max_distance' => 0.5,
+            'tag_limit' => 100,
+            'semantic_limit' => 100,
+        ]);
+        $thoughts = $result['thoughts']->take($limit);
 
         Log::warning('MCP search_thoughts query ok', ['count' => $thoughts->count()]);
 
