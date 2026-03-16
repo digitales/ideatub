@@ -43,5 +43,6 @@ return [
     'jira' => [
         'enabled' => filter_var(env('JIRA_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         'default_days' => (int) env('JIRA_SYNC_DAYS', 14),
+        'scheduled_sync_days' => (int) env('JIRA_SCHEDULED_SYNC_DAYS', 1),
     ],
 ];
