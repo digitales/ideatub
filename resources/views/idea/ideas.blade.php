@@ -112,6 +112,7 @@
                             {{ Str::limit($thought->content, 200) }}
                         </p>
                         <p class="text-[11px] text-slate-brand/50 mt-1">{{ $thought->getLoggedDate() }}</p>
+                        @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
                         {{-- Research block --}}
                         <div class="mt-2 pt-2 border-t border-memory-violet/10">
                             @if ($thought->isResearchPending())
