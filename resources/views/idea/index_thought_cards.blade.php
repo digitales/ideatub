@@ -29,11 +29,11 @@
 
         @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
             <p class="text-[11px] text-slate-brand/50 mb-1">
-                Comment on: {{ e(Str::limit($thought->parent->getDecodedContent(), 80)) }}
+                Comment on: {{ Str::limit($thought->parent->content, 80) }}
             </p>
         @endif
 
-        <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ e($thought->getDecodedContent()) }}</p>
+        <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ $thought->content }}</p>
 
         <div class="flex items-center gap-2 flex-wrap">
             <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
@@ -59,7 +59,7 @@
             <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2" data-comments-list>
                 @foreach ($thought->comments as $comment)
                     <li>
-                        <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line">{{ e(Str::limit($comment->getDecodedContent(), 200)) }}</p>
+                        <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line">{{ Str::limit($comment->content, 200) }}</p>
                         <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
                     </li>
                 @endforeach

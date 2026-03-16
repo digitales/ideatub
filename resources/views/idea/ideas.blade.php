@@ -109,7 +109,7 @@
                     </form>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm text-deep-indigo {{ $thought->isIdeaCompleted() ? 'line-through text-slate-brand/70' : '' }}">
-                            {{ e(Str::limit($thought->getDecodedContent(), 200)) }}
+                            {{ Str::limit($thought->content, 200) }}
                         </p>
                         <p class="text-[11px] text-slate-brand/50 mt-1">{{ $thought->getLoggedDate() }}</p>
                         {{-- Research block --}}
@@ -123,10 +123,10 @@
                                     <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-2">Research</p>
                                     @foreach ($researchList as $research)
                                         <div class="text-sm text-slate-brand/80 mb-2">
-                                            <p>{{ e(Str::limit($research->getDecodedContent(), 120)) }}</p>
+                                            <p>{{ Str::limit($research->content, 120) }}</p>
                                             <details class="mt-1">
                                                 <summary class="text-xs text-neural-teal cursor-pointer hover:underline">View full</summary>
-                                                <div class="mt-1 p-2 rounded-lg bg-slate-50/80 text-sm text-deep-indigo whitespace-pre-wrap">{{ e($research->getDecodedContent()) }}</div>
+                                                <div class="mt-1 p-2 rounded-lg bg-slate-50/80 text-sm text-deep-indigo whitespace-pre-wrap">{{ $research->content }}</div>
                                             </details>
                                         </div>
                                     @endforeach
@@ -146,10 +146,10 @@
                                 <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-1">Research</p>
                                 @foreach ($researchList as $research)
                                     <div class="text-sm text-slate-brand/80 mb-2">
-                                        <p>{{ e(Str::limit($research->getDecodedContent(), 120)) }}</p>
+                                        <p>{{ Str::limit($research->content, 120) }}</p>
                                         <details class="mt-1">
                                             <summary class="text-xs text-neural-teal cursor-pointer hover:underline">View full</summary>
-                                            <div class="mt-1 p-2 rounded-lg bg-slate-50/80 text-sm text-deep-indigo whitespace-pre-wrap">{{ e($research->getDecodedContent()) }}</div>
+                                            <div class="mt-1 p-2 rounded-lg bg-slate-50/80 text-sm text-deep-indigo whitespace-pre-wrap">{{ $research->content }}</div>
                                         </details>
                                     </div>
                                 @endforeach

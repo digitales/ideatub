@@ -14,7 +14,7 @@
 
 ## Display (HTML)
 
-- **Always escape at the boundary**: `{{ e($thought->content) }}` in Blade. Using `e()` ensures we never trust content in an HTML context (XSS-safe).
+- **Escape once**: Use `{{ $thought->content }}` in Blade. Do **not** wrap in `e()` — Blade's `{{ }}` already escapes (it compiles to `e()`). Using `{{ e($thought->content) }}` double-escapes (e.g. apostrophe → &#039; → &amp;#039;) and makes the browser show literal entity text like `&#039;`.
 - **AJAX/JSON**: Controllers return decoded content (`$thought->content` or `$thought->getDecodedContent()`). The frontend must use `textContent` (or escape) when inserting into the DOM; never use `innerHTML` with unescaped content.
 
 ## Commands

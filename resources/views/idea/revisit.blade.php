@@ -18,7 +18,7 @@
                 <li class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3 hover:border-memory-violet/25 transition-colors">
                     <a href="{{ route('idea.index', ['parent_id' => $thought->id]) }}" class="block min-w-0">
                         <p class="text-sm text-deep-indigo line-clamp-2">
-                            {{ e(Str::limit($thought->getDecodedContent(), 200)) }}
+                            {{ Str::limit($thought->content, 200) }}
                         </p>
                         <p class="text-[11px] text-slate-brand/50 mt-1">{{ $thought->getLoggedDate() }}</p>
                     </a>
