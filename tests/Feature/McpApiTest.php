@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SyncUserJiraActivity;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 class McpApiTest extends TestCase
@@ -634,5 +637,26 @@ class McpApiTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('error.code', -32602);
         $response->assertJsonPath('error.message', 'At least one of idea_id or content is required.');
+    }
+
+    public function test_sync_jira_dispatches_job_and_returns_message(): void
+    {
+        Config::set('services.jira.enabled', true);
+        Bus::fake();
+        [$key, $user] = $this->validKeyAndUser();
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => 'sync_jira',
+                'arguments' => ['days' => 7],
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.content.0.text', fn ($text) => str_contains($text, 'Jira sync started'));
+        Bus::assertDispatched(SyncUserJiraActivity::class);
     }
 }

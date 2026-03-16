@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SyncUserJiraActivity;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
@@ -39,8 +40,21 @@ class McpController extends Controller
             'version' => '1.0',
             'protocol' => 'json-rpc',
             'auth' => 'Send key via ?key=... or x-ideatub-key header',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'],
+            'methods' => $this->mcpMethodNames(),
         ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function mcpMethodNames(): array
+    {
+        $base = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'];
+        if (config('services.jira.enabled', true)) {
+            $base[] = 'sync_jira';
+        }
+
+        return $base;
     }
 
     /**
@@ -80,8 +94,7 @@ class McpController extends Controller
         }
 
         // Legacy direct method names (search_thoughts, browse_recent, etc.)
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'];
-        if (! in_array($method, $knownMethods, true)) {
+        if (! in_array($method, $this->mcpMethodNames(), true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
 
@@ -229,6 +242,18 @@ class McpController extends Controller
                 ],
             ],
         ];
+        if (config('services.jira.enabled', true)) {
+            $tools[] = [
+                'name' => 'sync_jira',
+                'description' => 'Sync your Jira activity into IdeaTub for the last N days. Use when the user wants to refresh Jira tickets or before a meeting.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'days' => ['type' => 'integer', 'description' => 'Number of days to sync (default from app config, e.g. 14)'],
+                    ],
+                ],
+            ];
+        }
 
         return response()->json([
             'jsonrpc' => '2.0',
@@ -248,8 +273,7 @@ class McpController extends Controller
             return $this->jsonRpcError(-32602, 'tools/call requires "name"', $id);
         }
 
-        $knownMethods = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'];
-        if (! in_array($name, $knownMethods, true)) {
+        if (! in_array($name, $this->mcpMethodNames(), true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
 
@@ -369,8 +393,29 @@ class McpController extends Controller
             'capture_idea' => $this->captureIdea($params),
             'get_ideas' => $this->getIdeas($params),
             'research_idea' => $this->researchIdea($params),
+            'sync_jira' => $this->syncJira($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
+    }
+
+    /**
+     * sync_jira: Dispatch job to sync user's Jira activity into thoughts. Optional days param.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{message: string}
+     */
+    private function syncJira(array $params): array
+    {
+        $days = isset($params['days']) ? (int) $params['days'] : (int) config('services.jira.default_days', 14);
+        $user = Auth::user();
+        if ($user === null) {
+            throw new \InvalidArgumentException('Not authenticated.');
+        }
+        SyncUserJiraActivity::dispatch($user->id, $days);
+
+        return [
+            'message' => "Jira sync started for the last {$days} days. You can search or browse recent thoughts for your Jira activity.",
+        ];
     }
 
     /**
