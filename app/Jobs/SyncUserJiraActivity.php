@@ -25,6 +25,9 @@ class SyncUserJiraActivity implements ShouldQueue
 
     public int $backoff = 120;
 
+    /** Allow long runs: Jira fetch (many API calls) + per-event embedding. Default worker timeout is often 60s. */
+    public int $timeout = 600;
+
     /**
      * Create a new job instance.
      */
