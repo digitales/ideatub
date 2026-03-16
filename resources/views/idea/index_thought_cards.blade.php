@@ -40,6 +40,7 @@
                     Reply
                 </a>
             @endif
+            @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
         </div>
 
         @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
