@@ -32,7 +32,9 @@
                 <p class="text-[11px] text-slate-brand/40 mb-2" id="stream-count-line">
                     Showing <span id="stream-showing-count">{{$thoughts->count()}}</span> of <span id="stream-total-count">{{$thoughts->total()}}</span> thoughts
                 </p>
-                <div id="stream-thoughts-list">
+                <div id="stream-thoughts-list"
+                    data-stream-refetch-url="{{ ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
+                    data-stream-since="{{ $thoughts->first()->created_at->toIso8601String() }}">
                     @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag]) 
                 </div>
                 @if($thoughts->hasMorePages())
@@ -96,6 +98,59 @@
                         threshold: 0
                     });
                     observer.observe(sentinel);
+                })();
+                </script>
+            @endif
+
+            @if(!$thoughts->isEmpty())
+                <script>
+                (function() {
+                    if (!window.ideatub || !window.ideatub.realtime) return;
+                    var list = document.getElementById('stream-thoughts-list');
+                    if (!list) return;
+
+                    var container = list;
+                    var refetchUrl = container.getAttribute('data-stream-refetch-url');
+                    if (!refetchUrl) return;
+
+                    function refetchStream() {
+                        fetch(refetchUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        })
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.html !== undefined) list.innerHTML = data.html;
+                            if (data.count !== undefined) {
+                                var showing = document.getElementById('stream-showing-count');
+                                if (showing) showing.textContent = data.count;
+                            }
+                            if (data.total !== undefined) {
+                                var totalEl = document.getElementById('stream-total-count');
+                                if (totalEl) totalEl.textContent = data.total;
+                            }
+                            if (data.latest_created_at) container.setAttribute('data-stream-since', data.latest_created_at);
+                        });
+                    }
+
+                    var rt = window.ideatub.realtime;
+                    if (rt.realtime_check_url && (rt.driver === 'polling' || !rt.reverb_key)) {
+                        setInterval(function() {
+                            var since = container.getAttribute('data-stream-since') || '';
+                            var url = rt.realtime_check_url + (rt.realtime_check_url.indexOf('?') >= 0 ? '&' : '?') + 'since=' + encodeURIComponent(since);
+                            fetch(url, {
+                                method: 'GET',
+                                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                            })
+                            .then(function(r) { return r.json(); })
+                            .then(function(res) {
+                                if (res && res.has_new) refetchStream();
+                            });
+                        }, 20000);
+                    }
                 })();
                 </script>
             @endif

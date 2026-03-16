@@ -28,6 +28,9 @@ class Thought extends Model
         parent::boot();
 
         $dispatchSync = function (Thought $thought): void {
+            if ($thought->source === 'jira') {
+                return;
+            }
             if (app(EvernoteService::class)->isConfigured()) {
                 SyncThoughtToEvernote::dispatch($thought->id);
             }
