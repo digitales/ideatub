@@ -104,10 +104,12 @@ class IdeaController extends Controller
 
             if ($request->ajax()) {
                 $html = view('idea.index_thought_cards', ['thoughts' => $thoughts, 'replyableIndexStart' => 0])->render();
+                $latest = $thoughts->isEmpty() ? null : $thoughts->first()->created_at->toIso8601String();
 
                 return response()->json([
                     'html' => $html,
                     'total' => $thoughts->count(),
+                    'latest_created_at' => $latest,
                 ]);
             }
         }
