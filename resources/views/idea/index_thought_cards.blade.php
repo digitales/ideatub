@@ -19,6 +19,9 @@
         :class="{ 'ring-2 ring-memory-violet ring-offset-2': selectedThoughtIndex === {{ $currentReplyableIndex }} }"
         class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all cursor-pointer"
     >
+        <div class="flex justify-end -mt-0.5 -mr-0.5 mb-0.5">
+            @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
+        </div>
 
         @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
             <p class="text-[11px] text-slate-brand/50 mb-1">
@@ -40,7 +43,6 @@
                     Reply
                 </a>
             @endif
-            @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
         </div>
 
         @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
