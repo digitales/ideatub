@@ -432,6 +432,35 @@ class IdeaController extends Controller
     }
 
     /**
+     * Delete a thought. Owner only; blocked if the thought has comments.
+     */
+    public function destroy(Request $request, Thought $thought): RedirectResponse|JsonResponse
+    {
+        $this->authorize('delete', $thought);
+
+        if ($thought->comments()->exists()) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(
+                    ['message' => 'This thought has comments. Remove them first.'],
+                    Response::HTTP_UNPROCESSABLE_ENTITY
+                );
+            }
+
+            return redirect()->back()
+                ->with('error', 'This thought has comments. Remove them first.')
+                ->setStatusCode(Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $thought->delete();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(null, Response::HTTP_NO_CONTENT);
+        }
+
+        return redirect()->back()->with('success', 'Thought deleted.');
+    }
+
+    /**
      * Run research for an existing idea in the background. Authorizes that the user owns the thought.
      */
     public function research(Thought $thought): RedirectResponse
