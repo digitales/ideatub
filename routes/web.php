@@ -92,6 +92,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/ideas/revisit', [IdeaController::class, 'revisit'])->name('idea.revisit');
     Route::post('/ideas', [IdeaController::class, 'storeIdea'])->name('ideas.store');
     Route::patch('/ideas/{thought}/completed', [IdeaController::class, 'toggleCompleted'])->name('ideas.toggle-completed');
+    Route::patch('/ideas/{thought}/tags', [IdeaController::class, 'updateTags'])->name('ideas.update-tags');
     Route::post('/ideas/research', [IdeaController::class, 'researchNew'])->name('ideas.research-new');
     Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');
 

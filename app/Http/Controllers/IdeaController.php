@@ -380,6 +380,32 @@ class IdeaController extends Controller
     }
 
     /**
+     * Update tags on a thought. Authorizes update; validates tags array; normalizes and deduplicates.
+     */
+    public function updateTags(Request $request, Thought $thought): RedirectResponse|JsonResponse
+    {
+        $this->authorize('update', $thought);
+
+        $validated = $request->validate([
+            'tags' => 'present|array',
+            'tags.*' => 'string|max:100',
+        ]);
+        $tags = $validated['tags'];
+        $tags = array_map(fn ($t) => trim((string) $t), $tags);
+        $normalized = Thought::normalizeMetadataTags(['tags' => $tags]);
+        $tags = array_values(array_unique($normalized['tags']));
+
+        $metadata = array_merge($thought->metadata ?? [], ['tags' => $tags]);
+        $thought->update(['metadata' => $metadata]);
+
+        if ($request->expectsJson()) {
+            return response()->json(['tags' => $tags]);
+        }
+
+        return redirect()->back()->with('success', 'Tags updated.');
+    }
+
+    /**
      * Run research for an existing idea in the background. Authorizes that the user owns the thought.
      */
     public function research(Thought $thought): RedirectResponse
