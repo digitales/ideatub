@@ -10,11 +10,9 @@ use Illuminate\Queue\SerializesModels;
 
 class ThoughtCreated implements ShouldBroadcast
 {
-    use Dispatchable, SerializesModels;
+    use Dispatchable;
+    use SerializesModels;
 
-    /**
-     * Create a new event instance.
-     */
     public function __construct(
         public Thought $thought
     ) {}
@@ -26,9 +24,11 @@ class ThoughtCreated implements ShouldBroadcast
      */
     public function broadcastOn(): array
     {
-        return [
-            new PrivateChannel('App.Models.User.' . $this->thought->user_id),
-        ];
+        $channel = $this->thought->user_id
+            ? new PrivateChannel('App.Models.User.'.$this->thought->user_id)
+            : null;
+
+        return $channel ? [$channel] : [];
     }
 
     /**
@@ -44,13 +44,5 @@ class ThoughtCreated implements ShouldBroadcast
             'parent_id' => $this->thought->parent_id,
             'metadata' => $this->thought->metadata ?? [],
         ];
-    }
-
-    /**
-     * The event's broadcast name.
-     */
-    public function broadcastAs(): string
-    {
-        return 'ThoughtCreated';
     }
 }
