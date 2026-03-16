@@ -29,7 +29,7 @@ Store per user. Options:
 
 - **Location:** User settings (or “Integrations”) section.
 - **Fields:** Jira site URL (text), API token (password input). “Connect” / “Save” persists encrypted. “Disconnect” clears stored credentials.
-- **Validation:** On save (or on first sync), optionally call a cheap Jira API (e.g. `GET /rest/api/3/myself`) to verify credentials; show error if invalid.
+- **Validation:** **v1 scope:** Credential validation on save is **optional**. If implemented, call `GET /rest/api/3/myself` when the user saves; if it fails, show “Invalid Jira credentials” and do not persist. If not implemented in v1, the first sync will fail and the user sees the job outcome (e.g. “Sync failed”); acceptable for v1.
 - **Security:** Token never echoed back; mask in UI (e.g. “••••••••” when present). Use HTTPS only for site URL.
 
 ## 2. What we fetch from Jira (API)
@@ -39,9 +39,7 @@ Store per user. Options:
 
 ### 2.1 Issue activity (A)
 
-- **Search:** `GET /rest/api/3/search` with JQL such as:
-  - `(reporter = currentUser() OR assignee = currentUser()) AND updated >= -Nd`
-  - For “commented by me”: Jira Cloud has no direct “commented by currentUser()” in JQL; alternatives: (1) use `issue in commentedIssues(currentUser())` if available in their JQL, or (2) fetch issues updated in range and filter comments by author when building events.
+- **Search:** `GET /rest/api/3/search` with JQL: `(reporter = currentUser() OR assignee = currentUser()) AND updated >= -Nd`. This returns issues the user reported or is assigned to. For “commented by me”, **v1 approach:** do not use JQL; fetch the same set of issues (updated in range) and when loading each issue’s comments, filter by current user as author. That yields all events (reporter/assignee + comments by me) with one consistent strategy.
 - **Per issue:** Request with `expand=changelog,renderedFields` (or minimal expand) to get:
   - **Created:** issue creation → one “created” event.
   - **Updates:** from `changelog.histories`: each item where `author.accountId` (or equivalent) matches current user → one “updated” event (field change, status transition, assignee change, etc.). Covers “admin-style” actions (B).
@@ -85,13 +83,23 @@ Other metadata keys (e.g. field name for “updated” events) can be added for 
 
 ## 4. Sync job and idempotency
 
-- **Job:** e.g. `SyncUserJiraActivity` (or `JiraSyncJob`). Accepts `user_id` and optional `days` (default 14). Runs in queue.
+### 4.1 JiraSyncService contract
+
+- **Purpose:** Fetch the user’s Jira activity and return a list of events suitable for creating thoughts. Keeps API and parsing logic out of the job.
+- **Public method:** `fetchEvents(User $user, int $days = 14): array`
+- **Returns:** Array of event arrays, each with at least: `jira_event_id`, `content` (short summary string), `metadata` (type, tags), `source_metadata` (keys listed in §3). The job iterates this list and creates thoughts (with idempotency check). No direct Thought or OpenRouter calls inside the service; the job owns embedding and persistence.
+- **Dependencies:** HTTP client (Laravel), user’s decrypted Jira credentials. Throws on unrecoverable API errors (see §7) so the job can fail or retry.
+
+### 4.2 Job steps
+
+- **Job:** e.g. `SyncUserJiraActivity`. Accepts `user_id` and optional `days` (default 14). Runs in queue.
 - **Steps:**
-  1. Load user’s Jira credentials; if missing, exit.
-  2. Call a **JiraSyncService** (or JiraService) that uses the Jira REST API to fetch issues (search + per-issue changelog/comments) for the last `days`.
-  3. For each event (created, changelog item, comment), compute `jira_event_id`. Check if a thought already exists for this user with `source = 'jira'` and same `jira_event_id` (query by `source_metadata->>'jira_event_id'`). If exists, skip.
-  4. Build content string and metadata (type, tags with project). Call OpenRouterService to embed content. Create Thought with content, embedding, metadata, user_id, source, source_metadata. Do not dispatch Evernote sync for Jira thoughts if that would be noisy (or leave as-is; Evernote mapping can omit `jira`).
-- **Rate limits:** Respect Jira rate limits (back off / throttle if needed); prefer batching and minimal requests (search with maxResults, then batch issue expand).
+  1. Load user’s Jira credentials; if missing, exit (no failure; user not connected).
+  2. Call `JiraSyncService::fetchEvents($user, $days)`. On exception (e.g. 401, 5xx), rethrow so the job fails and can retry or surface to user.
+  3. For each event, check if a thought already exists for this user with `source = 'jira'` and same `jira_event_id` (query using Laravel JSON: `Thought::where('user_id', $id)->where('source', 'jira')->where('source_metadata->jira_event_id', $event['source_metadata']['jira_event_id'])->exists()`). If exists, skip.
+  4. From each event use `content` and `metadata` (and `source_metadata`) returned by `fetchEvents`; call OpenRouterService to embed content; create Thought with content, embedding, metadata, user_id, source, source_metadata.
+  5. **Evernote:** For v1, do **not** trigger Evernote sync for thoughts with `source = 'jira'` (either skip in the Thought model observer when source is jira, or ensure Evernote notebook mapping does not include `jira` by default). One-way: Jira thoughts stay in IdeaTub only unless the user explicitly adds a jira notebook mapping later.
+- **Rate limits:** Inside JiraSyncService, respect Jira rate limits (back off / throttle if needed); prefer batching and minimal requests (search with maxResults, then batch issue expand).
 
 ## 5. Triggers (v1: on-demand only)
 
@@ -113,6 +121,13 @@ Other metadata keys (e.g. field name for “updated” events) can be added for 
 - **Duplicate events:** Idempotency via `jira_event_id` prevents duplicate thoughts on re-sync.
 - **Large history:** Cap events per sync (e.g. last 500 events or last 30 days) to avoid timeouts and rate limits; document in UI.
 
+### 7.1 Jira API errors
+
+- **401 / 403 (invalid or revoked token):** JiraSyncService throws (or returns a structured error); job fails. On next sync trigger (or in UI), surface a clear message: “Invalid Jira credentials. Please check your API token and site URL in settings.”
+- **429 (rate limit):** JiraSyncService should throttle (retry with backoff). If repeated 429s, fail the job after a sensible retry count and log; user can re-trigger sync later.
+- **5xx / timeout:** Fail the job (or retry once with backoff, then fail). Do not create partial thought sets; user can re-run sync. Optionally show “Jira sync failed. Try again later.”
+- **UI/MCP:** When the job fails, “Sync Jira now” / `sync_jira` should indicate failure (flash message or MCP response) so the user knows to check credentials or retry.
+
 ## 8. Out of scope (v1)
 
 - OAuth for Jira (use API token only).
@@ -125,4 +140,5 @@ Other metadata keys (e.g. field name for “updated” events) can be added for 
 
 - **Jira API client:** Use Laravel HTTP client or a minimal wrapper (GET with Basic auth). No need for a full SDK if we only need search + issue + changelog + comments.
 - **Evernote:** If Evernote notebook mapping includes `jira`, Jira thoughts may sync to Evernote; else leave default behaviour (no mapping = no sync for that type, or map to default notebook). No change required for v1.
-- **Tests:** Unit tests for JiraSyncService (parse Jira response → events, build thought payload); feature test for “sync creates thoughts with correct type and tags”; idempotency test (run twice, same event count).
+- **Tests:** Unit tests for JiraSyncService (parse Jira response → events, build thought payload; `fetchEvents` return shape); feature test for “sync creates thoughts with correct type and tags”; idempotency test (run twice, same event count).
+- **DB queries:** Use Laravel’s JSON query syntax for the active driver (e.g. `where('source_metadata->jira_event_id', $id)` for MySQL/PostgreSQL compatibility).
