@@ -26,6 +26,7 @@ class RealtimeCheckEndpointTest extends TestCase
             'created_at' => now()->subMinutes(5),
         ]);
 
+        // since = latest thought's time → no thoughts strictly after → has_new false
         $response = $this->actingAs($user)->getJson(route('api.thoughts.realtime-check', [
             'since' => $thought->created_at->toIso8601String(),
         ]));
@@ -37,17 +38,17 @@ class RealtimeCheckEndpointTest extends TestCase
     public function test_realtime_check_returns_has_new_true_when_new_thought_after_since(): void
     {
         $user = User::factory()->create();
-        $oldThought = Thought::factory()->create([
+        $old = Thought::factory()->create([
             'user_id' => $user->id,
             'created_at' => now()->subMinutes(5),
         ]);
         Thought::factory()->create([
             'user_id' => $user->id,
-            'content' => 'New thought',
+            'created_at' => now(),
         ]);
 
         $response = $this->actingAs($user)->getJson(route('api.thoughts.realtime-check', [
-            'since' => $oldThought->created_at->toIso8601String(),
+            'since' => $old->created_at->toIso8601String(),
         ]));
 
         $response->assertOk();
