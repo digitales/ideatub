@@ -69,13 +69,15 @@ class JiraSyncService
             '(reporter = currentUser() OR assignee = currentUser()) AND updated >= -%dd',
             $days
         );
-        $search = $client()->get("{$baseUrl}/rest/api/3/search", [
+        // Use the current search/jql endpoint (legacy /rest/api/3/search returns 410 Gone)
+        $search = $client()->get("{$baseUrl}/rest/api/3/search/jql", [
             'jql' => $jql,
             'maxResults' => 100,
             'fields' => 'summary,project,created,updated',
         ]);
         $search->throw();
-        $issues = $search->json('issues', []);
+        // Response may use "values" (new API) or "issues" (legacy); support both
+        $issues = $search->json('values') ?? $search->json('issues') ?? [];
 
         $events = [];
         foreach ($issues as $issue) {
