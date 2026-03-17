@@ -6,6 +6,7 @@ use App\Models\ResearchShare;
 use App\Models\Thought;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
@@ -72,5 +73,57 @@ class SharedResearchController extends Controller
         return redirect()
             ->route('shared-research.index', ['share' => $share->id])
             ->with('success', 'Link created. Copy below.');
+    }
+
+    /**
+     * Update password or expiry for a share.
+     */
+    public function update(Request $request, ResearchShare $researchShare): RedirectResponse
+    {
+        $this->authorize('update', $researchShare);
+
+        $validated = $request->validate([
+            'password' => 'nullable|string',
+            'password_remove' => 'sometimes|boolean',
+            'expires_at' => 'nullable|date',
+        ]);
+
+        $passwordChanged = false;
+
+        if (! empty($validated['password_remove'] ?? false)) {
+            $researchShare->password_hash = null;
+            $passwordChanged = true;
+        } elseif ($request->filled('password')) {
+            $researchShare->password_hash = Hash::make($request->password);
+            $passwordChanged = true;
+        }
+
+        if (array_key_exists('expires_at', $validated)) {
+            $researchShare->expires_at = $validated['expires_at'];
+        }
+
+        $researchShare->save();
+
+        $response = redirect()->back()->with('success', 'Share updated.');
+
+        if ($passwordChanged) {
+            $response->withCookie(Cookie::forget('research_share_'.$researchShare->token));
+        }
+
+        return $response;
+    }
+
+    /**
+     * Revoke (delete) a share.
+     */
+    public function destroy(ResearchShare $researchShare): RedirectResponse
+    {
+        $this->authorize('delete', $researchShare);
+
+        $researchShare->delete();
+
+        return redirect()
+            ->route('shared-research.index')
+            ->with('success', 'Share revoked.');
     }
 }
