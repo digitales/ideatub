@@ -20,9 +20,17 @@ class Draft extends Model
 
     protected $fillable = ['content', 'no_chunking'];
 
-    protected $casts = [
-        'no_chunking' => 'boolean',
-    ];
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'no_chunking' => 'boolean',
+        ];
+    }
 
     public function user(): BelongsTo
     {

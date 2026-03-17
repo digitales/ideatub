@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /** Run the migrations. */
     public function up(): void
     {
         Schema::create('drafts', function (Blueprint $table) {
@@ -14,13 +15,11 @@ return new class extends Migration
             $table->text('content');
             $table->boolean('no_chunking')->default(false);
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
-        });
-
-        Schema::table('drafts', function (Blueprint $table) {
             $table->index(['user_id', 'updated_at']);
         });
     }
 
+    /** Reverse the migrations. */
     public function down(): void
     {
         Schema::dropIfExists('drafts');
