@@ -18,7 +18,7 @@ class Draft extends Model
 
     const CREATED_AT = null;
 
-    protected $fillable = ['content', 'no_chunking'];
+    protected $fillable = ['user_id', 'content', 'no_chunking'];
 
     /**
      * Get the attributes that should be cast.
