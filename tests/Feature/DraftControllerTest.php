@@ -82,12 +82,15 @@ class DraftControllerTest extends TestCase
     public function test_store_cap_creates_11_drafts_only_10_exist_and_list_returns_10(): void
     {
         $user = User::factory()->create();
+        $lastResponse = null;
         for ($i = 0; $i < 11; $i++) {
-            $this->actingAs($user)->postJson(route('ideas.drafts.store'), [
+            $lastResponse = $this->actingAs($user)->postJson(route('ideas.drafts.store'), [
                 'content' => "Draft {$i}",
                 'no_chunking' => false,
             ]);
         }
+        $this->assertNotNull($lastResponse);
+        $lastResponse->assertStatus(201);
         $this->assertDatabaseCount('drafts', 10);
         $response = $this->actingAs($user)->getJson(route('ideas.drafts.index'));
         $response->assertOk();
