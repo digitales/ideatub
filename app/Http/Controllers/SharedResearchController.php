@@ -107,7 +107,7 @@ class SharedResearchController extends Controller
         $response = redirect()->back()->with('success', 'Share updated.');
 
         if ($passwordChanged) {
-            $response->withCookie(Cookie::forget('research_share_'.$researchShare->token));
+            $response = $response->withCookie(Cookie::forget('research_share_'.$researchShare->token));
         }
 
         return $response;
