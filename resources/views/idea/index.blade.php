@@ -140,6 +140,8 @@
                     <button
                         type="button"
                         x-ref="focusButton"
+                        x-show="!focusOverlayOpen"
+                        x-cloak
                         @click="toggleFocus()"
                         class="text-xs font-medium text-slate-brand hover:text-deep-indigo"
                     >
