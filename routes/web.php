@@ -106,6 +106,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/ideas/{thought}', [IdeaController::class, 'destroy'])->name('ideas.destroy');
     Route::post('/ideas/research', [IdeaController::class, 'researchNew'])->name('ideas.research-new');
     Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');
+    Route::get('/research/{thought}', [IdeaController::class, 'showResearch'])->name('idea.research.show');
 
     // Drafts for thought capture (list, create, show, update, delete)
     Route::get('/ideas/drafts', [DraftController::class, 'index'])->name('ideas.drafts.index');

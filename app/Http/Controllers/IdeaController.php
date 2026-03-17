@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use League\CommonMark\CommonMarkConverter;
 use Symfony\Component\HttpFoundation\Response;
 
 class IdeaController extends Controller
@@ -562,6 +563,35 @@ class IdeaController extends Controller
 
         return redirect()->route('idea.ideas')
             ->with('success', 'Idea saved. Research started — refresh in a moment to see results.');
+    }
+
+    /**
+     * Show a single thought (research document) with formatted markdown. Full app chrome.
+     * If the thought has a parent, redirect to the parent so the full document is shown.
+     */
+    public function showResearch(Thought $thought): View|RedirectResponse
+    {
+        $this->authorize('view', $thought);
+
+        if ($thought->parent_id !== null) {
+            return redirect()->route('idea.research.show', ['thought' => $thought->parent_id]);
+        }
+
+        $sections = $thought->comments()->orderBy('created_at')->get();
+        $converter = new CommonMarkConverter;
+
+        $rootHtml = $converter->convert($thought->content)->getContent();
+        $sectionsWithHtml = $sections->map(function ($section) use ($converter) {
+            return (object) [
+                'content_html' => $converter->convert($section->content)->getContent(),
+            ];
+        });
+
+        return view('idea.research_show', [
+            'root' => $thought,
+            'root_html' => $rootHtml,
+            'sections' => $sectionsWithHtml,
+        ]);
     }
 
     /**

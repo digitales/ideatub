@@ -46,10 +46,7 @@
                                 @foreach ($researchList as $research)
                                     <div class="text-sm text-slate-brand/80 mb-2">
                                         <p>{{ Str::limit($research->content, 120) }}</p>
-                                        <details class="mt-1">
-                                            <summary class="text-xs text-neural-teal cursor-pointer hover:underline">View full</summary>
-                                            <div class="mt-1 p-2 rounded-lg bg-slate-50/80 text-sm text-deep-indigo whitespace-pre-wrap">{{ $research->content }}</div>
-                                        </details>
+                                        <a href="{{ route('idea.research.show', $research) . '?from=ideas' }}" class="text-xs font-medium text-neural-teal hover:underline">View formatted</a>
                                     </div>
                                 @endforeach
                             @endif
@@ -69,10 +66,7 @@
                             @foreach ($researchList as $research)
                                 <div class="text-sm text-slate-brand/80 mb-2">
                                     <p>{{ Str::limit($research->content, 120) }}</p>
-                                    <details class="mt-1">
-                                        <summary class="text-xs text-neural-teal cursor-pointer hover:underline">View full</summary>
-                                        <div class="mt-1 p-2 rounded-lg bg-slate-50/80 text-sm text-deep-indigo whitespace-pre-wrap">{{ $research->content }}</div>
-                                    </details>
+                                    <a href="{{ route('idea.research.show', $research) . '?from=ideas' }}" class="text-xs font-medium text-neural-teal hover:underline">View formatted</a>
                                 </div>
                             @endforeach
                         @endif
