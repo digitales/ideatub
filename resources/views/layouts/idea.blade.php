@@ -118,6 +118,9 @@
                         @click.away="open = false"
                         class="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-memory-violet/10 py-1 z-30"
                     >
+                        <a href="{{ route('shared-research.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                            Shared research
+                        </a>
                         <a href="{{ route('settings.mcp-keys.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                             MCP key
                         </a>
