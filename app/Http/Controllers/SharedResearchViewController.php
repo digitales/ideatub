@@ -87,10 +87,13 @@ class SharedResearchViewController extends Controller
             ];
         });
 
+        $share->load('user');
+
         return view('shared_research.readonly', [
             'root' => $thought,
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
+            'sharedBy' => $share->user,
         ]);
     }
 }
