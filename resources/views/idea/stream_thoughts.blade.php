@@ -12,6 +12,9 @@
         <div class="pr-8">
         <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ $thought->content }}</p>
         <div class="flex items-center gap-2 flex-wrap">
+            @if($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
+                <a href="{{ route('idea.research.show', $thought) }}" class="text-[10.5px] font-medium text-memory-violet hover:underline">View formatted</a>
+            @endif
             <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
             @if ($thought->source)
                 <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
