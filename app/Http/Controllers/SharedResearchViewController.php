@@ -6,6 +6,7 @@ use App\Models\ResearchShare;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 class SharedResearchViewController extends Controller
@@ -14,7 +15,7 @@ class SharedResearchViewController extends Controller
      * Show shared research (readonly). GET: show content or password form.
      * POST: submit password to unlock; on success set cookie and redirect to GET.
      */
-    public function show(Request $request, string $token): View|\Illuminate\Http\RedirectResponse
+    public function show(Request $request, string $token): View|\Illuminate\Http\RedirectResponse|Response
     {
         $share = ResearchShare::where('token', $token)->first();
 
@@ -36,7 +37,7 @@ class SharedResearchViewController extends Controller
     /**
      * Handle password-protected share: POST = verify password and set cookie; GET = check cookie or show form.
      */
-    private function handlePasswordProtectedShare(Request $request, ResearchShare $share): View|\Illuminate\Http\RedirectResponse
+    private function handlePasswordProtectedShare(Request $request, ResearchShare $share): View|\Illuminate\Http\RedirectResponse|Response
     {
         $token = $share->token;
         $cookieName = 'research_share_'.$token;
@@ -44,7 +45,8 @@ class SharedResearchViewController extends Controller
         if ($request->isMethod('post')) {
             $password = $request->input('password');
             if ($password !== null && Hash::check($password, $share->password_hash)) {
-                Cookie::queue(cookie($cookieName, $token, 60 * 24)->httpOnly(true));
+                // Cookie is encrypted (and signed) by Laravel's EncryptCookies middleware by default.
+                Cookie::queue($cookieName, $token, 60 * 24, '/', null, null, true);
 
                 return redirect()->route('shared-research.show', ['token' => $token]);
             }
