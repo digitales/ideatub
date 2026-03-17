@@ -34,6 +34,10 @@ if (config('oauth-mcp.enabled', true)) {
 // Guest landing (optional; IdeaTub primary UI is at / when authenticated)
 Route::get('/welcome', [HomeController::class, 'index'])->name('home');
 
+// Public shared research view (no auth; password gate per share)
+Route::get('/r/{token}', [App\Http\Controllers\SharedResearchViewController::class, 'show'])
+    ->name('shared-research.show');
+
 // Tool pages
 Route::get('/tools/{tool}', [ToolController::class, 'show'])
     ->where('tool', 'merge|split|compress|pdf-to-image|image-to-pdf|rotate|reorder')
