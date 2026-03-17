@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
@@ -99,6 +100,13 @@ Route::middleware('auth')->group(function () {
     Route::delete('/ideas/{thought}', [IdeaController::class, 'destroy'])->name('ideas.destroy');
     Route::post('/ideas/research', [IdeaController::class, 'researchNew'])->name('ideas.research-new');
     Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');
+
+    // Drafts for thought capture (list, create, show, update, delete)
+    Route::get('/ideas/drafts', [DraftController::class, 'index'])->name('ideas.drafts.index');
+    Route::post('/ideas/drafts', [DraftController::class, 'store'])->name('ideas.drafts.store');
+    Route::get('/ideas/drafts/{draft}', [DraftController::class, 'show'])->name('ideas.drafts.show');
+    Route::patch('/ideas/drafts/{draft}', [DraftController::class, 'update'])->name('ideas.drafts.update');
+    Route::delete('/ideas/drafts/{draft}', [DraftController::class, 'destroy'])->name('ideas.drafts.destroy');
 
     Route::redirect('/example-prompts', '/help#example-prompts')->name('example-prompts');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
