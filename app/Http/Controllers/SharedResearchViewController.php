@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
+use League\CommonMark\CommonMarkConverter;
 
 class SharedResearchViewController extends Controller
 {
@@ -65,6 +66,7 @@ class SharedResearchViewController extends Controller
 
     /**
      * Load thought and sections, return readonly view.
+     * Renders content as markdown for readable headings, lists, code, etc.
      */
     private function renderReadonly(ResearchShare $share): View
     {
@@ -75,10 +77,20 @@ class SharedResearchViewController extends Controller
         }
 
         $sections = $thought->comments()->orderBy('created_at')->get();
+        $converter = new CommonMarkConverter;
+
+        $rootHtml = $converter->convert($thought->content)->getContent();
+        $sectionsWithHtml = $sections->map(function ($section) use ($converter) {
+            return (object) [
+                'content_html' => $converter->convert($section->content)->getContent(),
+                'created_at' => $section->created_at,
+            ];
+        });
 
         return view('shared_research.readonly', [
             'root' => $thought,
-            'sections' => $sections,
+            'root_html' => $rootHtml,
+            'sections' => $sectionsWithHtml,
         ]);
     }
 }
