@@ -34,7 +34,8 @@
         data-drafts-url="{{ route('ideas.drafts.index') }}"
         @focus-capture.window="focusCapture()"
         class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
-        :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col' : ''"
+        :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6' : ''"
+        @click.self="focusOverlayOpen && (focusOverlayOpen = false)"
     >
         {{-- Focus mode: full-screen white backdrop (click to close) --}}
         <div
@@ -47,7 +48,7 @@
 
         <div
             class="max-w-[600px] w-full"
-            :class="focusOverlayOpen ? 'flex flex-col flex-1 w-full max-w-none min-h-full p-6 bg-white' : ''"
+            :class="focusOverlayOpen ? 'flex flex-col flex-1 min-h-0 w-full max-w-none p-6 bg-white rounded-xl shadow-sm' : ''"
             :role="focusOverlayOpen ? 'dialog' : null"
             :aria-modal="focusOverlayOpen ? 'true' : null"
             :aria-label="focusOverlayOpen ? 'Capture thought' : null"
@@ -94,6 +95,7 @@
             action="{{ route('thoughts.store') }}"
             @submit.prevent="submitCapture()"
             @keydown.meta.enter.prevent="submitCapture()"
+            :class="focusOverlayOpen ? 'flex flex-col flex-1 min-h-0' : ''"
         >
             @csrf
             <input type="hidden" name="parent_id" value="{{ isset($replyingTo) && $replyingTo ? $replyingTo->id : '' }}">
@@ -120,7 +122,7 @@
                 aria-describedby="content-error"
                 placeholder="What are you thinking?"
                 class="w-full border-none outline-none resize-none text-sm text-deep-indigo placeholder-slate-brand/40 leading-relaxed"
-                :class="focusOverlayOpen ? 'bg-white border border-slate-200 rounded-lg p-3 min-h-[200px]' : 'bg-transparent'"
+                :class="focusOverlayOpen ? 'flex-1 min-h-0 bg-white border border-slate-200 rounded-lg p-3' : 'bg-transparent'"
             ></textarea>
 
             <p id="content-error" class="mt-1 text-xs text-red-500" x-show="errorField || {{ $errors->has('content') ? 'true' : 'false' }}" x-text="errorField">@if($errors->has('content')){{ $errors->first('content') }}@endif</p>
