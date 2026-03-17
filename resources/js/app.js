@@ -39,19 +39,157 @@ Alpine.data('captureBox', () => ({
   message: '',
   messageType: 'success',
   errorField: '',
+  drafts: [],
+  currentDraftId: null,
+  draftsExpanded: false,
+  draftSaveTimeout: null,
+  focusOverlayOpen: false,
+  isReplyMode: false,
+  noChunking: false,
 
   init() {
     this._rootEl = this.$el;
     const raw = this._rootEl.dataset.initialContent;
     this.content = raw !== undefined ? raw : '';
-    if (this._rootEl.dataset.focusReply === '1') {
-      this.$nextTick(() => this.focusCapture());
-    }
+    this.isReplyMode = this._rootEl.dataset.focusReply === '1';
+    const noChunkCb = this._rootEl.querySelector('input[name="no_chunking"]');
+    if (noChunkCb && noChunkCb.checked) this.noChunking = true;
+    if (!this.isReplyMode) this.fetchDrafts();
+    if (this.isReplyMode) this.$nextTick(() => this.focusCapture());
+    this.$watch('content', () => this.scheduleDraftSave());
+    this.$watch('noChunking', () => this.scheduleDraftSave());
+    this._escapeHandler = (e) => {
+      if (e.key === 'Escape' && this.focusOverlayOpen) this.focusOverlayOpen = false;
+    };
+    document.addEventListener('keydown', this._escapeHandler);
+  },
+
+  destroy() {
+    if (this._escapeHandler) document.removeEventListener('keydown', this._escapeHandler);
   },
 
   focusCapture() {
     const el = this.$refs.captureTextarea;
     if (el && el.focus) el.focus();
+  },
+
+  get draftsUrl() {
+    return this._rootEl?.dataset?.draftsUrl || '';
+  },
+
+  get csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  },
+
+  async fetchDrafts() {
+    const url = this.draftsUrl;
+    if (!url) return;
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': this.csrfToken,
+        },
+      });
+      if (res.ok) this.drafts = await res.json();
+    } catch {
+      // leave drafts as-is on failure
+    }
+  },
+
+  scheduleDraftSave() {
+    if (this.draftSaveTimeout) clearTimeout(this.draftSaveTimeout);
+    if (this.isReplyMode) return;
+    this.draftSaveTimeout = setTimeout(() => this.saveDraft(), 1500);
+  },
+
+  async saveDraft() {
+    if (this.isReplyMode) return;
+    const trimmed = (this.content || '').trim();
+    if (!trimmed) return;
+    const url = this.draftsUrl;
+    if (!url) return;
+    const body = JSON.stringify({ content: trimmed, no_chunking: this.noChunking });
+    const isUpdate = !!this.currentDraftId;
+    const reqUrl = isUpdate ? `${url}/${this.currentDraftId}` : url;
+    const method = isUpdate ? 'PATCH' : 'POST';
+    try {
+      const res = await fetch(reqUrl, {
+        method,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': this.csrfToken,
+        },
+        body,
+      });
+      if (res.ok) {
+        if (!isUpdate) {
+          const data = await res.json().catch(() => ({}));
+          if (data.id) this.currentDraftId = data.id;
+        }
+        this.fetchDrafts();
+      } else {
+        this.message = "Draft couldn't be saved";
+        this.messageType = 'error';
+        setTimeout(() => { this.message = ''; }, 4000);
+      }
+    } catch {
+      this.message = "Draft couldn't be saved";
+      this.messageType = 'error';
+      setTimeout(() => { this.message = ''; }, 4000);
+    }
+  },
+
+  async loadDraft(id) {
+    const url = this.draftsUrl;
+    if (!url) return;
+    try {
+      const res = await fetch(`${url}/${id}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrfToken },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      this.content = data.content ?? '';
+      this.noChunking = !!data.no_chunking;
+      this.currentDraftId = id;
+      this.draftsExpanded = false;
+      this.$nextTick(() => this.focusCapture());
+    } catch {
+      // no-op
+    }
+  },
+
+  async discardDraft(id) {
+    const url = this.draftsUrl;
+    if (!url) return;
+    try {
+      const res = await fetch(`${url}/${id}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrfToken },
+      });
+      if (!res.ok) return;
+      this.drafts = this.drafts.filter((d) => d.id != id);
+      if (this.currentDraftId == id) {
+        this.currentDraftId = null;
+        this.content = '';
+        this.noChunking = false;
+      }
+    } catch {
+      // no-op
+    }
+  },
+
+  toggleFocus() {
+    this.focusOverlayOpen = !this.focusOverlayOpen;
+    if (this.focusOverlayOpen) {
+      this.$nextTick(() => this.focusCapture());
+    } else {
+      const btn = this.$refs.focusButton;
+      if (btn && btn.focus) btn.focus();
+    }
   },
 
   async submitCapture() {
@@ -107,9 +245,22 @@ Alpine.data('captureBox', () => ({
         return;
       }
 
+      if (this.currentDraftId) {
+        try {
+          await fetch(`${this.draftsUrl}/${this.currentDraftId}`, {
+            method: 'DELETE',
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrfToken },
+          });
+        } catch {
+          // ignore
+        }
+        this.currentDraftId = null;
+      }
+
       this.content = '';
       this.message = data.message || 'Thought saved.';
       this.messageType = 'success';
+      this.fetchDrafts();
 
       if (data.thought) {
         if (data.thought.parent_id) {

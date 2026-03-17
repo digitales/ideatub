@@ -126,6 +126,7 @@
 
             <div class="mt-2 flex items-center gap-2">
                 <input type="checkbox" name="no_chunking" id="no_chunking" value="1" class="rounded border-slate-300 text-memory-violet focus:ring-memory-violet/30"
+                    x-model="noChunking"
                     {{ old('no_chunking') ? 'checked' : '' }}>
                 <label for="no_chunking" class="text-[11px] text-slate-brand/70">Don't split into sections (long docs are normally split at headings)</label>
             </div>
