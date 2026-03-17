@@ -5,3 +5,8 @@
 [x-cloak] {
   display: none !important;
 }
+
+/* Shared research: avoid double divider; ul already has border-t */
+.shared-research-root .prose hr:last-of-type {
+  display: none;
+}
