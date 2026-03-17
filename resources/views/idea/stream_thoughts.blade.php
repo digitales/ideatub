@@ -1,7 +1,13 @@
+@php
+    $shareByThoughtId = $shareByThoughtId ?? collect();
+@endphp
 @foreach ($thoughts as $thought)
+    @php
+        $share = $shareByThoughtId[$thought->id] ?? null;
+    @endphp
     <div data-thought-id="{{ $thought->id }}" class="relative rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all">
         <div class="absolute top-3 right-3">
-            @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
+            @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id, 'share' => $share])
         </div>
         <div class="pr-8">
         <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ $thought->content }}</p>

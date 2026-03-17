@@ -40,7 +40,7 @@
                 <div id="stream-thoughts-list"
                     data-stream-refetch-url="{{ (isset($streamJira) && $streamJira) ? route('idea.stream.jira') : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
                     data-stream-since="{{ $thoughts->first()->created_at->toIso8601String() }}">
-                    @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag]) 
+                    @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag, 'shareByThoughtId' => $shareByThoughtId ?? collect()]) 
                 </div>
                 @if($thoughts->hasMorePages())
                     <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{ (isset($streamJira) && $streamJira) ? route('idea.stream.jira') : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}" data-stream-total="{{$thoughts->total()}}"></div>
