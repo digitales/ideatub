@@ -34,20 +34,20 @@
         data-drafts-url="{{ route('ideas.drafts.index') }}"
         @focus-capture.window="focusCapture()"
         class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
-        :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex items-center justify-center p-4' : ''"
+        :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col' : ''"
     >
-        {{-- Focus mode backdrop --}}
+        {{-- Focus mode: full-screen white backdrop (click to close) --}}
         <div
             x-show="focusOverlayOpen"
             x-cloak
             @click="focusOverlayOpen = false"
-            class="absolute inset-0 bg-black/50 -z-10"
+            class="absolute inset-0 bg-white -z-10"
             aria-hidden="true"
         ></div>
 
         <div
             class="max-w-[600px] w-full"
-            :class="focusOverlayOpen ? 'rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)]' : ''"
+            :class="focusOverlayOpen ? 'flex flex-col flex-1 w-full max-w-none min-h-full p-6 bg-white' : ''"
             :role="focusOverlayOpen ? 'dialog' : null"
             :aria-modal="focusOverlayOpen ? 'true' : null"
             :aria-label="focusOverlayOpen ? 'Capture thought' : null"
@@ -119,7 +119,8 @@
                 :aria-invalid="!!errorField || {{ $errors->has('content') ? 'true' : 'false' }}"
                 aria-describedby="content-error"
                 placeholder="What are you thinking?"
-                class="w-full bg-transparent border-none outline-none resize-none text-sm text-deep-indigo placeholder-slate-brand/40 leading-relaxed"
+                class="w-full border-none outline-none resize-none text-sm text-deep-indigo placeholder-slate-brand/40 leading-relaxed"
+                :class="focusOverlayOpen ? 'bg-white border border-slate-200 rounded-lg p-3 min-h-[200px]' : 'bg-transparent'"
             ></textarea>
 
             <p id="content-error" class="mt-1 text-xs text-red-500" x-show="errorField || {{ $errors->has('content') ? 'true' : 'false' }}" x-text="errorField">@if($errors->has('content')){{ $errors->first('content') }}@endif</p>
