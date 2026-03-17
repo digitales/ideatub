@@ -27,6 +27,12 @@
     >
         @if ($isRootThought)
             @if ($share)
+                <a
+                    href="{{ url(route('shared-research.show', $share->token)) }}"
+                    target="_blank"
+                    rel="noopener"
+                    class="block px-3 py-1.5 text-[12px] text-memory-violet hover:bg-memory-violet/5 rounded"
+                >Open link</a>
                 <button
                     type="button"
                     data-copy-url="{{ $share ? e(url(route('shared-research.show', $share->token))) : '' }}"
