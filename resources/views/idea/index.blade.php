@@ -31,13 +31,62 @@
         data-initial-content="{{ e($initialContent) }}"
         data-focus-reply="{{ (isset($replyingTo) && $replyingTo) ? '1' : '0' }}"
         data-idea-index-url="{{ route('idea.index') }}"
+        data-drafts-url="{{ route('ideas.drafts.index') }}"
         @focus-capture.window="focusCapture()"
         class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
+        :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex items-center justify-center p-4' : ''"
     >
+        {{-- Focus mode backdrop --}}
+        <div
+            x-show="focusOverlayOpen"
+            x-cloak
+            @click="focusOverlayOpen = false"
+            class="absolute inset-0 bg-black/50 -z-10"
+            aria-hidden="true"
+        ></div>
+
+        <div
+            class="max-w-[600px] w-full"
+            :class="focusOverlayOpen ? 'rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)]' : ''"
+            :role="focusOverlayOpen ? 'dialog' : null"
+            :aria-modal="focusOverlayOpen ? 'true' : null"
+            :aria-label="focusOverlayOpen ? 'Capture thought' : null"
+        >
         {{-- AJAX success/error message --}}
         <div x-show="message" x-cloak class="mb-3 rounded-xl px-4 py-3 text-sm"
             :class="messageType === 'success' ? 'bg-neural-teal/10 border border-neural-teal/25 text-neural-teal' : 'bg-red-50 border border-red-200 text-red-600'"
             x-text="message">
+        </div>
+
+        {{-- Draft list (hidden in reply mode) --}}
+        <div
+            x-show="drafts.length > 0 && !isReplyMode"
+            x-cloak
+            class="mb-3"
+        >
+            <button
+                type="button"
+                @click="draftsExpanded = !draftsExpanded"
+                class="text-sm text-slate-brand hover:text-deep-indigo font-medium"
+            >
+                Drafts (<span x-text="drafts.length"></span>)
+            </button>
+            <template x-if="draftsExpanded">
+                <ul class="mt-2 space-y-2" role="list">
+                    <template x-for="draft in drafts" :key="draft.id">
+                        <li class="flex items-center justify-between gap-2 py-2 px-3 rounded-lg border border-memory-violet/15 bg-memory-violet/5 text-sm text-slate-brand">
+                            <div class="min-w-0 flex-1">
+                                <span class="line-clamp-1" x-text="draft.content_preview"></span>
+                                <span class="text-[11px] text-slate-brand/60" x-text="draft.updated_at_human"></span>
+                            </div>
+                            <div class="shrink-0 flex items-center gap-1.5">
+                                <button type="button" @click="loadDraft(draft.id)" class="text-xs font-medium text-memory-violet hover:text-deep-indigo">Resume</button>
+                                <button type="button" @click="discardDraft(draft.id)" class="text-xs font-medium text-slate-brand/70 hover:text-red-600">Discard</button>
+                            </div>
+                        </li>
+                    </template>
+                </ul>
+            </template>
         </div>
 
         <form
@@ -83,17 +132,37 @@
 
             <div class="flex items-center justify-between mt-2.5 pt-2.5 border-t border-memory-violet/8">
                 <span class="text-[11px] text-slate-brand/40">⌘ + Enter to store · ⌘/ to focus</span>
-                <button
-                    type="submit"
-                    :disabled="saving"
-                    class="text-xs font-medium text-white px-4 py-1.5 rounded-lg transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
-                    style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
-                >
-                    <span x-show="!saving">Store thought</span>
-                    <span x-show="saving" x-cloak>Saving…</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        x-ref="focusButton"
+                        @click="toggleFocus()"
+                        class="text-xs font-medium text-slate-brand hover:text-deep-indigo"
+                    >
+                        Focus
+                    </button>
+                    <button
+                        type="button"
+                        x-show="focusOverlayOpen"
+                        x-cloak
+                        @click="focusOverlayOpen = false"
+                        class="text-xs font-medium text-slate-brand hover:text-deep-indigo"
+                    >
+                        Close
+                    </button>
+                    <button
+                        type="submit"
+                        :disabled="saving"
+                        class="text-xs font-medium text-white px-4 py-1.5 rounded-lg transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+                        style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
+                    >
+                        <span x-show="!saving">Store thought</span>
+                        <span x-show="saving" x-cloak>Saving…</span>
+                    </button>
+                </div>
             </div>
         </form>
+        </div>
     </div>
 
     {{-- Thoughts list --}}
