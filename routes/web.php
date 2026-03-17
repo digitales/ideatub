@@ -37,6 +37,7 @@ Route::get('/welcome', [HomeController::class, 'index'])->name('home');
 // Public shared research view (no auth; password gate per share)
 Route::get('/r/{token}', [App\Http\Controllers\SharedResearchViewController::class, 'show'])
     ->name('shared-research.show');
+Route::post('/r/{token}', [App\Http\Controllers\SharedResearchViewController::class, 'show']);
 
 // Tool pages
 Route::get('/tools/{tool}', [ToolController::class, 'show'])

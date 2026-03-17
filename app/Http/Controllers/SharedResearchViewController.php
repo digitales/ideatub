@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\ResearchShare;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class SharedResearchViewController extends Controller
 {
     /**
-     * Show shared research (readonly). No auth; password gate in Task 2.3.
+     * Show shared research (readonly). GET: show content or password form.
+     * POST: submit password to unlock; on success set cookie and redirect to GET.
      */
-    public function show(string $token): View
+    public function show(Request $request, string $token): View|\Illuminate\Http\RedirectResponse
     {
         $share = ResearchShare::where('token', $token)->first();
 
@@ -22,7 +26,46 @@ class SharedResearchViewController extends Controller
             abort(410, 'This link has expired.');
         }
 
-        // If password_hash is set, skip check for now (cookie gate in Task 2.3)
+        if ($share->password_hash !== null) {
+            return $this->handlePasswordProtectedShare($request, $share);
+        }
+
+        return $this->renderReadonly($share);
+    }
+
+    /**
+     * Handle password-protected share: POST = verify password and set cookie; GET = check cookie or show form.
+     */
+    private function handlePasswordProtectedShare(Request $request, ResearchShare $share): View|\Illuminate\Http\RedirectResponse
+    {
+        $token = $share->token;
+        $cookieName = 'research_share_'.$token;
+
+        if ($request->isMethod('post')) {
+            $password = $request->input('password');
+            if ($password !== null && Hash::check($password, $share->password_hash)) {
+                Cookie::queue(cookie($cookieName, $token, 60 * 24)->httpOnly(true));
+
+                return redirect()->route('shared-research.show', ['token' => $token]);
+            }
+
+            return response()
+                ->view('shared_research.password_form', ['token' => $token, 'error' => 'Incorrect password'], 401);
+        }
+
+        $cookieValue = $request->cookie($cookieName);
+        if ($cookieValue === $token) {
+            return $this->renderReadonly($share);
+        }
+
+        return view('shared_research.password_form', ['token' => $token]);
+    }
+
+    /**
+     * Load thought and sections, return readonly view.
+     */
+    private function renderReadonly(ResearchShare $share): View
+    {
         $thought = $share->thought;
 
         if ($thought === null) {
