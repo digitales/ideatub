@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\IdeaResearchRequested;
+use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
@@ -254,10 +255,16 @@ class IdeaController extends Controller
         $page = (int) $request->input('page', 1);
         $thoughts = $query->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
+        $shareByThoughtId = ResearchShare::whereIn('thought_id', $thoughts->pluck('id'))
+            ->where('user_id', auth()->id())
+            ->get()
+            ->keyBy('thought_id');
+
         if ($request->ajax()) {
             $html = view('idea.stream_thoughts', [
                 'thoughts' => $thoughts,
                 'showFullSections' => $tagForDisplay !== null,
+                'shareByThoughtId' => $shareByThoughtId,
             ])->render();
 
             $orderAsc = $canonicalTag !== null;
@@ -280,6 +287,7 @@ class IdeaController extends Controller
             'tag' => $tagForDisplay,
             'tagSlug' => $tagSlug,
             'streamJira' => false,
+            'shareByThoughtId' => $shareByThoughtId,
         ]);
     }
 
@@ -299,10 +307,16 @@ class IdeaController extends Controller
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
+        $shareByThoughtId = ResearchShare::whereIn('thought_id', $thoughts->pluck('id'))
+            ->where('user_id', auth()->id())
+            ->get()
+            ->keyBy('thought_id');
+
         if ($request->ajax()) {
             $html = view('idea.stream_thoughts', [
                 'thoughts' => $thoughts,
                 'showFullSections' => false,
+                'shareByThoughtId' => $shareByThoughtId,
             ])->render();
             $latestCreatedAt = $thoughts->isNotEmpty()
                 ? $thoughts->first()->created_at->toIso8601String()
@@ -323,6 +337,7 @@ class IdeaController extends Controller
             'tag' => null,
             'tagSlug' => null,
             'streamJira' => true,
+            'shareByThoughtId' => $shareByThoughtId,
         ]);
     }
 

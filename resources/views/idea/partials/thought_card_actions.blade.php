@@ -1,5 +1,7 @@
 @php
     $editable = $editable ?? (auth()->check() && auth()->id() === $thought->user_id);
+    $share = $share ?? null;
+    $isRootThought = $thought->parent_id === null;
 @endphp
 @if ($editable)
 <div
@@ -23,6 +25,25 @@
         x-transition
         class="absolute right-0 top-full mt-0.5 py-1 min-w-[8rem] rounded-lg border border-memory-violet/15 bg-white shadow-lg z-10"
     >
+        @if ($isRootThought)
+            @if ($share)
+                <button
+                    type="button"
+                    data-copy-url="{{ $share ? e(url(route('shared-research.show', $share->token))) : '' }}"
+                    @click="navigator.clipboard.writeText($el.getAttribute('data-copy-url')); $el.textContent='Copied!'; setTimeout(() => { $el.textContent='Copy link'; }, 1500)"
+                    class="w-full text-left px-3 py-1.5 text-[12px] text-slate-brand hover:bg-slate-brand/5 rounded"
+                >Copy link</button>
+                <a
+                    href="{{ route('shared-research.index', ['share' => $share->id]) }}"
+                    class="block px-3 py-1.5 text-[12px] text-slate-brand hover:bg-slate-brand/5 rounded"
+                >Manage</a>
+            @else
+                <a
+                    href="{{ route('shared-research.index', ['create' => $thought->id]) }}"
+                    class="block px-3 py-1.5 text-[12px] text-slate-brand hover:bg-slate-brand/5 rounded"
+                >Share</a>
+            @endif
+        @endif
         <button
             type="button"
             @click="showConfirm()"

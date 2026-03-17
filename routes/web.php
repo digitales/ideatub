@@ -18,6 +18,7 @@ use App\Http\Controllers\IdeasRevisitSettingsController;
 use App\Http\Controllers\InboundEmailController;
 use App\Http\Controllers\JiraSettingsController;
 use App\Http\Controllers\PostmarkInboundController;
+use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -33,6 +34,11 @@ if (config('oauth-mcp.enabled', true)) {
 
 // Guest landing (optional; IdeaTub primary UI is at / when authenticated)
 Route::get('/welcome', [HomeController::class, 'index'])->name('home');
+
+// Public shared research view (no auth; password gate per share)
+Route::get('/r/{token}', [App\Http\Controllers\SharedResearchViewController::class, 'show'])
+    ->name('shared-research.show');
+Route::post('/r/{token}', [App\Http\Controllers\SharedResearchViewController::class, 'show']);
 
 // Tool pages
 Route::get('/tools/{tool}', [ToolController::class, 'show'])
@@ -122,6 +128,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/inbound-emails', [InboundEmailController::class, 'index'])->name('settings.inbound-emails.index');
     Route::post('/settings/inbound-emails', [InboundEmailController::class, 'store'])->name('settings.inbound-emails.store');
     Route::delete('/settings/inbound-emails/{userInboundAddress}', [InboundEmailController::class, 'destroy'])->name('settings.inbound-emails.destroy');
+
+    // Shared research (owner CRUD)
+    Route::get('/shared-research', [SharedResearchController::class, 'index'])->name('shared-research.index');
+    Route::post('/shared-research', [SharedResearchController::class, 'store'])->name('shared-research.store');
+    Route::patch('/shared-research/{researchShare}', [SharedResearchController::class, 'update'])->name('shared-research.update');
+    Route::delete('/shared-research/{researchShare}', [SharedResearchController::class, 'destroy'])->name('shared-research.destroy');
 
     if (config('services.jira.enabled', true)) {
         Route::get('/settings/jira', [JiraSettingsController::class, 'index'])->name('settings.jira.index');
