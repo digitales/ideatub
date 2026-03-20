@@ -135,6 +135,11 @@
                         <a href="{{ route('settings.inbound-emails.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                             Inbound email
                         </a>
+                        @if (config('services.mail_sync.enabled', true))
+                        <a href="{{ route('settings.email-accounts.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                            Email Accounts
+                        </a>
+                        @endif
                         @if (config('services.jira.enabled', true))
                         <a href="{{ route('settings.jira.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                             Jira

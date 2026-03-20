@@ -45,6 +45,19 @@ class Thought extends Model
                 broadcast(new ThoughtCreated($thought))->toOthers();
             }
         });
+
+        static::deleting(function (Thought $thought): void {
+            if ($thought->source !== 'email') {
+                return;
+            }
+
+            ImportedEmail::query()
+                ->where('thought_id', $thought->id)
+                ->update([
+                    'thought_id' => null,
+                    'thought_deleted_at' => now(),
+                ]);
+        });
     }
 
     /**
