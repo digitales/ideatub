@@ -7,11 +7,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Cashier\Billable;
-use Laravel\Cashier\Subscription;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, Billable;
+    use Billable, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -82,6 +81,14 @@ class User extends Authenticatable
     public function userInboundAddresses()
     {
         return $this->hasMany(UserInboundAddress::class);
+    }
+
+    /**
+     * Get the user's agent inbox items.
+     */
+    public function inboxItems()
+    {
+        return $this->hasMany(InboxItem::class);
     }
 
     /**

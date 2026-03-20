@@ -5,10 +5,12 @@ namespace App\Providers;
 use App\Contracts\EvernoteApiGateway;
 use App\Events\IdeaResearchRequested;
 use App\Listeners\RunResearchForIdeaListener;
+use App\Models\InboxItem;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -36,5 +38,18 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Event::listen(IdeaResearchRequested::class, RunResearchForIdeaListener::class);
+
+        View::composer('layouts.idea', function ($view): void {
+            $count = 0;
+
+            if (auth()->check()) {
+                $count = InboxItem::query()
+                    ->forUser(auth()->user())
+                    ->actionable()
+                    ->count();
+            }
+
+            $view->with('inboxActionableCount', $count);
+        });
     }
 }

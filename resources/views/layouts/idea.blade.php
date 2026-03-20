@@ -69,6 +69,14 @@
             <a href="{{ route('idea.ideas') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
                 Ideas
             </a>
+            <a href="{{ route('inbox.index') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-2">
+                <span>Inbox</span>
+                @if (($inboxActionableCount ?? 0) > 0)
+                    <span data-testid="inbox-badge" class="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-memory-violet/15 px-1.5 py-0.5 text-[10px] font-semibold text-memory-violet">
+                        {{ $inboxActionableCount }}
+                    </span>
+                @endif
+            </a>
             <a href="{{ route('idea.revisit') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
                 Ideas to revisit
             </a>
