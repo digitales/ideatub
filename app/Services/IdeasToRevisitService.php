@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserPreference;
+use App\Support\IdeaEffectiveDateSql;
 use Illuminate\Support\Carbon;
 
 /**
@@ -24,10 +25,7 @@ class IdeasToRevisitService
         $limit = (int) UserPreference::get($user, 'ideas_to_revisit_limit', 15);
         $minAgeDays = UserPreference::get($user, 'ideas_to_revisit_min_age_days');
 
-        $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
-        $effectiveDateSql = $driver === 'pgsql'
-            ? "COALESCE((metadata->>'logged_date')::date, created_at::date)"
-            : "COALESCE(json_extract(metadata, '$.logged_date'), date(created_at))";
+        $effectiveDateSql = IdeaEffectiveDateSql::expression();
 
         $query = Thought::query()
             ->where('user_id', $user->id)
@@ -42,7 +40,7 @@ class IdeasToRevisitService
             $query->whereRaw("({$effectiveDateSql}) <= ?", [$cutoff]);
         }
 
-        $query->orderByRaw($effectiveDateSql . ' ASC');
+        $query->orderByRaw($effectiveDateSql.' ASC');
         $query->take(max(1, $limit));
 
         $thoughts = $query->get()->all();

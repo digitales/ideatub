@@ -1,25 +1,28 @@
 <?php
 
+use App\Http\Controllers\Api\RealtimeCheckController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmailAccountSettingsController;
+use App\Http\Controllers\DraftController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IdeaController;
-use App\Http\Controllers\McpKeyController;
-use App\Http\Controllers\PricingController;
-use App\Http\Controllers\SocialAuthController;
-use App\Http\Controllers\ToolController;
-use App\Http\Controllers\OAuthServerController;
-use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\IdeasRevisitSettingsController;
 use App\Http\Controllers\InboundEmailController;
+use App\Http\Controllers\InboxController;
 use App\Http\Controllers\JiraSettingsController;
+use App\Http\Controllers\McpKeyController;
+use App\Http\Controllers\OAuthServerController;
+use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\PostmarkInboundController;
+use App\Http\Controllers\PricingController;
 use App\Http\Controllers\SharedResearchController;
+use App\Http\Controllers\SharedResearchViewController;
+use App\Http\Controllers\SocialAuthController;
+use App\Http\Controllers\ToolController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,9 +40,9 @@ if (config('oauth-mcp.enabled', true)) {
 Route::get('/welcome', [HomeController::class, 'index'])->name('home');
 
 // Public shared research view (no auth; password gate per share)
-Route::get('/r/{token}', [App\Http\Controllers\SharedResearchViewController::class, 'show'])
+Route::get('/r/{token}', [SharedResearchViewController::class, 'show'])
     ->name('shared-research.show');
-Route::post('/r/{token}', [App\Http\Controllers\SharedResearchViewController::class, 'show']);
+Route::post('/r/{token}', [SharedResearchViewController::class, 'show']);
 
 // Tool pages
 Route::get('/tools/{tool}', [ToolController::class, 'show'])
@@ -79,10 +82,10 @@ Route::get('/auth/github/callback', [SocialAuthController::class, 'handleGithubC
 Route::middleware('guest')->group(function () {
     Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
     Route::post('/register', [RegisteredUserController::class, 'store']);
-    
+
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthenticatedSessionController::class, 'store']);
-    
+
     Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
 });
@@ -90,13 +93,18 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
-    Route::get('/api/thoughts/realtime-check', [App\Http\Controllers\Api\RealtimeCheckController::class, 'realtimeCheck'])->name('api.thoughts.realtime-check');
+    Route::get('/api/thoughts/realtime-check', [RealtimeCheckController::class, 'realtimeCheck'])->name('api.thoughts.realtime-check');
 
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
     Route::get('/stream/jira', [IdeaController::class, 'streamJira'])->name('idea.stream.jira');
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
+
+    Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');
+    Route::post('/inbox/{inboxItem}/done', [InboxController::class, 'markDone'])->name('inbox.done');
+    Route::post('/inbox/{inboxItem}/snooze', [InboxController::class, 'snooze'])->name('inbox.snooze');
+    Route::post('/inbox/{inboxItem}/save-thought', [InboxController::class, 'saveAsThought'])->name('inbox.save-thought');
 
     // Ideas list and store
     Route::get('/ideas', [IdeaController::class, 'ideas'])->name('idea.ideas');
@@ -118,7 +126,7 @@ Route::middleware('auth')->group(function () {
 
     Route::redirect('/example-prompts', '/help#example-prompts')->name('example-prompts');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
-    
+
     // MCP key management (obtain / revoke auth key for AI clients)
     Route::get('/settings/mcp-keys', [McpKeyController::class, 'index'])->name('settings.mcp-keys.index');
     Route::post('/settings/mcp-keys', [McpKeyController::class, 'store'])->name('settings.mcp-keys.store');
