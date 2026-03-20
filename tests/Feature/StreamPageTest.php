@@ -206,4 +206,36 @@ class StreamPageTest extends TestCase
         $response->assertSee('Jira ticket PROJ-123');
         $response->assertDontSee('Normal thought');
     }
+
+    public function test_jira_stream_orders_by_jira_activity_time_descending(): void
+    {
+        $user = User::factory()->create();
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Older Jira event',
+            'parent_id' => null,
+            'source' => 'jira',
+            'source_metadata' => [
+                'jira_updated_at' => '2026-03-10T12:00:00.000+0000',
+            ],
+            'created_at' => now()->subMinutes(1),
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Newer Jira event',
+            'parent_id' => null,
+            'source' => 'jira',
+            'source_metadata' => [
+                'jira_updated_at' => '2026-03-20T12:00:00.000+0000',
+            ],
+            'created_at' => now()->subDays(7),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.jira'));
+
+        $response->assertStatus(200);
+        $response->assertSeeInOrder(['Newer Jira event', 'Older Jira event']);
+    }
 }

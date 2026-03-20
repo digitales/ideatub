@@ -72,6 +72,77 @@ class JiraSyncServiceTest extends TestCase
     }
 
     #[Test]
+    public function fetch_events_extracts_full_text_from_nested_adf_comments(): void
+    {
+        Http::fake([
+            '*rest/api/3/myself' => Http::response(['accountId' => 'acc-123'], 200),
+            '*rest/api/3/search*' => Http::response([
+                'issues' => [
+                    [
+                        'key' => 'PROJ-1',
+                        'id' => '10001',
+                        'fields' => [
+                            'summary' => 'Nested comment issue',
+                            'project' => ['key' => 'PROJ'],
+                            'created' => '2026-01-01T10:00:00.000+0000',
+                            'updated' => '2026-01-01T10:00:00.000+0000',
+                        ],
+                    ],
+                ],
+            ], 200),
+            '*rest/api/3/issue/PROJ-1/comment*' => Http::response([
+                'comments' => [
+                    [
+                        'id' => '90001',
+                        'created' => '2026-01-01T11:00:00.000+0000',
+                        'author' => ['accountId' => 'acc-123'],
+                        'body' => [
+                            'type' => 'doc',
+                            'version' => 1,
+                            'content' => [
+                                [
+                                    'type' => 'paragraph',
+                                    'content' => [
+                                        ['type' => 'text', 'text' => 'First line'],
+                                        ['type' => 'hardBreak'],
+                                        ['type' => 'text', 'text' => 'Second line'],
+                                    ],
+                                ],
+                                [
+                                    'type' => 'paragraph',
+                                    'content' => [
+                                        ['type' => 'text', 'text' => 'Third line'],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+            '*rest/api/3/issue/PROJ-1*' => Http::response(['changelog' => ['histories' => []]], 200),
+        ]);
+
+        $user = User::factory()->create();
+        UserJiraCredential::create([
+            'user_id' => $user->id,
+            'jira_site_url' => 'https://example.atlassian.net',
+            'jira_api_token' => 'secret-token',
+            'jira_email' => null,
+        ]);
+
+        $service = new JiraSyncService;
+        $events = $service->fetchEvents($user, 14);
+        $commentEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'comment');
+
+        $this->assertNotNull($commentEvent);
+        $this->assertStringContainsString('Commented on PROJ-1:', $commentEvent['content']);
+        $this->assertStringContainsString('First line', $commentEvent['content']);
+        $this->assertStringContainsString('Second line', $commentEvent['content']);
+        $this->assertStringContainsString('Third line', $commentEvent['content']);
+        $this->assertStringNotContainsString('{"type":"doc"', $commentEvent['content']);
+    }
+
+    #[Test]
     public function fetch_events_throws_invalid_jira_credentials_exception_on_401(): void
     {
         Http::fake([

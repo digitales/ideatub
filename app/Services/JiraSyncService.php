@@ -167,13 +167,16 @@ class JiraSyncService
                 $commentId = $comment['id'] ?? uniqid('', true);
                 $body = $comment['body'] ?? '';
                 if (is_array($body)) {
-                    $body = $body['content'][0]['content'][0]['text'] ?? json_encode($body);
+                    $body = $this->extractCommentText($body);
+                }
+                $body = trim((string) $body);
+                if ($body === '') {
+                    $body = '[empty comment]';
                 }
                 $commentCreated = $comment['created'] ?? $updated;
-                $preview = mb_strlen($body) > 80 ? mb_substr($body, 0, 77) . '...' : $body;
                 $events[] = $this->event(
                     "{$key}:comment:{$commentId}",
-                    "Commented on {$key}: {$preview}",
+                    "Commented on {$key}: {$body}",
                     $projectTags,
                     $key,
                     $summary,
@@ -187,6 +190,59 @@ class JiraSyncService
         }
 
         return $events;
+    }
+
+    /**
+     * Extract plain text from Jira ADF comment structures.
+     *
+     * Jira comments may be nested rich text (doc/paragraph/text/hardBreak/etc).
+     *
+     * @param  array<string, mixed>  $body
+     */
+    private function extractCommentText(array $body): string
+    {
+        $parts = [];
+        $this->collectTextFromAdfNode($body, $parts);
+        $text = trim(implode('', $parts));
+
+        if ($text !== '') {
+            return preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+        }
+
+        return (string) json_encode($body);
+    }
+
+    /**
+     * @param  mixed  $node
+     * @param  array<int, string>  $parts
+     */
+    private function collectTextFromAdfNode(mixed $node, array &$parts): void
+    {
+        if (! is_array($node)) {
+            return;
+        }
+
+        $type = $node['type'] ?? null;
+        if ($type === 'text') {
+            $parts[] = (string) ($node['text'] ?? '');
+        }
+        if ($type === 'hardBreak') {
+            $parts[] = "\n";
+        }
+        if ($type === 'paragraph' || $type === 'heading' || $type === 'listItem') {
+            $parts[] = "\n";
+        }
+
+        $content = $node['content'] ?? null;
+        if (is_array($content)) {
+            foreach ($content as $child) {
+                $this->collectTextFromAdfNode($child, $parts);
+            }
+        }
+
+        if ($type === 'paragraph' || $type === 'heading' || $type === 'listItem') {
+            $parts[] = "\n";
+        }
     }
 
     /**

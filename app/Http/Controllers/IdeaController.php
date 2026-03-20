@@ -305,7 +305,7 @@ class IdeaController extends Controller
             ->topLevel()
             ->where('source', 'jira')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
-            ->orderByDesc('created_at')
+            ->orderByRaw("COALESCE((source_metadata->>'jira_updated_at')::timestamptz, created_at) DESC")
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
         $shareByThoughtId = ResearchShare::whereIn('thought_id', $thoughts->pluck('id'))
@@ -320,7 +320,7 @@ class IdeaController extends Controller
                 'shareByThoughtId' => $shareByThoughtId,
             ])->render();
             $latestCreatedAt = $thoughts->isNotEmpty()
-                ? $thoughts->first()->created_at->toIso8601String()
+                ? ($thoughts->first()->source_metadata['jira_updated_at'] ?? $thoughts->first()->created_at?->toIso8601String())
                 : null;
 
             return response()->json([

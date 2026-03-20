@@ -15,7 +15,20 @@
             @if($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
                 <a href="{{ route('idea.research.show', $thought) }}" class="text-[10.5px] font-medium text-memory-violet hover:underline">View formatted</a>
             @endif
-            <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
+            @php
+                $activityAt = null;
+                if (($thought->source ?? null) === 'jira') {
+                    $jiraUpdatedAt = data_get($thought->source_metadata, 'jira_updated_at');
+                    if (is_string($jiraUpdatedAt) && trim($jiraUpdatedAt) !== '') {
+                        try {
+                            $activityAt = \Carbon\Carbon::parse($jiraUpdatedAt);
+                        } catch (\Throwable) {
+                            $activityAt = null;
+                        }
+                    }
+                }
+            @endphp
+            <span class="text-[10.5px] text-slate-brand/40">{{ ($activityAt ?? $thought->created_at)->diffForHumans() }}</span>
             @if ($thought->source)
                 <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
             @endif
