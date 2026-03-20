@@ -36,7 +36,12 @@
                         <p class="text-xs text-slate-brand/60">{{ $item->generated_at?->diffForHumans() }}</p>
                     </div>
 
-                    <p class="mt-3 whitespace-pre-line text-sm leading-6 text-slate-brand">{{ $item->body }}</p>
+                    <div class="prose prose-sm mt-3 max-w-none text-slate-brand prose-headings:text-deep-indigo prose-p:text-slate-brand prose-strong:text-deep-indigo prose-li:text-slate-brand">
+                        {!! \Illuminate\Support\Str::markdown($item->body ?? '', [
+                            'html_input' => 'strip',
+                            'allow_unsafe_links' => false,
+                        ]) !!}
+                    </div>
 
                     <div class="mt-4 flex flex-wrap gap-2">
                         <form method="POST" action="{{ route('inbox.done', $item) }}">
