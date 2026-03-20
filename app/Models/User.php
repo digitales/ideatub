@@ -85,6 +85,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the connected mail accounts for the user.
+     */
+    public function mailAccounts()
+    {
+        return $this->hasMany(MailAccount::class);
+    }
+
+    /**
      * Get the user's Jira credentials (one per user when connected).
      */
     public function jiraCredential(): HasOne

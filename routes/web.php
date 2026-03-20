@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmailAccountSettingsController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IdeaController;
@@ -129,6 +130,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/inbound-emails', [InboundEmailController::class, 'index'])->name('settings.inbound-emails.index');
     Route::post('/settings/inbound-emails', [InboundEmailController::class, 'store'])->name('settings.inbound-emails.store');
     Route::delete('/settings/inbound-emails/{userInboundAddress}', [InboundEmailController::class, 'destroy'])->name('settings.inbound-emails.destroy');
+
+    Route::get('/settings/email-accounts', [EmailAccountSettingsController::class, 'index'])->name('settings.email-accounts.index');
+    Route::post('/settings/email-accounts', [EmailAccountSettingsController::class, 'store'])->name('settings.email-accounts.store');
+    Route::delete('/settings/email-accounts/{mailAccount}', [EmailAccountSettingsController::class, 'destroy'])->name('settings.email-accounts.destroy');
+    Route::post('/settings/email-accounts/{mailAccount}/backfill', [EmailAccountSettingsController::class, 'backfill'])->name('settings.email-accounts.backfill');
+    Route::post('/settings/email-accounts/{mailAccount}/sync', [EmailAccountSettingsController::class, 'syncNow'])->name('settings.email-accounts.sync');
 
     // Shared research (owner CRUD)
     Route::get('/shared-research', [SharedResearchController::class, 'index'])->name('shared-research.index');

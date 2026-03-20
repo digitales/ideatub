@@ -40,6 +40,12 @@ return [
         'log_emails' => env('POSTMARK_INBOUND_LOG_EMAILS', false),
     ],
 
+    'mail_sync' => [
+        'enabled' => filter_var(env('MAIL_SYNC_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        'backfill_batch_size' => (int) env('MAIL_SYNC_BACKFILL_BATCH_SIZE', 50),
+        'incremental_batch_size' => (int) env('MAIL_SYNC_INCREMENTAL_BATCH_SIZE', 25),
+    ],
+
     'jira' => [
         'enabled' => filter_var(env('JIRA_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         'default_days' => (int) env('JIRA_SYNC_DAYS', 14),

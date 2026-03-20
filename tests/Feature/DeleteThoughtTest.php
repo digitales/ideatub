@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\ImportedEmail;
+use App\Models\MailAccount;
 use App\Models\Thought;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -82,5 +84,37 @@ class DeleteThoughtTest extends TestCase
         $response = $this->actingAs($owner)->deleteJson(route('ideas.destroy', ['thought' => $uuid]));
 
         $response->assertNotFound();
+    }
+
+    public function test_deleting_email_backed_thought_clears_imported_email_link(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'source' => 'email',
+            'source_metadata' => ['provider_message_id' => 'msg-123'],
+            'embedding' => null,
+        ]);
+
+        $imported = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => MailAccount::factory()->create(['user_id' => $owner->id])->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-123',
+            'direction' => 'sent',
+            'processing_status' => 'imported',
+            'thought_id' => $thought->id,
+        ]);
+
+        $this->actingAs($owner)->deleteJson(route('ideas.destroy', $thought))->assertNoContent();
+
+        $this->assertDatabaseHas('imported_emails', [
+            'id' => $imported->id,
+            'thought_id' => null,
+        ]);
+        $this->assertDatabaseMissing('imported_emails', [
+            'id' => $imported->id,
+            'thought_deleted_at' => null,
+        ]);
     }
 }
