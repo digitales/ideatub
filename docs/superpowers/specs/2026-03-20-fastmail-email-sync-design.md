@@ -169,19 +169,28 @@ Suggested fields:
 - `from_json`
 - `to_json`
 - `cc_json` nullable
-- `bcc_json` nullable when available
 - `participants_json` - normalized participant list
 - `sent_at` nullable
 - `received_at` nullable
-- `body_text`
+- `body_text` nullable
 - `summary` nullable
 - `message_metadata_json` - tags, people, action items, topics, filtering rationale, provider extras
 - `content_fingerprint` nullable
 - `thought_id` nullable
+- `thought_deleted_at` nullable
 - `processing_status` - `pending`, `imported`, `filtered`, `failed`
+- `failure_count` default `0`
 - `failure_reason` nullable
 - `created_at`
 - `updated_at`
+
+Rules:
+
+- Included messages should store the cleaned body.
+- Filtered messages should still create an `imported_emails` row for idempotency and auditability, but may store `body_text = null` and only keep minimal metadata plus the filter reason.
+- `imported_emails.user_id` must always match the owning `mail_accounts.user_id`.
+- `mail_sync_run_id` may be null only for future manual repair/migration flows; normal backfill and incremental sync writes should set it.
+- `thought_id` should be nullable and should be cleared if the linked thought is deleted; `thought_deleted_at` records that the user removed the previously created thought so normal sync does not silently recreate it.
 
 ### 3.4 Thought mapping
 
@@ -216,6 +225,8 @@ Instead:
 
 This design should refer to this concept as **participants**, not contacts.
 
+Canonical participant identity should come from normalized message headers. Any AI-extracted "people" metadata is supplemental and must not override the canonical participant list.
+
 ---
 
 ## 4. Provider strategy
@@ -233,7 +244,36 @@ The rest of the system should only depend on a thin provider interface such as:
 - fetch messages
 - map provider state into normalized email records
 
-### 4.2 Thin abstraction rule
+### 4.2 Auth and credential model
+
+V1 should support exactly one Fastmail connection method in the product, not multiple parallel auth modes.
+
+Because the user explicitly wants a Fastmail-native/JMAP-style integration, the implementation must begin with a short technical validation spike that confirms the concrete Fastmail-supported auth flow for JMAP and then standardize on it for v1.
+
+Rules for the product spec:
+
+- IdeaTub manages one shared integration pattern for all users in v1; no bring-your-own OAuth app or multiple connection types in the UI
+- account secrets are stored encrypted on `mail_accounts`
+- the account status model must support at least:
+  - `active`
+  - `needs_reauth`
+  - `disabled`
+  - `sync_error`
+- the connector must detect expired, revoked, or invalid credentials and move the account into `needs_reauth` rather than repeatedly failing background sync forever
+- the connection UI must clearly tell the user that mailbox content will be processed by IdeaTub and sent through the configured AI pipeline for summaries/metadata extraction
+
+### 4.3 JMAP assumptions for v1
+
+The implementation should assume:
+
+- poll-based sync only in v1; no push/webhook sync
+- provider-managed message identity is the primary dedupe key
+- provider change state/checkpoint semantics are the primary incremental sync mechanism
+- mailbox moves or metadata changes may cause re-seen messages, so the import layer must tolerate replay safely
+
+The implementation plan should capture the exact Fastmail/JMAP assumptions once the auth spike confirms the concrete API behavior, but the rest of the subsystem should already be designed around provider checkpoint state rather than timestamp-only sync.
+
+### 4.4 Thin abstraction rule
 
 The connector abstraction should be intentionally small.
 
@@ -241,7 +281,7 @@ It exists to avoid a rewrite when Gmail and Microsoft are added later, not to mo
 
 This keeps the design extensible without overbuilding.
 
-### 4.3 Provider checkpoints
+### 4.5 Provider checkpoints
 
 Incremental sync should rely on provider-specific checkpoint state stored on `mail_accounts`, not just "latest imported date."
 
@@ -279,6 +319,8 @@ Incremental sync should run as queued background jobs using the app's existing q
 
 Future scheduling frequency can be adjusted, but the architecture should assume repeated automated sync, not manual-only execution.
 
+For v1, sync should be poll-only and should use explicit batch caps and retries with backoff so large backfills or provider throttling do not produce runaway jobs.
+
 ### 5.3 Message-level isolation
 
 Failures should be isolated per message whenever possible.
@@ -291,6 +333,8 @@ If one message cannot be parsed or processed:
 
 This is important for large backfills.
 
+Failed rows should remain retriable. In v1, later sync runs may retry the same `imported_emails` row for the same provider message id, incrementing `failure_count` rather than creating a second row. A future manual "retry failed" control is optional, but the baseline behavior should not make failures permanently sticky after one attempt.
+
 ### 5.4 Idempotency
 
 Primary idempotency should use provider message identity:
@@ -298,7 +342,15 @@ Primary idempotency should use provider message identity:
 - one provider message id -> one `imported_emails` row for that account/user
 - one imported email -> at most one IdeaTub thought
 
+Recommended database invariant: unique key on `(mail_account_id, provider_message_id)`.
+
 Secondary content fingerprinting may be useful as a fallback or analysis aid, but provider identity should be the main dedupe mechanism.
+
+Filtered messages should also participate in idempotency through their `imported_emails` row, so the system does not repeatedly re-evaluate and re-store the same excluded message on every sync.
+
+Cross-flow content deduplication with the separate Postmark inbound capture feature is out of scope for v1. The same real-world email may appear twice if it enters IdeaTub through two different product flows.
+
+In v1, filtered classification should be sticky for normal incremental sync. If product rules or user settings later change and the team wants to re-evaluate previously filtered rows, that should happen through an explicit future reprocess/backfill action rather than ordinary sync replay.
 
 ### 5.5 Thought mutability
 
@@ -307,6 +359,10 @@ Email thoughts should be effectively immutable after creation, except for safe m
 If the sync sees the same provider message again, it should usually skip thought recreation and only update supporting import metadata if needed.
 
 This keeps the knowledge surface stable and prevents silent rewriting of prior thoughts.
+
+For v1, "safe metadata refresh" means updating sync-side fields on `imported_emails` or non-user-facing bookkeeping only. Thought content, summary, and user-visible message metadata should not be silently rewritten after creation.
+
+If a user deletes an imported email thought, normal sync should not recreate it automatically as long as the matching `imported_emails` row still exists. Re-import after deletion should be an explicit future/manual action, not part of v1 sync behavior.
 
 ---
 
@@ -326,6 +382,16 @@ By default, v1 should exclude:
 - bulk mail
 - no-reply style mail
 - low-signal auto-generated mail
+
+Operational definition for directly addressed personal received mail in v1:
+
+- the connected mailbox user appears in `To` or `Cc`, using the account email or any provider alias surfaced by the connector
+- alias discovery is implementation-spike-defined, but the chosen mechanism must produce a stable normalized alias list for inclusion checks and tests
+- mail that only appears personal because of BCC is not relied upon for inclusion logic in v1
+- bulk/list traffic should still be excluded even if the user appears in `To` or `Cc`
+- shared mailbox or team-inbox semantics are out of scope unless they look like a normal single-user mailbox to the connector
+
+Automation/bulk exclusion should be documented as heuristic in v1, using a mix of provider metadata, recipient patterns, sender patterns, and content/header signals where available. It should be treated as best-effort rather than perfect classification.
 
 ### 6.2 User-configurable v1 settings
 
@@ -366,6 +432,8 @@ Each included message should go through AI processing to produce:
 - other tags useful for semantic retrieval
 
 The summary should be stored on `imported_emails` and may also inform the thought content or metadata.
+
+This AI processing is mandatory for the v1 feature as scoped here, so the account connection flow must obtain explicit user consent that mailbox content will be sent to the app's configured AI providers for summarization and metadata extraction.
 
 ### 6.5 Thought content strategy
 
@@ -445,7 +513,20 @@ If sync logs capture message examples for debugging, they should:
 - avoid raw secrets entirely
 - truncate bodies if temporary logging is ever enabled
 
-### 8.3 Data isolation
+### 8.3 AI privacy boundary
+
+Mailbox content used for summaries and metadata extraction should be treated as highly sensitive.
+
+Rules:
+
+- the connection flow must disclose that message content is sent to the configured AI providers
+- the app should minimize payloads sent to AI where practical
+- filtered messages should avoid sending unnecessary data through the AI pipeline
+- BCC data must not be stored as first-class message metadata in v1 and should not be sent to AI models
+- if raw message bodies contain BCC-like header text, the cleaning pipeline should remove that header material before storage when reasonably detectable; otherwise this remains a residual best-effort limitation rather than a supported feature
+- mailbox/folder selection should be the primary user control for limiting scope in v1
+
+### 8.4 Data isolation
 
 Every record in the subsystem must remain scoped to the owning user:
 
@@ -454,7 +535,7 @@ Every record in the subsystem must remain scoped to the owning user:
 - `imported_emails`
 - resulting thoughts
 
-### 8.4 Attachments
+### 8.5 Attachments
 
 Do not ingest attachment binaries in v1.
 
