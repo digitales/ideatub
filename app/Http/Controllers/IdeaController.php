@@ -130,6 +130,22 @@ class IdeaController extends Controller
     }
 
     /**
+     * Show a single thought with its comments (replies). Owner only.
+     */
+    public function show(Thought $thought): View
+    {
+        $this->authorize('view', $thought);
+
+        $thought->load(['comments' => fn ($q) => $q->orderBy('created_at')]);
+        $importedEmail = $thought->source === 'email' ? $thought->importedEmail() : null;
+
+        return view('idea.show', [
+            'thought' => $thought,
+            'importedEmail' => $importedEmail,
+        ]);
+    }
+
+    /**
      * Store a new thought: validate, embed, extract metadata, save. Redirect back with success or JSON.
      * When parent_id is present, authorizes comment on the parent and sets parent_id on the new thought.
      */
