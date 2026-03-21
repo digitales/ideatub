@@ -264,6 +264,23 @@ class StreamPageTest extends TestCase
         $response->assertDontSee('Uppercase Jira ticket');
     }
 
+    public function test_stream_includes_research_thoughts_unlike_home_recent_feed(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Research doc root',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'Research'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Research doc root');
+    }
+
     public function test_jira_stream_shows_only_jira_thoughts(): void
     {
         $user = User::factory()->create();
@@ -317,5 +334,6 @@ class StreamPageTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSeeInOrder(['Newer Jira event', 'Older Jira event']);
+        $response->assertSee('data-stream-since="2026-03-20T12:00:00.000+0000"', false);
     }
 }

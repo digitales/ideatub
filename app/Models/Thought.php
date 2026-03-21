@@ -234,16 +234,7 @@ class Thought extends Model
      */
     public function scopeExcludingResearch(Builder $query): Builder
     {
-        $storedValues = ThoughtTypeNavigation::storedValuesForCollection('research');
-        $driver = $query->getModel()->getConnection()->getDriverName();
-        $expression = $driver === 'pgsql'
-            ? "LOWER(COALESCE(metadata->>'type', ''))"
-            : "LOWER(COALESCE(json_extract(metadata, '$.type'), ''))";
-
-        return $query->whereRaw(
-            $expression.' NOT IN ('.implode(', ', array_fill(0, count($storedValues), '?')).')',
-            $storedValues
-        );
+        return $this->scopeExcludingCanonicalMetadataType($query, 'research');
     }
 
     /**
@@ -251,11 +242,48 @@ class Thought extends Model
      */
     public function scopeExcludingJira(Builder $query): Builder
     {
-        $storedValues = ThoughtTypeNavigation::storedValuesForCollection('jira');
+        return $this->scopeExcludingCanonicalSourceType($query, 'jira');
+    }
 
-        return $query->whereRaw(
-            'LOWER(COALESCE(source, ?)) NOT IN ('.implode(', ', array_fill(0, count($storedValues), '?')).')',
-            ['', ...$storedValues]
+    public function scopeMatchingCanonicalSourceType(Builder $query, string $canonicalType): Builder
+    {
+        return self::applyCanonicalTypeMatch(
+            $query,
+            'LOWER(COALESCE(source, ?))',
+            ThoughtTypeNavigation::storedValuesForCollection($canonicalType),
+            true,
+            ['']
+        );
+    }
+
+    public function scopeExcludingCanonicalSourceType(Builder $query, string $canonicalType): Builder
+    {
+        return self::applyCanonicalTypeMatch(
+            $query,
+            'LOWER(COALESCE(source, ?))',
+            ThoughtTypeNavigation::storedValuesForCollection($canonicalType),
+            false,
+            ['']
+        );
+    }
+
+    public function scopeMatchingCanonicalMetadataType(Builder $query, string $canonicalType): Builder
+    {
+        return self::applyCanonicalTypeMatch(
+            $query,
+            self::canonicalMetadataTypeSqlExpression($query),
+            ThoughtTypeNavigation::storedValuesForCollection($canonicalType),
+            true
+        );
+    }
+
+    public function scopeExcludingCanonicalMetadataType(Builder $query, string $canonicalType): Builder
+    {
+        return self::applyCanonicalTypeMatch(
+            $query,
+            self::canonicalMetadataTypeSqlExpression($query),
+            ThoughtTypeNavigation::storedValuesForCollection($canonicalType),
+            false
         );
     }
 
@@ -393,5 +421,36 @@ class Thought extends Model
     public static function escapeForLike(string $value): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
+
+    /**
+     * @param  list<string>  $storedValues
+     * @param  list<string>  $prefixBindings
+     */
+    private static function applyCanonicalTypeMatch(
+        Builder $query,
+        string $expression,
+        array $storedValues,
+        bool $include,
+        array $prefixBindings = []
+    ): Builder {
+        if ($storedValues === []) {
+            return $include ? $query->whereRaw('0 = 1') : $query;
+        }
+
+        $operator = $include ? 'IN' : 'NOT IN';
+        $placeholders = implode(', ', array_fill(0, count($storedValues), '?'));
+
+        return $query->whereRaw(
+            $expression.' '.$operator.' ('.$placeholders.')',
+            [...$prefixBindings, ...$storedValues]
+        );
+    }
+
+    private static function canonicalMetadataTypeSqlExpression(Builder $query): string
+    {
+        return $query->getModel()->getConnection()->getDriverName() === 'pgsql'
+            ? "LOWER(COALESCE(metadata->>'type', ''))"
+            : "LOWER(COALESCE(json_extract(metadata, '$.type'), ''))";
     }
 }

@@ -10,8 +10,6 @@ use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
-use App\Support\ThoughtTypeNavigation;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -287,10 +285,7 @@ class IdeaController extends Controller
                 'shareByThoughtId' => $shareByThoughtId,
             ])->render();
 
-            $orderAsc = $canonicalTag !== null;
-            $latestCreatedAt = $thoughts->isNotEmpty()
-                ? ($orderAsc ? $thoughts->last() : $thoughts->first())->created_at->toIso8601String()
-                : null;
+            $streamSince = $this->firstPageCreatedAtCursor($thoughts, $canonicalTag !== null);
 
             return response()->json([
                 'html' => $html,
@@ -298,7 +293,7 @@ class IdeaController extends Controller
                 'next_page' => $thoughts->currentPage() + 1,
                 'count' => $thoughts->count(),
                 'total' => $thoughts->total(),
-                'latest_created_at' => $latestCreatedAt,
+                'latest_created_at' => $streamSince,
             ]);
         }
 
@@ -308,6 +303,7 @@ class IdeaController extends Controller
             'tagSlug' => $tagSlug,
             'streamJira' => false,
             'streamCollectionKey' => null,
+            'streamSince' => $this->firstPageCreatedAtCursor($thoughts, $canonicalTag !== null),
             'shareByThoughtId' => $shareByThoughtId,
         ]);
     }
@@ -323,7 +319,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->tap(fn (Builder $query) => $this->applyCaseInsensitiveSourceCollectionFilter($query, 'jira'))
+            ->matchingCanonicalSourceType('jira')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByRaw("COALESCE((source_metadata->>'jira_updated_at')::timestamptz, created_at) DESC")
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -354,7 +350,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->tap(fn (Builder $query) => $this->applyCaseInsensitiveSourceCollectionFilter($query, 'email'))
+            ->matchingCanonicalSourceType('email')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -380,7 +376,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->tap(fn (Builder $query) => $this->applyCaseInsensitiveMetadataTypeCollectionFilter($query, 'research'))
+            ->matchingCanonicalMetadataType('research')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -406,7 +402,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->tap(fn (Builder $query) => $this->applyCaseInsensitiveMetadataTypeCollectionFilter($query, 'plan'))
+            ->matchingCanonicalMetadataType('plan')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -443,7 +439,7 @@ class IdeaController extends Controller
                 'showFullSections' => false,
                 'shareByThoughtId' => $shareByThoughtId,
             ])->render();
-            $latestCreatedAt = $latestForAjax($thoughts);
+            $streamSince = $latestForAjax($thoughts);
 
             return response()->json([
                 'html' => $html,
@@ -451,7 +447,7 @@ class IdeaController extends Controller
                 'next_page' => $thoughts->currentPage() + 1,
                 'count' => $thoughts->count(),
                 'total' => $thoughts->total(),
-                'latest_created_at' => $latestCreatedAt,
+                'latest_created_at' => $streamSince,
             ]);
         }
 
@@ -461,32 +457,20 @@ class IdeaController extends Controller
             'tagSlug' => null,
             'streamJira' => $streamCollectionKey === 'jira',
             'streamCollectionKey' => $streamCollectionKey,
+            'streamSince' => $latestForAjax($thoughts),
             'shareByThoughtId' => $shareByThoughtId,
         ]);
     }
 
-    private function applyCaseInsensitiveSourceCollectionFilter(Builder $query, string $canonicalType): void
+    private function firstPageCreatedAtCursor(LengthAwarePaginator $thoughts, bool $ascending): ?string
     {
-        $storedValues = ThoughtTypeNavigation::storedValuesForCollection($canonicalType);
+        if ($thoughts->isEmpty()) {
+            return null;
+        }
 
-        $query->whereRaw(
-            'LOWER(COALESCE(source, ?)) IN ('.implode(', ', array_fill(0, count($storedValues), '?')).')',
-            ['', ...$storedValues]
-        );
-    }
+        $cursorThought = $ascending ? $thoughts->last() : $thoughts->first();
 
-    private function applyCaseInsensitiveMetadataTypeCollectionFilter(Builder $query, string $canonicalType): void
-    {
-        $storedValues = ThoughtTypeNavigation::storedValuesForCollection($canonicalType);
-        $driver = $query->getModel()->getConnection()->getDriverName();
-        $expression = $driver === 'pgsql'
-            ? "LOWER(COALESCE(metadata->>'type', ''))"
-            : "LOWER(COALESCE(json_extract(metadata, '$.type'), ''))";
-
-        $query->whereRaw(
-            $expression.' IN ('.implode(', ', array_fill(0, count($storedValues), '?')).')',
-            $storedValues
-        );
+        return $cursorThought?->created_at?->toIso8601String();
     }
 
     /**

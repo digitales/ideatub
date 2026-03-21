@@ -51,7 +51,7 @@
                 </p>
                 <div id="stream-thoughts-list"
                     data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
-                    data-stream-since="{{ $thoughts->first()->created_at->toIso8601String() }}">
+                    data-stream-since="{{ $streamSince }}">
                     @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag, 'shareByThoughtId' => $shareByThoughtId ?? collect()])
                 </div>
                 @if($thoughts->hasMorePages())
