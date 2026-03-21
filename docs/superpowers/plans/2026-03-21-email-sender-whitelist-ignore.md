@@ -65,13 +65,22 @@ Remove the `Bus::fake()` call and the `Bus::assertNotDispatched` assertion. Remo
 
 - [ ] **Step 2: Update `test_email_review_action_works_for_captured_inbound_email_source` to expect a thought**
 
-In `tests/Feature/EmailReviewInboxTest.php`, the test at line 132 currently ends with `$this->assertNull($captured->thought_id)`. Replace that assertion:
+In `tests/Feature/EmailReviewInboxTest.php`, find the exact two-line tail of this test:
 
 ```php
-$captured->refresh();
-$this->assertNotNull($captured->thought_id);
-$this->assertSame('imported', $captured->processing_status);
-$this->assertSame(1, Thought::query()->where('source', 'email')->count());
+        $captured->refresh();
+        $this->assertNull($captured->thought_id);
+    }
+```
+
+Replace it with:
+
+```php
+        $captured->refresh();
+        $this->assertNotNull($captured->thought_id);
+        $this->assertSame('imported', $captured->processing_status);
+        $this->assertSame(1, Thought::query()->where('source', 'email')->count());
+    }
 ```
 
 Also add `$this->fakeOpenRouterForThoughtCapture();` at the top of the test (before `Bus::fake()`). Leave `Bus::fake()` in place — it is harmless since `saveReviewedEmailAsThought` does not dispatch jobs.
