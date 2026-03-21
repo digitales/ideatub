@@ -376,14 +376,62 @@ class IdeaPageTest extends TestCase
         $this->assertSame(['Emails', 'Research', 'Plans'], $labels);
     }
 
-    public function test_compact_overflow_navigation_markup_exists(): void
+    public function test_compact_overflow_navigation_contains_reachable_entries(): void
     {
         $user = User::factory()->create();
         $response = $this->actingAs($user)->get(route('idea.index'));
 
         $response->assertOk();
-        $response->assertSee('data-testid="mobile-nav-trigger"', false);
-        $response->assertSee('data-testid="mobile-nav-panel"', false);
+        $xpath = $this->xpathFromResponse($response);
+        $panel = $xpath->query('//*[@data-testid="mobile-nav-panel"]')->item(0);
+
+        $this->assertNotNull($panel);
+        $this->assertSame(1, $xpath->query('//*[@data-testid="mobile-nav-trigger"]')->length);
+
+        $labels = [];
+        foreach ($xpath->query('.//a | .//button', $panel) as $item) {
+            $labels[] = trim($item->textContent);
+        }
+
+        $this->assertContains('Ideas', $labels);
+        $this->assertContains('Stream', $labels);
+        $this->assertContains('Help', $labels);
+        $this->assertContains('Keyboard shortcuts', $labels);
+        $this->assertContains('Jira', $labels);
+        $this->assertContains('Emails', $labels);
+        $this->assertContains('Research', $labels);
+        $this->assertContains('Plans', $labels);
+
+        $typeLabel = $xpath->query('.//p[normalize-space(.)="Types"]', $panel);
+        $this->assertSame(1, $typeLabel->length);
+    }
+
+    public function test_mobile_nav_lists_type_collections_in_order(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $this->assertSame(
+            ['Jira', 'Emails', 'Research', 'Plans'],
+            $this->mobileTypeLabelsFromResponse($response)
+        );
+    }
+
+    public function test_mobile_nav_omits_jira_when_jira_is_disabled(): void
+    {
+        config(['services.jira.enabled' => false]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $this->assertSame(
+            ['Emails', 'Research', 'Plans'],
+            $this->mobileTypeLabelsFromResponse($response)
+        );
     }
 
     private function xpathFromResponse(TestResponse $response): \DOMXPath
@@ -393,5 +441,19 @@ class IdeaPageTest extends TestCase
         $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
 
         return new \DOMXPath($dom);
+    }
+
+    private function mobileTypeLabelsFromResponse(TestResponse $response): array
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $panel = $xpath->query('//*[@data-testid="mobile-nav-panel"]')->item(0);
+        $this->assertNotNull($panel);
+
+        $labels = [];
+        foreach ($xpath->query('.//a[contains(@href, "/stream/")]', $panel) as $link) {
+            $labels[] = trim($link->textContent);
+        }
+
+        return $labels;
     }
 }
