@@ -28,10 +28,17 @@
                         <span class="sr-only">Mark as {{ $thought->isIdeaCompleted() ? 'incomplete' : 'complete' }}</span>
                     </label>
                 </form>
-                <div class="min-w-0 flex-1">
-                    <p class="text-sm text-deep-indigo {{ $thought->isIdeaCompleted() ? 'line-through text-slate-brand/70' : '' }}">
-                        {{ Str::limit($thought->content, 200) }}
-                    </p>
+                <div class="min-w-0 flex-1 relative" data-thought-id="{{ $thought->id }}">
+                    <div class="absolute top-0 right-0 z-10">
+                        @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
+                    </div>
+                    <div class="pr-8">
+                        @include('idea.partials.editable_thought_content', [
+                            'thought' => $thought,
+                            'editable' => auth()->check() && auth()->id() === $thought->user_id,
+                            'displayClass' => 'text-sm text-deep-indigo whitespace-pre-line mb-0 ' . ($thought->isIdeaCompleted() ? 'line-through text-slate-brand/70' : ''),
+                            'previewMaxLength' => 200,
+                        ])
                     <p class="text-[11px] text-slate-brand/50 mt-1">{{ $thought->getLoggedDate() }}</p>
                     @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
                     {{-- Research block --}}
@@ -70,6 +77,7 @@
                                 </div>
                             @endforeach
                         @endif
+                    </div>
                     </div>
                 </div>
             </li>

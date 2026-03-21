@@ -24,19 +24,25 @@
         </div>
 
         <div class="pr-8">
-            <a
-                href="{{ route('thoughts.show', $thought) }}"
-                class="block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40"
-            >
-                @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
-                    <p class="text-[11px] text-slate-brand/50 mb-1">
-                        Comment on: {{ Str::limit($thought->parent->content, 80) }}
-                    </p>
-                @endif
+            @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
+                <p class="text-[11px] text-slate-brand/50 mb-1">
+                    Comment on: {{ Str::limit($thought->parent->content, 80) }}
+                </p>
+            @endif
 
-                <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ $thought->content }}</p>
+            @include('idea.partials.editable_thought_content', [
+                'thought' => $thought,
+                'editable' => auth()->check() && auth()->id() === $thought->user_id,
+                'displayClass' => 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line',
+                'viewHref' => route('thoughts.show', $thought),
+                'viewLinkClass' => 'block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40',
+            ])
 
-                @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
+            @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
+                <a
+                    href="{{ route('thoughts.show', $thought) }}"
+                    class="block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40"
+                >
                     <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2" data-comments-list>
                         @foreach ($thought->comments as $comment)
                             <li>
@@ -45,10 +51,10 @@
                             </li>
                         @endforeach
                     </ul>
-                @elseif(!$thought->parent_id)
-                    <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2 hidden" data-comments-list aria-hidden="true"></ul>
-                @endif
-            </a>
+                </a>
+            @elseif(!$thought->parent_id)
+                <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2 hidden" data-comments-list aria-hidden="true"></ul>
+            @endif
 
             <div class="flex items-center gap-2 flex-wrap mt-2">
                 <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>

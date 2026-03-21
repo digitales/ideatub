@@ -10,12 +10,13 @@
             @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id, 'share' => $share])
         </div>
         <div class="pr-8">
-            <a
-                href="{{ route('thoughts.show', $thought) }}"
-                class="block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40"
-            >
-                <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ $thought->content }}</p>
-            </a>
+            @include('idea.partials.editable_thought_content', [
+                'thought' => $thought,
+                'editable' => auth()->check() && auth()->id() === $thought->user_id,
+                'displayClass' => 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line',
+                'viewHref' => route('thoughts.show', $thought),
+                'viewLinkClass' => 'block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40',
+            ])
 
             <div class="flex items-center gap-2 flex-wrap mt-2">
                 @if($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())

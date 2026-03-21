@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use League\CommonMark\CommonMarkConverter;
 use Symfony\Component\HttpFoundation\Response;
@@ -149,7 +150,7 @@ class IdeaController extends Controller
      * Store a new thought: validate, embed, extract metadata, save. Redirect back with success or JSON.
      * When parent_id is present, authorizes comment on the parent and sets parent_id on the new thought.
      */
-    public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'content' => 'required|string|max:65535',
@@ -502,6 +503,33 @@ class IdeaController extends Controller
         }
 
         return redirect()->back()->with('success', 'Tags updated.');
+    }
+
+    /**
+     * Update thought content only. Tags and metadata stay untouched.
+     */
+    public function updateContent(Request $request, Thought $thought): RedirectResponse|JsonResponse
+    {
+        $this->authorize('update', $thought);
+
+        $validated = $request->validate([
+            'content' => ['required', 'string', 'max:65535'],
+        ]);
+
+        $content = trim($validated['content']);
+        if ($content === '') {
+            throw ValidationException::withMessages([
+                'content' => ['Content cannot be empty.'],
+            ]);
+        }
+
+        $thought->update(['content' => $content]);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['content' => $thought->content]);
+        }
+
+        return redirect()->back()->with('success', 'Thought updated.');
     }
 
     /**
