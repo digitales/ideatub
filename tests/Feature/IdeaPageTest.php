@@ -309,6 +309,17 @@ class IdeaPageTest extends TestCase
         }
     }
 
+    public function test_primary_nav_is_removed_from_focus_flow_while_search_is_open(): void
+    {
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-testid="primary-nav"', false);
+        $response->assertSee('x-show="!searching"', false);
+        $response->assertDontSee('invisible pointer-events-none', false);
+    }
+
     public function test_primary_nav_cluster_contains_only_focused_destinations(): void
     {
         config(['services.jira.enabled' => true]);

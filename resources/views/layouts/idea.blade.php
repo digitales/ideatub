@@ -72,13 +72,20 @@
 
         @php
             $navLinkClass = 'text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors';
+            $accountMenuLabel = 'Account menu';
+
+            if ($inboxCount > 99) {
+                $accountMenuLabel = 'Account menu, inbox has more than 99 actionable items';
+            } elseif ($inboxCount > 0) {
+                $accountMenuLabel = 'Account menu, inbox has '.$inboxCount.' actionable '.($inboxCount === 1 ? 'item' : 'items');
+            }
         @endphp
 
         {{-- Desktop primary nav (focused cluster; no wrap — mobile uses overflow menu) --}}
         <div
             data-testid="primary-nav"
             class="hidden lg:flex flex-1 items-center justify-center gap-1 min-w-0"
-            :class="{ 'invisible pointer-events-none': searching }"
+            x-show="!searching"
         >
             <a href="{{ route('idea.ideas') }}" class="{{ $navLinkClass }}">
                 Ideas
@@ -207,7 +214,7 @@
                         @click="open = !open"
                         aria-haspopup="true"
                         :aria-expanded="open.toString()"
-                        aria-label="{{ $inboxCount > 0 ? 'Account menu, inbox has actionable items' : 'Account menu' }}"
+                        aria-label="{{ $accountMenuLabel }}"
                         class="relative w-8 h-8 rounded-full text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0"
                         style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
                     >
@@ -219,13 +226,6 @@
                                 class="pointer-events-none absolute -right-1 -top-1 inline-flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-memory-violet px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white"
                             >
                                 {{ $inboxCount > 99 ? '99+' : $inboxCount }}
-                            </span>
-                            <span class="sr-only">
-                                @if ($inboxCount > 99)
-                                    Inbox has more than 99 actionable items
-                                @else
-                                    Inbox has {{ $inboxCount }} actionable {{ $inboxCount === 1 ? 'item' : 'items' }}
-                                @endif
                             </span>
                         @endif
                     </button>

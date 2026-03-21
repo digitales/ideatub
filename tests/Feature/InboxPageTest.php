@@ -89,7 +89,7 @@ class InboxPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('data-testid="account-menu-inbox-link"', false);
         $response->assertSee('data-testid="avatar-inbox-badge"', false);
-        $response->assertSee('Inbox has 1 actionable item', false);
+        $response->assertSee('aria-label="Account menu, inbox has 1 actionable item"', false);
     }
 
     public function test_inbox_page_layout_uses_focused_primary_navigation(): void
@@ -129,6 +129,7 @@ class InboxPageTest extends TestCase
 
         $response->assertOk();
         $response->assertDontSee('data-testid="avatar-inbox-badge"', false);
+        $response->assertSee('aria-label="Account menu"', false);
     }
 
     public function test_avatar_badge_shows_99_plus_when_actionable_count_exceeds_99(): void
@@ -149,7 +150,7 @@ class InboxPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('data-testid="avatar-inbox-badge"', false);
         $response->assertSee('99+', false);
-        $response->assertSee('Inbox has more than 99 actionable items', false);
+        $response->assertSee('aria-label="Account menu, inbox has more than 99 actionable items"', false);
     }
 
     public function test_inbox_page_mobile_nav_contains_reachable_entries_and_type_links(): void
