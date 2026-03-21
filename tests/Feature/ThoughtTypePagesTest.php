@@ -66,6 +66,22 @@ class ThoughtTypePagesTest extends TestCase
         $response->assertDontSee('Web capture');
     }
 
+    public function test_emails_type_page_includes_email_alias_source_values(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Aliased email import',
+            'parent_id' => null,
+            'source' => 'emails',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.emails'));
+
+        $response->assertOk();
+        $response->assertSee('Aliased email import');
+    }
+
     public function test_research_type_page_shows_only_research_thoughts(): void
     {
         $user = User::factory()->create();
@@ -116,6 +132,23 @@ class ThoughtTypePagesTest extends TestCase
         $response->assertSee('Plans', false);
         $response->assertSee('Plan for Q2');
         $response->assertDontSee('Not a plan');
+    }
+
+    public function test_plans_type_page_includes_plan_alias_metadata_values(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Plural plans metadata',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'plans'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.plans'));
+
+        $response->assertOk();
+        $response->assertSee('Plural plans metadata');
     }
 
     public function test_type_page_shows_empty_state_when_no_matching_thoughts_exist(): void

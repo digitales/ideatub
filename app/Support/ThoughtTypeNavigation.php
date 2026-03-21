@@ -75,6 +75,22 @@ final class ThoughtTypeNavigation
         return self::ROUTE_NAMES[$key] ?? null;
     }
 
+    /**
+     * @return list<string>
+     */
+    public static function storedValuesForCollection(string $canonicalType): array
+    {
+        $key = self::normalizeTypeKey($canonicalType);
+
+        return match ($key) {
+            'jira' => ['jira'],
+            'email' => ['email', 'emails'],
+            'research' => ['research'],
+            'plan' => ['plan', 'plans'],
+            default => [],
+        };
+    }
+
     public static function isAvailable(string $canonicalType): bool
     {
         $key = self::normalizeTypeKey($canonicalType);

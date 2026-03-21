@@ -10,6 +10,7 @@ use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
+use App\Support\ThoughtTypeNavigation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -352,7 +353,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->ofSource('email')
+            ->whereIn('source', ThoughtTypeNavigation::storedValuesForCollection('email'))
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -378,7 +379,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->ofMetadataType('research')
+            ->whereIn('metadata->type', ThoughtTypeNavigation::storedValuesForCollection('research'))
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -404,7 +405,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->ofMetadataType('plan')
+            ->whereIn('metadata->type', ThoughtTypeNavigation::storedValuesForCollection('plan'))
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
