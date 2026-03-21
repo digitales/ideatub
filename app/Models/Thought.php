@@ -249,16 +249,6 @@ class Thought extends Model
         });
     }
 
-    public function scopeOfSource(Builder $query, string $source): Builder
-    {
-        return $query->where('source', $source);
-    }
-
-    public function scopeOfMetadataType(Builder $query, string $type): Builder
-    {
-        return $query->where('metadata->type', $type);
-    }
-
     /**
      * Scope to research thoughts linked to the given idea (metadata type research, idea_id = $ideaId).
      */
