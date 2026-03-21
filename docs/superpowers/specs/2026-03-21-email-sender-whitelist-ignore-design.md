@@ -49,9 +49,11 @@ Update `InboxController@applyEmailReviewAction` so that when `action=allow`:
    - If it returns `true`, proceed.
 2. Call `saveReviewedEmailAsThought($inboxItem, $user)`.
 
-**Why the sequential call is safe:** `saveReviewedEmailAsThought` does not check `isActionable` (it does not verify `status === 'pending'`). Its idempotency guard is the `save_as_thought` action-row check: if a `save_as_thought` action already exists on the item it returns early. After only `applySenderClassification` has run, no such row exists, so `saveReviewedEmailAsThought` will proceed. The second call will issue a redundant `InboxItem::update(['status' => 'done'])` on an already-done item — this is harmless. Note: `actioned_at` on the inbox item will be overwritten with the timestamp of the `saveReviewedEmailAsThought` call, not the earlier classification call. This is acceptable.
+**Why the sequential call is safe:** `saveReviewedEmailAsThought` does not check `isActionable` (it does not verify `status === 'pending'`). Its primary idempotency guard is the `save_as_thought` action-row check: if a `save_as_thought` action row exists with a resolved `thought_id`, it returns early. After only `applySenderClassification` has run, no such row exists, so `saveReviewedEmailAsThought` will proceed. The second call will issue a redundant `InboxItem::update(['status' => 'done'])` on an already-done item — this is harmless.
 
-**Error handling:** If `saveReviewedEmailAsThought` throws, catch `\Throwable`, call `report($e)`, and redirect to the inbox with a success flash ("Sender rule saved. Could not import email as a thought."). This is the correct UX because the sender rule is already committed in its own transaction — the item is already done and will not reappear in the inbox. A full error redirect would confuse the user. The thought creation failure is non-fatal.
+**`actioned_at` intent:** `actioned_at` on the `InboxItem` row will be overwritten by `saveReviewedEmailAsThought` with the thought-creation timestamp. This is intentional — the classify timestamp is preserved independently in the `InboxItemAction` row's metadata (`chosen_sender_action`, `classified_at`).
+
+**Error handling:** If `saveReviewedEmailAsThought` throws any `\Throwable` (including `\RuntimeException` if a prior incomplete `save_as_thought` action exists on the item from a previous interrupted attempt), catch it, call `report($e)`, and redirect to the inbox with a partial-success flash ("Sender rule saved. Could not import email as a thought."). This is correct UX because the sender rule is already committed in its own transaction — the item is already done and will not reappear in the inbox. A full error redirect would confuse the user.
 
 **Authorization:** The existing `$this->authorize('update', $inboxItem)` check in `applyEmailReviewAction` covers this. No additional authorization is needed.
 
@@ -65,7 +67,7 @@ Update `InboxController@applyEmailReviewAction` so that when `action=allow`:
 
 ## Change 2: Navigation Link from Inbox Section
 
-Add a "Manage sender rules →" link in the inbox page header (`resources/views/inbox/index.blade.php`), inside the existing `<div class="mb-8">` block that contains the "Inbox" heading.
+Add a "Manage sender rules →" link in the inbox page header (`resources/views/inbox/index.blade.php`), inside the existing `<div class="mb-8">` block, after the `<p class="mt-2 text-sm text-slate-brand">` subtitle tag. Style it as `text-xs text-neural-teal hover:underline` — consistent with similar contextual links in the codebase.
 
 Gate the link with `@if(config('services.email_sender_policy.enabled'))` — consistent with the existing settings nav item which uses the same gate.
 
