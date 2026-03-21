@@ -305,6 +305,7 @@ class IdeaController extends Controller
             'tag' => $tagForDisplay,
             'tagSlug' => $tagSlug,
             'streamJira' => false,
+            'streamCollectionKey' => null,
             'shareByThoughtId' => $shareByThoughtId,
         ]);
     }
@@ -325,6 +326,110 @@ class IdeaController extends Controller
             ->orderByRaw("COALESCE((source_metadata->>'jira_updated_at')::timestamptz, created_at) DESC")
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
+        return $this->streamCollectionResponse(
+            $request,
+            $thoughts,
+            'jira',
+            function (LengthAwarePaginator $thoughts) {
+                if ($thoughts->isEmpty()) {
+                    return null;
+                }
+                $first = $thoughts->first();
+
+                return $first->source_metadata['jira_updated_at'] ?? $first->created_at?->toIso8601String();
+            }
+        );
+    }
+
+    /**
+     * Email-sourced thoughts only (source = email).
+     */
+    public function streamEmails(Request $request): View|JsonResponse
+    {
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
+
+        $thoughts = Thought::query()
+            ->where('user_id', auth()->id())
+            ->topLevel()
+            ->ofSource('email')
+            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
+
+        return $this->streamCollectionResponse(
+            $request,
+            $thoughts,
+            'email',
+            fn (LengthAwarePaginator $thoughts) => $thoughts->isNotEmpty()
+                ? $thoughts->first()->created_at->toIso8601String()
+                : null
+        );
+    }
+
+    /**
+     * Research thoughts (metadata.type = research).
+     */
+    public function streamResearch(Request $request): View|JsonResponse
+    {
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
+
+        $thoughts = Thought::query()
+            ->where('user_id', auth()->id())
+            ->topLevel()
+            ->ofMetadataType('research')
+            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
+
+        return $this->streamCollectionResponse(
+            $request,
+            $thoughts,
+            'research',
+            fn (LengthAwarePaginator $thoughts) => $thoughts->isNotEmpty()
+                ? $thoughts->first()->created_at->toIso8601String()
+                : null
+        );
+    }
+
+    /**
+     * Plan thoughts (metadata.type = plan).
+     */
+    public function streamPlans(Request $request): View|JsonResponse
+    {
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
+
+        $thoughts = Thought::query()
+            ->where('user_id', auth()->id())
+            ->topLevel()
+            ->ofMetadataType('plan')
+            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
+
+        return $this->streamCollectionResponse(
+            $request,
+            $thoughts,
+            'plan',
+            fn (LengthAwarePaginator $thoughts) => $thoughts->isNotEmpty()
+                ? $thoughts->first()->created_at->toIso8601String()
+                : null
+        );
+    }
+
+    /**
+     * Shared HTML/JSON response for typed stream collection pages (Jira, Emails, Research, Plans).
+     *
+     * @param  callable(LengthAwarePaginator<int, Thought>): string|null  $latestForAjax
+     */
+    private function streamCollectionResponse(
+        Request $request,
+        LengthAwarePaginator $thoughts,
+        string $streamCollectionKey,
+        callable $latestForAjax
+    ): View|JsonResponse {
         $shareByThoughtId = ResearchShare::whereIn('thought_id', $thoughts->pluck('id'))
             ->where('user_id', auth()->id())
             ->get()
@@ -336,9 +441,7 @@ class IdeaController extends Controller
                 'showFullSections' => false,
                 'shareByThoughtId' => $shareByThoughtId,
             ])->render();
-            $latestCreatedAt = $thoughts->isNotEmpty()
-                ? ($thoughts->first()->source_metadata['jira_updated_at'] ?? $thoughts->first()->created_at?->toIso8601String())
-                : null;
+            $latestCreatedAt = $latestForAjax($thoughts);
 
             return response()->json([
                 'html' => $html,
@@ -354,7 +457,8 @@ class IdeaController extends Controller
             'thoughts' => $thoughts,
             'tag' => null,
             'tagSlug' => null,
-            'streamJira' => true,
+            'streamJira' => $streamCollectionKey === 'jira',
+            'streamCollectionKey' => $streamCollectionKey,
             'shareByThoughtId' => $shareByThoughtId,
         ]);
     }

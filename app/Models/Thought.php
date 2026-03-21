@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Pgvector\Laravel\Distance;
 use Pgvector\Laravel\HasNeighbors;
 use Pgvector\Laravel\Vector;
@@ -95,7 +96,7 @@ class Thought extends Model
      *
      * @param  array<float>|Vector  $embedding
      */
-    public function scopeNearestTo(\Illuminate\Database\Eloquent\Builder $query, array|Vector $embedding, int $limit = 10): void
+    public function scopeNearestTo(Builder $query, array|Vector $embedding, int $limit = 10): void
     {
         $query->nearestNeighbors('embedding', $embedding, Distance::Cosine);
         $query->take($limit);
@@ -248,6 +249,16 @@ class Thought extends Model
         });
     }
 
+    public function scopeOfSource(Builder $query, string $source): Builder
+    {
+        return $query->where('source', $source);
+    }
+
+    public function scopeOfMetadataType(Builder $query, string $type): Builder
+    {
+        return $query->where('metadata->type', $type);
+    }
+
     /**
      * Scope to research thoughts linked to the given idea (metadata type research, idea_id = $ideaId).
      */
@@ -311,7 +322,7 @@ class Thought extends Model
             return $query->whereRaw('0 = 1');
         }
 
-        $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+        $driver = DB::connection()->getDriverName();
         $likePattern = '%'.static::escapeForLike($normalizedQuery).'%';
 
         if ($driver === 'pgsql') {
@@ -347,7 +358,7 @@ class Thought extends Model
      */
     public function scopeWithoutTags(Builder $query): Builder
     {
-        $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+        $driver = DB::connection()->getDriverName();
 
         if ($driver === 'pgsql') {
             return $query->whereRaw("metadata IS NULL OR metadata->'tags' IS NULL OR (metadata->'tags')::jsonb = '[]'::jsonb");
