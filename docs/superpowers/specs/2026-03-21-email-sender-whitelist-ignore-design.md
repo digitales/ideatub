@@ -5,67 +5,70 @@
 
 ## Overview
 
-Adds UI for managing email sender rules: quick Allow/Ignore actions on inbox review items, and a Sender Rules settings page within the inbox section. The backend `EmailSenderRule` model and `EmailSenderRuleService` already exist; this spec covers the new UI and the controller endpoints that wire them together.
+The backend infrastructure for sender rules (whitelist/ignore) already exists. The inbox already renders Allow and Ignore buttons for email review items. What's missing is:
 
-## Inbox Quick Actions
+1. **Allow button currently only saves the sender rule** — it does not create a thought. The user wants Allow to do both: save the `allow` rule AND import the email as a thought.
+2. **The sender rules settings page exists at `/settings/email-sender-rules`** but is not linked from the inbox section. A navigation link from the inbox section is needed.
 
-Email review inbox items display two new buttons: **Allow** and **Ignore**.
+## Existing Infrastructure (Do Not Recreate)
 
-### Allow
+| Component | Status | Location |
+|-----------|--------|----------|
+| `EmailSenderRule` model + table | ✅ exists | `app/Models/EmailSenderRule.php` |
+| `EmailSenderRuleService` | ✅ exists | `app/Services/Email/EmailSenderRuleService.php` |
+| `EmailReviewActionService` | ✅ exists | `app/Services/Email/EmailReviewActionService.php` |
+| `InboxController@applyEmailReviewAction` | ✅ exists | route: `POST /inbox/{inboxItem}/email-review/action` |
+| Allow/Ignore/Save Thought buttons in inbox view | ✅ exists | `resources/views/inbox/index.blade.php` |
+| `EmailSenderRuleSettingsController` (index, store, update, destroy) | ✅ exists | `app/Http/Controllers/EmailSenderRuleSettingsController.php` |
+| Settings page view | ✅ exists | `resources/views/settings/email-sender-rules.blade.php` |
 
-- Route: `POST /inbox/email-review/{item}/allow`
-- Controller: `EmailReviewInboxActionController@allow`
-- Behavior:
-  1. Upserts an `EmailSenderRule` with `action = allow` for the sender via `EmailSenderRuleService`
-  2. Re-processes the underlying `ImportedEmail` through `EmailImportService` to create a thought
-  3. Marks the `InboxItem` done via `InboxActionService`
-- Result: inbox item disappears, email becomes a thought
+## Change 1: Allow = Save Rule + Create Thought
 
-### Ignore
+### Current behaviour
 
-- Route: `POST /inbox/email-review/{item}/ignore`
-- Controller: `EmailReviewInboxActionController@ignore`
-- Behavior:
-  1. Upserts an `EmailSenderRule` with `action = ignore` for the sender via `EmailSenderRuleService`
-  2. Sets `ImportedEmail.processing_status = filtered`
-  3. Marks the `InboxItem` done via `InboxActionService`
-- Result: inbox item disappears, email record kept (not imported as a thought)
+`action=allow` calls `EmailReviewActionService::applySenderClassification()` which:
+1. Upserts `EmailSenderRule` with `action = allow`
+2. Writes triage metadata to the email record
+3. Marks the `InboxItem` done
 
-## Sender Rules Settings Page
+No thought is created.
 
-### Route & Navigation
+### Desired behaviour
 
-- Route: `GET /inbox/sender-rules`
-- Controller: `EmailSenderRuleSettingsController@index` (new action on existing controller)
-- Navigation: "Sender Rules" link within the inbox section alongside the inbox itself
+`action=allow` should:
+1. Upsert `EmailSenderRule` with `action = allow` (unchanged)
+2. Create a thought from the email (same as `action=save_thought` via `saveReviewedEmailAsThought`)
+3. Mark the `InboxItem` done
 
-### Page Layout
+### Implementation
 
-Two lists, side by side on desktop, stacked on mobile:
-- **Allowed senders** — rules with `action = allow`
-- **Ignored senders** — rules with `action = ignore`
+Update `InboxController@applyEmailReviewAction` so that when `action=allow`:
+1. Call `applySenderClassification($inboxItem, $user, 'allow')` first to save the rule
+2. Then call `saveReviewedEmailAsThought($inboxItem, $user)` to create the thought
 
-Each row shows the sender email address and a **Delete** button.
+Both methods handle their own idempotency (locking, duplicate action checks), so calling them sequentially is safe. The `saveReviewedEmailAsThought` method already checks `thought_id` on the stored email to avoid duplicate thought creation.
 
-### Delete
+If `saveReviewedEmailAsThought` throws, catch and report but still redirect with success (rule was saved; thought creation failure is non-fatal). Or surface the error — decision for implementer to make based on UX preference.
 
-- Route: `DELETE /inbox/sender-rules/{rule}`
-- Controller: `EmailSenderRuleSettingsController@destroy` (new action on existing controller)
-- Behavior: deletes the `EmailSenderRule` record
-- Result: future emails from that sender fall back to the default `review` behavior (surfaced in inbox again)
+**Authorization:** The existing `$this->authorize('update', $inboxItem)` check in `applyEmailReviewAction` covers this.
 
-## Backend Changes
+**Feature flag:** The existing route is not gated by `email_sender_policy.enabled`. The allow/ignore actions work independently of whether the policy feature flag is on — the flag only gates the settings page.
 
-| Change | Description |
-|--------|-------------|
-| New controller | `EmailReviewInboxActionController` with `allow` and `ignore` actions |
-| New routes | `POST /inbox/email-review/{item}/allow` and `POST /inbox/email-review/{item}/ignore` |
-| New controller actions | `index` and `destroy` on existing `EmailSenderRuleSettingsController` |
-| No schema changes | `email_sender_rules` table already exists |
+### No changes needed to
+
+- Routes (existing `POST /inbox/{inboxItem}/email-review/action` is reused)
+- View (buttons already exist in `inbox/index.blade.php`)
+- `EmailReviewActionService` (its two methods are composed in the controller, not changed internally)
+
+## Change 2: Navigation Link from Inbox Section
+
+Add a link to the existing `/settings/email-sender-rules` page from within the inbox section — e.g., a "Manage sender rules" link in the inbox page header or sidebar navigation.
+
+The settings page itself does not need to change. It already shows all sender rules with delete and update actions.
 
 ## Out of Scope
 
-- Retroactive processing of previously imported/ignored emails when a rule changes
-- Adding rules manually from the settings page (rules are created only from inbox quick actions)
+- Changing the settings page layout (it already shows all rules with update/delete per row)
+- Retroactive processing of previously ignored emails when a rule changes
+- Domain-level rules (e.g., ignore all from `@domain.com`)
 - Confirmation step before applying allow/ignore
-- Support for domain-level rules (e.g., ignore all from `@domain.com`)
