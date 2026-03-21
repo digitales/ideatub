@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\OpenRouterService;
+use DOMDocument;
+use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -22,6 +24,33 @@ class IdeaIdeasTest extends TestCase
         $response->assertSee('Ideas');
         $response->assertSee('Add idea');
         $response->assertSee('No ideas yet');
+    }
+
+    public function test_ideas_page_shows_shared_secondary_nav_with_ideas_active(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertStatus(200);
+        $response->assertSee('data-testid="ideas-section-nav"', false);
+
+        $html = $response->getContent();
+        libxml_use_internal_errors(true);
+        $dom = new DOMDocument;
+        $dom->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+        $xpath = new DOMXPath($dom);
+        $navNodes = $xpath->query('//*[@data-testid="ideas-section-nav"]');
+        $this->assertSame(1, $navNodes->length);
+        $nav = $navNodes->item(0);
+        $ideasUrl = route('idea.ideas');
+        $revisitUrl = route('idea.revisit');
+        $ideasLink = $xpath->query(".//a[@href='{$ideasUrl}']", $nav)->item(0);
+        $revisitLink = $xpath->query(".//a[@href='{$revisitUrl}']", $nav)->item(0);
+        $this->assertNotNull($ideasLink);
+        $this->assertNotNull($revisitLink);
+        $this->assertSame('page', $ideasLink->getAttribute('aria-current'));
+        $this->assertSame('', $revisitLink->getAttribute('aria-current'));
     }
 
     public function test_ideas_page_redirects_guests(): void
