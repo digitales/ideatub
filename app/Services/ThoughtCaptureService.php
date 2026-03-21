@@ -85,6 +85,10 @@ class ThoughtCaptureService
             return $this->createChunked($content, $userId, $source, $sourceMetadata, $planSlug, $docType, $filePath, $project, $extraTags, $ideaMetadata);
         }
 
+        if ($parent === null) {
+            $sourceMetadata = $this->mergeDocumentHintsIntoSourceMetadata($sourceMetadata, $filePath, $project);
+        }
+
         $thought = $this->createOne($content, $userId, $parent?->id, $source, $sourceMetadata, $planSlug, $docType, $extraTags, $ideaMetadata);
 
         return [
@@ -228,5 +232,28 @@ class ThoughtCaptureService
             'section_ids' => $sectionIds,
             'count' => count($sectionIds),
         ];
+    }
+
+    /**
+     * Persist capture_plan-style file/project hints on single-thought captures (non-chunked roots).
+     *
+     * @param  array<string, mixed>|null  $sourceMetadata
+     * @return array<string, mixed>|null
+     */
+    private function mergeDocumentHintsIntoSourceMetadata(?array $sourceMetadata, ?string $filePath, ?string $project): ?array
+    {
+        if ($filePath === null && $project === null) {
+            return $sourceMetadata;
+        }
+
+        $out = $sourceMetadata ?? [];
+        if ($project !== null && $project !== '' && ! array_key_exists('project', $out)) {
+            $out['project'] = mb_substr(trim((string) $project), 0, 256);
+        }
+        if ($filePath !== null && $filePath !== '' && ! array_key_exists('file_path', $out)) {
+            $out['file_path'] = mb_substr(trim((string) $filePath), 0, 512);
+        }
+
+        return $out;
     }
 }

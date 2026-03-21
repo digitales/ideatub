@@ -54,6 +54,7 @@ class ThoughtsApiTest extends TestCase
     {
         $user = User::factory()->create();
         $embedding = array_fill(0, 1536, 0.01);
+        $token = 'test-access-token';
 
         $thought = Thought::factory()->create([
             'user_id' => $user->id,
@@ -66,7 +67,16 @@ class ThoughtsApiTest extends TestCase
             $mock->shouldReceive('embed')->once()->with('decision:project-spec')->andReturn($embedding);
         });
 
-        $token = app(OAuthMcpJwtService::class)->issueAccessToken($user, config('oauth-mcp.resource_api'));
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/thoughts/search?query=decision:project-spec');
 

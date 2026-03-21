@@ -135,6 +135,11 @@
                         <a href="{{ route('settings.inbound-emails.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                             Inbound email
                         </a>
+                        @if (config('services.email_sender_policy.enabled'))
+                        <a href="{{ route('settings.email-sender-rules.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                            Email Sender Rules
+                        </a>
+                        @endif
                         @if (config('services.mail_sync.enabled', true))
                         <a href="{{ route('settings.email-accounts.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                             Email Accounts
