@@ -12,6 +12,13 @@ class IdeaPageTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     public function test_idea_page_loads_for_authenticated_user(): void
     {
         $user = User::factory()->create();
@@ -46,6 +53,52 @@ class IdeaPageTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('This is a test thought about semantic search');
         $response->assertSee('Recent thoughts');
+    }
+
+    public function test_idea_page_renders_edit_affordance_and_content_update_route(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Owner thought for edit hook',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        $response->assertSee('Edit');
+        $response->assertSee(route('ideas.update-content', $thought), false);
+        $response->assertSee('thought-edit-requested', false);
+    }
+
+    public function test_reply_context_renders_inline_editor_escape_boundary(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Parent thought for reply context',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index', ['parent_id' => $thought->id]));
+
+        $response->assertOk();
+        $response->assertSee('x-on:keydown.escape.stop.prevent="cancelEdit()"', false);
+    }
+
+    public function test_idea_page_thought_cards_link_to_detail_page(): void
+    {
+        $this->withoutVite();
+
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Linked thought',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        $response->assertSee(route('thoughts.show', $thought), false);
     }
 
     public function test_idea_page_recent_thoughts_exclude_jira(): void

@@ -98,6 +98,7 @@ Route::middleware('auth')->group(function () {
 
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
+    Route::get('/thoughts/{thought}', [IdeaController::class, 'show'])->name('thoughts.show');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
     Route::get('/stream/jira', [IdeaController::class, 'streamJira'])->name('idea.stream.jira');
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
@@ -114,6 +115,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/ideas', [IdeaController::class, 'storeIdea'])->name('ideas.store');
     Route::patch('/ideas/{thought}/completed', [IdeaController::class, 'toggleCompleted'])->name('ideas.toggle-completed');
     Route::patch('/ideas/{thought}/tags', [IdeaController::class, 'updateTags'])->name('ideas.update-tags');
+    Route::patch('/ideas/{thought}/content', [IdeaController::class, 'updateContent'])->name('ideas.update-content');
     Route::delete('/ideas/{thought}', [IdeaController::class, 'destroy'])->name('ideas.destroy');
     Route::post('/ideas/research', [IdeaController::class, 'researchNew'])->name('ideas.research-new');
     Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');

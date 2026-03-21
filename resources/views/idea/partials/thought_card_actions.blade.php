@@ -52,6 +52,11 @@
         @endif
         <button
             type="button"
+            @click="requestEdit()"
+            class="w-full text-left px-3 py-1.5 text-[12px] text-slate-brand hover:bg-slate-brand/5 rounded"
+        >Edit</button>
+        <button
+            type="button"
             @click="showConfirm()"
             class="w-full text-left px-3 py-1.5 text-[12px] text-red-600 hover:bg-red-50 rounded"
         >Delete</button>
