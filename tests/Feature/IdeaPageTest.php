@@ -43,7 +43,7 @@ class IdeaPageTest extends TestCase
     public function test_idea_page_shows_stored_thoughts(): void
     {
         $user = User::factory()->create();
-        $thought = \App\Models\Thought::factory()->create([
+        $thought = Thought::factory()->create([
             'user_id' => $user->id,
             'content' => 'This is a test thought about semantic search',
         ]);
@@ -121,6 +121,36 @@ class IdeaPageTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Normal recent thought');
         $response->assertDontSee('Jira synced ticket');
+    }
+
+    public function test_idea_page_recent_thoughts_exclude_case_insensitive_jira_and_research(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Normal recent thought',
+            'parent_id' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Uppercase Jira synced ticket',
+            'parent_id' => null,
+            'source' => 'JIRA',
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Mixed case research note',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'Research'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Normal recent thought');
+        $response->assertDontSee('Uppercase Jira synced ticket');
+        $response->assertDontSee('Mixed case research note');
     }
 
     public function test_idea_page_shows_search_results(): void

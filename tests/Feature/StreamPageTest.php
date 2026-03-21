@@ -242,6 +242,28 @@ class StreamPageTest extends TestCase
         $response->assertDontSee('Jira ticket PROJ-123');
     }
 
+    public function test_stream_excludes_case_insensitive_jira_thoughts(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Normal thought',
+            'parent_id' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Uppercase Jira ticket',
+            'parent_id' => null,
+            'source' => 'JIRA',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Normal thought');
+        $response->assertDontSee('Uppercase Jira ticket');
+    }
+
     public function test_jira_stream_shows_only_jira_thoughts(): void
     {
         $user = User::factory()->create();

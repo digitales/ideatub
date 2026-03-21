@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Events\ThoughtCreated;
 use App\Jobs\SyncThoughtToEvernote;
 use App\Services\EvernoteService;
+use App\Support\ThoughtTypeNavigation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -229,24 +230,33 @@ class Thought extends Model
     }
 
     /**
-     * Scope to exclude thoughts with metadata type 'research' (e.g. from recent/feed).
+     * Scope to exclude thoughts matching the canonical research type (e.g. from recent/feed).
      */
     public function scopeExcludingResearch(Builder $query): Builder
     {
-        return $query->where(function (Builder $q) {
-            $q->where('metadata->type', '!=', 'research')
-                ->orWhereNull('metadata->type');
-        });
+        $storedValues = ThoughtTypeNavigation::storedValuesForCollection('research');
+        $driver = $query->getModel()->getConnection()->getDriverName();
+        $expression = $driver === 'pgsql'
+            ? "LOWER(COALESCE(metadata->>'type', ''))"
+            : "LOWER(COALESCE(json_extract(metadata, '$.type'), ''))";
+
+        return $query->whereRaw(
+            $expression.' NOT IN ('.implode(', ', array_fill(0, count($storedValues), '?')).')',
+            $storedValues
+        );
     }
 
     /**
-     * Scope to exclude Jira-sourced thoughts (e.g. from homepage recent and main stream).
+     * Scope to exclude thoughts matching the canonical Jira type (e.g. from homepage recent and main stream).
      */
     public function scopeExcludingJira(Builder $query): Builder
     {
-        return $query->where(function (Builder $q) {
-            $q->whereNull('source')->orWhere('source', '!=', 'jira');
-        });
+        $storedValues = ThoughtTypeNavigation::storedValuesForCollection('jira');
+
+        return $query->whereRaw(
+            'LOWER(COALESCE(source, ?)) NOT IN ('.implode(', ', array_fill(0, count($storedValues), '?')).')',
+            ['', ...$storedValues]
+        );
     }
 
     /**
