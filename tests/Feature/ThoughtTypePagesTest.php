@@ -42,6 +42,22 @@ class ThoughtTypePagesTest extends TestCase
         $response->assertDontSee('Normal thought');
     }
 
+    public function test_jira_type_page_includes_case_insensitive_source_values(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Uppercase Jira ticket',
+            'parent_id' => null,
+            'source' => 'JIRA',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.jira'));
+
+        $response->assertOk();
+        $response->assertSee('Uppercase Jira ticket');
+    }
+
     public function test_emails_type_page_shows_only_email_thoughts(): void
     {
         $user = User::factory()->create();
@@ -73,7 +89,7 @@ class ThoughtTypePagesTest extends TestCase
             'user_id' => $user->id,
             'content' => 'Aliased email import',
             'parent_id' => null,
-            'source' => 'emails',
+            'source' => 'EmailS',
         ]);
 
         $response = $this->actingAs($user)->get(route('idea.stream.emails'));
@@ -106,6 +122,23 @@ class ThoughtTypePagesTest extends TestCase
         $response->assertSee('Research', false);
         $response->assertSee('Research doc root');
         $response->assertDontSee('Plain note');
+    }
+
+    public function test_research_type_page_includes_case_insensitive_metadata_values(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Mixed case research metadata',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'Research'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.research'));
+
+        $response->assertOk();
+        $response->assertSee('Mixed case research metadata');
     }
 
     public function test_plans_type_page_shows_only_plan_thoughts(): void
@@ -142,7 +175,7 @@ class ThoughtTypePagesTest extends TestCase
             'content' => 'Plural plans metadata',
             'parent_id' => null,
             'source' => 'web',
-            'metadata' => ['type' => 'plans'],
+            'metadata' => ['type' => 'PLANS'],
         ]);
 
         $response = $this->actingAs($user)->get(route('idea.stream.plans'));

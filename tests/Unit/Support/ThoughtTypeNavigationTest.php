@@ -34,6 +34,13 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('email', ThoughtTypeNavigation::normalizeTypeKey('emails'));
         $this->assertSame('plan', ThoughtTypeNavigation::normalizeTypeKey('plans'));
         $this->assertSame('email', ThoughtTypeNavigation::normalizeTypeKey('EMAIL'));
+        $this->assertSame('plan', ThoughtTypeNavigation::normalizeTypeKey(' PlanS '));
+    }
+
+    public function test_stored_values_for_collection_are_shared_with_normalization(): void
+    {
+        $this->assertSame(['email', 'emails'], ThoughtTypeNavigation::storedValuesForCollection('EMAIL'));
+        $this->assertSame(['plan', 'plans'], ThoughtTypeNavigation::storedValuesForCollection('plans'));
     }
 
     public function test_jira_availability_follows_config(): void

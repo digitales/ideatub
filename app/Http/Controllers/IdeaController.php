@@ -11,6 +11,7 @@ use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Support\ThoughtTypeNavigation;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -312,7 +313,7 @@ class IdeaController extends Controller
     }
 
     /**
-     * Jira stream: top-level thoughts with source = 'jira' only. Paginated; same view as stream.
+     * Jira stream: top-level thoughts matching the canonical Jira type. Paginated; same view as stream.
      */
     public function streamJira(Request $request): View|JsonResponse
     {
@@ -322,7 +323,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->where('source', 'jira')
+            ->tap(fn (Builder $query) => $this->applyCaseInsensitiveSourceCollectionFilter($query, 'jira'))
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByRaw("COALESCE((source_metadata->>'jira_updated_at')::timestamptz, created_at) DESC")
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -343,7 +344,7 @@ class IdeaController extends Controller
     }
 
     /**
-     * Email-sourced thoughts only (source = email).
+     * Email thoughts matching the canonical email type, including stored aliases.
      */
     public function streamEmails(Request $request): View|JsonResponse
     {
@@ -353,7 +354,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->whereIn('source', ThoughtTypeNavigation::storedValuesForCollection('email'))
+            ->tap(fn (Builder $query) => $this->applyCaseInsensitiveSourceCollectionFilter($query, 'email'))
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -369,7 +370,7 @@ class IdeaController extends Controller
     }
 
     /**
-     * Research thoughts (metadata.type = research).
+     * Research thoughts matching the canonical research type.
      */
     public function streamResearch(Request $request): View|JsonResponse
     {
@@ -379,7 +380,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->whereIn('metadata->type', ThoughtTypeNavigation::storedValuesForCollection('research'))
+            ->tap(fn (Builder $query) => $this->applyCaseInsensitiveMetadataTypeCollectionFilter($query, 'research'))
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -395,7 +396,7 @@ class IdeaController extends Controller
     }
 
     /**
-     * Plan thoughts (metadata.type = plan).
+     * Plan thoughts matching the canonical plan type, including stored aliases.
      */
     public function streamPlans(Request $request): View|JsonResponse
     {
@@ -405,7 +406,7 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->topLevel()
-            ->whereIn('metadata->type', ThoughtTypeNavigation::storedValuesForCollection('plan'))
+            ->tap(fn (Builder $query) => $this->applyCaseInsensitiveMetadataTypeCollectionFilter($query, 'plan'))
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
@@ -462,6 +463,30 @@ class IdeaController extends Controller
             'streamCollectionKey' => $streamCollectionKey,
             'shareByThoughtId' => $shareByThoughtId,
         ]);
+    }
+
+    private function applyCaseInsensitiveSourceCollectionFilter(Builder $query, string $canonicalType): void
+    {
+        $storedValues = ThoughtTypeNavigation::storedValuesForCollection($canonicalType);
+
+        $query->whereRaw(
+            'LOWER(COALESCE(source, ?)) IN ('.implode(', ', array_fill(0, count($storedValues), '?')).')',
+            ['', ...$storedValues]
+        );
+    }
+
+    private function applyCaseInsensitiveMetadataTypeCollectionFilter(Builder $query, string $canonicalType): void
+    {
+        $storedValues = ThoughtTypeNavigation::storedValuesForCollection($canonicalType);
+        $driver = $query->getModel()->getConnection()->getDriverName();
+        $expression = $driver === 'pgsql'
+            ? "LOWER(COALESCE(metadata->>'type', ''))"
+            : "LOWER(COALESCE(json_extract(metadata, '$.type'), ''))";
+
+        $query->whereRaw(
+            $expression.' IN ('.implode(', ', array_fill(0, count($storedValues), '?')).')',
+            $storedValues
+        );
     }
 
     /**

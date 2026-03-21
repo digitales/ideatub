@@ -9,31 +9,36 @@ use App\Models\Thought;
  */
 final class ThoughtTypeNavigation
 {
-    /** @var list<string> */
-    private const ORDERED_TYPES = ['jira', 'email', 'research', 'plan'];
-
-    /** @var array<string, string> Collection / menu labels (plural where spec requires). */
-    private const COLLECTION_LABELS = [
-        'jira' => 'Jira',
-        'email' => 'Emails',
-        'research' => 'Research',
-        'plan' => 'Plans',
-    ];
-
-    /** @var array<string, string> Per-thought badge labels (singular for email/plan). */
-    private const THOUGHT_LABELS = [
-        'jira' => 'Jira',
-        'email' => 'Email',
-        'research' => 'Research',
-        'plan' => 'Plan',
-    ];
-
-    /** @var array<string, string> */
-    private const ROUTE_NAMES = [
-        'jira' => 'idea.stream.jira',
-        'email' => 'idea.stream.emails',
-        'research' => 'idea.stream.research',
-        'plan' => 'idea.stream.plans',
+    /**
+     * Single source of truth for canonical keys, labels, route names, and accepted stored aliases.
+     *
+     * @var array<string, array{collection_label: string, thought_label: string, route_name: string, stored_values: list<string>}>
+     */
+    private const TYPE_DEFINITIONS = [
+        'jira' => [
+            'collection_label' => 'Jira',
+            'thought_label' => 'Jira',
+            'route_name' => 'idea.stream.jira',
+            'stored_values' => ['jira'],
+        ],
+        'email' => [
+            'collection_label' => 'Emails',
+            'thought_label' => 'Email',
+            'route_name' => 'idea.stream.emails',
+            'stored_values' => ['email', 'emails'],
+        ],
+        'research' => [
+            'collection_label' => 'Research',
+            'thought_label' => 'Research',
+            'route_name' => 'idea.stream.research',
+            'stored_values' => ['research'],
+        ],
+        'plan' => [
+            'collection_label' => 'Plans',
+            'thought_label' => 'Plan',
+            'route_name' => 'idea.stream.plans',
+            'stored_values' => ['plan', 'plans'],
+        ],
     ];
 
     /**
@@ -41,21 +46,17 @@ final class ThoughtTypeNavigation
      */
     public static function orderedNavTypes(): array
     {
-        return self::ORDERED_TYPES;
+        return array_keys(self::TYPE_DEFINITIONS);
     }
 
     public static function collectionLabel(string $canonicalType): string
     {
-        $key = self::normalizeTypeKey($canonicalType);
-
-        return $key !== null ? (self::COLLECTION_LABELS[$key] ?? '') : '';
+        return self::definitionValue($canonicalType, 'collection_label');
     }
 
     public static function thoughtDisplayLabel(string $canonicalType): string
     {
-        $key = self::normalizeTypeKey($canonicalType);
-
-        return $key !== null ? (self::THOUGHT_LABELS[$key] ?? '') : '';
+        return self::definitionValue($canonicalType, 'thought_label');
     }
 
     public static function documentTitle(string $canonicalType): string
@@ -72,7 +73,7 @@ final class ThoughtTypeNavigation
             return null;
         }
 
-        return self::ROUTE_NAMES[$key] ?? null;
+        return self::TYPE_DEFINITIONS[$key]['route_name'] ?? null;
     }
 
     /**
@@ -81,20 +82,17 @@ final class ThoughtTypeNavigation
     public static function storedValuesForCollection(string $canonicalType): array
     {
         $key = self::normalizeTypeKey($canonicalType);
+        if ($key === null) {
+            return [];
+        }
 
-        return match ($key) {
-            'jira' => ['jira'],
-            'email' => ['email', 'emails'],
-            'research' => ['research'],
-            'plan' => ['plan', 'plans'],
-            default => [],
-        };
+        return self::TYPE_DEFINITIONS[$key]['stored_values'];
     }
 
     public static function isAvailable(string $canonicalType): bool
     {
         $key = self::normalizeTypeKey($canonicalType);
-        if ($key === null || ! isset(self::ROUTE_NAMES[$key])) {
+        if ($key === null || ! isset(self::TYPE_DEFINITIONS[$key])) {
             return false;
         }
         if ($key === 'jira') {
@@ -117,13 +115,13 @@ final class ThoughtTypeNavigation
             return null;
         }
 
-        return match ($v) {
-            'jira' => 'jira',
-            'email', 'emails' => 'email',
-            'research' => 'research',
-            'plan', 'plans' => 'plan',
-            default => null,
-        };
+        foreach (self::TYPE_DEFINITIONS as $canonicalKey => $definition) {
+            if (in_array($v, $definition['stored_values'], true)) {
+                return $canonicalKey;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -148,5 +146,12 @@ final class ThoughtTypeNavigation
         }
 
         return null;
+    }
+
+    private static function definitionValue(string $canonicalType, string $field): string
+    {
+        $key = self::normalizeTypeKey($canonicalType);
+
+        return $key !== null ? (self::TYPE_DEFINITIONS[$key][$field] ?? '') : '';
     }
 }
