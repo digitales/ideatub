@@ -30,7 +30,11 @@
             </p>
         @endif
 
-        <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ $thought->content }}</p>
+        @include('idea.partials.editable_thought_content', [
+            'thought' => $thought,
+            'editable' => auth()->check() && auth()->id() === $thought->user_id,
+            'displayClass' => 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line',
+        ])
 
         <div class="flex items-center gap-2 flex-wrap">
             <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>

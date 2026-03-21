@@ -10,7 +10,11 @@
             @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id, 'share' => $share])
         </div>
         <div class="pr-8">
-        <p class="text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line">{{ $thought->content }}</p>
+        @include('idea.partials.editable_thought_content', [
+            'thought' => $thought,
+            'editable' => auth()->check() && auth()->id() === $thought->user_id,
+            'displayClass' => 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line',
+        ])
         <div class="flex items-center gap-2 flex-wrap">
             @if($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
                 <a href="{{ route('idea.research.show', $thought) }}" class="text-[10.5px] font-medium text-memory-violet hover:underline">View formatted</a>

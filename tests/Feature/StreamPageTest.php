@@ -21,6 +21,22 @@ class StreamPageTest extends TestCase
         $response->assertSee('Stream', false);
     }
 
+    public function test_stream_page_renders_edit_affordance_and_content_update_route(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Stream thought for edit hook',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $response->assertSee('Edit');
+        $response->assertSee(route('ideas.update-content', $thought), false);
+        $response->assertSee('thought-edit-requested', false);
+    }
+
     public function test_stream_page_redirects_guests(): void
     {
         $response = $this->get(route('idea.stream'));
