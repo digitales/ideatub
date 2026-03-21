@@ -44,6 +44,20 @@ class StreamPageTest extends TestCase
         $response->assertSee('thought-edit-requested', false);
     }
 
+    public function test_stream_page_renders_a_single_polling_refetch_path(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Stream thought for polling script',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $this->assertSame(1, substr_count($response->getContent(), 'function refetchStream()'));
+    }
+
     public function test_stream_page_redirects_guests(): void
     {
         $response = $this->get(route('idea.stream'));

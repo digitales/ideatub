@@ -162,57 +162,5 @@
                 </script>
             @endif
 
-            @if(!$thoughts->isEmpty())
-                <script>
-                (function() {
-                    if (!window.ideatub || !window.ideatub.realtime) return;
-                    var list = document.getElementById('stream-thoughts-list');
-                    if (!list) return;
-
-                    var container = list;
-                    var refetchUrl = container.getAttribute('data-stream-refetch-url');
-                    if (!refetchUrl) return;
-
-                    function refetchStream() {
-                        fetch(refetchUrl, {
-                            method: 'GET',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        })
-                        .then(function(r) { return r.json(); })
-                        .then(function(data) {
-                            if (data.html !== undefined) list.innerHTML = data.html;
-                            if (data.count !== undefined) {
-                                var showing = document.getElementById('stream-showing-count');
-                                if (showing) showing.textContent = data.count;
-                            }
-                            if (data.total !== undefined) {
-                                var totalEl = document.getElementById('stream-total-count');
-                                if (totalEl) totalEl.textContent = data.total;
-                            }
-                            if (data.latest_created_at) container.setAttribute('data-stream-since', data.latest_created_at);
-                        });
-                    }
-
-                    var rt = window.ideatub.realtime;
-                    if (rt.realtime_check_url && (rt.driver === 'polling' || !rt.reverb_key)) {
-                        setInterval(function() {
-                            var since = container.getAttribute('data-stream-since') || '';
-                            var url = rt.realtime_check_url + (rt.realtime_check_url.indexOf('?') >= 0 ? '&' : '?') + 'since=' + encodeURIComponent(since);
-                            fetch(url, {
-                                method: 'GET',
-                                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                            })
-                            .then(function(r) { return r.json(); })
-                            .then(function(res) {
-                                if (res && res.has_new) refetchStream();
-                            });
-                        }, 20000);
-                    }
-                })();
-                </script>
-            @endif
         @endpush
 @endsection
