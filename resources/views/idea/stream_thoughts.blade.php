@@ -10,44 +10,53 @@
             @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id, 'share' => $share])
         </div>
         <div class="pr-8">
-        @include('idea.partials.editable_thought_content', [
-            'thought' => $thought,
-            'editable' => auth()->check() && auth()->id() === $thought->user_id,
-            'displayClass' => 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line',
-        ])
-        <div class="flex items-center gap-2 flex-wrap">
-            @if($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
-                <a href="{{ route('idea.research.show', $thought) }}" class="text-[10.5px] font-medium text-memory-violet hover:underline">View formatted</a>
-            @endif
-            @php
-                $activityAt = null;
-                if (($thought->source ?? null) === 'jira') {
-                    $jiraUpdatedAt = data_get($thought->source_metadata, 'jira_updated_at');
-                    if (is_string($jiraUpdatedAt) && trim($jiraUpdatedAt) !== '') {
-                        try {
-                            $activityAt = \Carbon\Carbon::parse($jiraUpdatedAt);
-                        } catch (\Throwable) {
-                            $activityAt = null;
+            @include('idea.partials.editable_thought_content', [
+                'thought' => $thought,
+                'editable' => auth()->check() && auth()->id() === $thought->user_id,
+                'displayClass' => 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line',
+                'viewHref' => route('thoughts.show', $thought),
+                'viewLinkClass' => 'block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40',
+            ])
+
+            <div class="flex items-center gap-2 flex-wrap mt-2">
+                @if($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
+                    <a href="{{ route('idea.research.show', $thought) }}" class="text-[10.5px] font-medium text-memory-violet hover:underline">View formatted</a>
+                @endif
+                @php
+                    $activityAt = null;
+                    if (($thought->source ?? null) === 'jira') {
+                        $jiraUpdatedAt = data_get($thought->source_metadata, 'jira_updated_at');
+                        if (is_string($jiraUpdatedAt) && trim($jiraUpdatedAt) !== '') {
+                            try {
+                                $activityAt = \Carbon\Carbon::parse($jiraUpdatedAt);
+                            } catch (\Throwable) {
+                                $activityAt = null;
+                            }
                         }
                     }
-                }
-            @endphp
-            <span class="text-[10.5px] text-slate-brand/40">{{ ($activityAt ?? $thought->created_at)->diffForHumans() }}</span>
-            @if ($thought->source)
-                <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
+                @endphp
+                <span class="text-[10.5px] text-slate-brand/40">{{ ($activityAt ?? $thought->created_at)->diffForHumans() }}</span>
+                @if ($thought->source)
+                    <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
+                @endif
+                @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
+            </div>
+
+            @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
+                <a
+                    href="{{ route('thoughts.show', $thought) }}"
+                    class="block rounded-lg -mx-1 px-1 py-0.5 mt-2 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40"
+                >
+                    <ul class="ml-3 pl-3 border-l border-memory-violet/15 space-y-2">
+                        @foreach ($thought->comments as $comment)
+                            <li>
+                                <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line">{{ $showFullSections ?? false ? $comment->content : Str::limit($comment->content, 200) }}</p>
+                                <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
+                            </li>
+                        @endforeach
+                    </ul>
+                </a>
             @endif
-            @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
-        </div>
-        @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
-            <ul class="mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2">
-                @foreach ($thought->comments as $comment)
-                    <li>
-                        <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line">{{ $showFullSections ?? false ? $comment->content : Str::limit($comment->content, 200) }}</p>
-                        <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
-                    </li>
-                @endforeach
-            </ul>
-        @endif
         </div>
     </div>
 @endforeach

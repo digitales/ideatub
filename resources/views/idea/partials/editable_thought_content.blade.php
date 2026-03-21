@@ -3,6 +3,8 @@
     $displayClass = $displayClass ?? 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line';
     $editorClass = $editorClass ?? 'w-full text-[13.5px] text-deep-indigo leading-relaxed rounded-lg border border-memory-violet/20 focus:border-memory-violet focus:ring-memory-violet/20';
     $previewMaxLength = $previewMaxLength ?? null;
+    $viewHref = $viewHref ?? null;
+    $viewLinkClass = $viewLinkClass ?? '';
 @endphp
 
 <!-- ideatub-thought-content-update:{{ route('ideas.update-content', $thought) }} -->
@@ -17,7 +19,13 @@
     x-on:thought-edit-requested.window="if ($event.detail?.thoughtId === @js((string) $thought->id)) startEdit()"
 >
     <template x-if="!editing">
-        <p class="{{ $displayClass }}" x-text="viewContent"></p>
+        @if ($viewHref)
+            <a href="{{ $viewHref }}" class="{{ $viewLinkClass }}">
+                <p class="{{ $displayClass }}" x-text="viewContent"></p>
+            </a>
+        @else
+            <p class="{{ $displayClass }}" x-text="viewContent"></p>
+        @endif
     </template>
 
     <template x-if="editing">

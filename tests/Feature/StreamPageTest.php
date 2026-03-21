@@ -11,6 +11,13 @@ class StreamPageTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     public function test_stream_page_loads_for_authenticated_user(): void
     {
         $user = User::factory()->create();
@@ -63,6 +70,41 @@ class StreamPageTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Work thought');
         $response->assertDontSee('Personal thought');
+    }
+
+    public function test_stream_thought_cards_link_to_detail_page(): void
+    {
+        $this->withoutVite();
+
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Stream linked thought',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $response->assertSee(route('thoughts.show', $thought), false);
+    }
+
+    public function test_stream_comment_preview_links_to_detail_page(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Stream root thought',
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $thought->id,
+            'content' => 'Stream comment preview',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $this->assertSame(2, substr_count($response->getContent(), route('thoughts.show', $thought)));
     }
 
     public function test_stream_tag_filter_empty_shows_message(): void

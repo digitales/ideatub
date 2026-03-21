@@ -82,4 +82,25 @@ class InboxPageTest extends TestCase
         $response->assertSee(route('inbox.index'), false);
         $response->assertSee('data-testid="inbox-badge"', false);
     }
+
+    public function test_inbox_renders_item_body_as_markdown(): void
+    {
+        $user = User::factory()->create();
+
+        InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'Markdown item',
+            'dedupe_key' => 'markdown-item',
+            'body' => "## Weekly Revisit\n\n**Important**\n\n- First item\n- Second item",
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('inbox.index'));
+
+        $response->assertOk();
+        $response->assertSee('<h2>Weekly Revisit</h2>', false);
+        $response->assertSee('<strong>Important</strong>', false);
+        $response->assertSee('<li>First item</li>', false);
+        $response->assertSee('<li>Second item</li>', false);
+    }
 }
