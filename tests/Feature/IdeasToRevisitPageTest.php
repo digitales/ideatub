@@ -5,13 +5,13 @@ namespace Tests\Feature;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserPreference;
-use DOMDocument;
-use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\AssertsIdeasSectionNav;
 use Tests\TestCase;
 
 class IdeasToRevisitPageTest extends TestCase
 {
+    use AssertsIdeasSectionNav;
     use RefreshDatabase;
 
     public function test_guest_redirected_to_login(): void
@@ -37,42 +37,14 @@ class IdeasToRevisitPageTest extends TestCase
         $response->assertSee('No ideas to revisit');
     }
 
-    public function test_revisit_page_shows_shared_secondary_nav_with_revisit_active(): void
+    public function test_revisit_page_is_directly_accessible_and_shows_shared_secondary_nav_with_revisit_active(): void
     {
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)->get(route('idea.revisit'));
 
         $response->assertStatus(200);
-        $response->assertSee('data-testid="ideas-section-nav"', false);
-
-        $html = $response->getContent();
-        libxml_use_internal_errors(true);
-        $dom = new DOMDocument;
-        $dom->loadHTML('<?xml encoding="utf-8" ?>'.$html);
-        $xpath = new DOMXPath($dom);
-        $navNodes = $xpath->query('//*[@data-testid="ideas-section-nav"]');
-        $this->assertSame(1, $navNodes->length);
-        $nav = $navNodes->item(0);
-        $ideasUrl = route('idea.ideas');
-        $revisitUrl = route('idea.revisit');
-        $ideasLink = $xpath->query(".//a[@href='{$ideasUrl}']", $nav)->item(0);
-        $revisitLink = $xpath->query(".//a[@href='{$revisitUrl}']", $nav)->item(0);
-        $this->assertNotNull($ideasLink);
-        $this->assertNotNull($revisitLink);
-        $this->assertSame('', $ideasLink->getAttribute('aria-current'));
-        $this->assertSame('page', $revisitLink->getAttribute('aria-current'));
-    }
-
-    public function test_idea_revisit_route_remains_directly_accessible(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->get(route('idea.revisit'));
-
-        $response->assertOk();
-        $response->assertSee('data-testid="ideas-section-nav"', false);
-        $response->assertSee(route('idea.ideas'), false);
+        $this->assertIdeasSectionNav($response, 'revisit');
     }
 
     public function test_authenticated_user_sees_list_when_incomplete_ideas_exist(): void
