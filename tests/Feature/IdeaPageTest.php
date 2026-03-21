@@ -6,6 +6,7 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class IdeaPageTest extends TestCase
@@ -288,5 +289,109 @@ class IdeaPageTest extends TestCase
         $response = $this->actingAs($user)->get(route('example-prompts'));
 
         $response->assertRedirect('/help#example-prompts');
+    }
+
+    public function test_authenticated_layout_includes_stable_navigation_test_hooks(): void
+    {
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        foreach ([
+            'primary-nav',
+            'types-menu-trigger',
+            'types-menu-list',
+            'mobile-nav-trigger',
+            'mobile-nav-panel',
+            'account-menu-inbox-link',
+        ] as $id) {
+            $response->assertSee('data-testid="'.$id.'"', false);
+        }
+    }
+
+    public function test_primary_nav_cluster_contains_only_focused_destinations(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $xpath = $this->xpathFromResponse($response);
+        $primary = $xpath->query('//*[@data-testid="primary-nav"]')->item(0);
+        $this->assertNotNull($primary);
+        $text = $primary->textContent ?? '';
+        $this->assertStringContainsString('Ideas', $text);
+        $this->assertStringContainsString('Stream', $text);
+        $this->assertStringContainsString('Types', $text);
+        $this->assertStringContainsString('Help', $text);
+        $this->assertStringContainsString('Keyboard shortcuts', $text);
+        $this->assertStringNotContainsString('Inbox', $text);
+        $this->assertStringNotContainsString('Ideas to revisit', $text);
+
+        // No top-level Jira nav item; Jira may only appear inside the Types dropdown.
+        $jiraOutsideTypes = $xpath->query(
+            './/a[normalize-space(.)="Jira" and not(ancestor::*[@data-testid="types-menu-list"])]',
+            $primary
+        );
+        $this->assertSame(0, $jiraOutsideTypes->length);
+
+        $inboxLinks = $xpath->query('.//a[contains(@href, "inbox")]', $primary);
+        $this->assertSame(0, $inboxLinks->length);
+    }
+
+    public function test_types_menu_lists_type_collections_in_order(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query('//*[@data-testid="types-menu-list"]//a[@role="menuitem"]');
+        $labels = [];
+        foreach ($links as $link) {
+            $labels[] = trim($link->textContent);
+        }
+
+        $this->assertSame(['Jira', 'Emails', 'Research', 'Plans'], $labels);
+    }
+
+    public function test_types_menu_omits_jira_when_jira_is_disabled(): void
+    {
+        config(['services.jira.enabled' => false]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query('//*[@data-testid="types-menu-list"]//a[@role="menuitem"]');
+        $labels = [];
+        foreach ($links as $link) {
+            $labels[] = trim($link->textContent);
+        }
+
+        $this->assertSame(['Emails', 'Research', 'Plans'], $labels);
+    }
+
+    public function test_compact_overflow_navigation_markup_exists(): void
+    {
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-testid="mobile-nav-trigger"', false);
+        $response->assertSee('data-testid="mobile-nav-panel"', false);
+    }
+
+    private function xpathFromResponse(TestResponse $response): \DOMXPath
+    {
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument;
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+
+        return new \DOMXPath($dom);
     }
 }

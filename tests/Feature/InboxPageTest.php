@@ -11,6 +11,13 @@ class InboxPageTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     public function test_inbox_requires_authentication(): void
     {
         $response = $this->get(route('inbox.index'));
@@ -65,7 +72,7 @@ class InboxPageTest extends TestCase
         $response->assertDontSee('Other users item');
     }
 
-    public function test_layout_shows_inbox_nav_link_and_badge_for_actionable_items(): void
+    public function test_layout_shows_account_menu_inbox_and_avatar_badge_for_actionable_items(): void
     {
         $user = User::factory()->create();
 
@@ -79,8 +86,40 @@ class InboxPageTest extends TestCase
         $response = $this->actingAs($user)->get(route('idea.ideas'));
 
         $response->assertOk();
-        $response->assertSee(route('inbox.index'), false);
-        $response->assertSee('data-testid="inbox-badge"', false);
+        $response->assertSee('data-testid="account-menu-inbox-link"', false);
+        $response->assertSee('data-testid="avatar-inbox-badge"', false);
+        $response->assertSee('Inbox has 1 actionable item', false);
+    }
+
+    public function test_layout_shows_no_avatar_badge_when_inbox_is_clear(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertOk();
+        $response->assertDontSee('data-testid="avatar-inbox-badge"', false);
+    }
+
+    public function test_avatar_badge_shows_99_plus_when_actionable_count_exceeds_99(): void
+    {
+        $user = User::factory()->create();
+
+        for ($i = 0; $i < 100; $i++) {
+            InboxItem::factory()->create([
+                'user_id' => $user->id,
+                'title' => 'Item '.$i,
+                'dedupe_key' => 'bulk-item-'.$i,
+                'status' => 'pending',
+            ]);
+        }
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertOk();
+        $response->assertSee('data-testid="avatar-inbox-badge"', false);
+        $response->assertSee('99+', false);
+        $response->assertSee('Inbox has more than 99 actionable items', false);
     }
 
     public function test_inbox_renders_item_body_as_markdown(): void
