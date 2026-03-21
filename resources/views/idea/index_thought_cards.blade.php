@@ -29,7 +29,6 @@
                     Comment on: {{ Str::limit($thought->parent->content, 80) }}
                 </p>
             @endif
-
             @include('idea.partials.editable_thought_content', [
                 'thought' => $thought,
                 'editable' => auth()->check() && auth()->id() === $thought->user_id,
@@ -61,6 +60,7 @@
                 @if ($thought->source)
                     <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
                 @endif
+                @include('idea.partials.email_newsletter_research_status', ['thought' => $thought])
                 @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
                 @if (!$thought->parent_id)
                     <a href="{{ route('idea.index', ['parent_id' => $thought->id]) }}"

@@ -6,6 +6,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Stored Fastmail sync email row.
+ *
+ * `processing_status` includes legacy pipeline values (`pending`, `filtered`, `imported`)
+ * and sender-policy / research lifecycle values aligned with `CapturedInboundEmail`, such as
+ * `review_queued`, `research_queued`, `research_completed`, `research_partial`,
+ * `research_skipped`, and `research_failed`.
+ */
 class ImportedEmail extends Model
 {
     use HasFactory;
@@ -34,6 +42,11 @@ class ImportedEmail extends Model
         'thought_id',
         'thought_deleted_at',
         'processing_status',
+        'rule_action',
+        'rule_email',
+        'review_inbox_item_id',
+        'research_thought_id',
+        'processing_metadata_json',
         'failure_count',
         'failure_reason',
     ];
@@ -46,6 +59,7 @@ class ImportedEmail extends Model
             'cc_json' => 'array',
             'participants_json' => 'array',
             'message_metadata_json' => 'array',
+            'processing_metadata_json' => 'array',
             'sent_at' => 'datetime',
             'received_at' => 'datetime',
             'thought_deleted_at' => 'datetime',
@@ -70,5 +84,15 @@ class ImportedEmail extends Model
     public function thought(): BelongsTo
     {
         return $this->belongsTo(Thought::class);
+    }
+
+    public function reviewInboxItem(): BelongsTo
+    {
+        return $this->belongsTo(InboxItem::class, 'review_inbox_item_id');
+    }
+
+    public function researchThought(): BelongsTo
+    {
+        return $this->belongsTo(Thought::class, 'research_thought_id');
     }
 }

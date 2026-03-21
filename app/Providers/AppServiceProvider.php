@@ -7,11 +7,14 @@ use App\Events\IdeaResearchRequested;
 use App\Listeners\RunResearchForIdeaListener;
 use App\Models\InboxItem;
 use App\Services\Evernote\EvernoteSdkApiGateway;
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\HttpFactory;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use MrMySQL\YoutubeTranscript\TranscriptListFetcher;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,6 +26,19 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton('files', fn () => new Filesystem);
 
         $this->app->bind(EvernoteApiGateway::class, EvernoteSdkApiGateway::class);
+
+        $this->app->singleton(TranscriptListFetcher::class, function (): TranscriptListFetcher {
+            $httpFactory = new HttpFactory;
+
+            return new TranscriptListFetcher(
+                new Client([
+                    'timeout' => 30,
+                    'connect_timeout' => 10,
+                ]),
+                $httpFactory,
+                $httpFactory,
+            );
+        });
     }
 
     /**

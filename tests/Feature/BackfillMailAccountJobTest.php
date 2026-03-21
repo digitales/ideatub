@@ -2,18 +2,22 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\BackfillMailAccount;
-use App\Jobs\SyncMailAccountIncremental;
 use App\Exceptions\InvalidMailAccountCredentialsException;
+use App\Jobs\BackfillMailAccount;
+use App\Jobs\ProcessExtraEmailResearch;
+use App\Jobs\SyncMailAccountIncremental;
+use App\Models\EmailSenderRule;
 use App\Models\ImportedEmail;
 use App\Models\MailAccount;
 use App\Models\Thought;
 use App\Services\Email\EmailBodyCleanupService;
+use App\Services\Email\EmailImportService;
 use App\Services\Email\NormalizedEmailMessage;
 use App\Services\Fastmail\FastmailConnector;
 use App\Services\ThoughtCaptureService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
@@ -81,7 +85,7 @@ class BackfillMailAccountJobTest extends TestCase
         app()->instance(ThoughtCaptureService::class, $capture);
 
         $job = new BackfillMailAccount($account->id);
-        $job->handle(app(FastmailConnector::class), app(\App\Services\Email\EmailImportService::class));
+        $job->handle(app(FastmailConnector::class), app(EmailImportService::class));
 
         $this->assertDatabaseHas('imported_emails', [
             'mail_account_id' => $account->id,
@@ -161,7 +165,7 @@ class BackfillMailAccountJobTest extends TestCase
         };
         app()->instance(ThoughtCaptureService::class, $capture);
 
-        (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(\App\Services\Email\EmailImportService::class));
+        (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
 
         $this->assertDatabaseHas('imported_emails', [
             'mail_account_id' => $account->id,
@@ -210,7 +214,8 @@ class BackfillMailAccountJobTest extends TestCase
             }
         };
         app()->instance(FastmailConnector::class, $connector);
-        app()->instance(EmailBodyCleanupService::class, new class extends EmailBodyCleanupService {
+        app()->instance(EmailBodyCleanupService::class, new class extends EmailBodyCleanupService
+        {
             public function clean(?string $body): string
             {
                 throw new RuntimeException('Cleanup exploded');
@@ -221,7 +226,7 @@ class BackfillMailAccountJobTest extends TestCase
 
         foreach ([1, 2] as $attempt) {
             try {
-                $job->handle(app(FastmailConnector::class), app(\App\Services\Email\EmailImportService::class));
+                $job->handle(app(FastmailConnector::class), app(EmailImportService::class));
             } catch (RuntimeException) {
                 // expected
             }
@@ -312,7 +317,7 @@ class BackfillMailAccountJobTest extends TestCase
         };
         app()->instance(ThoughtCaptureService::class, $capture);
 
-        (new SyncMailAccountIncremental($account->id))->handle(app(FastmailConnector::class), app(\App\Services\Email\EmailImportService::class));
+        (new SyncMailAccountIncremental($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
 
         $this->assertSame(0, $capture->calls);
         $this->assertDatabaseCount('thoughts', 0);
@@ -342,7 +347,7 @@ class BackfillMailAccountJobTest extends TestCase
         };
         app()->instance(FastmailConnector::class, $connector);
 
-        (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(\App\Services\Email\EmailImportService::class));
+        (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
 
         $this->assertDatabaseHas('mail_accounts', [
             'id' => $account->id,
@@ -379,7 +384,7 @@ class BackfillMailAccountJobTest extends TestCase
         };
         app()->instance(FastmailConnector::class, $connector);
 
-        (new SyncMailAccountIncremental($account->id))->handle(app(FastmailConnector::class), app(\App\Services\Email\EmailImportService::class));
+        (new SyncMailAccountIncremental($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
 
         $this->assertDatabaseHas('mail_accounts', [
             'id' => $account->id,
@@ -390,6 +395,307 @@ class BackfillMailAccountJobTest extends TestCase
             'run_type' => 'incremental',
             'status' => 'failed',
             'error_summary' => 'Token revoked',
+        ]);
+    }
+
+    #[Test]
+    public function backfill_unknown_sender_creates_review_inbox_item_when_sender_policy_enabled(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+        ]);
+
+        $connector = new class extends FastmailConnector
+        {
+            public function __construct() {}
+
+            public function fetchBackfillBatch(MailAccount $account, array $options): array
+            {
+                return [
+                    'messages' => [
+                        new NormalizedEmailMessage(
+                            providerMessageId: 'msg-review-inbox',
+                            providerThreadId: 'thread-review-inbox',
+                            providerMailboxIds: ['mb-inbox'],
+                            direction: 'received',
+                            subject: 'Hello stranger',
+                            from: [['email' => 'stranger@example.com', 'name' => 'Stranger']],
+                            to: [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+                            cc: [],
+                            sentAt: CarbonImmutable::parse('2026-03-20T10:00:00Z'),
+                            receivedAt: CarbonImmutable::parse('2026-03-20T10:00:05Z'),
+                            bodyText: 'Body',
+                        ),
+                    ],
+                    'next_checkpoint' => [
+                        'query_state' => 'state-review',
+                        'mailbox_id' => 'mb-inbox',
+                    ],
+                ];
+            }
+        };
+        app()->instance(FastmailConnector::class, $connector);
+
+        $capture = new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                return [
+                    'thought' => Thought::factory()->create([
+                        'user_id' => $options['user_id'],
+                        'content' => $options['content'],
+                        'source' => $options['source'],
+                        'source_metadata' => $options['source_metadata'] ?? null,
+                        'embedding' => null,
+                    ]),
+                    'chunked' => false,
+                ];
+            }
+        };
+        app()->instance(ThoughtCaptureService::class, $capture);
+
+        (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
+
+        $this->assertDatabaseHas('imported_emails', [
+            'mail_account_id' => $account->id,
+            'provider_message_id' => 'msg-review-inbox',
+            'processing_status' => 'review_queued',
+        ]);
+        $this->assertDatabaseHas('inbox_items', [
+            'user_id' => $account->user_id,
+            'generator_type' => 'email_sender_review',
+        ]);
+        $this->assertDatabaseCount('thoughts', 0);
+    }
+
+    #[Test]
+    public function backfill_explicit_allow_creates_thought_for_newsletter_like_sender_when_sender_policy_enabled(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+        ]);
+        EmailSenderRule::create([
+            'user_id' => $account->user_id,
+            'sender_email' => 'no-reply@newsletter.example',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $connector = new class extends FastmailConnector
+        {
+            public function __construct() {}
+
+            public function fetchBackfillBatch(MailAccount $account, array $options): array
+            {
+                return [
+                    'messages' => [
+                        new NormalizedEmailMessage(
+                            providerMessageId: 'msg-allow-news',
+                            providerThreadId: 'thread-allow-news',
+                            providerMailboxIds: ['mb-inbox'],
+                            direction: 'received',
+                            subject: 'Newsletter',
+                            from: [['email' => 'no-reply@newsletter.example', 'name' => 'Newsletter']],
+                            to: [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+                            cc: [],
+                            sentAt: CarbonImmutable::parse('2026-03-20T10:00:00Z'),
+                            receivedAt: CarbonImmutable::parse('2026-03-20T10:00:05Z'),
+                            bodyText: 'Weekly digest',
+                        ),
+                    ],
+                    'next_checkpoint' => [
+                        'query_state' => 'state-allow',
+                        'mailbox_id' => 'mb-inbox',
+                    ],
+                ];
+            }
+        };
+        app()->instance(FastmailConnector::class, $connector);
+
+        $capture = new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                return [
+                    'thought' => Thought::factory()->create([
+                        'user_id' => $options['user_id'],
+                        'content' => $options['content'],
+                        'source' => $options['source'],
+                        'source_metadata' => $options['source_metadata'] ?? null,
+                        'embedding' => null,
+                    ]),
+                    'chunked' => false,
+                ];
+            }
+        };
+        app()->instance(ThoughtCaptureService::class, $capture);
+
+        (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
+
+        $this->assertDatabaseHas('imported_emails', [
+            'mail_account_id' => $account->id,
+            'provider_message_id' => 'msg-allow-news',
+            'processing_status' => 'imported',
+            'rule_action' => 'allow',
+        ]);
+        $this->assertDatabaseCount('thoughts', 1);
+    }
+
+    #[Test]
+    public function backfill_extra_process_dispatches_research_job_once(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+        Bus::fake();
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+        ]);
+        EmailSenderRule::create([
+            'user_id' => $account->user_id,
+            'sender_email' => 'digest@example.com',
+            'action' => EmailSenderRule::ACTION_EXTRA_PROCESS,
+        ]);
+
+        $connector = new class extends FastmailConnector
+        {
+            public function __construct() {}
+
+            public function fetchBackfillBatch(MailAccount $account, array $options): array
+            {
+                return [
+                    'messages' => [
+                        new NormalizedEmailMessage(
+                            providerMessageId: 'msg-extra-bf',
+                            providerThreadId: 'thread-extra-bf',
+                            providerMailboxIds: ['mb-inbox'],
+                            direction: 'received',
+                            subject: 'Digest',
+                            from: [['email' => 'digest@example.com', 'name' => 'Digest']],
+                            to: [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+                            cc: [],
+                            sentAt: CarbonImmutable::parse('2026-03-20T10:00:00Z'),
+                            receivedAt: CarbonImmutable::parse('2026-03-20T10:00:05Z'),
+                            bodyText: 'Content',
+                        ),
+                    ],
+                    'next_checkpoint' => [
+                        'query_state' => 'state-extra',
+                        'mailbox_id' => 'mb-inbox',
+                    ],
+                ];
+            }
+        };
+        app()->instance(FastmailConnector::class, $connector);
+
+        $capture = new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                return [
+                    'thought' => Thought::factory()->create([
+                        'user_id' => $options['user_id'],
+                        'content' => $options['content'],
+                        'source' => $options['source'],
+                        'source_metadata' => $options['source_metadata'] ?? null,
+                        'embedding' => null,
+                    ]),
+                    'chunked' => false,
+                ];
+            }
+        };
+        app()->instance(ThoughtCaptureService::class, $capture);
+
+        (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
+
+        $row = ImportedEmail::query()
+            ->where('provider_message_id', 'msg-extra-bf')
+            ->firstOrFail();
+        $thought = Thought::query()->find($row->thought_id);
+
+        Bus::assertDispatched(ProcessExtraEmailResearch::class, fn (ProcessExtraEmailResearch $job): bool => $job->importedEmailId === $row->id);
+        Bus::assertDispatchedTimes(ProcessExtraEmailResearch::class, 1);
+        $this->assertNotNull($thought);
+        $this->assertSame('research_queued', $thought->source_metadata['newsletter_research']['status'] ?? null);
+    }
+
+    #[Test]
+    public function backfill_duplicate_provider_message_replay_is_idempotent_when_sender_policy_enabled(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+        ]);
+
+        $connector = new class extends FastmailConnector
+        {
+            public function __construct() {}
+
+            public function fetchBackfillBatch(MailAccount $account, array $options): array
+            {
+                return [
+                    'messages' => [
+                        new NormalizedEmailMessage(
+                            providerMessageId: 'msg-dup-bf',
+                            providerThreadId: 'thread-dup-bf',
+                            providerMailboxIds: ['mb-inbox'],
+                            direction: 'received',
+                            subject: 'Dup',
+                            from: [['email' => 'once@example.com', 'name' => 'Once']],
+                            to: [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+                            cc: [],
+                            sentAt: CarbonImmutable::parse('2026-03-20T10:00:00Z'),
+                            receivedAt: CarbonImmutable::parse('2026-03-20T10:00:05Z'),
+                            bodyText: 'Once',
+                        ),
+                    ],
+                    'next_checkpoint' => [
+                        'query_state' => 'state-dup',
+                        'mailbox_id' => 'mb-inbox',
+                    ],
+                ];
+            }
+        };
+        app()->instance(FastmailConnector::class, $connector);
+
+        $capture = new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                return [
+                    'thought' => Thought::factory()->create([
+                        'user_id' => $options['user_id'],
+                        'content' => $options['content'],
+                        'source' => $options['source'],
+                        'source_metadata' => $options['source_metadata'] ?? null,
+                        'embedding' => null,
+                    ]),
+                    'chunked' => false,
+                ];
+            }
+        };
+        app()->instance(ThoughtCaptureService::class, $capture);
+
+        (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
+        (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
+
+        $this->assertDatabaseCount('imported_emails', 1);
+        $this->assertDatabaseCount('thoughts', 0);
+        $this->assertDatabaseCount('inbox_items', 1);
+        $this->assertDatabaseHas('imported_emails', [
+            'mail_account_id' => $account->id,
+            'provider_message_id' => 'msg-dup-bf',
         ]);
     }
 }
