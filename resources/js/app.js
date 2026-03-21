@@ -457,6 +457,92 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl, editable = false) => ({
   },
 }));
 
+Alpine.data('thoughtContentEditor', ({ content, updateUrl, editable = false, previewMaxLength = null }) => ({
+  content: content || '',
+  originalContent: content || '',
+  draftContent: content || '',
+  updateUrl: updateUrl || '',
+  editable: !!editable,
+  previewMaxLength: previewMaxLength == null || previewMaxLength === '' ? null : Number(previewMaxLength),
+  editing: false,
+  saving: false,
+  error: '',
+
+  get viewContent() {
+    if (this.previewMaxLength == null || Number.isNaN(this.previewMaxLength) || this.previewMaxLength <= 0) {
+      return this.content;
+    }
+    const max = this.previewMaxLength;
+    const s = this.content || '';
+    if (s.length <= max) return s;
+    return `${s.slice(0, max)}...`;
+  },
+
+  get saveDisabled() {
+    return (
+      this.saving ||
+      this.draftContent.trim() === '' ||
+      this.draftContent === this.originalContent
+    );
+  },
+
+  startEdit() {
+    if (!this.editable) return;
+    this.editing = true;
+    this.draftContent = this.content;
+    this.error = '';
+    this.$nextTick(() => this.$el.querySelector('textarea')?.focus());
+  },
+
+  cancelEdit() {
+    this.editing = false;
+    this.draftContent = this.content;
+    this.error = '';
+  },
+
+  async saveEdit() {
+    const trimmed = this.draftContent.trim();
+    if (!trimmed || this.saveDisabled) return;
+
+    this.saving = true;
+    this.error = '';
+
+    try {
+      const res = await fetch(this.updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN':
+            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: JSON.stringify({ content: trimmed }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (res.status === 422 && data.errors?.content?.[0]) this.error = data.errors.content[0];
+        else if (res.status === 401 || res.status === 403 || res.status === 419)
+          this.error = 'Please sign in again.';
+        else if (res.status === 404) this.error = 'This thought no longer exists.';
+        else this.error = data.message || 'Unable to update thought.';
+        return;
+      }
+
+      this.content = data.content ?? trimmed;
+      this.originalContent = this.content;
+      this.draftContent = this.content;
+      this.editing = false;
+    } catch {
+      this.error = 'Unable to update thought.';
+    } finally {
+      this.saving = false;
+    }
+  },
+}));
+
 Alpine.data('thoughtCardActions', (deleteUrl, thoughtId) => ({
   menuOpen: false,
   confirmOpen: false,
@@ -473,6 +559,17 @@ Alpine.data('thoughtCardActions', (deleteUrl, thoughtId) => ({
   closeMenu() { this.menuOpen = false; },
   showConfirm() { this.menuOpen = false; this.confirmOpen = true; this.error = ''; },
   cancelConfirm() { this.confirmOpen = false; this.error = ''; },
+
+  requestEdit() {
+    this.menuOpen = false;
+    this.confirmOpen = false;
+    this.error = '';
+    window.dispatchEvent(
+      new CustomEvent('thought-edit-requested', {
+        detail: { thoughtId },
+      }),
+    );
+  },
 
   async submitDelete() {
     this.deleting = true;
@@ -516,11 +613,16 @@ Alpine.data('thoughtCardActions', (deleteUrl, thoughtId) => ({
   },
 
   init() {
-    window.addEventListener('keydown', (e) => {
+    this._keydownHandler = (e) => {
       if (e.key !== 'Escape') return;
       this.closeMenu();
       this.cancelConfirm();
-    });
+    };
+    window.addEventListener('keydown', this._keydownHandler);
+  },
+
+  destroy() {
+    if (this._keydownHandler) window.removeEventListener('keydown', this._keydownHandler);
   },
 }));
 

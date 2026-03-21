@@ -137,10 +137,15 @@ class IdeaIdeasTest extends TestCase
         $response->assertSee('Done idea');
         $response->assertSee('2025-03-01');
         $response->assertSee('2025-03-02');
-        // Completed row has checked checkbox and line-through styling in the view
         $html = $response->getContent();
-        $this->assertStringContainsString('Done idea', $html);
-        $this->assertMatchesRegularExpression('/<input[^>]*type="checkbox"[^>]*checked/', $html);
+        $this->assertMatchesRegularExpression(
+            '/<li\b[^>]*>.*?<input[^>]*type="checkbox"[^>]*checked[^>]*>.*?Done idea.*?<\/li>/s',
+            $html,
+        );
+        $this->assertMatchesRegularExpression(
+            '/<li\b[^>]*>.*?<input[^>]*type="checkbox"(?![^>]*checked)[^>]*>.*?Incomplete idea.*?<\/li>/s',
+            $html,
+        );
     }
 
     public function test_toggle_completed_returns_422_for_non_idea_thought(): void
@@ -160,5 +165,28 @@ class IdeaIdeasTest extends TestCase
         $response->assertStatus(422);
         $thought->refresh();
         $this->assertArrayNotHasKey('completed', $thought->metadata ?? []);
+    }
+
+    public function test_ideas_list_row_exposes_edit_and_full_content_for_truncated_preview(): void
+    {
+        $user = User::factory()->create();
+        $fullTail = 'IDEATUB_FULL_EDIT_MARKER';
+        $longContent = str_repeat('A', 220).$fullTail;
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => $longContent,
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-03-01'],
+            'embedding' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertStatus(200);
+        $response->assertSee('data-thought-id="'.$thought->id.'"', false);
+        $response->assertSee('requestEdit()', false);
+        $response->assertSee('Edit');
+        $response->assertSee('ideatub-thought-content-update:'.route('ideas.update-content', $thought), false);
+        $response->assertSee($fullTail, false);
+        $this->assertMatchesRegularExpression('/previewMaxLength\s*:\s*200/', $response->getContent());
     }
 }

@@ -36,31 +36,64 @@
                         <p class="text-xs text-slate-brand/60">{{ $item->generated_at?->diffForHumans() }}</p>
                     </div>
 
-                    <p class="mt-3 whitespace-pre-line text-sm leading-6 text-slate-brand">{{ $item->body }}</p>
-
-                    <div class="mt-4 flex flex-wrap gap-2">
-                        <form method="POST" action="{{ route('inbox.done', $item) }}">
-                            @csrf
-                            <button type="submit" class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white">Done</button>
-                        </form>
-
-                        <form method="POST" action="{{ route('inbox.snooze', $item) }}">
-                            @csrf
-                            <input type="hidden" name="preset" value="tomorrow">
-                            <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-slate-brand">Tomorrow</button>
-                        </form>
-
-                        <form method="POST" action="{{ route('inbox.snooze', $item) }}">
-                            @csrf
-                            <input type="hidden" name="preset" value="next_week">
-                            <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-slate-brand">Next week</button>
-                        </form>
-
-                        <form method="POST" action="{{ route('inbox.save-thought', $item) }}">
-                            @csrf
-                            <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Save as thought</button>
-                        </form>
+                    <div class="prose prose-sm mt-3 max-w-none text-slate-brand prose-headings:text-deep-indigo prose-p:text-slate-brand prose-strong:text-deep-indigo prose-li:text-slate-brand">
+                        {!! \Illuminate\Support\Str::markdown($item->body ?? '', [
+                            'html_input' => 'strip',
+                            'allow_unsafe_links' => false,
+                        ]) !!}
                     </div>
+
+                    @if (($item->generator_type ?? '') === 'email_sender_review')
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}">
+                                @csrf
+                                <input type="hidden" name="action" value="allow">
+                                <button type="submit" class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white">Allow sender</button>
+                            </form>
+
+                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}">
+                                @csrf
+                                <input type="hidden" name="action" value="ignore">
+                                <button type="submit" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-brand">Ignore sender</button>
+                            </form>
+
+                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}">
+                                @csrf
+                                <input type="hidden" name="action" value="extra_process">
+                                <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Extra process sender</button>
+                            </form>
+
+                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}">
+                                @csrf
+                                <input type="hidden" name="action" value="save_thought">
+                                <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Save as thought</button>
+                            </form>
+                        </div>
+                    @else
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <form method="POST" action="{{ route('inbox.done', $item) }}">
+                                @csrf
+                                <button type="submit" class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white">Done</button>
+                            </form>
+
+                            <form method="POST" action="{{ route('inbox.snooze', $item) }}">
+                                @csrf
+                                <input type="hidden" name="preset" value="tomorrow">
+                                <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-slate-brand">Tomorrow</button>
+                            </form>
+
+                            <form method="POST" action="{{ route('inbox.snooze', $item) }}">
+                                @csrf
+                                <input type="hidden" name="preset" value="next_week">
+                                <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-slate-brand">Next week</button>
+                            </form>
+
+                            <form method="POST" action="{{ route('inbox.save-thought', $item) }}">
+                                @csrf
+                                <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Save as thought</button>
+                            </form>
+                        </div>
+                    @endif
                 </article>
             @endforeach
         </div>

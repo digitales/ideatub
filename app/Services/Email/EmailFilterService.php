@@ -9,9 +9,16 @@ class EmailFilterService
     /**
      * @return array{include: bool, reason: ?string}
      */
-    public function evaluate(MailAccount $account, NormalizedEmailMessage $message): array
+    public function evaluate(MailAccount $account, NormalizedEmailMessage $message, ?string $senderPolicyAction = null): array
     {
         if ($message->direction === 'sent') {
+            return [
+                'include' => true,
+                'reason' => null,
+            ];
+        }
+
+        if (config('services.email_sender_policy.enabled') && $senderPolicyAction !== null) {
             return [
                 'include' => true,
                 'reason' => null,

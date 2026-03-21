@@ -13,6 +13,7 @@
         "laravel/reverb": "^1.8",
         "laravel/socialite": "^5.0",
         "laravel/tinker": "^2.9",
+        "mrmysql/youtube-transcript": "^0.0.5",
         "pgvector/pgvector": "^0.2"
     },
     "require-dev": {

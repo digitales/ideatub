@@ -4,11 +4,33 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Broadcast;
 use Tests\TestCase;
 
 class BroadcastingAuthTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'broadcasting.default' => 'pusher',
+            'broadcasting.connections.pusher.key' => 'test-key',
+            'broadcasting.connections.pusher.secret' => 'test-secret',
+            'broadcasting.connections.pusher.app_id' => 'test-app',
+            'broadcasting.connections.pusher.options' => [
+                'host' => 'localhost',
+                'port' => 6001,
+                'scheme' => 'http',
+                'useTLS' => false,
+            ],
+        ]);
+
+        Broadcast::forgetDrivers();
+        require base_path('routes/channels.php');
+    }
 
     public function test_user_can_authorize_own_private_channel(): void
     {

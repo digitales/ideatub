@@ -46,6 +46,10 @@ return [
         'incremental_batch_size' => (int) env('MAIL_SYNC_INCREMENTAL_BATCH_SIZE', 25),
     ],
 
+    'email_sender_policy' => [
+        'enabled' => filter_var(env('EMAIL_SENDER_POLICY_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+    ],
+
     'jira' => [
         'enabled' => filter_var(env('JIRA_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         'default_days' => (int) env('JIRA_SYNC_DAYS', 14),

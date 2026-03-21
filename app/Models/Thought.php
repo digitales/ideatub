@@ -199,6 +199,26 @@ class Thought extends Model
         return $this->hasMany(Thought::class, 'parent_id');
     }
 
+    public function importedEmail(): ?ImportedEmail
+    {
+        $importedEmailId = data_get($this->source_metadata, 'imported_email_id');
+
+        if ($importedEmailId !== null) {
+            $importedEmail = ImportedEmail::query()
+                ->where('user_id', $this->user_id)
+                ->find($importedEmailId);
+
+            if ($importedEmail !== null) {
+                return $importedEmail;
+            }
+        }
+
+        return ImportedEmail::query()
+            ->where('user_id', $this->user_id)
+            ->where('thought_id', $this->id)
+            ->first();
+    }
+
     /**
      * Scope to thoughts with metadata type 'idea'.
      */

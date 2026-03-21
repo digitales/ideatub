@@ -91,7 +91,23 @@ class User extends Authenticatable
         return $this->hasMany(MailAccount::class);
     }
 
-     /**
+    /**
+     * Get the per-user exact-sender email rules.
+     */
+    public function emailSenderRules()
+    {
+        return $this->hasMany(EmailSenderRule::class);
+    }
+
+    /**
+     * Matched Postmark inbound emails captured for this user.
+     */
+    public function capturedInboundEmails()
+    {
+        return $this->hasMany(CapturedInboundEmail::class);
+    }
+
+    /**
      * Get the user's agent inbox items.
      */
     public function inboxItems()

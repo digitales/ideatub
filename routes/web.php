@@ -5,8 +5,9 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\EmailAccountSettingsController;
 use App\Http\Controllers\DraftController;
+use App\Http\Controllers\EmailAccountSettingsController;
+use App\Http\Controllers\EmailSenderRuleSettingsController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IdeaController;
@@ -97,6 +98,7 @@ Route::middleware('auth')->group(function () {
 
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
+    Route::get('/thoughts/{thought}', [IdeaController::class, 'show'])->name('thoughts.show');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
     Route::get('/stream/jira', [IdeaController::class, 'streamJira'])->name('idea.stream.jira');
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
@@ -105,6 +107,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/inbox/{inboxItem}/done', [InboxController::class, 'markDone'])->name('inbox.done');
     Route::post('/inbox/{inboxItem}/snooze', [InboxController::class, 'snooze'])->name('inbox.snooze');
     Route::post('/inbox/{inboxItem}/save-thought', [InboxController::class, 'saveAsThought'])->name('inbox.save-thought');
+    Route::post('/inbox/{inboxItem}/email-review/action', [InboxController::class, 'applyEmailReviewAction'])->name('inbox.email-review.action');
 
     // Ideas list and store
     Route::get('/ideas', [IdeaController::class, 'ideas'])->name('idea.ideas');
@@ -112,6 +115,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/ideas', [IdeaController::class, 'storeIdea'])->name('ideas.store');
     Route::patch('/ideas/{thought}/completed', [IdeaController::class, 'toggleCompleted'])->name('ideas.toggle-completed');
     Route::patch('/ideas/{thought}/tags', [IdeaController::class, 'updateTags'])->name('ideas.update-tags');
+    Route::patch('/ideas/{thought}/content', [IdeaController::class, 'updateContent'])->name('ideas.update-content');
     Route::delete('/ideas/{thought}', [IdeaController::class, 'destroy'])->name('ideas.destroy');
     Route::post('/ideas/research', [IdeaController::class, 'researchNew'])->name('ideas.research-new');
     Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');
@@ -138,6 +142,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/inbound-emails', [InboundEmailController::class, 'index'])->name('settings.inbound-emails.index');
     Route::post('/settings/inbound-emails', [InboundEmailController::class, 'store'])->name('settings.inbound-emails.store');
     Route::delete('/settings/inbound-emails/{userInboundAddress}', [InboundEmailController::class, 'destroy'])->name('settings.inbound-emails.destroy');
+
+    Route::get('/settings/email-sender-rules', [EmailSenderRuleSettingsController::class, 'index'])->name('settings.email-sender-rules.index');
+    Route::post('/settings/email-sender-rules', [EmailSenderRuleSettingsController::class, 'store'])->name('settings.email-sender-rules.store');
+    Route::patch('/settings/email-sender-rules/{emailSenderRule}', [EmailSenderRuleSettingsController::class, 'update'])->name('settings.email-sender-rules.update');
+    Route::delete('/settings/email-sender-rules/{emailSenderRule}', [EmailSenderRuleSettingsController::class, 'destroy'])->name('settings.email-sender-rules.destroy');
 
     Route::get('/settings/email-accounts', [EmailAccountSettingsController::class, 'index'])->name('settings.email-accounts.index');
     Route::post('/settings/email-accounts', [EmailAccountSettingsController::class, 'store'])->name('settings.email-accounts.store');
