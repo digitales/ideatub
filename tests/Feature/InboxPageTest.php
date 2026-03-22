@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\InboxItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -222,6 +223,30 @@ class InboxPageTest extends TestCase
         $response->assertSee('<li>Second item</li>', false);
     }
 
+
+    public function test_inbox_shows_manage_sender_rules_link_when_sender_policy_enabled(): void
+    {
+        Config::set('services.email_sender_policy.enabled', true);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('inbox.index'));
+
+        $response->assertOk();
+        $response->assertSee(route('settings.email-sender-rules.index'), false);
+        $response->assertSee('Manage sender rules', false);
+    }
+
+    public function test_inbox_does_not_show_manage_sender_rules_link_when_sender_policy_disabled(): void
+    {
+        Config::set('services.email_sender_policy.enabled', false);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('inbox.index'));
+
+        $response->assertOk();
+        $response->assertDontSee('Manage sender rules', false);
+    }
+
     private function xpathFromResponse(TestResponse $response): \DOMXPath
     {
         libxml_use_internal_errors(true);
@@ -243,5 +268,6 @@ class InboxPageTest extends TestCase
         }
 
         return $labels;
+
     }
 }
