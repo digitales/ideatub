@@ -6,6 +6,7 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Support\ThoughtTypeNavigation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class ThoughtTypePagesTest extends TestCase
@@ -219,14 +220,12 @@ class ThoughtTypePagesTest extends TestCase
         $href = route('idea.stream.emails');
         $response = $this->actingAs($user)->get(route('idea.index'));
         $response->assertOk();
-        $response->assertSee('href="'.$href.'"', false);
-        $response->assertSee('class="thought-type-badge-link', false);
-        $response->assertSee('>Email</a>', false);
+        $this->assertThoughtBadgeLink($response, 'Email', $href);
 
         $this->actingAs($user)->get($href)->assertOk();
     }
 
-    public function test_idea_index_jira_thought_type_label_links_to_jira_stream_and_destination_ok(): void
+    public function test_jira_stream_thought_type_label_links_to_jira_stream_and_destination_ok(): void
     {
         config(['services.jira.enabled' => true]);
 
@@ -239,14 +238,14 @@ class ThoughtTypePagesTest extends TestCase
         ]);
 
         $href = route('idea.stream.jira');
-        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response = $this->actingAs($user)->get($href);
         $response->assertOk();
-        $response->assertSee('href="'.$href.'"', false);
+        $this->assertThoughtBadgeLink($response, 'Jira', $href);
 
         $this->actingAs($user)->get($href)->assertOk();
     }
 
-    public function test_idea_index_research_thought_type_label_links_to_research_stream_and_destination_ok(): void
+    public function test_research_stream_thought_type_label_links_to_research_stream_and_destination_ok(): void
     {
         $user = User::factory()->create();
         Thought::factory()->create([
@@ -258,9 +257,9 @@ class ThoughtTypePagesTest extends TestCase
         ]);
 
         $href = route('idea.stream.research');
-        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response = $this->actingAs($user)->get($href);
         $response->assertOk();
-        $response->assertSee('href="'.$href.'"', false);
+        $this->assertThoughtBadgeLink($response, 'Research', $href);
 
         $this->actingAs($user)->get($href)->assertOk();
     }
@@ -279,7 +278,7 @@ class ThoughtTypePagesTest extends TestCase
         $href = route('idea.stream.plans');
         $response = $this->actingAs($user)->get(route('idea.index'));
         $response->assertOk();
-        $response->assertSee('href="'.$href.'"', false);
+        $this->assertThoughtBadgeLink($response, 'Plan', $href);
 
         $this->actingAs($user)->get($href)->assertOk();
     }
@@ -297,7 +296,7 @@ class ThoughtTypePagesTest extends TestCase
         $href = route('idea.stream.emails');
         $response = $this->actingAs($user)->get($href);
         $response->assertOk();
-        $response->assertSee('href="'.$href.'"', false);
+        $this->assertThoughtBadgeLink($response, 'Email', $href);
     }
 
     public function test_non_routable_thought_does_not_render_placeholder_or_empty_href_links(): void
@@ -332,5 +331,26 @@ class ThoughtTypePagesTest extends TestCase
         $response = $this->actingAs($user)->get(route('idea.index'));
         $response->assertOk();
         $response->assertSee('Malformed meta type');
+    }
+
+    private function assertThoughtBadgeLink(TestResponse $response, string $label, string $href): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query(sprintf(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='%s' and @href='%s']",
+            $label,
+            $href
+        ));
+
+        $this->assertSame(1, $links->length);
+    }
+
+    private function xpathFromResponse(TestResponse $response): \DOMXPath
+    {
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument;
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+
+        return new \DOMXPath($dom);
     }
 }

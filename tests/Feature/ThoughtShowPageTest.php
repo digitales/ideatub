@@ -8,6 +8,7 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class ThoughtShowPageTest extends TestCase
@@ -223,8 +224,7 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
 
         $response->assertOk();
-        $response->assertSee('href="'.$href.'"', false);
-        $response->assertSee('thought-type-badge-link', false);
+        $this->assertThoughtBadgeLink($response, 'Email', $href);
 
         $this->actingAs($owner)->get($href)->assertOk();
     }
@@ -246,7 +246,7 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
 
         $response->assertOk();
-        $response->assertSee('href="'.$href.'"', false);
+        $this->assertThoughtBadgeLink($response, 'Jira', $href);
 
         $this->actingAs($owner)->get($href)->assertOk();
     }
@@ -267,7 +267,7 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
 
         $response->assertOk();
-        $response->assertSee('href="'.$href.'"', false);
+        $this->assertThoughtBadgeLink($response, 'Research', $href);
 
         $this->actingAs($owner)->get($href)->assertOk();
     }
@@ -288,7 +288,7 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
 
         $response->assertOk();
-        $response->assertSee('href="'.$href.'"', false);
+        $this->assertThoughtBadgeLink($response, 'Plan', $href);
 
         $this->actingAs($owner)->get($href)->assertOk();
     }
@@ -358,5 +358,26 @@ class ThoughtShowPageTest extends TestCase
             'parent_id' => $thought->id,
             'content' => 'Reply from detail page',
         ]);
+    }
+
+    private function assertThoughtBadgeLink(TestResponse $response, string $label, string $href): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query(sprintf(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='%s' and @href='%s']",
+            $label,
+            $href
+        ));
+
+        $this->assertSame(1, $links->length);
+    }
+
+    private function xpathFromResponse(TestResponse $response): \DOMXPath
+    {
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument;
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+
+        return new \DOMXPath($dom);
     }
 }

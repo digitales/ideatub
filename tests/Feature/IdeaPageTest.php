@@ -418,7 +418,15 @@ class IdeaPageTest extends TestCase
         $this->assertSame(['Emails', 'Research', 'Plans'], $labels);
 
         $response->assertSee('parityjiraidx Parity jira thought row');
-        $response->assertDontSee('thought-type-badge-link', false);
+        $badgeSpans = $xpath->query(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge ') and normalize-space(.)='Jira']"
+        );
+        $this->assertSame(1, $badgeSpans->length);
+
+        $badgeLinks = $xpath->query(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='Jira']"
+        );
+        $this->assertSame(0, $badgeLinks->length);
     }
 
     public function test_compact_overflow_navigation_contains_reachable_entries(): void
