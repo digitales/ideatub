@@ -139,10 +139,16 @@ class IdeaController extends Controller
 
         $thought->load(['comments' => fn ($q) => $q->orderBy('created_at')]);
         $importedEmail = $thought->source === 'email' ? $thought->importedEmail() : null;
+        $contentHtml = null;
+
+        if ($thought->source !== 'email') {
+            $contentHtml = (new CommonMarkConverter)->convert($thought->content)->getContent();
+        }
 
         return view('idea.show', [
             'thought' => $thought,
             'importedEmail' => $importedEmail,
+            'contentHtml' => $contentHtml,
         ]);
     }
 
