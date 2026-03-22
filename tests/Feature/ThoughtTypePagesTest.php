@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\OpenRouterService;
 use App\Support\ThoughtTypeNavigation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
@@ -225,6 +226,32 @@ class ThoughtTypePagesTest extends TestCase
         $this->actingAs($user)->get($href)->assertOk();
     }
 
+    public function test_idea_index_search_jira_thought_type_label_links_to_jira_stream_and_destination_ok(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->with('indexjiratype')->andReturn($fakeEmbedding);
+        });
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'indexjiratype Jira card type label on index search',
+            'parent_id' => null,
+            'source' => 'jira',
+            'embedding' => $fakeEmbedding,
+        ]);
+
+        $href = route('idea.stream.jira');
+        $response = $this->actingAs($user)->get(route('idea.index', ['q' => 'indexjiratype']));
+        $response->assertOk();
+        $this->assertThoughtBadgeLink($response, 'Jira', $href);
+
+        $this->actingAs($user)->get($href)->assertOk();
+    }
+
     public function test_jira_stream_thought_type_label_links_to_jira_stream_and_destination_ok(): void
     {
         config(['services.jira.enabled' => true]);
@@ -241,6 +268,31 @@ class ThoughtTypePagesTest extends TestCase
         $response = $this->actingAs($user)->get($href);
         $response->assertOk();
         $this->assertThoughtBadgeLink($response, 'Jira', $href);
+
+        $this->actingAs($user)->get($href)->assertOk();
+    }
+
+    public function test_idea_index_search_research_thought_type_label_links_to_research_stream_and_destination_ok(): void
+    {
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->with('indexresearchtype')->andReturn($fakeEmbedding);
+        });
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'indexresearchtype Research card type label on index search',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'research'],
+            'embedding' => $fakeEmbedding,
+        ]);
+
+        $href = route('idea.stream.research');
+        $response = $this->actingAs($user)->get(route('idea.index', ['q' => 'indexresearchtype']));
+        $response->assertOk();
+        $this->assertThoughtBadgeLink($response, 'Research', $href);
 
         $this->actingAs($user)->get($href)->assertOk();
     }
