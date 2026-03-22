@@ -52,7 +52,7 @@ class EmailReviewInboxTest extends TestCase
 
     public function test_user_can_mark_review_sender_as_allow_creates_sender_rule_and_completes_inbox(): void
     {
-        Bus::fake();
+        $this->fakeOpenRouterForThoughtCapture();
 
         $user = User::factory()->create();
         ['imported' => $imported, 'inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
@@ -71,13 +71,12 @@ class EmailReviewInboxTest extends TestCase
         ]);
 
         $inbox->refresh();
+        $imported->refresh(); // must refresh before asserting on thought_id
         $this->assertSame('done', $inbox->status);
         $this->assertNotNull($inbox->actioned_at);
-
-        $imported->refresh();
-        $this->assertNull($imported->thought_id);
-        $this->assertSame(0, Thought::query()->count());
-        Bus::assertNotDispatched(ProcessExtraEmailResearch::class);
+        $this->assertSame(1, Thought::query()->where('source', 'email')->count());
+        $this->assertNotNull($imported->thought_id);
+        $this->assertSame('imported', $imported->processing_status);
     }
 
     public function test_user_can_mark_review_sender_as_ignore_creates_sender_rule(): void
@@ -131,6 +130,7 @@ class EmailReviewInboxTest extends TestCase
 
     public function test_email_review_action_works_for_captured_inbound_email_source(): void
     {
+        $this->fakeOpenRouterForThoughtCapture();
         Bus::fake();
 
         $user = User::factory()->create();
@@ -181,7 +181,9 @@ class EmailReviewInboxTest extends TestCase
         ]);
 
         $captured->refresh();
-        $this->assertNull($captured->thought_id);
+        $this->assertNotNull($captured->thought_id);
+        $this->assertSame('imported', $captured->processing_status);
+        $this->assertSame(1, Thought::query()->where('source', 'email')->count());
     }
 
     public function test_user_cannot_apply_email_review_action_to_another_users_inbox_item(): void
@@ -202,6 +204,7 @@ class EmailReviewInboxTest extends TestCase
 
     public function test_sender_classification_updates_existing_rule_row(): void
     {
+        $this->fakeOpenRouterForThoughtCapture();
         $user = User::factory()->create();
         EmailSenderRule::query()->create([
             'user_id' => $user->id,
@@ -260,6 +263,7 @@ class EmailReviewInboxTest extends TestCase
 
     public function test_repeat_classification_post_does_not_mutate_completed_review_item_again(): void
     {
+        $this->fakeOpenRouterForThoughtCapture();
         $user = User::factory()->create();
         ['imported' => $imported, 'inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
 
@@ -302,6 +306,7 @@ class EmailReviewInboxTest extends TestCase
 
     public function test_repeat_classification_post_returns_already_handled_flash_message(): void
     {
+        $this->fakeOpenRouterForThoughtCapture();
         $user = User::factory()->create();
         ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
 
@@ -521,6 +526,7 @@ class EmailReviewInboxTest extends TestCase
 
     public function test_classified_at_uses_same_utc_timestamp_as_inbox_action_flow(): void
     {
+        $this->fakeOpenRouterForThoughtCapture();
         $originalTimezone = config('app.timezone');
         config(['app.timezone' => 'America/New_York']);
         date_default_timezone_set('America/New_York');
@@ -536,16 +542,12 @@ class EmailReviewInboxTest extends TestCase
 
             $response->assertRedirect(route('inbox.index'));
 
-            $inbox->refresh();
             $imported->refresh();
             $action = $inbox->actions()->where('action_type', 'email_sender_classify')->sole();
-            $rawInboxActionedAt = DB::table('inbox_items')->where('id', $inbox->id)->value('actioned_at');
             $rawActionCreatedAt = DB::table('inbox_item_actions')->where('id', $action->id)->value('created_at');
 
-            $this->assertSame(
-                Carbon::createFromFormat('Y-m-d H:i:s', $rawInboxActionedAt, 'UTC')->toIso8601String(),
-                $imported->processing_metadata_json['email_review_triage']['classified_at'] ?? null
-            );
+            // The classify timestamp in metadata matches the InboxItemAction row's created_at.
+            // Note: inbox_items.actioned_at is now the thought-creation timestamp (from saveReviewedEmailAsThought).
             $this->assertSame(
                 Carbon::createFromFormat('Y-m-d H:i:s', $rawActionCreatedAt, 'UTC')->toIso8601String(),
                 $imported->processing_metadata_json['email_review_triage']['classified_at'] ?? null
@@ -555,6 +557,37 @@ class EmailReviewInboxTest extends TestCase
             config(['app.timezone' => $originalTimezone]);
             date_default_timezone_set($originalTimezone ?? 'UTC');
         }
+    }
+
+    public function test_allow_action_shows_partial_success_flash_when_thought_creation_fails(): void
+    {
+        // Simulate thought creation failing with HTTP 500 from OpenRouter
+        config(['services.openrouter.api_key' => 'test-key']);
+        Http::fake([
+            'https://openrouter.ai/api/v1/embeddings' => Http::response([], 500),
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([], 500),
+        ]);
+
+        $user = User::factory()->create();
+        ['imported' => $imported, 'inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $response = $this->actingAs($user)->post(route('inbox.email-review.action', $inbox), [
+            'action' => 'allow',
+        ]);
+
+        $response->assertRedirect(route('inbox.index'));
+        // Sender rule is saved — this part succeeded
+        $this->assertDatabaseHas('email_sender_rules', [
+            'user_id' => $user->id,
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+        // Inbox item is done (was marked done by applySenderClassification)
+        $inbox->refresh();
+        $this->assertSame('done', $inbox->status);
+        // Partial-success flash
+        $response->assertSessionHas('success', 'Sender rule saved. Could not import email as a thought.');
+        // No thought created
+        $this->assertSame(0, Thought::query()->count());
     }
 
     /**
