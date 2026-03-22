@@ -365,6 +365,8 @@ class ThoughtTypePagesTest extends TestCase
         $response = $this->actingAs($user)->get(route('idea.index'));
         $response->assertOk();
         $response->assertSee('WebOnlyNoRoutableTypeLabel987');
+        $this->assertThoughtBadgeSpan($response, 'Web');
+        $this->assertNoThoughtBadgeLink($response, 'Web');
         $this->assertStringNotContainsString('href="#"', $response->getContent());
         $this->assertStringNotContainsString("href='#'", $response->getContent());
         $this->assertStringNotContainsString('href=""', $response->getContent());
@@ -385,11 +387,8 @@ class ThoughtTypePagesTest extends TestCase
         $response = $this->actingAs($user)->get(route('idea.index'));
         $response->assertOk();
         $response->assertSee('Malformed meta type');
-        $xpath = $this->xpathFromResponse($response);
-        $badgeLinks = $xpath->query(
-            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ')]"
-        );
-        $this->assertSame(0, $badgeLinks->length);
+        $this->assertThoughtBadgeSpan($response, 'Web');
+        $this->assertNoThoughtBadgeLink($response, 'Web');
         $this->assertStringNotContainsString('href="#"', $response->getContent());
         $this->assertStringNotContainsString("href='#'", $response->getContent());
         $this->assertStringNotContainsString('href=""', $response->getContent());
@@ -406,6 +405,28 @@ class ThoughtTypePagesTest extends TestCase
         ));
 
         $this->assertSame(1, $links->length);
+    }
+
+    private function assertThoughtBadgeSpan(TestResponse $response, string $label): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $spans = $xpath->query(sprintf(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge ') and normalize-space(.)='%s']",
+            $label
+        ));
+
+        $this->assertSame(1, $spans->length);
+    }
+
+    private function assertNoThoughtBadgeLink(TestResponse $response, string $label): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query(sprintf(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='%s']",
+            $label
+        ));
+
+        $this->assertSame(0, $links->length);
     }
 
     private function xpathFromResponse(TestResponse $response): \DOMXPath

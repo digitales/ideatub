@@ -293,6 +293,44 @@ class ThoughtShowPageTest extends TestCase
         $this->actingAs($owner)->get($href)->assertOk();
     }
 
+    public function test_non_canonical_source_detail_header_renders_human_readable_non_link_label(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body web type',
+            'source' => 'web',
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeSpan($response, 'Web');
+        $this->assertNoThoughtBadgeLink($response, 'Web');
+    }
+
+    public function test_missing_source_detail_header_falls_back_to_thought_label(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body without source',
+            'source' => null,
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeSpan($response, 'Thought');
+        $this->assertNoThoughtBadgeLink($response, 'Thought');
+    }
+
     public function test_jira_disabled_jira_thought_detail_header_does_not_link_to_jira_stream(): void
     {
         config(['services.jira.enabled' => false]);
@@ -309,16 +347,8 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
 
         $response->assertOk();
-        $xpath = $this->xpathFromResponse($response);
-        $badgeSpans = $xpath->query(
-            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge ') and normalize-space(.)='Jira']"
-        );
-        $this->assertSame(1, $badgeSpans->length);
-
-        $badgeLinks = $xpath->query(
-            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='Jira']"
-        );
-        $this->assertSame(0, $badgeLinks->length);
+        $this->assertThoughtBadgeSpan($response, 'Jira');
+        $this->assertNoThoughtBadgeLink($response, 'Jira');
     }
 
     public function test_user_can_post_a_reply_from_the_detail_page(): void
@@ -378,6 +408,28 @@ class ThoughtShowPageTest extends TestCase
         ));
 
         $this->assertSame(1, $links->length);
+    }
+
+    private function assertThoughtBadgeSpan(TestResponse $response, string $label): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $spans = $xpath->query(sprintf(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge ') and normalize-space(.)='%s']",
+            $label
+        ));
+
+        $this->assertSame(1, $spans->length);
+    }
+
+    private function assertNoThoughtBadgeLink(TestResponse $response, string $label): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query(sprintf(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='%s']",
+            $label
+        ));
+
+        $this->assertSame(0, $links->length);
     }
 
     private function xpathFromResponse(TestResponse $response): \DOMXPath

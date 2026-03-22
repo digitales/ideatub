@@ -9,6 +9,7 @@
         @include('idea.partials.thought_type_badge', [
             'thought' => $thought,
             'class' => 'text-[11px] font-medium uppercase tracking-[0.08em] text-slate-brand/60',
+            'fallbackLabel' => 'Thought',
         ])
         <span class="text-[11px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
     </div>
