@@ -88,4 +88,10 @@ class ThoughtTypeNavigationTest extends TestCase
         $t = new Thought(['source' => 'web', 'metadata' => ['type' => 'plans']]);
         $this->assertSame('plan', ThoughtTypeNavigation::resolveThoughtToTypeKey($t));
     }
+
+    public function test_resolve_thought_handles_null_metadata_without_throwing(): void
+    {
+        $t = new Thought(['source' => 'web', 'metadata' => null]);
+        $this->assertNull(ThoughtTypeNavigation::resolveThoughtToTypeKey($t));
+    }
 }

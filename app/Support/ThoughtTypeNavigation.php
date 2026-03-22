@@ -137,7 +137,9 @@ final class ThoughtTypeNavigation
             return 'email';
         }
 
-        $metaType = self::normalizeTypeKey(is_string($thought->metadata['type'] ?? null) ? $thought->metadata['type'] : null);
+        $metadata = $thought->metadata;
+        $typeRaw = is_array($metadata) ? ($metadata['type'] ?? null) : null;
+        $metaType = self::normalizeTypeKey(is_string($typeRaw) ? $typeRaw : null);
         if ($metaType === 'research') {
             return 'research';
         }

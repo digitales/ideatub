@@ -208,6 +208,111 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee(route('thoughts.store'), false);
     }
 
+    public function test_email_thought_detail_header_includes_emails_stream_link_and_destination_ok(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body email type',
+            'source' => 'email',
+        ]);
+
+        $href = route('idea.stream.emails');
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee('href="'.$href.'"', false);
+        $response->assertSee('thought-type-badge-link', false);
+
+        $this->actingAs($owner)->get($href)->assertOk();
+    }
+
+    public function test_jira_thought_detail_header_includes_jira_stream_link_and_destination_ok(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body jira type',
+            'source' => 'jira',
+        ]);
+
+        $href = route('idea.stream.jira');
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee('href="'.$href.'"', false);
+
+        $this->actingAs($owner)->get($href)->assertOk();
+    }
+
+    public function test_research_thought_detail_header_includes_research_stream_link_and_destination_ok(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body research type',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $href = route('idea.stream.research');
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee('href="'.$href.'"', false);
+
+        $this->actingAs($owner)->get($href)->assertOk();
+    }
+
+    public function test_plan_thought_detail_header_includes_plans_stream_link_and_destination_ok(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body plan type',
+            'source' => 'web',
+            'metadata' => ['type' => 'plan', 'tags' => []],
+        ]);
+
+        $href = route('idea.stream.plans');
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee('href="'.$href.'"', false);
+
+        $this->actingAs($owner)->get($href)->assertOk();
+    }
+
+    public function test_jira_disabled_jira_thought_detail_header_does_not_link_to_jira_stream(): void
+    {
+        config(['services.jira.enabled' => false]);
+
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Jira detail when off',
+            'source' => 'jira',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertStringNotContainsString(route('idea.stream.jira'), $response->getContent());
+        $response->assertDontSee('thought-type-badge-link', false);
+    }
+
     public function test_user_can_post_a_reply_from_the_detail_page(): void
     {
         $user = User::factory()->create();

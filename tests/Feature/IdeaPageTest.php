@@ -387,6 +387,40 @@ class IdeaPageTest extends TestCase
         $this->assertSame(['Emails', 'Research', 'Plans'], $labels);
     }
 
+    public function test_jira_disabled_types_menu_and_thought_badge_stay_consistent_on_idea_index(): void
+    {
+        config(['services.jira.enabled' => false]);
+
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->with('parityjiraidx')->andReturn($fakeEmbedding);
+        });
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'parityjiraidx Parity jira thought row',
+            'parent_id' => null,
+            'source' => 'jira',
+            'embedding' => $fakeEmbedding,
+        ]);
+
+        // Recent feed excludes Jira; semantic search still surfaces the thought on `idea.index?q=`.
+        $response = $this->actingAs($user)->get(route('idea.index', ['q' => 'parityjiraidx']));
+        $response->assertOk();
+
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query('//*[@data-testid="types-menu-list"]//a[@role="menuitem"]');
+        $labels = [];
+        foreach ($links as $link) {
+            $labels[] = trim($link->textContent);
+        }
+        $this->assertSame(['Emails', 'Research', 'Plans'], $labels);
+
+        $response->assertSee('parityjiraidx Parity jira thought row');
+        $response->assertDontSee('thought-type-badge-link', false);
+    }
+
     public function test_compact_overflow_navigation_contains_reachable_entries(): void
     {
         $user = User::factory()->create();

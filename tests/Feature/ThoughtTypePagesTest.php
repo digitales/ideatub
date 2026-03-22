@@ -205,4 +205,132 @@ class ThoughtTypePagesTest extends TestCase
 
         $this->assertFalse(ThoughtTypeNavigation::isAvailable('jira'));
     }
+
+    public function test_idea_index_email_thought_type_label_links_to_emails_stream_and_destination_ok(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Email card type label',
+            'parent_id' => null,
+            'source' => 'email',
+        ]);
+
+        $href = route('idea.stream.emails');
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+        $response->assertSee('href="'.$href.'"', false);
+        $response->assertSee('class="thought-type-badge-link', false);
+        $response->assertSee('>Email</a>', false);
+
+        $this->actingAs($user)->get($href)->assertOk();
+    }
+
+    public function test_idea_index_jira_thought_type_label_links_to_jira_stream_and_destination_ok(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Jira card type label',
+            'parent_id' => null,
+            'source' => 'jira',
+        ]);
+
+        $href = route('idea.stream.jira');
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+        $response->assertSee('href="'.$href.'"', false);
+
+        $this->actingAs($user)->get($href)->assertOk();
+    }
+
+    public function test_idea_index_research_thought_type_label_links_to_research_stream_and_destination_ok(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Research card type label',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'research'],
+        ]);
+
+        $href = route('idea.stream.research');
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+        $response->assertSee('href="'.$href.'"', false);
+
+        $this->actingAs($user)->get($href)->assertOk();
+    }
+
+    public function test_idea_index_plan_thought_type_label_links_to_plans_stream_and_destination_ok(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Plan card type label',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'plan'],
+        ]);
+
+        $href = route('idea.stream.plans');
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+        $response->assertSee('href="'.$href.'"', false);
+
+        $this->actingAs($user)->get($href)->assertOk();
+    }
+
+    public function test_emails_stream_thought_cards_include_type_link_to_canonical_href(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'On emails stream page',
+            'parent_id' => null,
+            'source' => 'email',
+        ]);
+
+        $href = route('idea.stream.emails');
+        $response = $this->actingAs($user)->get($href);
+        $response->assertOk();
+        $response->assertSee('href="'.$href.'"', false);
+    }
+
+    public function test_non_routable_thought_does_not_render_placeholder_or_empty_href_links(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'WebOnlyNoRoutableTypeLabel987',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+        $response->assertSee('WebOnlyNoRoutableTypeLabel987');
+        $this->assertStringNotContainsString('href="#"', $response->getContent());
+        $this->assertStringNotContainsString("href='#'", $response->getContent());
+    }
+
+    public function test_malformed_metadata_type_does_not_throw_on_idea_index(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Malformed meta type',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => ['nested' => 'x']],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+        $response->assertSee('Malformed meta type');
+    }
 }
