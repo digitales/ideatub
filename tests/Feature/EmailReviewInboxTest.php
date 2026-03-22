@@ -131,7 +131,6 @@ class EmailReviewInboxTest extends TestCase
     public function test_email_review_action_works_for_captured_inbound_email_source(): void
     {
         $this->fakeOpenRouterForThoughtCapture();
-        Bus::fake();
 
         $user = User::factory()->create();
         $captured = CapturedInboundEmail::query()->create([
@@ -547,11 +546,14 @@ class EmailReviewInboxTest extends TestCase
             $rawActionCreatedAt = DB::table('inbox_item_actions')->where('id', $action->id)->value('created_at');
 
             // The classify timestamp in metadata matches the InboxItemAction row's created_at.
-            // Note: inbox_items.actioned_at is now the thought-creation timestamp (from saveReviewedEmailAsThought).
+            // Note: inbox_items.actioned_at is now the thought-creation timestamp (from saveReviewedEmailAsThought),
+            // distinct from the classify timestamp stored in InboxItemAction metadata.
             $this->assertSame(
                 Carbon::createFromFormat('Y-m-d H:i:s', $rawActionCreatedAt, 'UTC')->toIso8601String(),
                 $imported->processing_metadata_json['email_review_triage']['classified_at'] ?? null
             );
+            $inbox->refresh();
+            $this->assertNotNull($inbox->actioned_at);
         } finally {
             Carbon::setTestNow();
             config(['app.timezone' => $originalTimezone]);
