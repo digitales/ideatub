@@ -37,6 +37,24 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Root thought body for detail view', false);
     }
 
+    public function test_non_email_thought_detail_page_renders_markdown_content(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'web',
+            'content' => "# Thought heading\n\nSome **bold** text.",
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee('<h1>Thought heading</h1>', false);
+        $response->assertSee('<strong>bold</strong>', false);
+    }
+
     public function test_other_user_cannot_view_thought_show_page(): void
     {
         $owner = User::factory()->create();
