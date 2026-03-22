@@ -44,6 +44,20 @@ class StreamPageTest extends TestCase
         $response->assertSee('thought-edit-requested', false);
     }
 
+    public function test_stream_page_renders_a_single_polling_refetch_path(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Stream thought for polling script',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $this->assertSame(1, substr_count($response->getContent(), 'function refetchStream()'));
+    }
+
     public function test_stream_page_redirects_guests(): void
     {
         $response = $this->get(route('idea.stream'));
@@ -242,6 +256,45 @@ class StreamPageTest extends TestCase
         $response->assertDontSee('Jira ticket PROJ-123');
     }
 
+    public function test_stream_excludes_case_insensitive_jira_thoughts(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Normal thought',
+            'parent_id' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Uppercase Jira ticket',
+            'parent_id' => null,
+            'source' => 'JIRA',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Normal thought');
+        $response->assertDontSee('Uppercase Jira ticket');
+    }
+
+    public function test_stream_includes_research_thoughts_unlike_home_recent_feed(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Research doc root',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'Research'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Research doc root');
+    }
+
     public function test_jira_stream_shows_only_jira_thoughts(): void
     {
         $user = User::factory()->create();
@@ -295,5 +348,6 @@ class StreamPageTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSeeInOrder(['Newer Jira event', 'Older Jira event']);
+        $response->assertSee('data-stream-since="2026-03-20T12:00:00.000+0000"', false);
     }
 }
