@@ -315,6 +315,8 @@ class ThoughtTypePagesTest extends TestCase
         $response->assertSee('WebOnlyNoRoutableTypeLabel987');
         $this->assertStringNotContainsString('href="#"', $response->getContent());
         $this->assertStringNotContainsString("href='#'", $response->getContent());
+        $this->assertStringNotContainsString('href=""', $response->getContent());
+        $this->assertStringNotContainsString("href=''", $response->getContent());
     }
 
     public function test_malformed_metadata_type_does_not_throw_on_idea_index(): void
@@ -331,6 +333,15 @@ class ThoughtTypePagesTest extends TestCase
         $response = $this->actingAs($user)->get(route('idea.index'));
         $response->assertOk();
         $response->assertSee('Malformed meta type');
+        $xpath = $this->xpathFromResponse($response);
+        $badgeLinks = $xpath->query(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ')]"
+        );
+        $this->assertSame(0, $badgeLinks->length);
+        $this->assertStringNotContainsString('href="#"', $response->getContent());
+        $this->assertStringNotContainsString("href='#'", $response->getContent());
+        $this->assertStringNotContainsString('href=""', $response->getContent());
+        $this->assertStringNotContainsString("href=''", $response->getContent());
     }
 
     private function assertThoughtBadgeLink(TestResponse $response, string $label, string $href): void

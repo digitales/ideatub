@@ -309,8 +309,16 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
 
         $response->assertOk();
-        $this->assertStringNotContainsString(route('idea.stream.jira'), $response->getContent());
-        $response->assertDontSee('thought-type-badge-link', false);
+        $xpath = $this->xpathFromResponse($response);
+        $badgeSpans = $xpath->query(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge ') and normalize-space(.)='Jira']"
+        );
+        $this->assertSame(1, $badgeSpans->length);
+
+        $badgeLinks = $xpath->query(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='Jira']"
+        );
+        $this->assertSame(0, $badgeLinks->length);
     }
 
     public function test_user_can_post_a_reply_from_the_detail_page(): void
