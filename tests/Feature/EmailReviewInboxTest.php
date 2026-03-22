@@ -548,10 +548,14 @@ class EmailReviewInboxTest extends TestCase
 
             // The classify timestamp in metadata matches the InboxItemAction row's created_at.
             // Note: inbox_items.actioned_at is now the thought-creation timestamp (from saveReviewedEmailAsThought).
+            // Note: inbox_items.actioned_at is now the thought-creation timestamp (from saveReviewedEmailAsThought),
+            // distinct from the classify timestamp stored in InboxItemAction metadata.
             $this->assertSame(
                 Carbon::createFromFormat('Y-m-d H:i:s', $rawActionCreatedAt, 'UTC')->toIso8601String(),
                 $imported->processing_metadata_json['email_review_triage']['classified_at'] ?? null
             );
+            $inbox->refresh();
+            $this->assertNotNull($inbox->actioned_at);
         } finally {
             Carbon::setTestNow();
             config(['app.timezone' => $originalTimezone]);

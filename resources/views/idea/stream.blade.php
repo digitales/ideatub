@@ -1,12 +1,18 @@
-@extends('layouts.idea') 
+@extends('layouts.idea')
 
-@section('title', isset($streamJira) && $streamJira ? 'Jira — IdeaTub' : ($tag ? 'Tag: ' . e($tag) . ' — IdeaTub' : 'Stream — IdeaTub'))
+@php
+    use App\Support\ThoughtTypeNavigation;
+    $__collectionKey = $streamCollectionKey ?? ((isset($streamJira) && $streamJira) ? 'jira' : null);
+    $__typedStreamRouteName = $__collectionKey ? ThoughtTypeNavigation::routeName($__collectionKey) : null;
+@endphp
 
-    @section('content')
+@section('title', $__collectionKey ? ThoughtTypeNavigation::documentTitle($__collectionKey) : ($tag ? 'Tag: ' . e($tag) . ' — IdeaTub' : 'Stream — IdeaTub'))
+
+@section('content')
         <div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
             <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-6">
-                @if(isset($streamJira) && $streamJira)
-                    Jira
+                @if($__collectionKey)
+                    {{ ThoughtTypeNavigation::collectionLabel($__collectionKey) }}
                 @elseif($tag)
                     Tag: {{e($tag)}}
                 @else
@@ -14,18 +20,28 @@
                 @endif
             </h1>
 
-            @if($tag || (isset($streamJira) && $streamJira))
+            @if (! $tag)
+                @include('idea.partials.stream_type_nav', ['active' => $__collectionKey ?? 'all'])
+            @endif
+
+            @if($tag)
                 <p class="text-center mb-4">
                     <a href="{{ route('idea.stream') }}" class="text-[12px] font-medium text-memory-violet hover:underline">
-                        {{ (isset($streamJira) && $streamJira) ? 'All thoughts' : 'All thoughts' }}
+                        All thoughts
                     </a>
                 </p>
             @endif
 
             @if($thoughts->isEmpty())
                 <div class="rounded-xl border border-memory-violet/10 bg-white/50 px-4 py-8 text-center text-sm text-slate-brand/50">
-                    @if(isset($streamJira) && $streamJira)
+                    @if($__collectionKey === 'jira')
                         No Jira activity yet. @if(config('services.jira.enabled', true))<a href="{{ route('settings.jira.index') }}" class="text-memory-violet hover:underline">Sync from Jira settings</a>.@endif
+                    @elseif($__collectionKey === 'email')
+                        No email thoughts yet.
+                    @elseif($__collectionKey === 'research')
+                        No research yet.
+                    @elseif($__collectionKey === 'plan')
+                        No plans yet.
                     @elseif($tag)
                         No thoughts with tag ‘{{e($tag)}}’. <a href="{{route('idea.stream')}}" class="text-memory-violet hover:underline">All thoughts</a>
                     @else
@@ -38,12 +54,12 @@
                     Showing <span id="stream-showing-count">{{$thoughts->count()}}</span> of <span id="stream-total-count">{{$thoughts->total()}}</span> thoughts
                 </p>
                 <div id="stream-thoughts-list"
-                    data-stream-refetch-url="{{ (isset($streamJira) && $streamJira) ? route('idea.stream.jira') : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
-                    data-stream-since="{{ $thoughts->first()->created_at->toIso8601String() }}">
-                    @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag, 'shareByThoughtId' => $shareByThoughtId ?? collect()]) 
+                    data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
+                    data-stream-since="{{ $streamSince }}">
+                    @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag, 'shareByThoughtId' => $shareByThoughtId ?? collect()])
                 </div>
                 @if($thoughts->hasMorePages())
-                    <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{ (isset($streamJira) && $streamJira) ? route('idea.stream.jira') : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}" data-stream-total="{{$thoughts->total()}}"></div>
+                    <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}" data-stream-total="{{$thoughts->total()}}"></div>
                 @endif
             @endif
         </div>
@@ -150,57 +166,5 @@
                 </script>
             @endif
 
-            @if(!$thoughts->isEmpty())
-                <script>
-                (function() {
-                    if (!window.ideatub || !window.ideatub.realtime) return;
-                    var list = document.getElementById('stream-thoughts-list');
-                    if (!list) return;
-
-                    var container = list;
-                    var refetchUrl = container.getAttribute('data-stream-refetch-url');
-                    if (!refetchUrl) return;
-
-                    function refetchStream() {
-                        fetch(refetchUrl, {
-                            method: 'GET',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        })
-                        .then(function(r) { return r.json(); })
-                        .then(function(data) {
-                            if (data.html !== undefined) list.innerHTML = data.html;
-                            if (data.count !== undefined) {
-                                var showing = document.getElementById('stream-showing-count');
-                                if (showing) showing.textContent = data.count;
-                            }
-                            if (data.total !== undefined) {
-                                var totalEl = document.getElementById('stream-total-count');
-                                if (totalEl) totalEl.textContent = data.total;
-                            }
-                            if (data.latest_created_at) container.setAttribute('data-stream-since', data.latest_created_at);
-                        });
-                    }
-
-                    var rt = window.ideatub.realtime;
-                    if (rt.realtime_check_url && (rt.driver === 'polling' || !rt.reverb_key)) {
-                        setInterval(function() {
-                            var since = container.getAttribute('data-stream-since') || '';
-                            var url = rt.realtime_check_url + (rt.realtime_check_url.indexOf('?') >= 0 ? '&' : '?') + 'since=' + encodeURIComponent(since);
-                            fetch(url, {
-                                method: 'GET',
-                                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                            })
-                            .then(function(r) { return r.json(); })
-                            .then(function(res) {
-                                if (res && res.has_new) refetchStream();
-                            });
-                        }, 20000);
-                    }
-                })();
-                </script>
-            @endif
         @endpush
-    @endsection
+@endsection

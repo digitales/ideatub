@@ -6,10 +6,12 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserPreference;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\AssertsIdeasSectionNav;
 use Tests\TestCase;
 
 class IdeasToRevisitPageTest extends TestCase
 {
+    use AssertsIdeasSectionNav;
     use RefreshDatabase;
 
     public function test_guest_redirected_to_login(): void
@@ -33,6 +35,16 @@ class IdeasToRevisitPageTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Ideas to revisit');
         $response->assertSee('No ideas to revisit');
+    }
+
+    public function test_revisit_page_is_directly_accessible_and_shows_shared_secondary_nav_with_revisit_active(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.revisit'));
+
+        $response->assertStatus(200);
+        $this->assertIdeasSectionNav($response, 'revisit');
     }
 
     public function test_authenticated_user_sees_list_when_incomplete_ideas_exist(): void

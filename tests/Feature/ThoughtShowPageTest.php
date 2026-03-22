@@ -8,6 +8,7 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class ThoughtShowPageTest extends TestCase
@@ -226,6 +227,148 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee(route('thoughts.store'), false);
     }
 
+    public function test_email_thought_detail_header_includes_emails_stream_link_and_destination_ok(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body email type',
+            'source' => 'email',
+        ]);
+
+        $href = route('idea.stream.emails');
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeLink($response, 'Email', $href);
+
+        $this->actingAs($owner)->get($href)->assertOk();
+    }
+
+    public function test_jira_thought_detail_header_includes_jira_stream_link_and_destination_ok(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body jira type',
+            'source' => 'jira',
+        ]);
+
+        $href = route('idea.stream.jira');
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeLink($response, 'Jira', $href);
+
+        $this->actingAs($owner)->get($href)->assertOk();
+    }
+
+    public function test_research_thought_detail_header_includes_research_stream_link_and_destination_ok(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body research type',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $href = route('idea.stream.research');
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeLink($response, 'Research', $href);
+
+        $this->actingAs($owner)->get($href)->assertOk();
+    }
+
+    public function test_plan_thought_detail_header_includes_plans_stream_link_and_destination_ok(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body plan type',
+            'source' => 'web',
+            'metadata' => ['type' => 'plan', 'tags' => []],
+        ]);
+
+        $href = route('idea.stream.plans');
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeLink($response, 'Plan', $href);
+
+        $this->actingAs($owner)->get($href)->assertOk();
+    }
+
+    public function test_non_canonical_source_detail_header_renders_human_readable_non_link_label(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body web type',
+            'source' => 'web',
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeSpan($response, 'Web');
+        $this->assertNoThoughtBadgeLink($response, 'Web');
+    }
+
+    public function test_missing_source_detail_header_falls_back_to_thought_label(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body without source',
+            'source' => null,
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeSpan($response, 'Thought');
+        $this->assertNoThoughtBadgeLink($response, 'Thought');
+    }
+
+    public function test_jira_disabled_jira_thought_detail_header_does_not_link_to_jira_stream(): void
+    {
+        config(['services.jira.enabled' => false]);
+
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Jira detail when off',
+            'source' => 'jira',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeSpan($response, 'Jira');
+        $this->assertNoThoughtBadgeLink($response, 'Jira');
+    }
+
     public function test_user_can_post_a_reply_from_the_detail_page(): void
     {
         $user = User::factory()->create();
@@ -271,5 +414,48 @@ class ThoughtShowPageTest extends TestCase
             'parent_id' => $thought->id,
             'content' => 'Reply from detail page',
         ]);
+    }
+
+    private function assertThoughtBadgeLink(TestResponse $response, string $label, string $href): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query(sprintf(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='%s' and @href='%s']",
+            $label,
+            $href
+        ));
+
+        $this->assertSame(1, $links->length);
+    }
+
+    private function assertThoughtBadgeSpan(TestResponse $response, string $label): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $spans = $xpath->query(sprintf(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge ') and normalize-space(.)='%s']",
+            $label
+        ));
+
+        $this->assertSame(1, $spans->length);
+    }
+
+    private function assertNoThoughtBadgeLink(TestResponse $response, string $label): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query(sprintf(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='%s']",
+            $label
+        ));
+
+        $this->assertSame(0, $links->length);
+    }
+
+    private function xpathFromResponse(TestResponse $response): \DOMXPath
+    {
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument;
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+
+        return new \DOMXPath($dom);
     }
 }

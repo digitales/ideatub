@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{str_replace('_', '-', app()->getLocale())}}">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="csrf-token" content="{{csrf_token()}}">
 
     <title>@yield('title', config('app.name', 'IdeaTub') . ' — Your thinking space')</title>
 
@@ -13,239 +14,249 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+        <style>
+        [x-cloak] {
+            display: none !important
+        }
+        </style>
 </head>
+
 <body class="font-sans antialiased min-h-screen" style="background: linear-gradient(135deg, #eef2ff 0%, #f3f0ff 50%, #f0f5ff 100%); padding-top: max(0.5rem, env(safe-area-inset-top, 0px));">
 
-    <div
-        x-data="ideaShortcuts()"
-        data-query="{{ e(old('q', $query ?? '')) }}"
-        data-idea-index-url="{{ e(route('idea.index')) }}"
-        @keydown.window="handleKey($event)"
-    >
-    {{-- Nav --}}
-    <nav
-        class="sticky top-0 z-20 flex items-center justify-between px-6 md:px-8 py-4 border-b border-memory-violet/10"
-        style="background: rgba(238,242,255,0.82); backdrop-filter: blur(12px);"
-    >
-        {{-- Logo --}}
-        <a href="{{ route('idea.index') }}" class="text-xs font-semibold tracking-[0.1em] uppercase text-memory-violet flex-shrink-0">
-            IdeaTub
-        </a>
+    <div x-data="ideaShortcuts()" data-query="{{e(old('q', $query ?? ''))}}" data-idea-index-url="{{e(route('idea.index'))}}" @keydown.window="handleKey($event)" <blade ideatub|-open-shortcuts%3D%26%2334%3BshortcutsOpen%20%3D%20true%26%2334%3B%3E>
+        @php
+            $inboxCount = (int) ($inboxActionableCount ?? 0);
+        @endphp
 
-        {{-- Search overlay (shown when searching) --}}
-        <form
-            x-show="searching"
-            x-transition
-            method="GET"
-            action="{{ route('idea.index') }}"
-            class="absolute inset-x-0 top-0 bottom-0 flex items-center px-6 md:px-8 z-10"
-            style="background: rgba(238,242,255,0.95); backdrop-filter: blur(12px);"
-            @click.away="searching = false"
-        >
-            <div class="flex flex-col w-full max-w-lg mx-auto gap-4">
-                <div class="flex items-center gap-3">
-                    <svg class="w-4 h-4 text-neural-teal flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                    </svg>
-                    <input
-                    type="search"
-                    name="q"
-                    x-model="query"
-                    x-ref="searchInput"
-                    x-init="$watch('searching', v => v && $nextTick(() => $refs.searchInput.focus()))"
-                    placeholder="Find a memory…"
-                    class="flex-1 bg-white rounded-md px-3 py-2 border border-slate-200/80 outline-none text-deep-indigo placeholder-slate-brand/50 text-sm focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50"
-                >
-                <button type="button" @click="searching = false" class="text-slate-brand/60 hover:text-slate-brand text-xs">
-                    Cancel
-                </button>
+        {{-- Nav --}}
+        <nav class="sticky top-0 z-20 flex items-center justify-between gap-3 px-6 md:px-8 py-4 border-b border-memory-violet/10 relative" style="background: rgba(238,242,255,0.82); backdrop-filter: blur(12px);">
+            {{-- Logo --}}
+            <a href="{{route('idea.index')}}" class="text-xs font-semibold tracking-[0.1em] uppercase text-memory-violet flex-shrink-0">
+                IdeaTub
+            </a>
+
+            {{-- Search overlay (shown when searching) --}}
+            <form x-show="searching" x-transition method="GET" action="{{route('idea.index')}}" class="absolute inset-x-0 top-0 bottom-0 flex items-center px-6 md:px-8 z-10" style="background: rgba(238,242,255,0.95); backdrop-filter: blur(12px);" <blade click|.away%3D%26%2334%3Bsearching%20%3D%20false%26%2334%3B%3E>
+                <div class="flex flex-col w-full max-w-lg mx-auto gap-4">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-4 h-4 text-neural-teal flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                        </svg>
+                        <input type="search" name="q" x-model="query" x-ref="searchInput" x-init="$watch('searching', v => v && $nextTick(() => $refs.searchInput.focus()))" placeholder="Find a memory…" class="flex-1 bg-white rounded-md px-3 py-2 border border-slate-200/80 outline-none text-deep-indigo placeholder-slate-brand/50 text-sm focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50">
+                        <button type="button" @click="searching = false" class="text-slate-brand/60 hover:text-slate-brand text-xs">
+                            Cancel
+                        </button>
+                    </div>
+                    <p class="text-[11px] text-slate-brand/50 mt-0.5">Escape to close · ⌘K to focus search</p>
                 </div>
-                <p class="text-[11px] text-slate-brand/50 mt-0.5">Escape to close · ⌘K to focus search</p>
+            </form>
+
+            @php
+                $navLinkClass =
+                    'text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors';
+                $accountMenuLabel = 'Account menu';
+
+                if ($inboxCount > 99) {
+                    $accountMenuLabel = 'Account menu, inbox has more than 99 actionable items';
+                } elseif ($inboxCount > 0) {
+                    $accountMenuLabel =
+                        'Account menu, inbox has ' .
+                        $inboxCount .
+                        ' actionable ' .
+                        ($inboxCount === 1 ? 'item' : 'items');
+                }
+            @endphp
+
+            {{-- Desktop primary nav (focused cluster; no wrap — mobile uses overflow menu) --}}
+            <div data-testid="primary-nav" class="hidden lg:flex flex-1 items-center justify-center gap-1 min-w-0" x-show="!searching">
+                <a href="{{route('idea.ideas')}}" class="{{$navLinkClass}}">
+                    Ideas
+                </a>
+                <a href="{{route('idea.stream')}}" class="{{$navLinkClass}}">
+                    Stream
+                </a>
+                <a href="{{route('help')}}" class="{{$navLinkClass}}">
+                    Help
+                </a>
+                <button type="button" @click="shortcutsOpen = true" class="{{$navLinkClass}}">
+                    Keyboard shortcuts
+                </button>
             </div>
-        </form>
 
-        {{-- Right nav items (visible by default; :class so nav shows before Alpine inits) --}}
-        <div class="flex items-center gap-1" :class="{ 'hidden': searching }">
-            <a href="{{ route('idea.ideas') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
-                Ideas
-            </a>
-            <a href="{{ route('inbox.index') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-2">
-                <span>Inbox</span>
-                @if (($inboxActionableCount ?? 0) > 0)
-                    <span data-testid="inbox-badge" class="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-memory-violet/15 px-1.5 py-0.5 text-[10px] font-semibold text-memory-violet">
-                        {{ $inboxActionableCount }}
-                    </span>
-                @endif
-            </a>
-            <a href="{{ route('idea.revisit') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
-                Ideas to revisit
-            </a>
-            <a href="{{ route('idea.stream') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
-                Stream
-            </a>
-            @if (config('services.jira.enabled', true))
-            <a href="{{ route('idea.stream.jira') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
-                Jira
-            </a>
-            @endif
-            <a href="{{ route('help') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
-                Help
-            </a>
-            <button type="button" @click="shortcutsOpen = true" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
-                Keyboard shortcuts
-            </button>
-
-            <div class="w-px h-4 bg-memory-violet/20 mx-2"></div>
-
-            {{-- Search pill --}}
-            <button
-                type="button"
-                @click="searching = true"
-                class="flex items-center gap-1.5 text-xs text-slate-brand bg-white/70 border border-neural-teal/20 rounded-full px-3.5 py-1.5 hover:bg-white hover:border-neural-teal/40 transition-all"
-            >
-                <svg class="w-3 h-3 text-neural-teal" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                </svg>
-                Find a memory
-                <span class="text-[10px] text-slate-brand/50">⌘K</span>
-            </button>
-
-            {{-- Avatar / logout --}}
-            @auth
-                <div x-data="{ open: false }" class="relative ml-1">
-                    <button
-                        @click="open = !open"
-                        class="w-8 h-8 rounded-full text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0"
-                        style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
-                    >
-                        {{ strtoupper(substr(auth()->user()->name ?? auth()->user()->email, 0, 2)) }}
+            {{-- Right: compact / overflow + search + avatar --}}
+            <div class="flex items-center gap-1 flex-shrink-0 ml-auto" :class="{ 'hidden': searching }">
+                {{-- Small viewports: explicit overflow menu (avoids two-row wrapped nav) --}}
+                <div x-data="{ mobileNavOpen: false }" class="relative lg:hidden">
+                    <button type="button" data-testid="mobile-nav-trigger" @click="mobileNavOpen = !mobileNavOpen" :aria-expanded="mobileNavOpen.toString()" aria-controls="mobile-nav-panel" class="inline-flex items-center justify-center rounded-lg border border-memory-violet/15 bg-white/60 px-2.5 py-1.5 text-slate-brand hover:bg-memory-violet/8">
+                        <span class="sr-only">Open navigation menu</span>
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
                     </button>
-                    <div
-                        x-show="open"
-                        x-transition
-                        @click.away="open = false"
-                        class="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-memory-violet/10 py-1 z-30"
-                    >
-                        <a href="{{ route('shared-research.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                            Shared research
-                        </a>
-                        <a href="{{ route('settings.mcp-keys.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                            MCP key
-                        </a>
-                        <a href="{{ route('settings.inbound-emails.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                            Inbound email
-                        </a>
-                        @if (config('services.email_sender_policy.enabled'))
-                        <a href="{{ route('settings.email-sender-rules.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                            Email Sender Rules
-                        </a>
-                        @endif
-                        @if (config('services.mail_sync.enabled', true))
-                        <a href="{{ route('settings.email-accounts.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                            Email Accounts
-                        </a>
-                        @endif
-                        @if (config('services.jira.enabled', true))
-                        <a href="{{ route('settings.jira.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                            Jira
-                        </a>
-                        @endif
-                        <a href="{{ route('settings.ideas-revisit.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                            Ideas to revisit
-                        </a>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="w-full text-left px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                Log out
-                            </button>
-                        </form>
+                    <div id="mobile-nav-panel" data-testid="mobile-nav-panel" x-show="mobileNavOpen" x-transition x-cloak @click.away="mobileNavOpen = false" class="absolute right-0 z-40 mt-2 w-[min(100vw-2rem,20rem)] max-h-[min(80vh,32rem)] overflow-y-auto rounded-xl border border-memory-violet/10 bg-white py-2 shadow-lg">
+                        <a href="{{route('idea.ideas')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3EIdeas%3C%2Fa%3E>
+                            <a href="{{route('idea.stream')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3EStream%3C%2Fa%3E>
+                                <div class="border-t border-memory-violet/10 my-1"></div>
+                                <p class="px-4 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-brand/50">Types
+                                </p>
+                                @foreach(\App\Support\ThoughtTypeNavigation::orderedNavTypes() as $typeKey)
+                                    @if(\App\Support\ThoughtTypeNavigation::isAvailable($typeKey))
+                                        @php$typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey); @endphp 
+                                        <a href="{{route($typeRoute)}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3E>
+                                            {{\App\Support\ThoughtTypeNavigation::collectionLabel($typeKey)}}
+                                        </a>
+                                    @endif
+                                @endforeach
+                                <div class="border-t border-memory-violet/10 my-1"></div>
+                                <a href="{{route('help')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3EHelp%3C%2Fa%3E>
+                                    <button type="button" class="w-full px-4 py-2 text-left text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%3B%20%24dispatch(%26%2339%3Bideatub-open-shortcuts%26%2339%3B)%26%2334%3B%3E>
+                                        Keyboard shortcuts
+                                    </button>
                     </div>
                 </div>
-            @endauth
-        </div>
-    </nav>
 
-    {{-- Page content --}}
-    <main>
-        @yield('content')
-    </main>
+                <div class="hidden sm:block w-px h-4 bg-memory-violet/20 mx-1"></div>
 
-    {{-- Shortcut palette (modal) --}}
-    <div
-        x-show="shortcutsOpen"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        @keydown.escape.window="shortcutsOpen = false"
-        @click.away="shortcutsOpen = false"
-        class="fixed inset-0 z-40 flex items-center justify-center p-4"
-        style="background: rgba(30, 37, 71, 0.4); backdrop-filter: blur(6px);"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="shortcuts-modal-title"
-        x-ref="shortcutsModal"
-        x-effect="shortcutsOpen && $nextTick(() => { const el = $refs.shortcutsModal && $refs.shortcutsModal.querySelector('[autofocus]'); if (el) el.focus(); })"
-    >
-        <div
-            class="rounded-2xl border border-memory-violet/25 bg-white shadow-2xl max-w-md w-full p-6"
-            @click.stop
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="opacity-0 scale-95"
-            x-transition:enter-end="opacity-100 scale-100"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="opacity-100 scale-100"
-            x-transition:leave-end="opacity-0 scale-95"
-        >
-            <h2 id="shortcuts-modal-title" class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>
-            <table class="w-full text-sm text-deep-indigo">
-                <tbody class="divide-y divide-memory-violet/10">
-                    <tr><td class="py-1.5">Focus capture</td><td class="py-1.5 text-right text-slate-brand font-medium">⌘/ or Ctrl+/</td></tr>
-                    <tr><td class="py-1.5">Open search</td><td class="py-1.5 text-right text-slate-brand font-medium">⌘K or Ctrl+K</td></tr>
-                    <tr><td class="py-1.5">Move down / up thought</td><td class="py-1.5 text-right text-slate-brand font-medium">j / k</td></tr>
-                    <tr><td class="py-1.5">Open reply</td><td class="py-1.5 text-right text-slate-brand font-medium">Enter</td></tr>
-                    <tr><td class="py-1.5">Cancel reply / close search</td><td class="py-1.5 text-right text-slate-brand font-medium">Escape</td></tr>
-                    <tr><td class="py-1.5">Submit thought</td><td class="py-1.5 text-right text-slate-brand font-medium">⌘+Enter or Ctrl+Enter</td></tr>
-                    <tr><td class="py-1.5">Show this list</td><td class="py-1.5 text-right text-slate-brand font-medium">?</td></tr>
-                </tbody>
-            </table>
-            <p class="mt-4 text-[11px] text-slate-brand/50">Press Escape or click outside to close</p>
-            <button
-                type="button"
-                autofocus
-                @click="shortcutsOpen = false"
-                class="mt-5 w-full text-sm font-medium text-white py-2 rounded-lg transition-opacity hover:opacity-90"
-                style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
-            >
-                Close
-            </button>
+                {{-- Search pill --}}
+                <button type="button" @click="searching = true" class="flex items-center gap-1.5 text-xs text-slate-brand bg-white/70 border border-neural-teal/20 rounded-full px-3.5 py-1.5 hover:bg-white hover:border-neural-teal/40 transition-all">
+                    <svg class="w-3 h-3 text-neural-teal" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="m21 21-4.35-4.35" />
+                    </svg>
+                    Find a memory
+                    <span class="text-[10px] text-slate-brand/50">⌘K</span>
+                </button>
+
+                {{-- Avatar / logout --}}
+                @auth
+                    <div x-data="{ open: false }" class="relative ml-1">
+                        <button type="button" @click="open = !open" aria-haspopup="true" :aria-expanded="open.toString()" aria-label="{{$accountMenuLabel}}" class="relative w-8 h-8 rounded-full text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0" style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);">
+                            {{strtoupper(substr(auth()->user()->name ?? auth()->user()->email, 0, 2))}}
+                            @if($inboxCount > 0)
+                                <span data-testid="avatar-inbox-badge" aria-hidden="true" class="pointer-events-none absolute -right-1 -top-1 inline-flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-memory-violet px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white">
+                                    {{$inboxCount > 99 ? '99+' : $inboxCount}}
+                                </span>
+                            @endif
+                        </button>
+                        <div x-show="open" x-transition @click.away="open = false" class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-memory-violet/10 py-1 z-30">
+                            <a href="{{route('inbox.index')}}" data-testid="account-menu-inbox-link" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                Inbox
+                            </a>
+                            <a href="{{route('shared-research.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                Shared research
+                            </a>
+                            <a href="{{route('settings.mcp-keys.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                MCP key
+                            </a>
+                            <a href="{{route('settings.inbound-emails.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                Inbound email
+                            </a>
+                            @if(config('services.email_sender_policy.enabled'))
+                                <a href="{{route('settings.email-sender-rules.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                    Email Sender Rules
+                                </a>
+                            @endif
+                            @if(config('services.mail_sync.enabled', true))
+                                <a href="{{route('settings.email-accounts.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                    Email Accounts
+                                </a>
+                            @endif
+                            @if(config('services.jira.enabled', true))
+                                <a href="{{route('settings.jira.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                    Jira
+                                </a>
+                            @endif
+                            <a href="{{route('settings.ideas-revisit.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                Ideas to revisit settings
+                            </a>
+                            <form method="POST" action="{{route('logout')}}">
+                                @csrf
+                                <button type="submit" class="w-full text-left px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                    Log out
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @endauth
+            </div>
+        </nav>
+
+        {{-- Page content --}}
+        <main>
+            @yield('content') 
+        </main>
+
+        {{-- Shortcut palette (modal) --}}
+        <div x-show="shortcutsOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @keydown.escape.window="shortcutsOpen = false" <blade click|.away%3D%26%2334%3BshortcutsOpen%20%3D%20false%26%2334%3B%20class%3D%26%2334%3Bfixed%20inset-0%20z-40%20flex%20items-center%20justify-center%20p-4%26%2334%3B>
+            style="background: rgba(30, 37, 71, 0.4); backdrop-filter: blur(6px);" role="dialog" aria-modal="true"
+            aria-labelledby="shortcuts-modal-title" x-ref="shortcutsModal"
+            x-effect="shortcutsOpen && $nextTick(() => { const el = $refs.shortcutsModal && $refs.shortcutsModal.querySelector('[autofocus]'); if (el) el.focus(); })">
+            <div class="rounded-2xl border border-memory-violet/25 bg-white shadow-2xl max-w-md w-full p-6" @click.stop x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95">
+                <h2 id="shortcuts-modal-title" class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts
+                </h2>
+                <table class="w-full text-sm text-deep-indigo">
+                    <tbody class="divide-y divide-memory-violet/10">
+                        <tr>
+                            <td class="py-1.5">Focus capture</td>
+                            <td class="py-1.5 text-right text-slate-brand font-medium">⌘/ or Ctrl+/</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5">Open search</td>
+                            <td class="py-1.5 text-right text-slate-brand font-medium">⌘K or Ctrl+K</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5">Move down / up thought</td>
+                            <td class="py-1.5 text-right text-slate-brand font-medium">j / k</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5">Open reply</td>
+                            <td class="py-1.5 text-right text-slate-brand font-medium">Enter</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5">Cancel reply / close search</td>
+                            <td class="py-1.5 text-right text-slate-brand font-medium">Escape</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5">Submit thought</td>
+                            <td class="py-1.5 text-right text-slate-brand font-medium">⌘+Enter or Ctrl+Enter</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5">Show this list</td>
+                            <td class="py-1.5 text-right text-slate-brand font-medium">?</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="mt-4 text-[11px] text-slate-brand/50">Press Escape or click outside to close</p>
+                <button type="button" autofocus @click="shortcutsOpen = false" class="mt-5 w-full text-sm font-medium text-white py-2 rounded-lg transition-opacity hover:opacity-90" style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);">
+                    Close
+                </button>
+            </div>
         </div>
-    </div>
     </div>
 
     @auth
-    @php
-        $realtimeConfig = [
-            'driver' => config('realtime.driver'),
-            'reverb_key' => config('broadcasting.connections.reverb.key') ?? null,
-            'reverb_host' => config('broadcasting.connections.reverb.options.host') ?? null,
-            'reverb_port' => config('broadcasting.connections.reverb.options.port') ?? null,
-            'reverb_scheme' => config('broadcasting.connections.reverb.options.scheme') ?? 'https',
-            'user_id' => auth()->id(),
-            'recent_url' => route('idea.index'),
-            'stream_url' => route('idea.stream'),
-            'ideas_url' => route('idea.ideas'),
-            'realtime_check_url' => route('api.thoughts.realtime-check'),
-        ];
-    @endphp
-    <script>
+        @php
+            $realtimeConfig = [
+                'driver' => config('realtime.driver'),
+                'reverb_key' => config('broadcasting.connections.reverb.key') ?? null,
+                'reverb_host' => config('broadcasting.connections.reverb.options.host') ?? null,
+                'reverb_port' => config('broadcasting.connections.reverb.options.port') ?? null,
+                'reverb_scheme' => config('broadcasting.connections.reverb.options.scheme') ?? 'https',
+                'user_id' => auth()->id(),
+                'recent_url' => route('idea.index'),
+                'stream_url' => route('idea.stream'),
+                'ideas_url' => route('idea.ideas'),
+                'realtime_check_url' => route('api.thoughts.realtime-check'),
+            ];
+        @endphp
+        <script>
         window.ideatub = window.ideatub || {};
         window.ideatub.realtime = @json($realtimeConfig);
-    </script>
+        </script>
     @endauth
 
-    @stack('scripts')
+    @stack('scripts') 
 </body>
+
 </html>

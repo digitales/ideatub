@@ -6,6 +6,7 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class IdeaPageTest extends TestCase
@@ -43,7 +44,7 @@ class IdeaPageTest extends TestCase
     public function test_idea_page_shows_stored_thoughts(): void
     {
         $user = User::factory()->create();
-        $thought = \App\Models\Thought::factory()->create([
+        $thought = Thought::factory()->create([
             'user_id' => $user->id,
             'content' => 'This is a test thought about semantic search',
         ]);
@@ -121,6 +122,36 @@ class IdeaPageTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Normal recent thought');
         $response->assertDontSee('Jira synced ticket');
+    }
+
+    public function test_idea_page_recent_thoughts_exclude_case_insensitive_jira_and_research(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Normal recent thought',
+            'parent_id' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Uppercase Jira synced ticket',
+            'parent_id' => null,
+            'source' => 'JIRA',
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Mixed case research note',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'Research'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Normal recent thought');
+        $response->assertDontSee('Uppercase Jira synced ticket');
+        $response->assertDontSee('Mixed case research note');
     }
 
     public function test_idea_page_shows_search_results(): void
@@ -258,5 +289,224 @@ class IdeaPageTest extends TestCase
         $response = $this->actingAs($user)->get(route('example-prompts'));
 
         $response->assertRedirect('/help#example-prompts');
+    }
+
+    public function test_authenticated_layout_includes_stable_navigation_test_hooks(): void
+    {
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        foreach ([
+            'primary-nav',
+            'types-menu-trigger',
+            'types-menu-list',
+            'mobile-nav-trigger',
+            'mobile-nav-panel',
+            'account-menu-inbox-link',
+        ] as $id) {
+            $response->assertSee('data-testid="'.$id.'"', false);
+        }
+    }
+
+    public function test_primary_nav_is_removed_from_focus_flow_while_search_is_open(): void
+    {
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-testid="primary-nav"', false);
+        $response->assertSee('x-show="!searching"', false);
+        $response->assertDontSee('invisible pointer-events-none', false);
+    }
+
+    public function test_primary_nav_cluster_contains_only_focused_destinations(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $xpath = $this->xpathFromResponse($response);
+        $primary = $xpath->query('//*[@data-testid="primary-nav"]')->item(0);
+        $this->assertNotNull($primary);
+        $text = $primary->textContent ?? '';
+        $this->assertStringContainsString('Ideas', $text);
+        $this->assertStringContainsString('Stream', $text);
+        $this->assertStringContainsString('Types', $text);
+        $this->assertStringContainsString('Help', $text);
+        $this->assertStringContainsString('Keyboard shortcuts', $text);
+        $this->assertStringNotContainsString('Inbox', $text);
+        $this->assertStringNotContainsString('Ideas to revisit', $text);
+
+        // No top-level Jira nav item; Jira may only appear inside the Types dropdown.
+        $jiraOutsideTypes = $xpath->query(
+            './/a[normalize-space(.)="Jira" and not(ancestor::*[@data-testid="types-menu-list"])]',
+            $primary
+        );
+        $this->assertSame(0, $jiraOutsideTypes->length);
+
+        $inboxLinks = $xpath->query('.//a[contains(@href, "inbox")]', $primary);
+        $this->assertSame(0, $inboxLinks->length);
+    }
+
+    public function test_types_menu_lists_type_collections_in_order(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query('//*[@data-testid="types-menu-list"]//a[@role="menuitem"]');
+        $labels = [];
+        foreach ($links as $link) {
+            $labels[] = trim($link->textContent);
+        }
+
+        $this->assertSame(['Jira', 'Emails', 'Research', 'Plans'], $labels);
+    }
+
+    public function test_types_menu_omits_jira_when_jira_is_disabled(): void
+    {
+        config(['services.jira.enabled' => false]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query('//*[@data-testid="types-menu-list"]//a[@role="menuitem"]');
+        $labels = [];
+        foreach ($links as $link) {
+            $labels[] = trim($link->textContent);
+        }
+
+        $this->assertSame(['Emails', 'Research', 'Plans'], $labels);
+    }
+
+    public function test_jira_disabled_types_menu_and_thought_badge_stay_consistent_on_idea_index(): void
+    {
+        config(['services.jira.enabled' => false]);
+
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->with('parityjiraidx')->andReturn($fakeEmbedding);
+        });
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'parityjiraidx Parity jira thought row',
+            'parent_id' => null,
+            'source' => 'jira',
+            'embedding' => $fakeEmbedding,
+        ]);
+
+        // Recent feed excludes Jira; semantic search still surfaces the thought on `idea.index?q=`.
+        $response = $this->actingAs($user)->get(route('idea.index', ['q' => 'parityjiraidx']));
+        $response->assertOk();
+
+        $xpath = $this->xpathFromResponse($response);
+        $links = $xpath->query('//*[@data-testid="types-menu-list"]//a[@role="menuitem"]');
+        $labels = [];
+        foreach ($links as $link) {
+            $labels[] = trim($link->textContent);
+        }
+        $this->assertSame(['Emails', 'Research', 'Plans'], $labels);
+
+        $response->assertSee('parityjiraidx Parity jira thought row');
+        $badgeSpans = $xpath->query(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge ') and normalize-space(.)='Jira']"
+        );
+        $this->assertSame(1, $badgeSpans->length);
+
+        $badgeLinks = $xpath->query(
+            "//*[contains(concat(' ', normalize-space(@class), ' '), ' thought-type-badge-link ') and normalize-space(.)='Jira']"
+        );
+        $this->assertSame(0, $badgeLinks->length);
+    }
+
+    public function test_compact_overflow_navigation_contains_reachable_entries(): void
+    {
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        $xpath = $this->xpathFromResponse($response);
+        $panel = $xpath->query('//*[@data-testid="mobile-nav-panel"]')->item(0);
+
+        $this->assertNotNull($panel);
+        $this->assertSame(1, $xpath->query('//*[@data-testid="mobile-nav-trigger"]')->length);
+
+        $labels = [];
+        foreach ($xpath->query('.//a | .//button', $panel) as $item) {
+            $labels[] = trim($item->textContent);
+        }
+
+        $this->assertContains('Ideas', $labels);
+        $this->assertContains('Stream', $labels);
+        $this->assertContains('Help', $labels);
+        $this->assertContains('Keyboard shortcuts', $labels);
+        $this->assertContains('Jira', $labels);
+        $this->assertContains('Emails', $labels);
+        $this->assertContains('Research', $labels);
+        $this->assertContains('Plans', $labels);
+
+        $typeLabel = $xpath->query('.//p[normalize-space(.)="Types"]', $panel);
+        $this->assertSame(1, $typeLabel->length);
+    }
+
+    public function test_mobile_nav_lists_type_collections_in_order(): void
+    {
+        config(['services.jira.enabled' => true]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $this->assertSame(
+            ['Jira', 'Emails', 'Research', 'Plans'],
+            $this->mobileTypeLabelsFromResponse($response)
+        );
+    }
+
+    public function test_mobile_nav_omits_jira_when_jira_is_disabled(): void
+    {
+        config(['services.jira.enabled' => false]);
+
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+
+        $this->assertSame(
+            ['Emails', 'Research', 'Plans'],
+            $this->mobileTypeLabelsFromResponse($response)
+        );
+    }
+
+    private function xpathFromResponse(TestResponse $response): \DOMXPath
+    {
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument;
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+
+        return new \DOMXPath($dom);
+    }
+
+    private function mobileTypeLabelsFromResponse(TestResponse $response): array
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $panel = $xpath->query('//*[@data-testid="mobile-nav-panel"]')->item(0);
+        $this->assertNotNull($panel);
+
+        $labels = [];
+        foreach ($xpath->query('.//a[contains(@href, "/stream/")]', $panel) as $link) {
+            $labels[] = trim($link->textContent);
+        }
+
+        return $labels;
     }
 }

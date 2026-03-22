@@ -36,9 +36,7 @@
                     }
                 @endphp
                 <span class="text-[10.5px] text-slate-brand/40">{{ ($activityAt ?? $thought->created_at)->diffForHumans() }}</span>
-                @if ($thought->source)
-                    <span class="text-[10.5px] text-slate-brand/40">{{ ucfirst(strtolower($thought->source)) }}</span>
-                @endif
+                @include('idea.partials.thought_type_badge', ['thought' => $thought])
                 @include('idea.partials.email_newsletter_research_status', ['thought' => $thought])
                 @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
             </div>

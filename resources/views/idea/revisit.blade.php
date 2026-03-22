@@ -8,6 +8,8 @@
     <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-2">Ideas to revisit</h1>
     <p class="text-center text-sm text-slate-brand/70 mb-6">Incomplete ideas, oldest first. <a href="{{ route('settings.ideas-revisit.index') }}" class="text-memory-violet hover:underline">Settings</a></p>
 
+    @include('idea.partials.ideas_section_nav', ['active' => 'revisit'])
+
     @if (empty($ideas))
         <div class="rounded-xl border border-memory-violet/10 bg-white/50 px-4 py-12 text-center text-sm text-slate-brand/50">
             No ideas to revisit. Add ideas on <a href="{{ route('idea.ideas') }}" class="text-memory-violet hover:underline">Ideas</a> and leave them incomplete to see them here.
