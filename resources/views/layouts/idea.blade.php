@@ -98,11 +98,14 @@
                         <a href="{{route('idea.ideas')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3EIdeas%3C%2Fa%3E>
                             <a href="{{route('idea.stream')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3EStream%3C%2Fa%3E>
                                 <div class="border-t border-memory-violet/10 my-1"></div>
-                                <p class="px-4 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-brand/50">Types
+                                <p class="px-4 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-brand/50">
+                                    Types
                                 </p>
                                 @foreach(\App\Support\ThoughtTypeNavigation::orderedNavTypes() as $typeKey)
                                     @if(\App\Support\ThoughtTypeNavigation::isAvailable($typeKey))
-                                        @php$typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey); @endphp 
+                                        @php
+                                            $typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey);
+                                        @endphp
                                         <a href="{{route($typeRoute)}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3E>
                                             {{\App\Support\ThoughtTypeNavigation::collectionLabel($typeKey)}}
                                         </a>
