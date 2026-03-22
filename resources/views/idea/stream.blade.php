@@ -20,7 +20,11 @@
                 @endif
             </h1>
 
-            @if($tag || $__collectionKey)
+            @if (! $tag)
+                @include('idea.partials.stream_type_nav', ['active' => $__collectionKey ?? 'all'])
+            @endif
+
+            @if($tag)
                 <p class="text-center mb-4">
                     <a href="{{ route('idea.stream') }}" class="text-[12px] font-medium text-memory-violet hover:underline">
                         All thoughts
