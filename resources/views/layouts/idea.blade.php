@@ -267,7 +267,7 @@
                         </a>
                         @endif
                         <a href="{{ route('settings.ideas-revisit.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                            Ideas to revisit
+                            Ideas to revisit settings
                         </a>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
