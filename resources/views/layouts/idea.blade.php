@@ -76,25 +76,6 @@
                 <a href="{{route('idea.stream')}}" class="{{$navLinkClass}}">
                     Stream
                 </a>
-                <div x-data="{ typesOpen: false }" class="relative">
-                    <button type="button" data-testid="types-menu-trigger" @click="typesOpen = !typesOpen" :aria-expanded="typesOpen.toString()" aria-haspopup="true" class="{{$navLinkClass}}">
-                        Types
-                    </button>
-                    <div x-show="typesOpen" x-transition x-cloak @click.away="typesOpen = false" <blade keydown|.escape.window%3D%26%2334%3BtypesOpen%20%3D%20false%26%2334%3B%20data-testid%3D%26%2334%3Btypes-menu-list%26%2334%3B>
-                        class="absolute left-0 mt-2 min-w-[11rem] rounded-xl border border-memory-violet/10 bg-white py-1 shadow-lg z-40"
-                        role="menu">
-                        @foreach(\App\Support\ThoughtTypeNavigation::orderedNavTypes() as $typeKey)
-                            @if(\App\Support\ThoughtTypeNavigation::isAvailable($typeKey))
-                                @php
-                                    $typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey);
-                                @endphp
-                                <a href="{{route($typeRoute)}}" role="menuitem" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5 hover:text-deep-indigo" <blade click|%3D%26%2334%3BtypesOpen%20%3D%20false%26%2334%3B%3E>
-                                    {{\App\Support\ThoughtTypeNavigation::collectionLabel($typeKey)}}
-                                </a>
-                            @endif
-                        @endforeach
-                    </div>
-                </div>
                 <a href="{{route('help')}}" class="{{$navLinkClass}}">
                     Help
                 </a>
@@ -114,24 +95,19 @@
                         </svg>
                     </button>
                     <div id="mobile-nav-panel" data-testid="mobile-nav-panel" x-show="mobileNavOpen" x-transition x-cloak @click.away="mobileNavOpen = false" class="absolute right-0 z-40 mt-2 w-[min(100vw-2rem,20rem)] max-h-[min(80vh,32rem)] overflow-y-auto rounded-xl border border-memory-violet/10 bg-white py-2 shadow-lg">
-                        <a href="{{route('idea.ideas')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3EIdeas%3C%2Fa%3E>
-                            <a href="{{route('idea.stream')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3EStream%3C%2Fa%3E>
-                                <div class="border-t border-memory-violet/10 my-1"></div>
-                                <p class="px-4 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-brand/50">
-                                    Types</p>
-                                @foreach(\App\Support\ThoughtTypeNavigation::orderedNavTypes() as $typeKey)
-                                    @if(\App\Support\ThoughtTypeNavigation::isAvailable($typeKey))
-                                        @php$typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey); @endphp 
-                                        <a href="{{route($typeRoute)}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3E>
-                                            {{\App\Support\ThoughtTypeNavigation::collectionLabel($typeKey)}}
-                                        </a>
-                                    @endif
-                                @endforeach
-                                <div class="border-t border-memory-violet/10 my-1"></div>
-                                <a href="{{route('help')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3EHelp%3C%2Fa%3E>
-                                    <button type="button" class="w-full px-4 py-2 text-left text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%3B%20%24dispatch(%26%2339%3Bideatub-open-shortcuts%26%2339%3B)%26%2334%3B%3E>
-                                        Keyboard shortcuts
-                                    </button>
+                        <a href="{{route('idea.ideas')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                            Ideas
+                        </a>
+                        <a href="{{route('idea.stream')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                            Stream
+                        </a>
+                        <div class="border-t border-memory-violet/10 my-1"></div>
+                        <a href="{{route('help')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                            Help
+                        </a>
+                        <button type="button" class="w-full px-4 py-2 text-left text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false; $dispatch('ideatub-open-shortcuts')">
+                            Keyboard shortcuts
+                        </button>
                     </div>
                 </div>
 
@@ -203,7 +179,7 @@
 
         {{-- Page content --}}
         <main>
-            @yield('content') 
+            @yield('content')
         </main>
 
         {{-- Shortcut palette (modal) --}}
@@ -275,7 +251,7 @@
         </script>
     @endauth
 
-    @stack('scripts') 
+    @stack('scripts')
 </body>
 
 </html>
