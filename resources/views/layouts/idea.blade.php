@@ -76,6 +76,25 @@
                 <a href="{{route('idea.stream')}}" class="{{$navLinkClass}}">
                     Stream
                 </a>
+                <div x-data="{ typesOpen: false }" class="relative">
+                    <button type="button" data-testid="types-menu-trigger" @click="typesOpen = !typesOpen" :aria-expanded="typesOpen.toString()" aria-haspopup="true" class="{{$navLinkClass}}">
+                        Types
+                    </button>
+                    <div x-show="typesOpen" x-transition x-cloak @click.away="typesOpen = false" <blade keydown|.escape.window%3D%26%2334%3BtypesOpen%20%3D%20false%26%2334%3B%20data-testid%3D%26%2334%3Btypes-menu-list%26%2334%3B>
+                        class="absolute left-0 mt-2 min-w-[11rem] rounded-xl border border-memory-violet/10 bg-white py-1 shadow-lg z-40"
+                        role="menu">
+                        @foreach(\App\Support\ThoughtTypeNavigation::orderedNavTypes() as $typeKey)
+                            @if(\App\Support\ThoughtTypeNavigation::isAvailable($typeKey))
+                                @php
+                                    $typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey);
+                                @endphp
+                                <a href="{{route($typeRoute)}}" role="menuitem" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5 hover:text-deep-indigo" <blade click|%3D%26%2334%3BtypesOpen%20%3D%20false%26%2334%3B%3E>
+                                    {{\App\Support\ThoughtTypeNavigation::collectionLabel($typeKey)}}
+                                </a>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
                 <a href="{{route('help')}}" class="{{$navLinkClass}}">
                     Help
                 </a>
@@ -99,13 +118,10 @@
                             <a href="{{route('idea.stream')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3EStream%3C%2Fa%3E>
                                 <div class="border-t border-memory-violet/10 my-1"></div>
                                 <p class="px-4 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-brand/50">
-                                    Types
-                                </p>
+                                    Types</p>
                                 @foreach(\App\Support\ThoughtTypeNavigation::orderedNavTypes() as $typeKey)
                                     @if(\App\Support\ThoughtTypeNavigation::isAvailable($typeKey))
-                                        @php
-                                            $typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey);
-                                        @endphp
+                                        @php$typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey); @endphp 
                                         <a href="{{route($typeRoute)}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" <blade click|%3D%26%2334%3BmobileNavOpen%20%3D%20false%26%2334%3B%3E>
                                             {{\App\Support\ThoughtTypeNavigation::collectionLabel($typeKey)}}
                                         </a>
