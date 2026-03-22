@@ -6,10 +6,12 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\AssertsIdeasSectionNav;
 use Tests\TestCase;
 
 class IdeaIdeasTest extends TestCase
 {
+    use AssertsIdeasSectionNav;
     use RefreshDatabase;
 
     public function test_ideas_page_loads_empty_for_authenticated_user(): void
@@ -22,6 +24,16 @@ class IdeaIdeasTest extends TestCase
         $response->assertSee('Ideas');
         $response->assertSee('Add idea');
         $response->assertSee('No ideas yet');
+    }
+
+    public function test_ideas_page_shows_shared_secondary_nav_with_ideas_active(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertStatus(200);
+        $this->assertIdeasSectionNav($response, 'ideas');
     }
 
     public function test_ideas_page_redirects_guests(): void

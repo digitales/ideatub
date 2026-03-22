@@ -5,12 +5,14 @@ namespace App\Models;
 use App\Events\ThoughtCreated;
 use App\Jobs\SyncThoughtToEvernote;
 use App\Services\EvernoteService;
+use App\Support\ThoughtTypeNavigation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Pgvector\Laravel\Distance;
 use Pgvector\Laravel\HasNeighbors;
 use Pgvector\Laravel\Vector;
@@ -95,7 +97,7 @@ class Thought extends Model
      *
      * @param  array<float>|Vector  $embedding
      */
-    public function scopeNearestTo(\Illuminate\Database\Eloquent\Builder $query, array|Vector $embedding, int $limit = 10): void
+    public function scopeNearestTo(Builder $query, array|Vector $embedding, int $limit = 10): void
     {
         $query->nearestNeighbors('embedding', $embedding, Distance::Cosine);
         $query->take($limit);
@@ -228,24 +230,61 @@ class Thought extends Model
     }
 
     /**
-     * Scope to exclude thoughts with metadata type 'research' (e.g. from recent/feed).
+     * Scope to exclude thoughts matching the canonical research type (e.g. from recent/feed).
      */
     public function scopeExcludingResearch(Builder $query): Builder
     {
-        return $query->where(function (Builder $q) {
-            $q->where('metadata->type', '!=', 'research')
-                ->orWhereNull('metadata->type');
-        });
+        return $this->scopeExcludingCanonicalMetadataType($query, 'research');
     }
 
     /**
-     * Scope to exclude Jira-sourced thoughts (e.g. from homepage recent and main stream).
+     * Scope to exclude thoughts matching the canonical Jira type (e.g. from homepage recent and main stream).
      */
     public function scopeExcludingJira(Builder $query): Builder
     {
-        return $query->where(function (Builder $q) {
-            $q->whereNull('source')->orWhere('source', '!=', 'jira');
-        });
+        return $this->scopeExcludingCanonicalSourceType($query, 'jira');
+    }
+
+    public function scopeMatchingCanonicalSourceType(Builder $query, string $canonicalType): Builder
+    {
+        return self::applyCanonicalTypeMatch(
+            $query,
+            'LOWER(COALESCE(source, ?))',
+            ThoughtTypeNavigation::storedValuesForCollection($canonicalType),
+            true,
+            ['']
+        );
+    }
+
+    public function scopeExcludingCanonicalSourceType(Builder $query, string $canonicalType): Builder
+    {
+        return self::applyCanonicalTypeMatch(
+            $query,
+            'LOWER(COALESCE(source, ?))',
+            ThoughtTypeNavigation::storedValuesForCollection($canonicalType),
+            false,
+            ['']
+        );
+    }
+
+    public function scopeMatchingCanonicalMetadataType(Builder $query, string $canonicalType): Builder
+    {
+        return self::applyCanonicalTypeMatch(
+            $query,
+            self::canonicalMetadataTypeSqlExpression($query),
+            ThoughtTypeNavigation::storedValuesForCollection($canonicalType),
+            true
+        );
+    }
+
+    public function scopeExcludingCanonicalMetadataType(Builder $query, string $canonicalType): Builder
+    {
+        return self::applyCanonicalTypeMatch(
+            $query,
+            self::canonicalMetadataTypeSqlExpression($query),
+            ThoughtTypeNavigation::storedValuesForCollection($canonicalType),
+            false
+        );
     }
 
     /**
@@ -311,7 +350,7 @@ class Thought extends Model
             return $query->whereRaw('0 = 1');
         }
 
-        $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+        $driver = DB::connection()->getDriverName();
         $likePattern = '%'.static::escapeForLike($normalizedQuery).'%';
 
         if ($driver === 'pgsql') {
@@ -347,7 +386,7 @@ class Thought extends Model
      */
     public function scopeWithoutTags(Builder $query): Builder
     {
-        $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+        $driver = DB::connection()->getDriverName();
 
         if ($driver === 'pgsql') {
             return $query->whereRaw("metadata IS NULL OR metadata->'tags' IS NULL OR (metadata->'tags')::jsonb = '[]'::jsonb");
@@ -382,5 +421,36 @@ class Thought extends Model
     public static function escapeForLike(string $value): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
+
+    /**
+     * @param  list<string>  $storedValues
+     * @param  list<string>  $prefixBindings
+     */
+    private static function applyCanonicalTypeMatch(
+        Builder $query,
+        string $expression,
+        array $storedValues,
+        bool $include,
+        array $prefixBindings = []
+    ): Builder {
+        if ($storedValues === []) {
+            return $include ? $query->whereRaw('0 = 1') : $query;
+        }
+
+        $operator = $include ? 'IN' : 'NOT IN';
+        $placeholders = implode(', ', array_fill(0, count($storedValues), '?'));
+
+        return $query->whereRaw(
+            $expression.' '.$operator.' ('.$placeholders.')',
+            [...$prefixBindings, ...$storedValues]
+        );
+    }
+
+    private static function canonicalMetadataTypeSqlExpression(Builder $query): string
+    {
+        return $query->getModel()->getConnection()->getDriverName() === 'pgsql'
+            ? "LOWER(COALESCE(metadata->>'type', ''))"
+            : "LOWER(COALESCE(json_extract(metadata, '$.type'), ''))";
     }
 }

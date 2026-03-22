@@ -13,6 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>[x-cloak]{display:none!important}</style>
 </head>
 <body class="font-sans antialiased min-h-screen" style="background: linear-gradient(135deg, #eef2ff 0%, #f3f0ff 50%, #f0f5ff 100%); padding-top: max(0.5rem, env(safe-area-inset-top, 0px));">
 
@@ -21,10 +22,15 @@
         data-query="{{ e(old('q', $query ?? '')) }}"
         data-idea-index-url="{{ e(route('idea.index')) }}"
         @keydown.window="handleKey($event)"
+        @ideatub-open-shortcuts="shortcutsOpen = true"
     >
+    @php
+        $inboxCount = (int) ($inboxActionableCount ?? 0);
+    @endphp
+
     {{-- Nav --}}
     <nav
-        class="sticky top-0 z-20 flex items-center justify-between px-6 md:px-8 py-4 border-b border-memory-violet/10"
+        class="sticky top-0 z-20 flex items-center justify-between gap-3 px-6 md:px-8 py-4 border-b border-memory-violet/10 relative"
         style="background: rgba(238,242,255,0.82); backdrop-filter: blur(12px);"
     >
         {{-- Logo --}}
@@ -64,38 +70,128 @@
             </div>
         </form>
 
-        {{-- Right nav items (visible by default; :class so nav shows before Alpine inits) --}}
-        <div class="flex items-center gap-1" :class="{ 'hidden': searching }">
-            <a href="{{ route('idea.ideas') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
+        @php
+            $navLinkClass = 'text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors';
+            $accountMenuLabel = 'Account menu';
+
+            if ($inboxCount > 99) {
+                $accountMenuLabel = 'Account menu, inbox has more than 99 actionable items';
+            } elseif ($inboxCount > 0) {
+                $accountMenuLabel = 'Account menu, inbox has '.$inboxCount.' actionable '.($inboxCount === 1 ? 'item' : 'items');
+            }
+        @endphp
+
+        {{-- Desktop primary nav (focused cluster; no wrap — mobile uses overflow menu) --}}
+        <div
+            data-testid="primary-nav"
+            class="hidden lg:flex flex-1 items-center justify-center gap-1 min-w-0"
+            x-show="!searching"
+        >
+            <a href="{{ route('idea.ideas') }}" class="{{ $navLinkClass }}">
                 Ideas
             </a>
-            <a href="{{ route('inbox.index') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center gap-2">
-                <span>Inbox</span>
-                @if (($inboxActionableCount ?? 0) > 0)
-                    <span data-testid="inbox-badge" class="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-memory-violet/15 px-1.5 py-0.5 text-[10px] font-semibold text-memory-violet">
-                        {{ $inboxActionableCount }}
-                    </span>
-                @endif
-            </a>
-            <a href="{{ route('idea.revisit') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
-                Ideas to revisit
-            </a>
-            <a href="{{ route('idea.stream') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
+            <a href="{{ route('idea.stream') }}" class="{{ $navLinkClass }}">
                 Stream
             </a>
-            @if (config('services.jira.enabled', true))
-            <a href="{{ route('idea.stream.jira') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
-                Jira
-            </a>
-            @endif
-            <a href="{{ route('help') }}" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
+            <div x-data="{ typesOpen: false }" class="relative">
+                <button
+                    type="button"
+                    data-testid="types-menu-trigger"
+                    @click="typesOpen = !typesOpen"
+                    :aria-expanded="typesOpen.toString()"
+                    aria-haspopup="true"
+                    class="{{ $navLinkClass }}"
+                >
+                    Types
+                </button>
+                <div
+                    x-show="typesOpen"
+                    x-transition
+                    x-cloak
+                    @click.away="typesOpen = false"
+                    @keydown.escape.window="typesOpen = false"
+                    data-testid="types-menu-list"
+                    class="absolute left-0 mt-2 min-w-[11rem] rounded-xl border border-memory-violet/10 bg-white py-1 shadow-lg z-40"
+                    role="menu"
+                >
+                    @foreach (\App\Support\ThoughtTypeNavigation::orderedNavTypes() as $typeKey)
+                        @if (\App\Support\ThoughtTypeNavigation::isAvailable($typeKey))
+                            @php $typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey); @endphp
+                            <a
+                                href="{{ route($typeRoute) }}"
+                                role="menuitem"
+                                class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5 hover:text-deep-indigo"
+                                @click="typesOpen = false"
+                            >
+                                {{ \App\Support\ThoughtTypeNavigation::collectionLabel($typeKey) }}
+                            </a>
+                        @endif
+                    @endforeach
+                </div>
+            </div>
+            <a href="{{ route('help') }}" class="{{ $navLinkClass }}">
                 Help
             </a>
-            <button type="button" @click="shortcutsOpen = true" class="text-[12.5px] font-medium text-slate-brand hover:text-memory-violet hover:bg-memory-violet/8 px-3 py-1.5 rounded-lg transition-colors">
+            <button type="button" @click="shortcutsOpen = true" class="{{ $navLinkClass }}">
                 Keyboard shortcuts
             </button>
+        </div>
 
-            <div class="w-px h-4 bg-memory-violet/20 mx-2"></div>
+        {{-- Right: compact / overflow + search + avatar --}}
+        <div class="flex items-center gap-1 flex-shrink-0 ml-auto" :class="{ 'hidden': searching }">
+            {{-- Small viewports: explicit overflow menu (avoids two-row wrapped nav) --}}
+            <div x-data="{ mobileNavOpen: false }" class="relative lg:hidden">
+                <button
+                    type="button"
+                    data-testid="mobile-nav-trigger"
+                    @click="mobileNavOpen = !mobileNavOpen"
+                    :aria-expanded="mobileNavOpen.toString()"
+                    aria-controls="mobile-nav-panel"
+                    class="inline-flex items-center justify-center rounded-lg border border-memory-violet/15 bg-white/60 px-2.5 py-1.5 text-slate-brand hover:bg-memory-violet/8"
+                >
+                    <span class="sr-only">Open navigation menu</span>
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+                <div
+                    id="mobile-nav-panel"
+                    data-testid="mobile-nav-panel"
+                    x-show="mobileNavOpen"
+                    x-transition
+                    x-cloak
+                    @click.away="mobileNavOpen = false"
+                    class="absolute right-0 z-40 mt-2 w-[min(100vw-2rem,20rem)] max-h-[min(80vh,32rem)] overflow-y-auto rounded-xl border border-memory-violet/10 bg-white py-2 shadow-lg"
+                >
+                    <a href="{{ route('idea.ideas') }}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">Ideas</a>
+                    <a href="{{ route('idea.stream') }}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">Stream</a>
+                    <div class="border-t border-memory-violet/10 my-1"></div>
+                    <p class="px-4 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-brand/50">Types</p>
+                    @foreach (\App\Support\ThoughtTypeNavigation::orderedNavTypes() as $typeKey)
+                        @if (\App\Support\ThoughtTypeNavigation::isAvailable($typeKey))
+                            @php $typeRoute = \App\Support\ThoughtTypeNavigation::routeName($typeKey); @endphp
+                            <a
+                                href="{{ route($typeRoute) }}"
+                                class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5"
+                                @click="mobileNavOpen = false"
+                            >
+                                {{ \App\Support\ThoughtTypeNavigation::collectionLabel($typeKey) }}
+                            </a>
+                        @endif
+                    @endforeach
+                    <div class="border-t border-memory-violet/10 my-1"></div>
+                    <a href="{{ route('help') }}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">Help</a>
+                    <button
+                        type="button"
+                        class="w-full px-4 py-2 text-left text-sm text-slate-brand hover:bg-memory-violet/5"
+                        @click="mobileNavOpen = false; $dispatch('ideatub-open-shortcuts')"
+                    >
+                        Keyboard shortcuts
+                    </button>
+                </div>
+            </div>
+
+            <div class="hidden sm:block w-px h-4 bg-memory-violet/20 mx-1"></div>
 
             {{-- Search pill --}}
             <button
@@ -114,18 +210,38 @@
             @auth
                 <div x-data="{ open: false }" class="relative ml-1">
                     <button
+                        type="button"
                         @click="open = !open"
-                        class="w-8 h-8 rounded-full text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0"
+                        aria-haspopup="true"
+                        :aria-expanded="open.toString()"
+                        aria-label="{{ $accountMenuLabel }}"
+                        class="relative w-8 h-8 rounded-full text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0"
                         style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
                     >
                         {{ strtoupper(substr(auth()->user()->name ?? auth()->user()->email, 0, 2)) }}
+                        @if ($inboxCount > 0)
+                            <span
+                                data-testid="avatar-inbox-badge"
+                                aria-hidden="true"
+                                class="pointer-events-none absolute -right-1 -top-1 inline-flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-memory-violet px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white"
+                            >
+                                {{ $inboxCount > 99 ? '99+' : $inboxCount }}
+                            </span>
+                        @endif
                     </button>
                     <div
                         x-show="open"
                         x-transition
                         @click.away="open = false"
-                        class="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-memory-violet/10 py-1 z-30"
+                        class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-memory-violet/10 py-1 z-30"
                     >
+                        <a
+                            href="{{ route('inbox.index') }}"
+                            data-testid="account-menu-inbox-link"
+                            class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors"
+                        >
+                            Inbox
+                        </a>
                         <a href="{{ route('shared-research.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                             Shared research
                         </a>
@@ -151,7 +267,7 @@
                         </a>
                         @endif
                         <a href="{{ route('settings.ideas-revisit.index') }}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                            Ideas to revisit
+                            Ideas to revisit settings
                         </a>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
