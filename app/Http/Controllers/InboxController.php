@@ -95,9 +95,20 @@ class InboxController extends Controller
             return redirect()->route('inbox.index')->with('error', 'Unable to apply sender classification.');
         }
 
-        return redirect()->route('inbox.index')->with(
-            'success',
-            $applied ? 'Sender classification saved.' : 'Sender classification was already handled.'
-        );
+        if (! $applied) {
+            return redirect()->route('inbox.index')->with('success', 'Sender classification was already handled.');
+        }
+
+        if ($validated['action'] === 'allow') {
+            try {
+                $reviewActionService->saveReviewedEmailAsThought($inboxItem, $request->user());
+            } catch (\Throwable $e) {
+                report($e);
+
+                return redirect()->route('inbox.index')->with('success', 'Sender rule saved. Could not import email as a thought.');
+            }
+        }
+
+        return redirect()->route('inbox.index')->with('success', 'Sender classification saved.');
     }
 }

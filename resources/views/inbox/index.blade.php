@@ -18,6 +18,9 @@
     <div class="mb-8">
         <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">Inbox</h1>
         <p class="mt-2 text-sm text-slate-brand">Agent-generated prompts that need triage.</p>
+        @if (config('services.email_sender_policy.enabled'))
+            <a href="{{ route('settings.email-sender-rules.index') }}" class="mt-2 inline-block text-xs text-neural-teal hover:underline">Manage sender rules →</a>
+        @endif
     </div>
 
     @if ($items->isEmpty())
