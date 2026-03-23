@@ -6,7 +6,7 @@
         'teal'   => 'bg-neural-teal/10 text-neural-teal',
         'indigo' => 'bg-deep-indigo/8 text-slate-brand',
     ];
-    $tags = $thought->metadata['tags'] ?? [];
+    $tags = is_array($thought->metadata ?? null) ? ($thought->metadata['tags'] ?? []) : [];
 @endphp
 <div
     class="flex items-center gap-2 flex-wrap"

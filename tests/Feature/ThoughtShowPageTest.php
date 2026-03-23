@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\CapturedInboundEmail;
+use App\Models\EmailSenderRule;
 use App\Models\ImportedEmail;
 use App\Models\MailAccount;
 use App\Models\Thought;
@@ -162,6 +164,376 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Direction: received');
     }
 
+    public function test_email_thought_detail_shows_view_research_link_when_source_metadata_matches_imported_email_research_thought(): void
+    {
+        $owner = User::factory()->create();
+        $researchThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Linked research',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email body for research link',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Email with research',
+                'research_thought_id' => $researchThought->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-research-link',
+            'provider_thread_id' => 'thread-research-link',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchThought->id,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $researchHref = route('idea.research.show', $researchThought);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertSee('View research', false);
+        $response->assertSee($researchHref, false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_research_thought_id_points_at_non_research_thought_for_same_user(): void
+    {
+        $owner = User::factory()->create();
+        $nonResearchThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Regular idea, not research metadata',
+            'source' => 'web',
+            'metadata' => ['type' => 'idea', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email body with mistaken research id',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Email with non-research link',
+                'research_thought_id' => $nonResearchThought->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-non-research-target',
+            'provider_thread_id' => 'thread-non-research-target',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $nonResearchThought->id,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $wouldBeHref = route('idea.research.show', $nonResearchThought);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+        $response->assertDontSee($wouldBeHref, false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_linked_research_thought_belongs_to_another_user(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $researchThought = Thought::factory()->create([
+            'user_id' => $other->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Other user research',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email body with cross-user research id',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Email referencing foreign research',
+                'research_thought_id' => $researchThought->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-foreign-research',
+            'provider_thread_id' => 'thread-foreign-research',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchThought->id,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $researchHref = route('idea.research.show', $researchThought);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+        $response->assertDontSee($researchHref, false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_imported_and_captured_rows_disagree_even_if_source_metadata_matches_one_side(): void
+    {
+        $owner = User::factory()->create();
+        $researchFromImported = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research from imported row',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+        $researchFromCaptured = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research from captured row',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email with split durable research ids',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Split durable ids',
+                'research_thought_id' => $researchFromImported->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-split-durable-imported',
+            'provider_thread_id' => 'thread-split-durable',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchFromImported->id,
+        ]);
+
+        CapturedInboundEmail::query()->create([
+            'user_id' => $owner->id,
+            'message_id' => 'captured-msg-split-durable-'.uniqid(),
+            'sender_email' => 'captured@example.com',
+            'subject' => 'Captured subject',
+            'body_text' => 'Captured body',
+            'received_at' => now(),
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchFromCaptured->id,
+            'processing_status' => 'imported',
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $wouldBeHrefImported = route('idea.research.show', $researchFromImported);
+        $wouldBeHrefCaptured = route('idea.research.show', $researchFromCaptured);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+        $response->assertDontSee($wouldBeHrefImported, false);
+        $response->assertDontSee($wouldBeHrefCaptured, false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_source_metadata_and_imported_email_research_thought_disagree(): void
+    {
+        $owner = User::factory()->create();
+        $researchFromMetadata = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research A',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+        $researchFromStoredEmail = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research B',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Conflicting research ids',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Conflict subject',
+                'research_thought_id' => $researchFromMetadata->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-conflict',
+            'provider_thread_id' => 'thread-conflict',
+            'direction' => 'received',
+            'subject' => 'Imported',
+            'from_json' => [['email' => 'a@example.com', 'name' => 'A']],
+            'to_json' => [['email' => 'b@example.com', 'name' => 'B']],
+            'participants_json' => [['role' => 'from', 'email' => 'a@example.com', 'name' => 'A']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchFromStoredEmail->id,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_research_thought_id_does_not_resolve(): void
+    {
+        $owner = User::factory()->create();
+        $researchThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research later deleted',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+        $staleResearchId = $researchThought->id;
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email body with stale research id',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Email with deleted research',
+                'research_thought_id' => $staleResearchId,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-stale-research',
+            'provider_thread_id' => 'thread-stale-research',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $staleResearchId,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $researchThought->delete();
+        $this->assertDatabaseMissing('thoughts', ['id' => $staleResearchId]);
+        $this->assertNull($importedEmail->fresh()->research_thought_id);
+
+        $orphanResearchHref = route('idea.research.show', $staleResearchId);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+        $response->assertDontSee($orphanResearchHref, false);
+    }
+
     public function test_email_thought_detail_page_falls_back_when_imported_email_is_missing(): void
     {
         $owner = User::factory()->create();
@@ -184,6 +556,275 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Fallback email body from thought');
         $response->assertSee('Fallback metadata subject');
         $response->assertSee('fallback@example.com');
+    }
+
+    public function test_email_thought_detail_sender_rule_shows_whitelist_sender_for_imported_email_without_rule(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $thought = $this->createImportedEmailThought($user, [
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('thoughts.show', $thought))
+            ->assertOk()
+            ->assertSee('Sender rule')
+            ->assertSee('sender@example.com')
+            ->assertSee('Whitelist sender');
+    }
+
+    public function test_email_thought_detail_sender_rule_card_renders_for_captured_inbound_email(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $thought = $this->createCapturedInboundEmailThought($user, [
+            'rule_email' => 'postmark-sender@example.com',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('thoughts.show', $thought))
+            ->assertOk()
+            ->assertSee('Sender rule')
+            ->assertSee('postmark-sender@example.com');
+    }
+
+    public function test_email_thought_detail_sender_rule_shows_current_rule_state_when_rule_exists(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $thought = $this->createImportedEmailThought($user, [
+            'from_json' => [['email' => 'existing@example.com', 'name' => 'Existing Sender']],
+        ]);
+        EmailSenderRule::query()->create([
+            'user_id' => $user->id,
+            'sender_email' => 'existing@example.com',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('thoughts.show', $thought))
+            ->assertOk()
+            ->assertSee('Sender rule')
+            ->assertSee('Current rule')
+            ->assertSee('Ignore');
+    }
+
+    public function test_email_thought_detail_sender_rule_keeps_whitelist_sender_quick_action_for_ignore_and_review_rules(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        foreach ([EmailSenderRule::ACTION_IGNORE, EmailSenderRule::ACTION_REVIEW] as $action) {
+            EmailSenderRule::query()->delete();
+
+            $user = User::factory()->create();
+            $thought = $this->createImportedEmailThought($user, [
+                'from_json' => [['email' => $action.'@example.com', 'name' => ucfirst($action).' Sender']],
+            ]);
+            EmailSenderRule::query()->create([
+                'user_id' => $user->id,
+                'sender_email' => $action.'@example.com',
+                'action' => $action,
+            ]);
+
+            $response = $this->actingAs($user)
+                ->get(route('thoughts.show', $thought))
+                ->assertOk();
+
+            $this->assertSenderRuleCardContains($response, 'Whitelist sender');
+            $this->assertSenderRuleCardContains($response, ucfirst($action));
+        }
+    }
+
+    public function test_email_thought_detail_sender_rule_existing_allow_rule_shows_remove_from_whitelist(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $thought = $this->createImportedEmailThought($user, [
+            'from_json' => [['email' => 'allow@example.com', 'name' => 'Allow Sender']],
+        ]);
+        EmailSenderRule::query()->create([
+            'user_id' => $user->id,
+            'sender_email' => 'allow@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('thoughts.show', $thought))
+            ->assertOk();
+
+        $this->assertSenderRuleCardContains($response, 'Remove from whitelist');
+        $this->assertSenderRuleCardDoesNotContain($response, 'Whitelist sender');
+    }
+
+    public function test_email_thought_detail_sender_rule_imported_email_falls_back_to_plain_string_source_metadata_from_when_stored_sender_is_unusable(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Imported email fallback body',
+            'source' => 'email',
+            'source_metadata' => [
+                'from' => 'Metadata Sender <metadata-fallback@example.com>',
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $importedEmail = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'imported-string-fallback-'.uniqid(),
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'body_text' => 'Imported body text',
+            'from_json' => [['name' => 'Name Only Sender']],
+            'processing_status' => 'imported',
+            'thought_id' => $thought->id,
+        ]);
+
+        $thought->update([
+            'source_metadata' => array_merge($thought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('thoughts.show', $thought))
+            ->assertOk();
+
+        $this->assertSenderRuleCardContains($response, 'metadata-fallback@example.com');
+        $this->assertSenderRuleCardDoesNotContain($response, 'Sender rule unavailable for this email.');
+    }
+
+    public function test_email_thought_detail_sender_rule_imported_email_does_not_use_later_from_json_entries_when_first_entry_is_unusable(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Imported email later entry body',
+            'source' => 'email',
+            'source_metadata' => [
+                'from' => 'Metadata Sender <metadata-first-valid@example.com>',
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $importedEmail = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'imported-later-entry-'.uniqid(),
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'body_text' => 'Imported body text',
+            'from_json' => [
+                ['name' => 'Broken First Entry'],
+                ['email' => 'later@example.com', 'name' => 'Later Sender'],
+            ],
+            'processing_status' => 'imported',
+            'thought_id' => $thought->id,
+        ]);
+
+        $thought->update([
+            'source_metadata' => array_merge($thought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('thoughts.show', $thought))
+            ->assertOk();
+
+        $this->assertSenderRuleCardContains($response, 'metadata-first-valid@example.com');
+        $this->assertSenderRuleCardDoesNotContain($response, 'later@example.com');
+    }
+
+    public function test_email_thought_detail_sender_rule_captured_inbound_email_falls_back_to_plain_string_source_metadata_from_when_stored_sender_is_unusable(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Captured inbound metadata fallback body',
+            'source' => 'email',
+            'source_metadata' => [
+                'from' => 'Metadata Sender <captured-fallback@example.com>',
+            ],
+        ]);
+
+        $captured = CapturedInboundEmail::query()->create([
+            'user_id' => $user->id,
+            'message_id' => 'captured-string-fallback-'.uniqid(),
+            'sender_email' => '',
+            'subject' => 'Captured subject',
+            'body_text' => 'Captured body text',
+            'received_at' => now(),
+            'rule_action' => 'review',
+            'thought_id' => $thought->id,
+            'processing_status' => 'imported',
+        ]);
+
+        $thought->update([
+            'source_metadata' => array_merge($thought->source_metadata ?? [], [
+                'captured_inbound_email_id' => $captured->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('thoughts.show', $thought))
+            ->assertOk();
+
+        $this->assertSenderRuleCardContains($response, 'captured-fallback@example.com');
+        $this->assertSenderRuleCardDoesNotContain($response, 'Sender rule unavailable for this email.');
+    }
+
+    public function test_email_thought_detail_sender_rule_feature_flag_disabled_hides_card(): void
+    {
+        config(['services.email_sender_policy.enabled' => false]);
+
+        $user = User::factory()->create();
+        $thought = $this->createImportedEmailThought($user, [
+            'from_json' => [['email' => 'hidden@example.com', 'name' => 'Hidden Sender']],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('thoughts.show', $thought))
+            ->assertOk()
+            ->assertDontSee('Sender rule')
+            ->assertDontSee('Whitelist sender');
+    }
+
+    public function test_email_thought_detail_sender_rule_unresolved_sender_shows_unavailable_message(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Email without sender',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Missing sender metadata',
+                'from' => [['name' => 'Missing Email']],
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('thoughts.show', $thought))
+            ->assertOk()
+            ->assertSee('Sender rule')
+            ->assertSee('Sender rule unavailable for this email.')
+            ->assertDontSee('Whitelist sender');
     }
 
     public function test_imported_email_lookup_falls_back_to_thought_id_when_metadata_id_is_stale(): void
@@ -416,6 +1057,57 @@ class ThoughtShowPageTest extends TestCase
         ]);
     }
 
+    public function test_detail_tag_row_with_existing_tags_renders_editable_tag_affordance(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Tagged thought detail body',
+            'metadata' => ['tags' => ['alpha', 'beta']],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertDetailTagEditControl($response, $thought);
+    }
+
+    public function test_detail_tag_row_with_no_tags_still_renders_editable_tag_affordance(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Untagged thought detail body',
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertDetailTagEditControl($response, $thought);
+    }
+
+    public function test_detail_tag_row_with_cleared_tags_shape_still_renders_editable_tag_affordance(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Cleared tags thought detail body',
+            'metadata' => ['tags' => []],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertDetailTagEditControl($response, $thought);
+    }
+
     private function assertThoughtBadgeLink(TestResponse $response, string $label, string $href): void
     {
         $xpath = $this->xpathFromResponse($response);
@@ -450,6 +1142,35 @@ class ThoughtShowPageTest extends TestCase
         $this->assertSame(0, $links->length);
     }
 
+    private function assertDetailTagEditControl(TestResponse $response, Thought $thought): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $streamUrl = route('idea.stream');
+        $updateTagsUrl = route('ideas.update-tags', $thought);
+
+        $buttons = $xpath->query(sprintf(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), ' rounded-2xl ') and .//p[normalize-space(.)='Thought detail']]//div[@data-stream-base-url=%s and contains(@x-data, %s)]//button[@type='button' and @aria-label='Edit tags' and normalize-space(.)='Edit']",
+            $this->xpathLiteral($streamUrl),
+            $this->xpathLiteral($updateTagsUrl)
+        ));
+
+        $this->assertSame(1, $buttons->length);
+    }
+
+    private function assertSenderRuleCardContains(TestResponse $response, string $text): void
+    {
+        $cardText = $this->senderRuleCardText($response);
+
+        $this->assertStringContainsString($text, $cardText);
+    }
+
+    private function assertSenderRuleCardDoesNotContain(TestResponse $response, string $text): void
+    {
+        $cardText = $this->senderRuleCardText($response);
+
+        $this->assertStringNotContainsString($text, $cardText);
+    }
+
     private function xpathFromResponse(TestResponse $response): \DOMXPath
     {
         libxml_use_internal_errors(true);
@@ -457,5 +1178,93 @@ class ThoughtShowPageTest extends TestCase
         $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
 
         return new \DOMXPath($dom);
+    }
+
+    private function xpathLiteral(string $value): string
+    {
+        if (! str_contains($value, "'")) {
+            return "'".$value."'";
+        }
+
+        if (! str_contains($value, '"')) {
+            return '"'.$value.'"';
+        }
+
+        $parts = explode("'", $value);
+
+        return "concat('".implode("', \"'\", '", $parts)."')";
+    }
+
+    private function senderRuleCardText(TestResponse $response): string
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $cards = $xpath->query(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), ' bg-white/60 ') and contains(concat(' ', normalize-space(@class), ' '), ' p-4 ') and ./p[normalize-space(.)='Sender rule']]"
+        );
+
+        $this->assertSame(1, $cards->length);
+
+        return trim($cards->item(0)?->textContent ?? '');
+    }
+
+    private function createImportedEmailThought(User $user, array $overrides = []): Thought
+    {
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Imported email thought body',
+            'source' => 'email',
+            'source_metadata' => [],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $importedEmail = ImportedEmail::query()->create(array_merge([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'imported-'.uniqid(),
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'body_text' => 'Imported body text',
+            'processing_status' => 'imported',
+            'thought_id' => $thought->id,
+        ], $overrides));
+
+        $thought->update([
+            'source_metadata' => array_merge($thought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        return $thought->fresh();
+    }
+
+    private function createCapturedInboundEmailThought(User $user, array $overrides = []): Thought
+    {
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Captured inbound email thought body',
+            'source' => 'email',
+            'source_metadata' => [],
+        ]);
+
+        $captured = CapturedInboundEmail::query()->create(array_merge([
+            'user_id' => $user->id,
+            'message_id' => 'captured-'.uniqid(),
+            'sender_email' => 'captured@example.com',
+            'subject' => 'Captured subject',
+            'body_text' => 'Captured body',
+            'received_at' => now(),
+            'rule_action' => 'review',
+            'thought_id' => $thought->id,
+            'processing_status' => 'imported',
+        ], $overrides));
+
+        $thought->update([
+            'source_metadata' => array_merge($thought->source_metadata ?? [], [
+                'captured_inbound_email_id' => $captured->id,
+            ]),
+        ]);
+
+        return $thought->fresh();
     }
 }

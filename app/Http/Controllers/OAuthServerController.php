@@ -45,7 +45,7 @@ class OAuthServerController extends Controller
     /**
      * Authorization endpoint — show consent or redirect to login.
      */
-    public function authorize(Request $request): View|RedirectResponse
+    public function showConsent(Request $request): View|RedirectResponse
     {
         $request->validate([
             'response_type' => 'required|in:code',

@@ -250,7 +250,7 @@ class McpApiTest extends TestCase
     {
         [$key, $user] = $this->validKeyAndUser();
         $fakeEmbedding = array_fill(0, 1536, 0.01);
-        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+        $this->mock(OpenRouterService::class, function ($mock): void {
             $mock->shouldReceive('embed')->never();
         });
 
@@ -685,5 +685,62 @@ class McpApiTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('result.thoughts.0.id', $thought->id);
+    }
+
+    public function test_browse_recent_excludes_hidden_email_thoughts(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'MCP visible row',
+            'source' => 'web',
+        ]);
+        $hidden = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'MCP hidden email row',
+            'source' => 'email',
+            'is_visible_in_stream' => false,
+            'visibility_reason' => Thought::VISIBILITY_REASON_IGNORED_SENDER,
+        ]);
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'browse_recent',
+            'params' => ['limit' => 10],
+        ]);
+
+        $response->assertStatus(200);
+        $ids = array_column($response->json('result.thoughts'), 'id');
+        $this->assertNotContains($hidden->id, $ids);
+    }
+
+    public function test_thought_stats_excludes_hidden_email_from_count(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Counted for MCP',
+            'source' => 'web',
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Not counted hidden',
+            'source' => 'email',
+            'is_visible_in_stream' => false,
+            'visibility_reason' => Thought::VISIBILITY_REASON_IGNORED_SENDER,
+        ]);
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'thought_stats',
+            'params' => [],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.count', 1);
     }
 }

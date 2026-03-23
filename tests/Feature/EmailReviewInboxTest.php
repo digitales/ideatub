@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ProcessExtraEmailResearch;
+use App\Jobs\ReconcileIgnoredSenderThoughtVisibility;
 use App\Models\CapturedInboundEmail;
 use App\Models\EmailSenderRule;
 use App\Models\ImportedEmail;
@@ -20,6 +21,13 @@ use Tests\TestCase;
 class EmailReviewInboxTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['services.email_sender_policy.enabled' => true]);
+    }
 
     public function test_inbox_shows_sender_classification_controls_for_email_review_items(): void
     {
@@ -53,6 +61,7 @@ class EmailReviewInboxTest extends TestCase
     public function test_user_can_mark_review_sender_as_allow_creates_sender_rule_and_completes_inbox(): void
     {
         $this->fakeOpenRouterForThoughtCapture();
+        Bus::fake([ReconcileIgnoredSenderThoughtVisibility::class]);
 
         $user = User::factory()->create();
         ['imported' => $imported, 'inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
@@ -77,6 +86,10 @@ class EmailReviewInboxTest extends TestCase
         $this->assertSame(1, Thought::query()->where('source', 'email')->count());
         $this->assertNotNull($imported->thought_id);
         $this->assertSame('imported', $imported->processing_status);
+
+        Bus::assertDispatched(ReconcileIgnoredSenderThoughtVisibility::class, function (ReconcileIgnoredSenderThoughtVisibility $job) use ($user): bool {
+            return $job->userId === $user->id && $job->senderEmail === 'newsletter@example.com';
+        });
     }
 
     public function test_user_can_mark_review_sender_as_ignore_creates_sender_rule(): void
@@ -101,6 +114,10 @@ class EmailReviewInboxTest extends TestCase
         $inbox->refresh();
         $this->assertSame('done', $inbox->status);
         Bus::assertNotDispatched(ProcessExtraEmailResearch::class);
+
+        Bus::assertDispatched(ReconcileIgnoredSenderThoughtVisibility::class, function (ReconcileIgnoredSenderThoughtVisibility $job) use ($user): bool {
+            return $job->userId === $user->id && $job->senderEmail === 'newsletter@example.com';
+        });
     }
 
     public function test_user_can_mark_review_sender_as_extra_process_creates_sender_rule_without_dispatching_research_job(): void
@@ -126,6 +143,10 @@ class EmailReviewInboxTest extends TestCase
         $this->assertSame('done', $inbox->status);
         $this->assertSame(0, Thought::query()->count());
         Bus::assertNotDispatched(ProcessExtraEmailResearch::class);
+
+        Bus::assertDispatched(ReconcileIgnoredSenderThoughtVisibility::class, function (ReconcileIgnoredSenderThoughtVisibility $job) use ($user): bool {
+            return $job->userId === $user->id && $job->senderEmail === 'newsletter@example.com';
+        });
     }
 
     public function test_email_review_action_works_for_captured_inbound_email_source(): void
@@ -184,6 +205,26 @@ class EmailReviewInboxTest extends TestCase
         $this->assertNotNull($captured->thought_id);
         $this->assertSame('imported', $captured->processing_status);
         $this->assertSame(1, Thought::query()->where('source', 'email')->count());
+
+        Bus::assertDispatched(ReconcileIgnoredSenderThoughtVisibility::class, function (ReconcileIgnoredSenderThoughtVisibility $job) use ($user): bool {
+            return $job->userId === $user->id && $job->senderEmail === 'postmark-sender@example.com';
+        });
+    }
+
+    public function test_email_review_classification_does_not_dispatch_visibility_reconcile_when_sender_policy_disabled(): void
+    {
+        config(['services.email_sender_policy.enabled' => false]);
+        $this->fakeOpenRouterForThoughtCapture();
+        Bus::fake([ReconcileIgnoredSenderThoughtVisibility::class]);
+
+        $user = User::factory()->create();
+        ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $this->actingAs($user)->post(route('inbox.email-review.action', $inbox), [
+            'action' => 'allow',
+        ])->assertRedirect(route('inbox.index'));
+
+        Bus::assertNotDispatched(ReconcileIgnoredSenderThoughtVisibility::class);
     }
 
     public function test_user_cannot_apply_email_review_action_to_another_users_inbox_item(): void
@@ -339,6 +380,34 @@ class EmailReviewInboxTest extends TestCase
         $response->assertSessionHas('success', 'Sender classification was already handled.');
         $this->assertDatabaseCount('email_sender_rules', 0);
         $this->assertDatabaseCount('inbox_item_actions', 0);
+    }
+
+    public function test_save_as_thought_hides_stream_immediately_when_sender_is_now_ignored(): void
+    {
+        $this->fakeOpenRouterForThoughtCapture();
+        Bus::fake();
+
+        $user = User::factory()->create();
+        ['imported' => $imported, 'inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        EmailSenderRule::query()->create([
+            'user_id' => $user->id,
+            'sender_email' => 'newsletter@example.com',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ]);
+
+        $this->actingAs($user)->post(route('inbox.email-review.action', $inbox), [
+            'action' => 'save_thought',
+        ])->assertRedirect(route('inbox.index'));
+
+        $this->assertSame(1, Thought::query()->where('source', 'email')->count());
+        $thought = Thought::query()->where('source', 'email')->first();
+        $this->assertNotNull($thought);
+        $this->assertFalse($thought->is_visible_in_stream);
+        $this->assertSame(Thought::VISIBILITY_REASON_IGNORED_SENDER, $thought->visibility_reason);
+
+        $imported->refresh();
+        $this->assertSame($thought->id, $imported->thought_id);
     }
 
     public function test_imported_email_review_save_as_thought_creates_email_thought_and_links_thought_id(): void

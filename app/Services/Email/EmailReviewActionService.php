@@ -2,6 +2,7 @@
 
 namespace App\Services\Email;
 
+use App\Jobs\ReconcileIgnoredSenderThoughtVisibility;
 use App\Models\CapturedInboundEmail;
 use App\Models\EmailSenderRule;
 use App\Models\ImportedEmail;
@@ -19,6 +20,7 @@ class EmailReviewActionService
     public function __construct(
         private readonly EmailSenderRuleService $senderRuleService,
         private readonly ThoughtCaptureService $thoughtCaptureService,
+        private readonly EmailThoughtStreamVisibilityService $streamVisibilityService,
     ) {}
 
     /**
@@ -28,7 +30,9 @@ class EmailReviewActionService
      */
     public function applySenderClassification(InboxItem $item, User $user, string $action): bool
     {
-        return DB::transaction(function () use ($item, $user, $action): bool {
+        $reconcileSender = null;
+
+        $applied = DB::transaction(function () use ($item, $user, $action, &$reconcileSender): bool {
             $locked = InboxItem::query()->whereKey($item->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->generator_type !== 'email_sender_review') {
@@ -77,8 +81,16 @@ class EmailReviewActionService
                 'created_at' => $actedAt,
             ]);
 
+            $reconcileSender = $normalizedSender;
+
             return true;
         });
+
+        if ($applied && is_string($reconcileSender) && $reconcileSender !== '' && config('services.email_sender_policy.enabled')) {
+            ReconcileIgnoredSenderThoughtVisibility::dispatch((int) $user->id, $reconcileSender);
+        }
+
+        return $applied;
     }
 
     /**
@@ -129,6 +141,12 @@ class EmailReviewActionService
         });
 
         if (isset($reservation['thought_id'])) {
+            $thought = Thought::query()->find($reservation['thought_id']);
+            $rawSender = trim((string) (($item->source_data ?? [])['sender_email'] ?? ''));
+            if ($thought !== null && $rawSender !== '') {
+                $this->streamVisibilityService->applyToThought($thought, $user, $rawSender);
+            }
+
             return $reservation['thought_id'];
         }
 
@@ -147,7 +165,7 @@ class EmailReviewActionService
             throw new \RuntimeException('Thought capture did not return a thought.');
         }
 
-        return DB::transaction(function () use ($item, $reservation, $thought, $user): string {
+        $thoughtId = DB::transaction(function () use ($item, $reservation, $thought, $user): string {
             $locked = InboxItem::query()->whereKey($item->getKey())->lockForUpdate()->firstOrFail();
             $stored = $this->loadValidatedStoredEmailRecord($locked, $user);
 
@@ -187,6 +205,17 @@ class EmailReviewActionService
 
             return $thought->id;
         });
+
+        $freshItem = $item->fresh();
+        $rawSender = trim((string) (($freshItem?->source_data ?? [])['sender_email'] ?? ''));
+        if ($rawSender !== '') {
+            $persisted = Thought::query()->find($thoughtId);
+            if ($persisted !== null) {
+                $this->streamVisibilityService->applyToThought($persisted, $user, $rawSender);
+            }
+        }
+
+        return $thoughtId;
     }
 
     private function loadValidatedStoredEmailRecord(InboxItem $locked, User $user): ImportedEmail|CapturedInboundEmail

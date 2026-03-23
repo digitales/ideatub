@@ -98,6 +98,10 @@ class ProcessExtraEmailResearchJobTest extends TestCase
         $this->assertNotNull($research);
         $this->assertSame('research', $research->source);
         $this->assertStringContainsString('Newsletter subject', $research->content);
+        $rsm = $research->source_metadata ?? [];
+        $this->assertSame($emailThought->id, $rsm['email_thought_id'] ?? null);
+        $this->assertSame('Newsletter subject', $rsm['email_subject'] ?? null);
+        $this->assertSame('News <news@example.com>', $rsm['email_sender'] ?? null);
     }
 
     #[Test]
@@ -268,6 +272,8 @@ class ProcessExtraEmailResearchJobTest extends TestCase
         $this->assertSame($captured->id, $research->source_metadata['stored_email_id']);
         $this->assertSame('captured_inbound_email', $research->source_metadata['stored_email_type']);
         $this->assertSame('research_completed', $captured->processing_metadata_json['newsletter_research']['status'] ?? null);
+        $this->assertSame('Link test subject', $research->source_metadata['email_subject'] ?? null);
+        $this->assertSame('nl@example.com', $research->source_metadata['email_sender'] ?? null);
     }
 
     #[Test]

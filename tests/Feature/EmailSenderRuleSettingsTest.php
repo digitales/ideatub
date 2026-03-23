@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ReconcileIgnoredSenderThoughtVisibility;
 use App\Models\EmailSenderRule;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class EmailSenderRuleSettingsTest extends TestCase
@@ -159,5 +161,60 @@ class EmailSenderRuleSettingsTest extends TestCase
             ->assertForbidden();
 
         $this->assertDatabaseHas('email_sender_rules', ['id' => $rule->id]);
+    }
+
+    public function test_store_dispatches_reconcile_visibility_job_with_normalized_sender(): void
+    {
+        Bus::fake();
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post(route('settings.email-sender-rules.store'), [
+            'sender_email' => '  NatesNewsletter@Substack.com  ',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ])->assertRedirect(route('settings.email-sender-rules.index'));
+
+        Bus::assertDispatched(ReconcileIgnoredSenderThoughtVisibility::class, function (ReconcileIgnoredSenderThoughtVisibility $job) use ($user): bool {
+            return $job->userId === $user->id && $job->senderEmail === 'natesnewsletter@substack.com';
+        });
+    }
+
+    public function test_update_dispatches_reconcile_visibility_job(): void
+    {
+        Bus::fake();
+
+        $user = User::factory()->create();
+        $rule = $user->emailSenderRules()->create([
+            'sender_email' => 'update-me@example.com',
+            'action' => EmailSenderRule::ACTION_REVIEW,
+        ]);
+
+        $this->actingAs($user)->patch(
+            route('settings.email-sender-rules.update', $rule),
+            ['action' => EmailSenderRule::ACTION_IGNORE]
+        )->assertRedirect(route('settings.email-sender-rules.index'));
+
+        Bus::assertDispatched(ReconcileIgnoredSenderThoughtVisibility::class, function (ReconcileIgnoredSenderThoughtVisibility $job) use ($user): bool {
+            return $job->userId === $user->id && $job->senderEmail === 'update-me@example.com';
+        });
+    }
+
+    public function test_destroy_dispatches_reconcile_visibility_job_with_deleted_sender(): void
+    {
+        Bus::fake();
+
+        $user = User::factory()->create();
+        $rule = $user->emailSenderRules()->create([
+            'sender_email' => 'remove-me@example.com',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ]);
+
+        $this->actingAs($user)->delete(
+            route('settings.email-sender-rules.destroy', $rule)
+        )->assertRedirect(route('settings.email-sender-rules.index'));
+
+        Bus::assertDispatched(ReconcileIgnoredSenderThoughtVisibility::class, function (ReconcileIgnoredSenderThoughtVisibility $job) use ($user): bool {
+            return $job->userId === $user->id && $job->senderEmail === 'remove-me@example.com';
+        });
     }
 }
