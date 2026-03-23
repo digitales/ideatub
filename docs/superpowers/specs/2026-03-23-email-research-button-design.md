@@ -28,7 +28,9 @@ Add two new menu items to the existing `thought_card_actions` dropdown — visib
 - Route: `POST /emails/{thought}/idea-research` (named `emails.idea-research`)
 - Auth: `authorize('update', $thought)`
 - Guard: verify `$thought->source === 'email'`; abort 403 otherwise
-- Action: dispatch `IdeaResearchRequested` event with the thought
+- Action:
+  1. Merge `['research_pending' => true]` into `$thought->metadata` and save (required for the in-progress UI indicator; consistent with `IdeaController::research()`)
+  2. Dispatch `IdeaResearchRequested::dispatch($thought, 'email')`
 - Response: `redirect()->back()->with('success', '...')`
 
 **`newsletterResearch(Thought $thought)`**
@@ -36,13 +38,13 @@ Add two new menu items to the existing `thought_card_actions` dropdown — visib
 - Auth: `authorize('update', $thought)`
 - Guard: verify `$thought->source === 'email'`; abort 403 otherwise
 - Action:
-  1. Resolve the underlying `ImportedEmail` or `CapturedInboundEmail` via `thought_id`
-  2. If neither found, abort 404
+  1. Resolve the underlying email row: `ImportedEmail::where('thought_id', $thought->id)->first()` then `CapturedInboundEmail::where('thought_id', $thought->id)->first()`; abort 404 if neither found
   3. On the stored email row: set `processing_status = 'research_queued'`, clear `research_thought_id = null`
   4. On the thought: clear `source_metadata.newsletter_research` block
   5. Dispatch `ProcessExtraEmailResearch` with the appropriate ID (`importedEmailId` or `capturedInboundEmailId`)
 - Response: `redirect()->back()->with('success', '...')`
 - Note: any previously generated research thought is left in the DB as an unlinked orphan; no deletion needed
+- Note: `failure_count` and `failure_reason` columns on `ImportedEmail` are intentionally not cleared on re-trigger
 
 ### Routes
 
