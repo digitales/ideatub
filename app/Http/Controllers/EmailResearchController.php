@@ -8,6 +8,7 @@ use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\Thought;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 
 class EmailResearchController extends Controller
 {
@@ -19,7 +20,7 @@ class EmailResearchController extends Controller
         $this->authorize('update', $thought);
 
         if ($thought->source !== 'email') {
-            abort(403);
+            abort(422);
         }
 
         $thought->update([
@@ -40,7 +41,7 @@ class EmailResearchController extends Controller
         $this->authorize('update', $thought);
 
         if ($thought->source !== 'email') {
-            abort(403);
+            abort(422);
         }
 
         $stored = ImportedEmail::where('thought_id', $thought->id)->first()
@@ -50,22 +51,24 @@ class EmailResearchController extends Controller
             abort(404);
         }
 
-        // Reset so the job's research_thought_id guard does not bail early.
-        $stored->processing_status = 'research_queued';
-        $stored->research_thought_id = null;
-        $stored->save();
+        DB::transaction(function () use ($stored, $thought): void {
+            // Reset so the job's research_thought_id guard does not bail early.
+            $stored->processing_status = 'research_queued';
+            $stored->research_thought_id = null;
+            $stored->save();
 
-        // Clear stale status from the thought so the badge resets.
-        $meta = $thought->source_metadata ?? [];
-        unset($meta['newsletter_research']);
-        $thought->source_metadata = $meta;
-        $thought->save();
+            // Clear stale status from the thought so the badge resets.
+            $meta = $thought->source_metadata ?? [];
+            unset($meta['newsletter_research']);
+            $thought->source_metadata = $meta;
+            $thought->save();
 
-        if ($stored instanceof ImportedEmail) {
-            ProcessExtraEmailResearch::dispatch(importedEmailId: $stored->id);
-        } else {
-            ProcessExtraEmailResearch::dispatch(capturedInboundEmailId: $stored->id);
-        }
+            if ($stored instanceof ImportedEmail) {
+                ProcessExtraEmailResearch::dispatch(importedEmailId: $stored->id);
+            } else {
+                ProcessExtraEmailResearch::dispatch(capturedInboundEmailId: $stored->id);
+            }
+        });
 
         return redirect()->back()->with('success', 'Newsletter research queued. Refresh in a moment to see results.');
     }

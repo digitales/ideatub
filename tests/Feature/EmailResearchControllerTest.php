@@ -113,7 +113,7 @@ class EmailResearchControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('emails.idea-research', $thought))
-            ->assertForbidden();
+            ->assertUnprocessable();
     }
 
     // -----------------------------------------------------------------------
@@ -224,6 +224,6 @@ class EmailResearchControllerTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('emails.newsletter-research', $thought))
-            ->assertForbidden();
+            ->assertUnprocessable();
     }
 }
