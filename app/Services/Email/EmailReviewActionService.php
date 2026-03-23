@@ -2,6 +2,7 @@
 
 namespace App\Services\Email;
 
+use App\Jobs\ReconcileIgnoredSenderThoughtVisibility;
 use App\Models\CapturedInboundEmail;
 use App\Models\EmailSenderRule;
 use App\Models\ImportedEmail;
@@ -28,7 +29,9 @@ class EmailReviewActionService
      */
     public function applySenderClassification(InboxItem $item, User $user, string $action): bool
     {
-        return DB::transaction(function () use ($item, $user, $action): bool {
+        $reconcileSender = null;
+
+        $applied = DB::transaction(function () use ($item, $user, $action, &$reconcileSender): bool {
             $locked = InboxItem::query()->whereKey($item->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->generator_type !== 'email_sender_review') {
@@ -77,8 +80,16 @@ class EmailReviewActionService
                 'created_at' => $actedAt,
             ]);
 
+            $reconcileSender = $normalizedSender;
+
             return true;
         });
+
+        if ($applied && is_string($reconcileSender) && $reconcileSender !== '' && config('services.email_sender_policy.enabled')) {
+            ReconcileIgnoredSenderThoughtVisibility::dispatch((int) $user->id, $reconcileSender);
+        }
+
+        return $applied;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ReconcileIgnoredSenderThoughtVisibility;
 use App\Models\EmailSenderRule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -49,6 +50,10 @@ class EmailSenderRuleSettingsController extends Controller
             'action' => $validated['action'],
         ]);
 
+        if (config('services.email_sender_policy.enabled')) {
+            ReconcileIgnoredSenderThoughtVisibility::dispatch((int) $request->user()->id, $senderEmail);
+        }
+
         return redirect()
             ->route('settings.email-sender-rules.index')
             ->with('success', 'Sender rule added.');
@@ -64,6 +69,10 @@ class EmailSenderRuleSettingsController extends Controller
 
         $emailSenderRule->update(['action' => $validated['action']]);
 
+        if (config('services.email_sender_policy.enabled')) {
+            ReconcileIgnoredSenderThoughtVisibility::dispatch((int) $request->user()->id, $emailSenderRule->sender_email);
+        }
+
         return redirect()
             ->route('settings.email-sender-rules.index')
             ->with('success', 'Sender rule updated.');
@@ -73,7 +82,12 @@ class EmailSenderRuleSettingsController extends Controller
     {
         abort_unless($emailSenderRule->user_id === $request->user()->id, 403);
 
+        $senderEmail = $emailSenderRule->sender_email;
         $emailSenderRule->delete();
+
+        if (config('services.email_sender_policy.enabled')) {
+            ReconcileIgnoredSenderThoughtVisibility::dispatch((int) $request->user()->id, $senderEmail);
+        }
 
         return redirect()
             ->route('settings.email-sender-rules.index')
