@@ -33,19 +33,24 @@ class ProcessExtraEmailResearch implements ShouldQueue
 
     public function __construct(
         public readonly ?int $importedEmailId = null,
-        public readonly ?int $capturedInboundEmailId = null,
+        public readonly ?int $capturedInboundEmailId = null
     ) {
-        if (($importedEmailId === null) === ($capturedInboundEmailId === null)) {
-            throw new \InvalidArgumentException('Exactly one of importedEmailId or capturedInboundEmailId must be set.');
+        if (
+            ($importedEmailId === null) ===
+            ($capturedInboundEmailId === null)
+        ) {
+            throw new \InvalidArgumentException(
+                "Exactly one of importedEmailId or capturedInboundEmailId must be set."
+            );
         }
     }
 
     public function handle(
         EmailNewsletterResearchService $researchService,
-        EmailLinkExtractor $linkExtractor,
+        EmailLinkExtractor $linkExtractor
     ): void {
         $lock = Cache::lock($this->lockKey(), $this->timeout + 60);
-        if (! $lock->get()) {
+        if (!$lock->get()) {
             $this->release($this->contentionReleaseDelay());
 
             return;
@@ -60,13 +65,13 @@ class ProcessExtraEmailResearch implements ShouldQueue
 
     private function handleLocked(
         EmailNewsletterResearchService $researchService,
-        EmailLinkExtractor $linkExtractor,
+        EmailLinkExtractor $linkExtractor
     ): void {
         $stored = $this->resolveStoredEmail();
         if ($stored === null) {
-            Log::warning('ProcessExtraEmailResearch: stored email not found.', [
-                'imported_email_id' => $this->importedEmailId,
-                'captured_inbound_email_id' => $this->capturedInboundEmailId,
+            Log::warning("ProcessExtraEmailResearch: stored email not found.", [
+                "imported_email_id" => $this->importedEmailId,
+                "captured_inbound_email_id" => $this->capturedInboundEmailId,
             ]);
 
             return;
@@ -78,54 +83,70 @@ class ProcessExtraEmailResearch implements ShouldQueue
 
         $thought = $stored->thought;
         if ($thought === null) {
-            throw new \RuntimeException('Stored email has no linked email thought.');
+            throw new \RuntimeException(
+                "Stored email has no linked email thought."
+            );
         }
 
-        $links = $linkExtractor->linksFromProcessingMetadata($stored->processing_metadata_json);
+        $links = $linkExtractor->linksFromProcessingMetadata(
+            $stored->processing_metadata_json
+        );
         if ($links === []) {
-            $links = $linkExtractor->extractFromContent(trim((string) ($stored->body_text ?? '')), null);
+            $links = $linkExtractor->extractFromContent(
+                trim((string) ($stored->body_text ?? "")),
+                null
+            );
         }
 
-        $ingestionSource = $stored instanceof CapturedInboundEmail ? 'postmark' : 'fastmail';
+        $ingestionSource =
+            $stored instanceof CapturedInboundEmail ? "postmark" : "fastmail";
 
         $result = $researchService->createFromEmailThought(
             $thought,
             $stored,
             $ingestionSource,
-            $links,
+            $links
         );
 
         $stored->refresh();
         $thought->refresh();
 
-        if ($result['status'] === 'skipped') {
-            $stored->processing_status = 'research_skipped';
+        if ($result["status"] === "skipped") {
+            $stored->processing_status = "research_skipped";
             $stored->save();
-            $this->mergeEmailThoughtNewsletterStatus($thought, 'research_skipped', $result['reason'] ?? null);
+            $this->mergeEmailThoughtNewsletterStatus(
+                $thought,
+                "research_skipped",
+                $result["reason"] ?? null
+            );
 
             return;
         }
 
-        $degraded = (bool) ($result['degraded'] ?? false);
-        $stored->processing_status = $degraded ? 'research_partial' : 'research_completed';
+        $degraded = (bool) ($result["degraded"] ?? false);
+        $stored->processing_status = $degraded
+            ? "research_partial"
+            : "research_completed";
         $stored->save();
 
-        $researchThought = $result['research_thought'] ?? null;
+        $researchThought = $result["research_thought"] ?? null;
         $this->mergeEmailThoughtNewsletterStatus(
             $thought,
-            $degraded ? 'research_partial' : 'research_completed',
+            $degraded ? "research_partial" : "research_completed",
             null,
-            $researchThought instanceof Thought ? $researchThought->id : null,
+            $researchThought instanceof Thought ? $researchThought->id : null
         );
     }
 
     private function lockKey(): string
     {
         if ($this->importedEmailId !== null) {
-            return 'process-extra-email-research:imported:'.$this->importedEmailId;
+            return "process-extra-email-research:imported:" .
+                $this->importedEmailId;
         }
 
-        return 'process-extra-email-research:captured:'.$this->capturedInboundEmailId;
+        return "process-extra-email-research:captured:" .
+            $this->capturedInboundEmailId;
     }
 
     private function resolveStoredEmail(): ImportedEmail|CapturedInboundEmail|null
@@ -134,7 +155,9 @@ class ProcessExtraEmailResearch implements ShouldQueue
             return ImportedEmail::query()->find($this->importedEmailId);
         }
 
-        return CapturedInboundEmail::query()->find($this->capturedInboundEmailId);
+        return CapturedInboundEmail::query()->find(
+            $this->capturedInboundEmailId
+        );
     }
 
     private function contentionReleaseDelay(): int
@@ -155,19 +178,19 @@ class ProcessExtraEmailResearch implements ShouldQueue
         Thought $thought,
         string $status,
         ?string $reason,
-        ?string $researchThoughtId = null,
+        ?string $researchThoughtId = null
     ): void {
         $meta = $thought->source_metadata ?? [];
         $block = [
-            'status' => $status,
+            "status" => $status,
         ];
         if ($reason !== null) {
-            $block['reason'] = $reason;
+            $block["reason"] = $reason;
         }
         if ($researchThoughtId !== null) {
-            $block['research_thought_id'] = $researchThoughtId;
+            $block["research_thought_id"] = $researchThoughtId;
         }
-        $meta['newsletter_research'] = $block;
+        $meta["newsletter_research"] = $block;
         $thought->source_metadata = $meta;
         $thought->save();
     }
