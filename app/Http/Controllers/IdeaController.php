@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\IdeaResearchRequested;
+use App\Models\CapturedInboundEmail;
 use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Services\Email\ThoughtEmailSenderContextResolver;
@@ -151,11 +152,14 @@ class IdeaController extends Controller
             $contentHtml = (new CommonMarkConverter)->convert($thought->content)->getContent();
         }
 
+        $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl($thought);
+
         return view('idea.show', [
             'thought' => $thought,
             'importedEmail' => $importedEmail,
             'senderRuleContext' => $senderRuleContext,
             'contentHtml' => $contentHtml,
+            'linkedResearchUrl' => $linkedResearchUrl,
         ]);
     }
 
@@ -753,6 +757,16 @@ class IdeaController extends Controller
             return redirect()->route('idea.research.show', ['thought' => $thought->parent_id]);
         }
 
+        $isResearchRoot = Thought::query()
+            ->whereKey($thought->id)
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
+            ->exists();
+
+        if (! $isResearchRoot) {
+            return redirect()->route('thoughts.show', $thought);
+        }
+
         $sections = $thought->comments()->orderBy('created_at')->get();
         $converter = new CommonMarkConverter;
 
@@ -763,11 +777,175 @@ class IdeaController extends Controller
             ];
         });
 
+        $relatedEmail = $this->resolveResearchRelatedEmailCard($thought);
+
         return view('idea.research_show', [
             'root' => $thought,
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
+            'relatedEmail' => $relatedEmail,
         ]);
+    }
+
+    /**
+     * Resolve a URL for the research document linked from an email thought (metadata + durable stored email only).
+     */
+    private function resolveEmailLinkedResearchUrl(Thought $thought): ?string
+    {
+        if ($thought->source !== 'email') {
+            return null;
+        }
+
+        $metaId = $this->normalizeResearchThoughtId(data_get($thought->source_metadata, 'research_thought_id'));
+
+        $imported = $thought->importedEmail();
+        $importedResearchId = $this->normalizeResearchThoughtId($imported?->research_thought_id);
+
+        $captured = $this->resolveCapturedInboundEmailForThought($thought);
+        $capturedResearchId = $this->normalizeResearchThoughtId($captured?->research_thought_id);
+
+        if ($importedResearchId !== null && $capturedResearchId !== null && $importedResearchId !== $capturedResearchId) {
+            return null;
+        }
+
+        $storedIds = array_values(array_unique(array_filter([$importedResearchId, $capturedResearchId])));
+        $storedId = null;
+        if (count($storedIds) === 1) {
+            $storedId = $storedIds[0];
+        }
+
+        if ($metaId !== null && $storedId !== null && $metaId !== $storedId) {
+            return null;
+        }
+
+        $candidateId = $metaId ?? $storedId;
+        if ($candidateId === null) {
+            return null;
+        }
+
+        $research = Thought::query()
+            ->whereKey($candidateId)
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
+            ->first();
+
+        if ($research === null) {
+            return null;
+        }
+
+        return route('idea.research.show', $research);
+    }
+
+    /**
+     * @return array{subject: string, sender: string, url: string}|null
+     */
+    private function resolveResearchRelatedEmailCard(Thought $researchRoot): ?array
+    {
+        $merged = $this->mergeResearchRootEmailLinkageFields(
+            $researchRoot->metadata ?? [],
+            $researchRoot->source_metadata ?? []
+        );
+
+        if ($merged === null) {
+            return null;
+        }
+
+        $emailThoughtId = $merged['email_thought_id'];
+        $subject = $merged['email_subject'];
+        $sender = $merged['email_sender'];
+
+        $emailThought = Thought::query()
+            ->whereKey($emailThoughtId)
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalSourceType('email')
+            ->first();
+
+        if ($emailThought === null) {
+            return null;
+        }
+
+        return [
+            'subject' => $subject,
+            'sender' => $sender,
+            'url' => route('thoughts.show', $emailThought),
+        ];
+    }
+
+    /**
+     * Merge email linkage fields from research root metadata and source_metadata.
+     * Uses values from either bag when the other omits a field; when both supply a non-empty value for the same field, they must agree or the card is omitted.
+     *
+     * @return array{email_thought_id: string, email_subject: string, email_sender: string}|null
+     */
+    private function mergeResearchRootEmailLinkageFields(array $metadata, array $sourceMetadata): ?array
+    {
+        $keys = ['email_thought_id', 'email_subject', 'email_sender'];
+        $merged = [];
+
+        foreach ($keys as $key) {
+            $rawM = data_get($metadata, $key);
+            $rawS = data_get($sourceMetadata, $key);
+            $normM = $key === 'email_thought_id'
+                ? $this->normalizeResearchThoughtId($rawM)
+                : $this->normalizeResearchEmailCardTextField($rawM);
+            $normS = $key === 'email_thought_id'
+                ? $this->normalizeResearchThoughtId($rawS)
+                : $this->normalizeResearchEmailCardTextField($rawS);
+
+            if ($normM !== null && $normS !== null && $normM !== $normS) {
+                return null;
+            }
+
+            if ($normM !== null) {
+                $merged[$key] = trim((string) $rawM);
+            } elseif ($normS !== null) {
+                $merged[$key] = trim((string) $rawS);
+            } else {
+                return null;
+            }
+        }
+
+        return $merged;
+    }
+
+    private function normalizeResearchEmailCardTextField(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function normalizeResearchThoughtId(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $id = strtolower(trim((string) $value));
+
+        return $id === '' ? null : $id;
+    }
+
+    private function resolveCapturedInboundEmailForThought(Thought $thought): ?CapturedInboundEmail
+    {
+        $capturedId = data_get($thought->source_metadata, 'captured_inbound_email_id');
+        if ($capturedId !== null && (string) $capturedId !== '') {
+            $row = CapturedInboundEmail::query()
+                ->where('user_id', $thought->user_id)
+                ->find($capturedId);
+            if ($row !== null) {
+                return $row;
+            }
+        }
+
+        return CapturedInboundEmail::query()
+            ->where('user_id', $thought->user_id)
+            ->where('thought_id', $thought->id)
+            ->first();
     }
 
     /**

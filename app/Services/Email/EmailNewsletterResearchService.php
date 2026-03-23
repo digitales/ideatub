@@ -54,6 +54,8 @@ class EmailNewsletterResearchService
         $markdown = $this->buildResearchMarkdown($storedEmail, $extractedLinks, $youtubeRows, $degraded);
 
         $sender = $this->resolveSenderEmail($storedEmail);
+        $emailSubject = $this->resolveEmailSubject($storedEmail, $emailThought);
+        $emailSenderDisplay = $this->resolveEmailSenderDisplay($storedEmail, $emailThought);
         [$storedType, $storedId, $planSlug] = $this->storedEmailIdentity($storedEmail);
 
         $project = (string) config('app.name', 'ideatub');
@@ -63,6 +65,8 @@ class EmailNewsletterResearchService
             'stored_email_id' => $storedId,
             'stored_email_type' => $storedType,
             'email_thought_id' => $emailThought->id,
+            'email_subject' => $emailSubject,
+            'email_sender' => $emailSenderDisplay,
             'sender_email' => $sender,
             'ingestion_source' => $ingestionSource,
         ];
@@ -308,9 +312,12 @@ class EmailNewsletterResearchService
             return mb_strtolower(trim((string) $storedEmail->sender_email));
         }
 
-        $from = $storedEmail->from_json[0] ?? null;
-        if (is_array($from) && isset($from['email']) && is_string($from['email'])) {
-            return mb_strtolower(trim($from['email']));
+        $fromJson = $storedEmail->from_json;
+        if (is_array($fromJson)) {
+            $from = $fromJson[0] ?? null;
+            if (is_array($from) && isset($from['email']) && is_string($from['email'])) {
+                return mb_strtolower(trim($from['email']));
+            }
         }
 
         if ($storedEmail->rule_email !== null && trim((string) $storedEmail->rule_email) !== '') {
@@ -318,6 +325,70 @@ class EmailNewsletterResearchService
         }
 
         return '';
+    }
+
+    private function resolveEmailSubject(ImportedEmail|CapturedInboundEmail $storedEmail, Thought $emailThought): string
+    {
+        $fromStored = trim((string) ($storedEmail->subject ?? ''));
+        if ($fromStored !== '') {
+            return $fromStored;
+        }
+
+        $meta = is_array($emailThought->source_metadata) ? $emailThought->source_metadata : [];
+        foreach (['email_subject', 'subject'] as $key) {
+            $v = $meta[$key] ?? null;
+            if (is_string($v) && trim($v) !== '') {
+                return trim($v);
+            }
+        }
+
+        return '';
+    }
+
+    private function resolveEmailSenderDisplay(ImportedEmail|CapturedInboundEmail $storedEmail, Thought $emailThought): string
+    {
+        $fromStored = $storedEmail instanceof CapturedInboundEmail
+            ? trim((string) ($storedEmail->sender_email ?? ''))
+            : $this->formatImportedSenderDisplay($storedEmail);
+
+        if ($fromStored !== '') {
+            return $fromStored;
+        }
+
+        $meta = is_array($emailThought->source_metadata) ? $emailThought->source_metadata : [];
+        foreach (['email_sender', 'sender_display', 'from'] as $key) {
+            $v = $meta[$key] ?? null;
+            if (is_string($v) && trim($v) !== '') {
+                return trim($v);
+            }
+        }
+
+        return '';
+    }
+
+    private function formatImportedSenderDisplay(ImportedEmail $row): string
+    {
+        $fromJson = $row->from_json;
+        if (! is_array($fromJson)) {
+            return '';
+        }
+
+        $from = $fromJson[0] ?? null;
+        if (! is_array($from)) {
+            return '';
+        }
+
+        $email = trim((string) ($from['email'] ?? ''));
+        $name = isset($from['name']) ? trim((string) $from['name']) : '';
+        if ($email === '') {
+            return '';
+        }
+
+        if ($name !== '') {
+            return $name.' <'.$email.'>';
+        }
+
+        return $email;
     }
 
     /**
@@ -396,5 +467,29 @@ class EmailNewsletterResearchService
         }
 
         return $out;
+    }
+
+    /**
+     * Resolve email thought id + display fields using the same fallbacks as the newsletter research write path.
+     *
+     * @return array{email_thought_id: string, email_subject: string, email_sender: string}|null
+     */
+    public function linkageFieldsForStoredEmail(ImportedEmail|CapturedInboundEmail $storedEmail, Thought $emailThought): ?array
+    {
+        if ((int) $emailThought->user_id !== (int) $storedEmail->user_id) {
+            return null;
+        }
+
+        $subject = $this->resolveEmailSubject($storedEmail, $emailThought);
+        $sender = $this->resolveEmailSenderDisplay($storedEmail, $emailThought);
+        if ($subject === '' || $sender === '') {
+            return null;
+        }
+
+        return [
+            'email_thought_id' => (string) $emailThought->id,
+            'email_subject' => $subject,
+            'email_sender' => $sender,
+        ];
     }
 }

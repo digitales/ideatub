@@ -33,6 +33,7 @@
             @include('idea.partials.thought_detail_email_sidebar', [
                 'thought' => $thought,
                 'importedEmail' => $importedEmail,
+                'linkedResearchUrl' => $linkedResearchUrl ?? null,
                 'senderRuleContext' => $senderRuleContext,
             ])
         @endif
