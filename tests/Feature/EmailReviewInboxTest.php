@@ -382,6 +382,34 @@ class EmailReviewInboxTest extends TestCase
         $this->assertDatabaseCount('inbox_item_actions', 0);
     }
 
+    public function test_save_as_thought_hides_stream_immediately_when_sender_is_now_ignored(): void
+    {
+        $this->fakeOpenRouterForThoughtCapture();
+        Bus::fake();
+
+        $user = User::factory()->create();
+        ['imported' => $imported, 'inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        EmailSenderRule::query()->create([
+            'user_id' => $user->id,
+            'sender_email' => 'newsletter@example.com',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ]);
+
+        $this->actingAs($user)->post(route('inbox.email-review.action', $inbox), [
+            'action' => 'save_thought',
+        ])->assertRedirect(route('inbox.index'));
+
+        $this->assertSame(1, Thought::query()->where('source', 'email')->count());
+        $thought = Thought::query()->where('source', 'email')->first();
+        $this->assertNotNull($thought);
+        $this->assertFalse($thought->is_visible_in_stream);
+        $this->assertSame(Thought::VISIBILITY_REASON_IGNORED_SENDER, $thought->visibility_reason);
+
+        $imported->refresh();
+        $this->assertSame($thought->id, $imported->thought_id);
+    }
+
     public function test_imported_email_review_save_as_thought_creates_email_thought_and_links_thought_id(): void
     {
         $this->fakeOpenRouterForThoughtCapture();
