@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\EmailAccountSettingsController;
 use App\Http\Controllers\EmailSenderRuleSettingsController;
+use App\Http\Controllers\EmailThoughtSenderRuleController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IdeaController;
@@ -99,6 +100,10 @@ Route::middleware('auth')->group(function () {
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::get('/thoughts/{thought}', [IdeaController::class, 'show'])->name('thoughts.show');
+    Route::post('/thoughts/{thought}/sender-rules', [EmailThoughtSenderRuleController::class, 'store'])
+        ->name('thoughts.sender-rules.store');
+    Route::delete('/thoughts/{thought}/sender-rules', [EmailThoughtSenderRuleController::class, 'destroy'])
+        ->name('thoughts.sender-rules.destroy');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
     Route::get('/stream/jira', [IdeaController::class, 'streamJira'])->name('idea.stream.jira');
     Route::get('/stream/emails', [IdeaController::class, 'streamEmails'])->name('idea.stream.emails');
