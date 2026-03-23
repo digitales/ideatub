@@ -201,4 +201,29 @@ class EmailThoughtStreamVisibilityTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('Policy off hidden email');
     }
+
+    public function test_hidden_email_alias_source_stays_filtered_from_stream(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Visible stream neighbor',
+            'parent_id' => null,
+            'source' => 'web',
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Hidden aliased email row',
+            'parent_id' => null,
+            'source' => 'emails',
+            'is_visible_in_stream' => false,
+            'visibility_reason' => Thought::VISIBILITY_REASON_IGNORED_SENDER,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $response->assertSee('Visible stream neighbor');
+        $response->assertDontSee('Hidden aliased email row');
+    }
 }

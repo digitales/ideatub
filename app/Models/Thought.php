@@ -338,12 +338,27 @@ class Thought extends Model
      */
     public function scopeVisibleInStream(Builder $query): Builder
     {
-        return $query->where(function (Builder $q): void {
-            $q->where(function (Builder $nonEmail): void {
-                $nonEmail->whereNull('source')->orWhere('source', '!=', 'email');
-            })->orWhere(function (Builder $email): void {
-                $email->where('source', 'email')
-                    ->where('is_visible_in_stream', true);
+        $emailSourceValues = ThoughtTypeNavigation::storedValuesForCollection('email');
+
+        return $query->where(function (Builder $q) use ($emailSourceValues): void {
+            $q->where(function (Builder $nonEmail) use ($emailSourceValues): void {
+                self::applyCanonicalTypeMatch(
+                    $nonEmail,
+                    'LOWER(COALESCE(source, ?))',
+                    $emailSourceValues,
+                    false,
+                    ['']
+                );
+            })->orWhere(function (Builder $email) use ($emailSourceValues): void {
+                self::applyCanonicalTypeMatch(
+                    $email,
+                    'LOWER(COALESCE(source, ?))',
+                    $emailSourceValues,
+                    true,
+                    ['']
+                );
+
+                $email->where('is_visible_in_stream', true);
             });
         });
     }
