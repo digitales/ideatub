@@ -416,6 +416,42 @@ class ThoughtShowPageTest extends TestCase
         ]);
     }
 
+    public function test_detail_tag_row_with_existing_tags_renders_editable_tag_affordance(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Tagged thought detail body',
+            'metadata' => ['tags' => ['alpha', 'beta']],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee(route('ideas.update-tags', $thought), false);
+        $response->assertSee('aria-label="Edit tags"', false);
+    }
+
+    public function test_detail_tag_row_with_no_tags_still_renders_editable_tag_affordance(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Untagged thought detail body',
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee(route('ideas.update-tags', $thought), false);
+        $response->assertSee('aria-label="Edit tags"', false);
+    }
+
     private function assertThoughtBadgeLink(TestResponse $response, string $label, string $href): void
     {
         $xpath = $this->xpathFromResponse($response);
