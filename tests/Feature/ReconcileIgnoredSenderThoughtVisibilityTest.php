@@ -322,6 +322,109 @@ class ReconcileIgnoredSenderThoughtVisibilityTest extends TestCase
         $this->assertNull($thought->visibility_reason);
     }
 
+    public function test_imported_email_resolution_does_not_fall_back_to_row_participants_json(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $mailAccount = MailAccount::factory()->create(['user_id' => $user->id]);
+
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $mailAccount->id,
+            'mail_sync_run_id' => null,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-'.uniqid(),
+            'direction' => 'inbound',
+            'subject' => 'Subj',
+            'body_text' => 'Hi',
+            'processing_status' => 'imported',
+            'rule_action' => 'allow',
+            'rule_email' => null,
+            'from_json' => [],
+            'participants_json' => [
+                ['role' => 'from', 'email' => 'wrong-from-row@example.com', 'name' => 'Wrong Row'],
+            ],
+            'thought_id' => null,
+        ]);
+
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'participants' => [
+                    ['role' => 'from', 'email' => 'correct-from-metadata@example.com', 'name' => 'Correct Metadata'],
+                ],
+            ],
+            'is_visible_in_stream' => true,
+            'visibility_reason' => null,
+        ]);
+
+        $imported->update(['thought_id' => $thought->id]);
+
+        EmailSenderRule::query()->create([
+            'user_id' => $user->id,
+            'sender_email' => 'correct-from-metadata@example.com',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ]);
+
+        $job = new ReconcileIgnoredSenderThoughtVisibility($user->id, 'correct-from-metadata@example.com');
+        app()->call([$job, 'handle']);
+
+        $thought->refresh();
+        $this->assertFalse($thought->is_visible_in_stream);
+        $this->assertSame(Thought::VISIBILITY_REASON_IGNORED_SENDER, $thought->visibility_reason);
+    }
+
+    public function test_broken_metadata_id_can_fall_back_to_existing_imported_email_linkage(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create();
+        $mailAccount = MailAccount::factory()->create(['user_id' => $user->id]);
+
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => 999999,
+            ],
+            'is_visible_in_stream' => true,
+            'visibility_reason' => null,
+        ]);
+
+        ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $mailAccount->id,
+            'mail_sync_run_id' => null,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-'.uniqid(),
+            'direction' => 'inbound',
+            'subject' => 'Subj',
+            'body_text' => 'Hi',
+            'processing_status' => 'imported',
+            'rule_action' => 'allow',
+            'rule_email' => 'linked@example.com',
+            'thought_id' => $thought->id,
+        ]);
+
+        EmailSenderRule::query()->create([
+            'user_id' => $user->id,
+            'sender_email' => 'linked@example.com',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ]);
+
+        $job = new ReconcileIgnoredSenderThoughtVisibility($user->id, 'linked@example.com');
+        app()->call([$job, 'handle']);
+
+        $thought->refresh();
+        $this->assertFalse($thought->is_visible_in_stream);
+        $this->assertSame(Thought::VISIBILITY_REASON_IGNORED_SENDER, $thought->visibility_reason);
+    }
+
     public function test_job_no_ops_when_sender_policy_feature_flag_is_disabled(): void
     {
         config(['services.email_sender_policy.enabled' => false]);

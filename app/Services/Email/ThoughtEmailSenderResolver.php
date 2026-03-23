@@ -26,20 +26,16 @@ class ThoughtEmailSenderResolver
 
         if (array_key_exists('imported_email_id', $meta)) {
             $row = $this->importedEmailFromMetadata($thought);
-            if ($row === null) {
-                return null;
+            if ($row !== null) {
+                return $this->normalizedFromImportedRow($row, $thought);
             }
-
-            return $this->normalizedFromImportedRow($row, $thought);
         }
 
         if (array_key_exists('captured_inbound_email_id', $meta)) {
             $row = $this->capturedInboundFromMetadata($thought);
-            if ($row === null) {
-                return null;
+            if ($row !== null) {
+                return $this->normalizedFromCapturedRow($row, $thought);
             }
-
-            return $this->normalizedFromCapturedRow($row, $thought);
         }
 
         $imported = $thought->importedEmail();
@@ -106,7 +102,7 @@ class ThoughtEmailSenderResolver
     }
 
     /**
-     * Precedence: rule_email → formatted first from_json participant → from-role participant (row, then thought metadata).
+     * Precedence: rule_email → formatted first from_json participant → thought metadata fallback.
      *
      * @return non-empty-string|string
      */
@@ -119,11 +115,6 @@ class ThoughtEmailSenderResolver
         $fromJson = $this->formatFirstFromJson($row->from_json ?? []);
         if ($fromJson !== '') {
             return $fromJson;
-        }
-
-        $fromParticipant = $this->firstFromRoleMailbox($row->participants_json ?? []);
-        if ($fromParticipant !== '') {
-            return $fromParticipant;
         }
 
         $fromParticipant = $this->firstFromRoleMailbox(data_get($thought->source_metadata, 'participants', []) ?? []);
