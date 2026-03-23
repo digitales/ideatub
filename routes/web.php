@@ -34,7 +34,7 @@ if (config('oauth-mcp.enabled', true)) {
     Route::get('.well-known/oauth-authorization-server', [OAuthWellKnownController::class, 'authorizationServer']);
     Route::get('.well-known/jwks.json', [OAuthWellKnownController::class, 'jwks']);
     Route::post('oauth/register', [OAuthServerController::class, 'register']);
-    Route::get('oauth/authorize', [OAuthServerController::class, 'authorize'])->name('oauth.authorize');
+    Route::get('oauth/authorize', [OAuthServerController::class, 'showConsent'])->name('oauth.authorize');
     Route::post('oauth/token', [OAuthServerController::class, 'token']);
 }
 
