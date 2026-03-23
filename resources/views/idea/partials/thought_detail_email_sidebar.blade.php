@@ -92,4 +92,6 @@
             <a href="{{ $linkedResearchUrl }}" class="text-[13px] font-medium text-memory-violet hover:underline">View research</a>
         </p>
     @endif
+
+    @include('idea.partials.thought_detail_sender_rule_card', ['senderRuleContext' => $senderRuleContext])
 </aside>

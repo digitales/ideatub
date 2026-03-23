@@ -15,6 +15,7 @@ use App\Services\Email\EmailImportService;
 use App\Services\Email\EmailLinkExtractor;
 use App\Services\Email\EmailReviewInboxService;
 use App\Services\Email\EmailSenderRuleService;
+use App\Services\Email\EmailThoughtStreamVisibilityService;
 use App\Services\Email\NormalizedEmailMessage;
 use App\Services\Email\ParticipantNormalizer;
 use App\Services\ThoughtCaptureService;
@@ -667,7 +668,7 @@ class EmailImportServiceTest extends TestCase
             }
         };
 
-        $service = new class(app(EmailBodyCleanupService::class), app(ParticipantNormalizer::class), app(EmailFilterService::class), $capture, app(EmailSenderRuleService::class), app(EmailReviewInboxService::class), app(EmailLinkExtractor::class)) extends EmailImportService
+        $service = new class(app(EmailBodyCleanupService::class), app(ParticipantNormalizer::class), app(EmailFilterService::class), $capture, app(EmailSenderRuleService::class), app(EmailReviewInboxService::class), app(EmailLinkExtractor::class), app(EmailThoughtStreamVisibilityService::class)) extends EmailImportService
         {
             protected function dispatchExtraEmailResearch(ImportedEmail $row): void
             {
@@ -742,6 +743,202 @@ class EmailImportServiceTest extends TestCase
         $this->assertDatabaseCount('imported_emails', 1);
         $this->assertDatabaseCount('thoughts', 0);
         $this->assertDatabaseCount('inbox_items', 1);
+    }
+
+    #[Test]
+    public function import_restores_stream_visibility_for_allow_sender_when_sender_policy_enabled(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+        ]);
+        EmailSenderRule::create([
+            'user_id' => $account->user_id,
+            'sender_email' => 'allowed@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $capture = new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                $thought = Thought::factory()->create([
+                    'user_id' => $options['user_id'],
+                    'content' => $options['content'],
+                    'source' => $options['source'],
+                    'source_metadata' => $options['source_metadata'] ?? null,
+                    'embedding' => null,
+                    'is_visible_in_stream' => false,
+                    'visibility_reason' => Thought::VISIBILITY_REASON_IGNORED_SENDER,
+                ]);
+
+                return [
+                    'thought' => $thought,
+                    'chunked' => false,
+                ];
+            }
+        };
+        app()->instance(ThoughtCaptureService::class, $capture);
+
+        $service = app(EmailImportService::class);
+
+        $row = $service->importMessage($account, $this->message(
+            'msg-stream-allow',
+            direction: 'received',
+            from: [['email' => 'allowed@example.com', 'name' => 'Allowed']],
+            to: [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+        ));
+
+        $this->assertNotNull($row->thought_id);
+        $thought = Thought::query()->find($row->thought_id);
+        $this->assertNotNull($thought);
+        $this->assertTrue($thought->is_visible_in_stream);
+        $this->assertNull($thought->visibility_reason);
+    }
+
+    #[Test]
+    public function import_does_not_clear_non_ignored_visibility_reason_for_allow_sender(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+        ]);
+        EmailSenderRule::create([
+            'user_id' => $account->user_id,
+            'sender_email' => 'allowed@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $capture = new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                $thought = Thought::factory()->create([
+                    'user_id' => $options['user_id'],
+                    'content' => $options['content'],
+                    'source' => $options['source'],
+                    'source_metadata' => $options['source_metadata'] ?? null,
+                    'embedding' => null,
+                    'is_visible_in_stream' => false,
+                    'visibility_reason' => 'manually_hidden',
+                ]);
+
+                return [
+                    'thought' => $thought,
+                    'chunked' => false,
+                ];
+            }
+        };
+        app()->instance(ThoughtCaptureService::class, $capture);
+
+        $service = app(EmailImportService::class);
+
+        $row = $service->importMessage($account, $this->message(
+            'msg-stream-preserve-other-reason',
+            direction: 'received',
+            from: [['email' => 'allowed@example.com', 'name' => 'Allowed']],
+            to: [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+        ));
+
+        $this->assertNotNull($row->thought_id);
+        $thought = Thought::query()->find($row->thought_id);
+        $this->assertNotNull($thought);
+        $this->assertFalse($thought->is_visible_in_stream);
+        $this->assertSame('manually_hidden', $thought->visibility_reason);
+    }
+
+    #[Test]
+    public function import_leaves_stream_visibility_unchanged_when_sender_policy_disabled_even_if_capture_starts_hidden(): void
+    {
+        config(['services.email_sender_policy.enabled' => false]);
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+        ]);
+
+        $capture = new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                $thought = Thought::factory()->create([
+                    'user_id' => $options['user_id'],
+                    'content' => $options['content'],
+                    'source' => $options['source'],
+                    'source_metadata' => $options['source_metadata'] ?? null,
+                    'embedding' => null,
+                    'is_visible_in_stream' => false,
+                    'visibility_reason' => Thought::VISIBILITY_REASON_IGNORED_SENDER,
+                ]);
+
+                return [
+                    'thought' => $thought,
+                    'chunked' => false,
+                ];
+            }
+        };
+        app()->instance(ThoughtCaptureService::class, $capture);
+
+        $service = app(EmailImportService::class);
+
+        $row = $service->importMessage($account, $this->message(
+            'msg-stream-policy-off',
+            direction: 'received',
+            from: [['email' => 'sender@example.com', 'name' => 'Sender']],
+            to: [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+        ));
+
+        $this->assertNotNull($row->thought_id);
+        $thought = Thought::query()->find($row->thought_id);
+        $this->assertNotNull($thought);
+        $this->assertFalse($thought->is_visible_in_stream);
+        $this->assertSame(Thought::VISIBILITY_REASON_IGNORED_SENDER, $thought->visibility_reason);
+    }
+
+    #[Test]
+    public function import_does_not_invoke_stream_visibility_service_when_sender_policy_disabled(): void
+    {
+        config(['services.email_sender_policy.enabled' => false]);
+
+        $spy = $this->createMock(EmailThoughtStreamVisibilityService::class);
+        $spy->expects($this->never())->method('applyToThought');
+        app()->instance(EmailThoughtStreamVisibilityService::class, $spy);
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+        ]);
+        app()->instance(ThoughtCaptureService::class, new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                return [
+                    'thought' => Thought::factory()->create([
+                        'user_id' => $options['user_id'],
+                        'content' => $options['content'],
+                        'source' => $options['source'],
+                        'source_metadata' => $options['source_metadata'] ?? null,
+                        'embedding' => null,
+                    ]),
+                    'chunked' => false,
+                ];
+            }
+        });
+
+        app(EmailImportService::class)->importMessage($account, $this->message(
+            'msg-never-visibility-svc',
+            direction: 'received',
+            from: [['email' => 'sender@example.com', 'name' => 'Sender']],
+            to: [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+        ));
     }
 
     #[Test]
