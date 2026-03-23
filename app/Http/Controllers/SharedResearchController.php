@@ -24,6 +24,7 @@ class SharedResearchController extends Controller
 
         $topLevelThoughts = Thought::where('user_id', $request->user()->id)
             ->whereNull('parent_id')
+            ->visibleInStream()
             ->orderByDesc('created_at')
             ->limit(50)
             ->get();
