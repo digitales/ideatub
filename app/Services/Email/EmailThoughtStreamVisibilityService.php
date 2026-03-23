@@ -56,6 +56,11 @@ class EmailThoughtStreamVisibilityService
      */
     private function applyVisibleState(Thought $thought, array $state): void
     {
+        if ($thought->visibility_reason !== null
+            && $thought->visibility_reason !== Thought::VISIBILITY_REASON_IGNORED_SENDER) {
+            return;
+        }
+
         if ($thought->is_visible_in_stream === $state['is_visible_in_stream']
             && $thought->visibility_reason === $state['visibility_reason']) {
             return;

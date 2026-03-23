@@ -800,6 +800,60 @@ class EmailImportServiceTest extends TestCase
     }
 
     #[Test]
+    public function import_does_not_clear_non_ignored_visibility_reason_for_allow_sender(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+        ]);
+        EmailSenderRule::create([
+            'user_id' => $account->user_id,
+            'sender_email' => 'allowed@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $capture = new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                $thought = Thought::factory()->create([
+                    'user_id' => $options['user_id'],
+                    'content' => $options['content'],
+                    'source' => $options['source'],
+                    'source_metadata' => $options['source_metadata'] ?? null,
+                    'embedding' => null,
+                    'is_visible_in_stream' => false,
+                    'visibility_reason' => 'manually_hidden',
+                ]);
+
+                return [
+                    'thought' => $thought,
+                    'chunked' => false,
+                ];
+            }
+        };
+        app()->instance(ThoughtCaptureService::class, $capture);
+
+        $service = app(EmailImportService::class);
+
+        $row = $service->importMessage($account, $this->message(
+            'msg-stream-preserve-other-reason',
+            direction: 'received',
+            from: [['email' => 'allowed@example.com', 'name' => 'Allowed']],
+            to: [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+        ));
+
+        $this->assertNotNull($row->thought_id);
+        $thought = Thought::query()->find($row->thought_id);
+        $this->assertNotNull($thought);
+        $this->assertFalse($thought->is_visible_in_stream);
+        $this->assertSame('manually_hidden', $thought->visibility_reason);
+    }
+
+    #[Test]
     public function import_leaves_stream_visibility_unchanged_when_sender_policy_disabled_even_if_capture_starts_hidden(): void
     {
         config(['services.email_sender_policy.enabled' => false]);
