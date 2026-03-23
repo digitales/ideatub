@@ -123,6 +123,7 @@ class EmailResearchControllerTest extends TestCase
     public function test_newsletter_research_requeues_for_imported_email(): void
     {
         Queue::fake();
+        Event::fake();
 
         $user    = User::factory()->create();
         $thought = $this->makeEmailThought($user, [
@@ -145,6 +146,7 @@ class EmailResearchControllerTest extends TestCase
         $this->assertSame('prior failure', $email->failure_reason);
         $thought->refresh();
         $this->assertNull(data_get($thought->source_metadata, 'newsletter_research'));
+        Event::assertNotDispatched(IdeaResearchRequested::class);
     }
 
     public function test_newsletter_research_requeues_for_captured_inbound_email(): void
@@ -153,6 +155,7 @@ class EmailResearchControllerTest extends TestCase
 
         $user    = User::factory()->create();
         $thought = $this->makeEmailThought($user);
+        // Use a real Thought ID to satisfy any FK constraint on research_thought_id.
         $priorResearch = Thought::factory()->create(['user_id' => $user->id]);
         $captured = CapturedInboundEmail::query()->create([
             'user_id'            => $user->id,
@@ -188,6 +191,7 @@ class EmailResearchControllerTest extends TestCase
         $this->actingAs($user)
             ->post(route('emails.newsletter-research', $thought))
             ->assertNotFound();
+        Queue::assertNothingPushed();
     }
 
     public function test_newsletter_research_requires_authentication(): void
