@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\EmailAccountSettingsController;
+use App\Http\Controllers\EmailResearchController;
 use App\Http\Controllers\EmailSenderRuleSettingsController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
@@ -123,6 +124,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/ideas/research', [IdeaController::class, 'researchNew'])->name('ideas.research-new');
     Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');
     Route::get('/research/{thought}', [IdeaController::class, 'showResearch'])->name('idea.research.show');
+
+    Route::post('/emails/{thought}/idea-research', [EmailResearchController::class, 'ideaResearch'])->name('emails.idea-research');
+    Route::post('/emails/{thought}/newsletter-research', [EmailResearchController::class, 'newsletterResearch'])->name('emails.newsletter-research');
 
     // Drafts for thought capture (list, create, show, update, delete)
     Route::get('/ideas/drafts', [DraftController::class, 'index'])->name('ideas.drafts.index');
