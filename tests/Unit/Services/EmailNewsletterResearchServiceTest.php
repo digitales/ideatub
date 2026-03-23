@@ -13,6 +13,7 @@ use App\Services\OpenRouterService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtChunkingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -98,6 +99,13 @@ class EmailNewsletterResearchServiceTest extends TestCase
         $this->assertSame($result['research_thought']->id, $emailThought->source_metadata['research_thought_id']);
         $this->assertSame('extra_process', $emailThought->source_metadata['sender_rule_action']);
         $this->assertSame($imported->id, $emailThought->source_metadata['imported_email_id']);
+
+        $research = $result['research_thought']->fresh();
+        $rsm = $research->source_metadata ?? [];
+        $this->assertSame($emailThought->id, $rsm['email_thought_id'] ?? null);
+        $this->assertSame('Weekly digest', $rsm['email_subject'] ?? null);
+        $this->assertSame('Digest <digest@example.com>', $rsm['email_sender'] ?? null);
+        $this->assertSame('digest@example.com', $rsm['sender_email'] ?? null);
     }
 
     #[Test]
@@ -321,6 +329,8 @@ class EmailNewsletterResearchServiceTest extends TestCase
         $this->assertSame($captured->id, $sm['stored_email_id'] ?? null);
         $this->assertSame('captured_inbound_email', $sm['stored_email_type'] ?? null);
         $this->assertSame($emailThought->id, $sm['email_thought_id'] ?? null);
+        $this->assertSame('Captured subject', $sm['email_subject'] ?? null);
+        $this->assertSame('sender@newsletter.example', $sm['email_sender'] ?? null);
         $this->assertSame('sender@newsletter.example', $sm['sender_email'] ?? null);
         $this->assertSame('postmark', $sm['ingestion_source'] ?? null);
         $this->assertSame('PostmarkAppName', $sm['project'] ?? null);
@@ -336,5 +346,165 @@ class EmailNewsletterResearchServiceTest extends TestCase
         $this->assertArrayHasKey('newsletter_research', $cm);
         $this->assertSame($research->id, $cm['newsletter_research']['research_thought_id'] ?? null);
         $this->assertSame($emailThought->id, $cm['newsletter_research']['email_thought_id'] ?? null);
+    }
+
+    #[Test]
+    public function falls_back_to_email_thought_source_metadata_for_subject_and_sender_when_stored_fields_are_empty(): void
+    {
+        config(['app.name' => 'TestAppNewsletter']);
+        $this->bindOpenRouterMocks();
+
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'prov-msg-fallback-meta-1',
+            'direction' => 'received',
+            'subject' => '',
+            'body_text' => str_repeat('This is substantive newsletter body text. ', 30),
+            'from_json' => [],
+            'processing_status' => 'research_queued',
+            'rule_action' => 'extra_process',
+            'rule_email' => 'rule-only@example.com',
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'sender_rule_action' => 'extra_process',
+                'subject' => 'Subject from email thought',
+                'email_sender' => 'Human Name <human@example.org>',
+            ],
+        ]);
+
+        $links = [
+            ['url' => 'https://example.com/article', 'type' => 'generic'],
+        ];
+
+        $yt = Mockery::mock(YouTubeTranscriptService::class);
+        $yt->shouldReceive('fetchForUrl')->never();
+        $this->app->instance(YouTubeTranscriptService::class, $yt);
+
+        $result = app(EmailNewsletterResearchService::class)->createFromEmailThought(
+            $emailThought,
+            $imported,
+            'fastmail',
+            $links,
+        );
+
+        $this->assertSame('created', $result['status']);
+        $rsm = $result['research_thought']->fresh()->source_metadata ?? [];
+        $this->assertSame($emailThought->id, $rsm['email_thought_id'] ?? null);
+        $this->assertSame('Subject from email thought', $rsm['email_subject'] ?? null);
+        $this->assertSame('Human Name <human@example.org>', $rsm['email_sender'] ?? null);
+        $this->assertSame('rule-only@example.com', $rsm['sender_email'] ?? null);
+    }
+
+    #[Test]
+    public function skips_research_for_medium_length_text_only_email_with_no_links_when_under_word_threshold(): void
+    {
+        config(['app.name' => 'TestAppNewsletter']);
+        $this->bindOpenRouterMocks();
+
+        $body = str_repeat('x', 100);
+        $this->assertGreaterThanOrEqual(80, mb_strlen($body));
+        $this->assertLessThan(200, mb_strlen($body));
+        $this->assertLessThan(40, str_word_count($body));
+
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'prov-msg-medium-text-only-1',
+            'direction' => 'received',
+            'subject' => '',
+            'body_text' => $body,
+            'from_json' => [['email' => 'news@example.com', 'name' => 'News']],
+            'processing_status' => 'research_queued',
+            'rule_action' => 'extra_process',
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'sender_rule_action' => 'extra_process',
+            ],
+        ]);
+
+        $yt = Mockery::mock(YouTubeTranscriptService::class);
+        $yt->shouldReceive('fetchForUrl')->never();
+        $this->app->instance(YouTubeTranscriptService::class, $yt);
+
+        $result = app(EmailNewsletterResearchService::class)->createFromEmailThought(
+            $emailThought,
+            $imported,
+            'fastmail',
+            [],
+        );
+
+        $this->assertSame('skipped', $result['status']);
+        $this->assertSame('insufficient_content', $result['reason'] ?? null);
+        $this->assertNull($result['research_thought'] ?? null);
+    }
+
+    #[Test]
+    public function creates_research_when_imported_email_from_json_is_null_using_rule_email_and_thought_sender_fallback(): void
+    {
+        config(['app.name' => 'TestAppNewsletter']);
+        $this->bindOpenRouterMocks();
+
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'prov-msg-null-from-json-1',
+            'direction' => 'received',
+            'subject' => 'No from_json',
+            'body_text' => str_repeat('This is substantive newsletter body text. ', 30),
+            'from_json' => [['email' => 'placeholder@example.com', 'name' => 'Placeholder']],
+            'processing_status' => 'research_queued',
+            'rule_action' => 'extra_process',
+            'rule_email' => 'rule-fallback@example.com',
+        ]);
+
+        DB::table('imported_emails')->where('id', $imported->id)->update(['from_json' => null]);
+        $imported->refresh();
+        $this->assertNull($imported->from_json);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'sender_rule_action' => 'extra_process',
+                'email_sender' => 'Display Name <display@example.org>',
+            ],
+        ]);
+
+        $yt = Mockery::mock(YouTubeTranscriptService::class);
+        $yt->shouldReceive('fetchForUrl')->never();
+        $this->app->instance(YouTubeTranscriptService::class, $yt);
+
+        $result = app(EmailNewsletterResearchService::class)->createFromEmailThought(
+            $emailThought,
+            $imported,
+            'fastmail',
+            [],
+        );
+
+        $this->assertSame('created', $result['status']);
+        $rsm = $result['research_thought']->fresh()->source_metadata ?? [];
+        $this->assertSame('rule-fallback@example.com', $rsm['sender_email'] ?? null);
+        $this->assertSame('Display Name <display@example.org>', $rsm['email_sender'] ?? null);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\MailAccount;
 use App\Models\Thought;
@@ -160,6 +161,376 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Imported subject');
         $response->assertSee('sender@example.com');
         $response->assertSee('Direction: received');
+    }
+
+    public function test_email_thought_detail_shows_view_research_link_when_source_metadata_matches_imported_email_research_thought(): void
+    {
+        $owner = User::factory()->create();
+        $researchThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Linked research',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email body for research link',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Email with research',
+                'research_thought_id' => $researchThought->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-research-link',
+            'provider_thread_id' => 'thread-research-link',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchThought->id,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $researchHref = route('idea.research.show', $researchThought);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertSee('View research', false);
+        $response->assertSee($researchHref, false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_research_thought_id_points_at_non_research_thought_for_same_user(): void
+    {
+        $owner = User::factory()->create();
+        $nonResearchThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Regular idea, not research metadata',
+            'source' => 'web',
+            'metadata' => ['type' => 'idea', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email body with mistaken research id',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Email with non-research link',
+                'research_thought_id' => $nonResearchThought->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-non-research-target',
+            'provider_thread_id' => 'thread-non-research-target',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $nonResearchThought->id,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $wouldBeHref = route('idea.research.show', $nonResearchThought);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+        $response->assertDontSee($wouldBeHref, false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_linked_research_thought_belongs_to_another_user(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $researchThought = Thought::factory()->create([
+            'user_id' => $other->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Other user research',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email body with cross-user research id',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Email referencing foreign research',
+                'research_thought_id' => $researchThought->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-foreign-research',
+            'provider_thread_id' => 'thread-foreign-research',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchThought->id,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $researchHref = route('idea.research.show', $researchThought);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+        $response->assertDontSee($researchHref, false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_imported_and_captured_rows_disagree_even_if_source_metadata_matches_one_side(): void
+    {
+        $owner = User::factory()->create();
+        $researchFromImported = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research from imported row',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+        $researchFromCaptured = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research from captured row',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email with split durable research ids',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Split durable ids',
+                'research_thought_id' => $researchFromImported->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-split-durable-imported',
+            'provider_thread_id' => 'thread-split-durable',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchFromImported->id,
+        ]);
+
+        CapturedInboundEmail::query()->create([
+            'user_id' => $owner->id,
+            'message_id' => 'captured-msg-split-durable-'.uniqid(),
+            'sender_email' => 'captured@example.com',
+            'subject' => 'Captured subject',
+            'body_text' => 'Captured body',
+            'received_at' => now(),
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchFromCaptured->id,
+            'processing_status' => 'imported',
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $wouldBeHrefImported = route('idea.research.show', $researchFromImported);
+        $wouldBeHrefCaptured = route('idea.research.show', $researchFromCaptured);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+        $response->assertDontSee($wouldBeHrefImported, false);
+        $response->assertDontSee($wouldBeHrefCaptured, false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_source_metadata_and_imported_email_research_thought_disagree(): void
+    {
+        $owner = User::factory()->create();
+        $researchFromMetadata = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research A',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+        $researchFromStoredEmail = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research B',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Conflicting research ids',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Conflict subject',
+                'research_thought_id' => $researchFromMetadata->id,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-conflict',
+            'provider_thread_id' => 'thread-conflict',
+            'direction' => 'received',
+            'subject' => 'Imported',
+            'from_json' => [['email' => 'a@example.com', 'name' => 'A']],
+            'to_json' => [['email' => 'b@example.com', 'name' => 'B']],
+            'participants_json' => [['role' => 'from', 'email' => 'a@example.com', 'name' => 'A']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchFromStoredEmail->id,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+    }
+
+    public function test_email_thought_detail_omits_view_research_link_when_research_thought_id_does_not_resolve(): void
+    {
+        $owner = User::factory()->create();
+        $researchThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research later deleted',
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+        $staleResearchId = $researchThought->id;
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email body with stale research id',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Email with deleted research',
+                'research_thought_id' => $staleResearchId,
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-stale-research',
+            'provider_thread_id' => 'thread-stale-research',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $staleResearchId,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $researchThought->delete();
+        $this->assertDatabaseMissing('thoughts', ['id' => $staleResearchId]);
+        $this->assertNull($importedEmail->fresh()->research_thought_id);
+
+        $orphanResearchHref = route('idea.research.show', $staleResearchId);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertDontSee('View research', false);
+        $response->assertDontSee($orphanResearchHref, false);
     }
 
     public function test_email_thought_detail_page_falls_back_when_imported_email_is_missing(): void

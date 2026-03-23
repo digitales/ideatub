@@ -87,4 +87,9 @@
             <p><span class="font-medium text-deep-indigo">Account: {{ $accountEmail }}</span></p>
         @endif
     </div>
+    @if (! empty($linkedResearchUrl))
+        <p class="mt-5 pt-4 border-t border-memory-violet/10">
+            <a href="{{ $linkedResearchUrl }}" class="text-[13px] font-medium text-memory-violet hover:underline">View research</a>
+        </p>
+    @endif
 </aside>
