@@ -22,6 +22,7 @@ class RealtimeCheckController extends Controller
         $since = $validated['since'];
         $hasNew = Thought::query()
             ->where('user_id', $request->user()->id)
+            ->visibleInStream()
             ->where('created_at', '>', $since)
             ->exists();
 

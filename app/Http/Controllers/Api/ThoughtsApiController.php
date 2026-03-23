@@ -72,6 +72,7 @@ class ThoughtsApiController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get(['id', 'content', 'metadata', 'created_at', 'source', 'source_metadata']);
@@ -93,7 +94,10 @@ class ThoughtsApiController extends Controller
      */
     public function stats(): JsonResponse
     {
-        $count = Thought::query()->where('user_id', auth()->id())->count();
+        $count = Thought::query()
+            ->where('user_id', auth()->id())
+            ->visibleInStream()
+            ->count();
 
         return response()->json(['count' => $count]);
     }

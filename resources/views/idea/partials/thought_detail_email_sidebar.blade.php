@@ -87,4 +87,6 @@
             <p><span class="font-medium text-deep-indigo">Account: {{ $accountEmail }}</span></p>
         @endif
     </div>
+
+    @include('idea.partials.thought_detail_sender_rule_card', ['senderRuleContext' => $senderRuleContext])
 </aside>

@@ -23,6 +23,8 @@ class Thought extends Model
     use HasNeighbors;
     use HasUuids;
 
+    public const VISIBILITY_REASON_IGNORED_SENDER = 'ignored_sender';
+
     /**
      * Boot the model and register sync job dispatch on created/updated.
      */
@@ -76,6 +78,8 @@ class Thought extends Model
         'source_metadata',
         'parent_id',
         'evernote_note_guid',
+        'is_visible_in_stream',
+        'visibility_reason',
     ];
 
     /**
@@ -89,6 +93,7 @@ class Thought extends Model
             'metadata' => 'array',
             'source_metadata' => 'array',
             'embedding' => Vector::class,
+            'is_visible_in_stream' => 'boolean',
         ];
     }
 
@@ -325,6 +330,37 @@ class Thought extends Model
     public function scopeTopLevel(Builder $query): Builder
     {
         return $query->whereNull('parent_id');
+    }
+
+    /**
+     * Scope to thoughts that should appear in stream-style listings (index recent, stream, search, API browse, etc.).
+     * Non-email sources are always included; email rows require is_visible_in_stream.
+     */
+    public function scopeVisibleInStream(Builder $query): Builder
+    {
+        $emailSourceValues = ThoughtTypeNavigation::storedValuesForCollection('email');
+
+        return $query->where(function (Builder $q) use ($emailSourceValues): void {
+            $q->where(function (Builder $nonEmail) use ($emailSourceValues): void {
+                self::applyCanonicalTypeMatch(
+                    $nonEmail,
+                    'LOWER(COALESCE(source, ?))',
+                    $emailSourceValues,
+                    false,
+                    ['']
+                );
+            })->orWhere(function (Builder $email) use ($emailSourceValues): void {
+                self::applyCanonicalTypeMatch(
+                    $email,
+                    'LOWER(COALESCE(source, ?))',
+                    $emailSourceValues,
+                    true,
+                    ['']
+                );
+
+                $email->where('is_visible_in_stream', true);
+            });
+        });
     }
 
     /**

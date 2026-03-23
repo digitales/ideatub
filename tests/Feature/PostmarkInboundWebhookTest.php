@@ -13,6 +13,7 @@ use App\Models\UserInboundAddress;
 use App\Services\Email\EmailLinkExtractor;
 use App\Services\Email\EmailReviewInboxService;
 use App\Services\Email\EmailSenderRuleService;
+use App\Services\Email\EmailThoughtStreamVisibilityService;
 use App\Services\OpenRouterService;
 use App\Services\PostmarkInboundService;
 use App\Services\ThoughtCaptureService;
@@ -401,6 +402,71 @@ class PostmarkInboundWebhookTest extends TestCase
         $this->assertSame($thought->id, $captured->thought_id);
     }
 
+    public function test_postmark_allow_flow_restores_stream_visibility_for_non_ignored_sender(): void
+    {
+        config(['services.email_sender_policy.enabled' => true]);
+
+        $user = User::factory()->create(['email' => 'sender@example.com']);
+        EmailSenderRule::create([
+            'user_id' => $user->id,
+            'sender_email' => 'sender@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $this->app->instance(ThoughtCaptureService::class, new class extends ThoughtCaptureService
+        {
+            public function __construct() {}
+
+            public function create(array $options): array
+            {
+                $thought = Thought::factory()->create([
+                    'user_id' => $options['user_id'],
+                    'content' => $options['content'],
+                    'source' => $options['source'],
+                    'source_metadata' => $options['source_metadata'] ?? null,
+                    'embedding' => null,
+                    'is_visible_in_stream' => false,
+                    'visibility_reason' => Thought::VISIBILITY_REASON_IGNORED_SENDER,
+                ]);
+
+                return [
+                    'thought' => $thought,
+                    'chunked' => false,
+                ];
+            }
+        });
+
+        $this->postJson($this->webhookUrl(), $this->minimalPayload([
+            'TextBody' => 'Stream visibility body',
+            'MessageID' => 'msg-stream-visibility-allow',
+        ]))->assertStatus(200);
+
+        $thought = Thought::query()->sole();
+        $this->assertTrue($thought->is_visible_in_stream);
+        $this->assertNull($thought->visibility_reason);
+    }
+
+    public function test_postmark_legacy_inbound_does_not_invoke_stream_visibility_service(): void
+    {
+        config(['services.email_sender_policy.enabled' => false]);
+
+        $spy = $this->createMock(EmailThoughtStreamVisibilityService::class);
+        $spy->expects($this->never())->method('applyToThought');
+        $this->app->instance(EmailThoughtStreamVisibilityService::class, $spy);
+
+        User::factory()->create(['email' => 'sender@example.com']);
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->with('Hello')->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->with('Hello')->andReturn(['tags' => []]);
+        });
+
+        $this->postJson($this->webhookUrl(), $this->minimalPayload([
+            'TextBody' => 'Hello',
+            'MessageID' => 'msg-legacy-no-visibility-svc',
+        ]))->assertStatus(200);
+    }
+
     public function test_sender_policy_extra_process_creates_captured_thought_and_dispatches_research_job(): void
     {
         config(['services.email_sender_policy.enabled' => true]);
@@ -511,16 +577,17 @@ class PostmarkInboundWebhookTest extends TestCase
 
         $probe = (object) ['transactionLevel' => null, 'capturedSeenAtDispatch' => null];
         $this->app->bind(PostmarkInboundService::class, function ($app) use ($probe) {
-            return new class($app->make(ThoughtCaptureService::class), $app->make(EmailSenderRuleService::class), $app->make(EmailReviewInboxService::class), $app->make(EmailLinkExtractor::class), $probe) extends PostmarkInboundService
+            return new class($app->make(ThoughtCaptureService::class), $app->make(EmailSenderRuleService::class), $app->make(EmailReviewInboxService::class), $app->make(EmailLinkExtractor::class), $app->make(EmailThoughtStreamVisibilityService::class), $probe) extends PostmarkInboundService
             {
                 public function __construct(
                     ThoughtCaptureService $captureService,
                     EmailSenderRuleService $senderRuleService,
                     EmailReviewInboxService $reviewInboxService,
                     EmailLinkExtractor $linkExtractor,
+                    EmailThoughtStreamVisibilityService $streamVisibilityService,
                     private object $probe,
                 ) {
-                    parent::__construct($captureService, $senderRuleService, $reviewInboxService, $linkExtractor);
+                    parent::__construct($captureService, $senderRuleService, $reviewInboxService, $linkExtractor, $streamVisibilityService);
                 }
 
                 protected function dispatchExtraEmailResearch(CapturedInboundEmail $captured): void
@@ -619,8 +686,18 @@ class PostmarkInboundWebhookTest extends TestCase
         });
 
         $this->app->bind(PostmarkInboundService::class, function ($app) {
-            return new class($app->make(ThoughtCaptureService::class), $app->make(EmailSenderRuleService::class), $app->make(EmailReviewInboxService::class), $app->make(EmailLinkExtractor::class)) extends PostmarkInboundService
+            return new class($app->make(ThoughtCaptureService::class), $app->make(EmailSenderRuleService::class), $app->make(EmailReviewInboxService::class), $app->make(EmailLinkExtractor::class), $app->make(EmailThoughtStreamVisibilityService::class)) extends PostmarkInboundService
             {
+                public function __construct(
+                    ThoughtCaptureService $captureService,
+                    EmailSenderRuleService $senderRuleService,
+                    EmailReviewInboxService $reviewInboxService,
+                    EmailLinkExtractor $linkExtractor,
+                    EmailThoughtStreamVisibilityService $streamVisibilityService,
+                ) {
+                    parent::__construct($captureService, $senderRuleService, $reviewInboxService, $linkExtractor, $streamVisibilityService);
+                }
+
                 protected function dispatchExtraEmailResearch(CapturedInboundEmail $captured): void
                 {
                     throw new RuntimeException('Dispatch failed');

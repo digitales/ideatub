@@ -21,6 +21,7 @@ class EmailImportService
         private readonly EmailSenderRuleService $senderRuleService,
         private readonly EmailReviewInboxService $reviewInboxService,
         private readonly EmailLinkExtractor $linkExtractor,
+        private readonly EmailThoughtStreamVisibilityService $streamVisibilityService,
     ) {}
 
     public function importMessage(
@@ -142,6 +143,9 @@ class EmailImportService
                 }
 
                 $row->thought_id = $thought->id;
+                if ($policyForReceived) {
+                    $this->streamVisibilityService->applyToThought($thought, $user, $this->formatRawSender($message->from));
+                }
                 $row->processing_status = 'research_queued';
                 $row->save();
 
@@ -164,6 +168,9 @@ class EmailImportService
             }
 
             $row->thought_id = $thought->id;
+            if ($policyForReceived) {
+                $this->streamVisibilityService->applyToThought($thought, $user, $this->formatRawSender($message->from));
+            }
             $row->processing_status = 'imported';
             $row->save();
 

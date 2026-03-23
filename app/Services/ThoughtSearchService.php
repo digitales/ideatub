@@ -26,7 +26,9 @@ class ThoughtSearchService
 
         $normalizedQuery = mb_strtolower(trim($query));
 
-        $baseQuery = Thought::query()->where('user_id', $userId);
+        $baseQuery = Thought::query()
+            ->where('user_id', $userId)
+            ->visibleInStream();
 
         $tagMatches = collect();
         if ($normalizedQuery !== '') {

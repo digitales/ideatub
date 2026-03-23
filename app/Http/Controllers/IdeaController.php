@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\IdeaResearchRequested;
 use App\Models\ResearchShare;
 use App\Models\Thought;
+use App\Services\Email\ThoughtEmailSenderContextResolver;
 use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
 use App\Services\ResearchService;
@@ -38,7 +39,8 @@ class IdeaController extends Controller
         private OpenRouterService $openRouter,
         private ThoughtCaptureService $captureService,
         private ResearchService $researchService,
-        private ThoughtSearchService $searchService
+        private ThoughtSearchService $searchService,
+        private ThoughtEmailSenderContextResolver $thoughtEmailSenderContextResolver,
     ) {}
 
     /**
@@ -93,6 +95,7 @@ class IdeaController extends Controller
         } else {
             $thoughts = Thought::query()
                 ->where('user_id', auth()->id())
+                ->visibleInStream()
                 ->topLevel()
                 ->excludingResearch()
                 ->excludingJira()
@@ -139,6 +142,9 @@ class IdeaController extends Controller
 
         $thought->load(['comments' => fn ($q) => $q->orderBy('created_at')]);
         $importedEmail = $thought->source === 'email' ? $thought->importedEmail() : null;
+        $senderRuleContext = $thought->source === 'email'
+            ? $this->thoughtEmailSenderContextResolver->resolve($thought)
+            : null;
         $contentHtml = null;
 
         if ($thought->source !== 'email') {
@@ -148,6 +154,7 @@ class IdeaController extends Controller
         return view('idea.show', [
             'thought' => $thought,
             'importedEmail' => $importedEmail,
+            'senderRuleContext' => $senderRuleContext,
             'contentHtml' => $contentHtml,
         ]);
     }
@@ -257,6 +264,7 @@ class IdeaController extends Controller
 
         $query = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->excludingJira()
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')]);
@@ -324,6 +332,7 @@ class IdeaController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalSourceType('jira')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
@@ -355,6 +364,7 @@ class IdeaController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalSourceType('email')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
@@ -381,6 +391,7 @@ class IdeaController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalMetadataType('research')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
@@ -407,6 +418,7 @@ class IdeaController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalMetadataType('plan')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
