@@ -95,6 +95,7 @@ class IdeaController extends Controller
         } else {
             $thoughts = Thought::query()
                 ->where('user_id', auth()->id())
+                ->visibleInStream()
                 ->topLevel()
                 ->excludingResearch()
                 ->excludingJira()
@@ -263,6 +264,7 @@ class IdeaController extends Controller
 
         $query = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->excludingJira()
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')]);
@@ -330,6 +332,7 @@ class IdeaController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalSourceType('jira')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
@@ -361,6 +364,7 @@ class IdeaController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalSourceType('email')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
@@ -387,6 +391,7 @@ class IdeaController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalMetadataType('research')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
@@ -413,6 +418,7 @@ class IdeaController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalMetadataType('plan')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])

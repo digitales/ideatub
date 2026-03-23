@@ -12,6 +12,7 @@ use App\Models\UserInboundAddress;
 use App\Services\Email\EmailLinkExtractor;
 use App\Services\Email\EmailReviewInboxService;
 use App\Services\Email\EmailSenderRuleService;
+use App\Services\Email\EmailThoughtStreamVisibilityService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -23,6 +24,7 @@ class PostmarkInboundService
         private EmailSenderRuleService $senderRuleService,
         private EmailReviewInboxService $reviewInboxService,
         private EmailLinkExtractor $linkExtractor,
+        private EmailThoughtStreamVisibilityService $streamVisibilityService,
     ) {}
 
     /**
@@ -158,7 +160,7 @@ class PostmarkInboundService
         }
 
         if ($decision['action'] === EmailSenderRule::ACTION_ALLOW) {
-            DB::transaction(function () use ($payload, $user, $bodyText, $baseCaptured, $decision): void {
+            DB::transaction(function () use ($payload, $user, $bodyText, $baseCaptured, $decision, $rawFrom): void {
                 $captured = CapturedInboundEmail::create(array_merge($baseCaptured, [
                     'thought_id' => null,
                     'research_thought_id' => null,
@@ -173,6 +175,7 @@ class PostmarkInboundService
                 if ($thought === null) {
                     throw new \RuntimeException('Thought capture did not return a thought.');
                 }
+                $this->streamVisibilityService->applyToThought($thought, $user, $rawFrom);
                 $captured->thought_id = $thought->id;
                 $captured->processing_status = 'imported';
                 $captured->save();
@@ -182,7 +185,7 @@ class PostmarkInboundService
         }
 
         if ($decision['action'] === EmailSenderRule::ACTION_EXTRA_PROCESS) {
-            $captured = DB::transaction(function () use ($payload, $user, $bodyText, $baseCaptured, $decision): CapturedInboundEmail {
+            $captured = DB::transaction(function () use ($payload, $user, $bodyText, $baseCaptured, $decision, $rawFrom): CapturedInboundEmail {
                 $captured = CapturedInboundEmail::create(array_merge($baseCaptured, [
                     'thought_id' => null,
                     'research_thought_id' => null,
@@ -197,6 +200,7 @@ class PostmarkInboundService
                 if ($thought === null) {
                     throw new \RuntimeException('Thought capture did not return a thought.');
                 }
+                $this->streamVisibilityService->applyToThought($thought, $user, $rawFrom);
                 $captured->thought_id = $thought->id;
                 $captured->processing_status = 'research_queued';
                 $captured->save();

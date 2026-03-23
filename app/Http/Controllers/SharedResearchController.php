@@ -18,12 +18,15 @@ class SharedResearchController extends Controller
     public function index(Request $request): View
     {
         $shares = ResearchShare::where('user_id', $request->user()->id)
-            ->with('thought')
+            ->with([
+                'thought' => fn ($query) => $query->visibleInStream(),
+            ])
             ->orderByDesc('created_at')
             ->get();
 
         $topLevelThoughts = Thought::where('user_id', $request->user()->id)
             ->whereNull('parent_id')
+            ->visibleInStream()
             ->orderByDesc('created_at')
             ->limit(50)
             ->get();
@@ -54,6 +57,20 @@ class SharedResearchController extends Controller
 
         if ($thought->parent_id !== null) {
             abort(403, 'Only top-level thoughts can be shared.');
+        }
+
+        $isVisibleInStream = Thought::query()
+            ->whereKey($thought->id)
+            ->visibleInStream()
+            ->exists();
+
+        if (! $isVisibleInStream) {
+            return redirect()
+                ->route('shared-research.index')
+                ->withErrors([
+                    'thought_id' => 'Only visible top-level thoughts can be shared.',
+                ])
+                ->withInput();
         }
 
         if (ResearchShare::where('thought_id', $thought->id)->exists()) {
