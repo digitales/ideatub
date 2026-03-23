@@ -51,6 +51,9 @@ class EmailResearchController extends Controller
             abort(404);
         }
 
+        $isImported = $stored instanceof ImportedEmail;
+        $storedId   = $stored->id;
+
         DB::transaction(function () use ($stored, $thought): void {
             // Reset so the job's research_thought_id guard does not bail early.
             $stored->processing_status = 'research_queued';
@@ -62,13 +65,14 @@ class EmailResearchController extends Controller
             unset($meta['newsletter_research']);
             $thought->source_metadata = $meta;
             $thought->save();
-
-            if ($stored instanceof ImportedEmail) {
-                ProcessExtraEmailResearch::dispatch(importedEmailId: $stored->id);
-            } else {
-                ProcessExtraEmailResearch::dispatch(capturedInboundEmailId: $stored->id);
-            }
         });
+
+        // Dispatch after the transaction commits so the job sees committed state.
+        if ($isImported) {
+            ProcessExtraEmailResearch::dispatch(importedEmailId: $storedId);
+        } else {
+            ProcessExtraEmailResearch::dispatch(capturedInboundEmailId: $storedId);
+        }
 
         return redirect()->back()->with('success', 'Newsletter research queued. Refresh in a moment to see results.');
     }
