@@ -125,6 +125,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');
     Route::get('/research/{thought}', [IdeaController::class, 'showResearch'])->name('idea.research.show');
 
+    // Email research actions
     Route::post('/emails/{thought}/idea-research', [EmailResearchController::class, 'ideaResearch'])->name('emails.idea-research');
     Route::post('/emails/{thought}/newsletter-research', [EmailResearchController::class, 'newsletterResearch'])->name('emails.newsletter-research');
 
