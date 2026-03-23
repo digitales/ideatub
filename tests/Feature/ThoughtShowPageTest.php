@@ -430,8 +430,7 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
 
         $response->assertOk();
-        $response->assertSee(route('ideas.update-tags', $thought), false);
-        $response->assertSee('aria-label="Edit tags"', false);
+        $this->assertDetailTagEditControl($response, $thought);
     }
 
     public function test_detail_tag_row_with_no_tags_still_renders_editable_tag_affordance(): void
@@ -448,8 +447,24 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
 
         $response->assertOk();
-        $response->assertSee(route('ideas.update-tags', $thought), false);
-        $response->assertSee('aria-label="Edit tags"', false);
+        $this->assertDetailTagEditControl($response, $thought);
+    }
+
+    public function test_detail_tag_row_with_cleared_tags_shape_still_renders_editable_tag_affordance(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Cleared tags thought detail body',
+            'metadata' => ['tags' => []],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertDetailTagEditControl($response, $thought);
     }
 
     private function assertThoughtBadgeLink(TestResponse $response, string $label, string $href): void
@@ -486,6 +501,21 @@ class ThoughtShowPageTest extends TestCase
         $this->assertSame(0, $links->length);
     }
 
+    private function assertDetailTagEditControl(TestResponse $response, Thought $thought): void
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $streamUrl = route('idea.stream');
+        $updateTagsUrl = route('ideas.update-tags', $thought);
+
+        $buttons = $xpath->query(sprintf(
+            "//div[contains(concat(' ', normalize-space(@class), ' '), ' rounded-2xl ') and .//p[normalize-space(.)='Thought detail']]//div[@data-stream-base-url=%s and contains(@x-data, %s)]//button[@type='button' and @aria-label='Edit tags' and normalize-space(.)='Edit']",
+            $this->xpathLiteral($streamUrl),
+            $this->xpathLiteral($updateTagsUrl)
+        ));
+
+        $this->assertSame(1, $buttons->length);
+    }
+
     private function xpathFromResponse(TestResponse $response): \DOMXPath
     {
         libxml_use_internal_errors(true);
@@ -493,5 +523,20 @@ class ThoughtShowPageTest extends TestCase
         $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
 
         return new \DOMXPath($dom);
+    }
+
+    private function xpathLiteral(string $value): string
+    {
+        if (! str_contains($value, "'")) {
+            return "'".$value."'";
+        }
+
+        if (! str_contains($value, '"')) {
+            return '"'.$value.'"';
+        }
+
+        $parts = explode("'", $value);
+
+        return "concat('".implode("', \"'\", '", $parts)."')";
     }
 }
