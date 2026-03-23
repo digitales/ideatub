@@ -479,6 +479,7 @@ class McpController extends Controller
 
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
+            ->visibleInStream()
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get(['id', 'content', 'metadata', 'created_at', 'source', 'source_metadata']);
@@ -503,7 +504,10 @@ class McpController extends Controller
      */
     private function thoughtStats(array $params): array
     {
-        $count = Thought::query()->where('user_id', auth()->id())->count();
+        $count = Thought::query()
+            ->where('user_id', auth()->id())
+            ->visibleInStream()
+            ->count();
 
         return ['count' => $count];
     }
