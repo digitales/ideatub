@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\BackfillIgnoredSenderThoughtVisibilityCommand;
 use App\Jobs\ReconcileIgnoredSenderThoughtVisibility;
 use App\Models\CapturedInboundEmail;
 use App\Models\EmailSenderRule;
@@ -12,6 +13,10 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * Covers {@see ReconcileIgnoredSenderThoughtVisibility} when run directly; the rollout command
+ * {@see BackfillIgnoredSenderThoughtVisibilityCommand} dispatches one job per distinct ignored rule.
+ */
 class ReconcileIgnoredSenderThoughtVisibilityTest extends TestCase
 {
     use RefreshDatabase;
