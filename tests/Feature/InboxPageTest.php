@@ -6,6 +6,7 @@ use App\Models\InboxItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class InboxPageTest extends TestCase
@@ -89,6 +90,31 @@ class InboxPageTest extends TestCase
         $response->assertOk();
         $response->assertSee(route('inbox.index'), false);
         $response->assertSee('data-testid="avatar-inbox-badge"', false);
+        $xpath = $this->xpathFromResponse($response);
+        $badge = $xpath->query('//*[@data-testid="account-menu-inbox-badge"]')->item(0);
+
+        $this->assertNotNull($badge);
+        $this->assertSame('1', trim($badge->textContent ?? ''));
+    }
+
+    public function test_layout_caps_account_menu_inbox_badge_at_99_plus(): void
+    {
+        $user = User::factory()->create();
+
+        InboxItem::factory()->count(100)->create([
+            'user_id' => $user->id,
+            'status' => 'pending',
+            'snoozed_until' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertOk();
+        $xpath = $this->xpathFromResponse($response);
+        $badge = $xpath->query('//*[@data-testid="account-menu-inbox-badge"]')->item(0);
+
+        $this->assertNotNull($badge);
+        $this->assertSame('99+', trim($badge->textContent ?? ''));
     }
 
     public function test_inbox_renders_item_body_as_markdown(): void
@@ -133,5 +159,14 @@ class InboxPageTest extends TestCase
 
         $response->assertOk();
         $response->assertDontSee('Manage sender rules', false);
+    }
+
+    private function xpathFromResponse(TestResponse $response): \DOMXPath
+    {
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument;
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+
+        return new \DOMXPath($dom);
     }
 }

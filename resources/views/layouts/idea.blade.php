@@ -135,8 +135,13 @@
                             @endif
                         </button>
                         <div x-show="open" x-transition @click.away="open = false" class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-memory-violet/10 py-1 z-30">
-                            <a href="{{route('inbox.index')}}" data-testid="account-menu-inbox-link" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                Inbox
+                            <a href="{{route('inbox.index')}}" data-testid="account-menu-inbox-link" class="flex items-center justify-between gap-3 px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                <span>Inbox</span>
+                                @if($inboxCount > 0)
+                                    <span data-testid="account-menu-inbox-badge" aria-hidden="true" class="inline-flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-memory-violet px-1 text-[9px] font-bold leading-none text-white">
+                                        {{$inboxCount > 99 ? '99+' : $inboxCount}}
+                                    </span>
+                                @endif
                             </a>
                             <a href="{{route('shared-research.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                                 Shared research
