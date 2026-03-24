@@ -4,16 +4,65 @@ namespace Tests\Unit\Services;
 
 use App\Exceptions\InvalidMailAccountCredentialsException;
 use App\Models\MailAccount;
+use App\Services\Email\NormalizedEmailMessage;
 use App\Services\Fastmail\FastmailConnector;
 use App\Services\Fastmail\FastmailHttpClient;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class FastmailConnectorTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function emailGetArgumentsFromJmapRequest(Request $request): ?array
+    {
+        foreach ($request['methodCalls'] ?? [] as $call) {
+            if (($call[0] ?? null) === 'Email/get') {
+                $args = $call[1] ?? null;
+
+                return is_array($args) ? $args : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $arguments
+     */
+    private function assertEmailGetRequestsExplicitJmapBodyValues(array $arguments): void
+    {
+        foreach (['textBody', 'htmlBody', 'bodyValues'] as $property) {
+            $this->assertContains(
+                $property,
+                $arguments['properties'] ?? [],
+                'Email/get should request '.$property.' in properties.'
+            );
+        }
+
+        foreach (['partId', 'type'] as $bodyProperty) {
+            $this->assertContains(
+                $bodyProperty,
+                $arguments['bodyProperties'] ?? [],
+                'Email/get should request '.$bodyProperty.' in bodyProperties.'
+            );
+        }
+
+        $this->assertTrue(
+            (bool) ($arguments['fetchTextBodyValues'] ?? false),
+            'Email/get should set fetchTextBodyValues true.'
+        );
+        $this->assertTrue(
+            (bool) ($arguments['fetchHTMLBodyValues'] ?? false),
+            'Email/get should set fetchHTMLBodyValues true.'
+        );
+    }
 
     #[Test]
     public function fastmail_http_client_sends_validated_session_request(): void
@@ -166,11 +215,20 @@ class FastmailConnectorTest extends TestCase
         $this->assertSame('state-1', $result['next_checkpoint']['query_state']);
         $this->assertSame('mb-inbox', $result['next_checkpoint']['mailbox_id']);
         Http::assertSent(function ($request) {
-            return $request->url() === 'https://api.fastmail.com/jmap/api/'
-                && $request['methodCalls'][1][0] === 'Email/get'
-                && ($request['methodCalls'][1][1]['#ids']['resultOf'] ?? null) === 'q1'
-                && ($request['methodCalls'][1][1]['#ids']['name'] ?? null) === 'Email/query'
-                && ($request['methodCalls'][1][1]['#ids']['path'] ?? null) === '/ids/*';
+            if ($request->url() !== 'https://api.fastmail.com/jmap/api/') {
+                return false;
+            }
+
+            $emailGet = $this->emailGetArgumentsFromJmapRequest($request);
+            if ($emailGet === null) {
+                return false;
+            }
+
+            $this->assertEmailGetRequestsExplicitJmapBodyValues($emailGet);
+
+            return ($emailGet['#ids']['resultOf'] ?? null) === 'q1'
+                && ($emailGet['#ids']['name'] ?? null) === 'Email/query'
+                && ($emailGet['#ids']['path'] ?? null) === '/ids/*';
         });
     }
 
@@ -224,11 +282,266 @@ class FastmailConnectorTest extends TestCase
         $this->assertSame('state-2', $result['next_checkpoint']['query_state']);
         $this->assertSame('mb-sent', $result['next_checkpoint']['mailbox_id']);
         Http::assertSent(function ($request) {
-            return $request->url() === 'https://api.fastmail.com/jmap/api/'
-                && $request['methodCalls'][1][0] === 'Email/get'
-                && ($request['methodCalls'][1][1]['#ids']['resultOf'] ?? null) === 'c1'
-                && ($request['methodCalls'][1][1]['#ids']['name'] ?? null) === 'Email/queryChanges'
-                && ($request['methodCalls'][1][1]['#ids']['path'] ?? null) === '/added/*/id';
+            if ($request->url() !== 'https://api.fastmail.com/jmap/api/') {
+                return false;
+            }
+
+            $emailGet = $this->emailGetArgumentsFromJmapRequest($request);
+            if ($emailGet === null) {
+                return false;
+            }
+
+            $this->assertEmailGetRequestsExplicitJmapBodyValues($emailGet);
+
+            return ($emailGet['#ids']['resultOf'] ?? null) === 'c1'
+                && ($emailGet['#ids']['name'] ?? null) === 'Email/queryChanges'
+                && ($emailGet['#ids']['path'] ?? null) === '/added/*/id';
         });
+    }
+
+    #[Test]
+    public function normalization_assembles_text_body_from_body_values_using_text_body_part_ids(): void
+    {
+        Http::fake([
+            'https://api.fastmail.com/jmap/api/' => Http::response([
+                'methodResponses' => [
+                    ['Email/query', [
+                        'ids' => ['msg-bodyvalues'],
+                        'queryState' => 'state-bv',
+                    ], 'q1'],
+                    ['Email/get', [
+                        'list' => [
+                            [
+                                'id' => 'msg-bodyvalues',
+                                'threadId' => 'thread-bv',
+                                'mailboxIds' => ['mb-inbox' => true],
+                                'subject' => 'BodyValues subject',
+                                'from' => [['email' => 'a@example.com', 'name' => 'A']],
+                                'to' => [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+                                'cc' => [],
+                                'sentAt' => '2026-03-20T12:00:00Z',
+                                'receivedAt' => '2026-03-20T12:00:01Z',
+                                'textBody' => [
+                                    ['partId' => '2', 'type' => 'text/plain'],
+                                ],
+                                'bodyValues' => [
+                                    '2' => ['value' => 'Plain from bodyValues'],
+                                ],
+                            ],
+                        ],
+                    ], 'g1'],
+                ],
+            ], 200),
+        ]);
+
+        $account = MailAccount::factory()->create();
+        $connector = app(FastmailConnector::class);
+
+        $result = $connector->fetchBackfillBatch($account, ['mailbox_id' => 'mb-inbox']);
+
+        $this->assertSame('Plain from bodyValues', $result['messages'][0]->bodyText);
+    }
+
+    #[Test]
+    public function normalization_concatenates_multiple_text_body_parts_in_order(): void
+    {
+        Http::fake([
+            'https://api.fastmail.com/jmap/api/' => Http::response([
+                'methodResponses' => [
+                    ['Email/query', ['ids' => ['msg-multi'], 'queryState' => 's'], 'q1'],
+                    ['Email/get', [
+                        'list' => [
+                            [
+                                'id' => 'msg-multi',
+                                'threadId' => 't',
+                                'mailboxIds' => ['mb-inbox' => true],
+                                'subject' => 'Multi',
+                                'from' => [['email' => 'x@example.com', 'name' => 'X']],
+                                'to' => [['email' => 'owner@fastmail.fm', 'name' => 'O']],
+                                'cc' => [],
+                                'sentAt' => '2026-03-20T12:00:00Z',
+                                'receivedAt' => '2026-03-20T12:00:01Z',
+                                'textBody' => [
+                                    ['partId' => 'a', 'type' => 'text/plain'],
+                                    ['partId' => 'b', 'type' => 'text/plain'],
+                                ],
+                                'bodyValues' => [
+                                    'a' => ['value' => 'First part'],
+                                    'b' => ['value' => 'Second part'],
+                                ],
+                            ],
+                        ],
+                    ], 'g1'],
+                ],
+            ], 200),
+        ]);
+
+        $account = MailAccount::factory()->create();
+        $connector = app(FastmailConnector::class);
+
+        $result = $connector->fetchBackfillBatch($account, []);
+
+        $this->assertSame("First part\n\nSecond part", $result['messages'][0]->bodyText);
+    }
+
+    #[Test]
+    public function normalization_falls_back_to_html_body_from_body_values_when_no_text_body(): void
+    {
+        Http::fake([
+            'https://api.fastmail.com/jmap/api/' => Http::response([
+                'methodResponses' => [
+                    ['Email/query', ['ids' => ['msg-html'], 'queryState' => 's'], 'q1'],
+                    ['Email/get', [
+                        'list' => [
+                            [
+                                'id' => 'msg-html',
+                                'threadId' => 't',
+                                'mailboxIds' => ['mb-inbox' => true],
+                                'subject' => 'HTML only',
+                                'from' => [['email' => 'h@example.com', 'name' => 'H']],
+                                'to' => [['email' => 'owner@fastmail.fm', 'name' => 'O']],
+                                'cc' => [],
+                                'sentAt' => '2026-03-20T12:00:00Z',
+                                'receivedAt' => '2026-03-20T12:00:01Z',
+                                'textBody' => [],
+                                'htmlBody' => [
+                                    ['partId' => 'h1', 'type' => 'text/html'],
+                                ],
+                                'bodyValues' => [
+                                    'h1' => ['value' => '<p>Hello &amp; <b>welcome</b></p>'],
+                                ],
+                            ],
+                        ],
+                    ], 'g1'],
+                ],
+            ], 200),
+        ]);
+
+        $account = MailAccount::factory()->create();
+        $connector = app(FastmailConnector::class);
+
+        $result = $connector->fetchBackfillBatch($account, []);
+
+        $this->assertSame('Hello & welcome', $result['messages'][0]->bodyText);
+    }
+
+    #[Test]
+    public function normalization_yields_empty_body_when_body_values_missing_without_error(): void
+    {
+        Http::fake([
+            'https://api.fastmail.com/jmap/api/' => Http::response([
+                'methodResponses' => [
+                    ['Email/query', ['ids' => ['msg-empty'], 'queryState' => 's'], 'q1'],
+                    ['Email/get', [
+                        'list' => [
+                            [
+                                'id' => 'msg-empty',
+                                'threadId' => 't',
+                                'mailboxIds' => ['mb-inbox' => true],
+                                'subject' => 'No body',
+                                'from' => [['email' => 'n@example.com', 'name' => 'N']],
+                                'to' => [['email' => 'owner@fastmail.fm', 'name' => 'O']],
+                                'cc' => [],
+                                'sentAt' => '2026-03-20T12:00:00Z',
+                                'receivedAt' => '2026-03-20T12:00:01Z',
+                                'textBody' => [
+                                    ['partId' => 'x', 'type' => 'text/plain'],
+                                ],
+                            ],
+                        ],
+                    ], 'g1'],
+                ],
+            ], 200),
+        ]);
+
+        $account = MailAccount::factory()->create();
+        $connector = app(FastmailConnector::class);
+
+        $result = $connector->fetchBackfillBatch($account, []);
+
+        $this->assertSame('', $result['messages'][0]->bodyText);
+    }
+
+    #[Test]
+    public function fetch_message_by_id_returns_normalized_message_when_found(): void
+    {
+        Http::fake([
+            'https://api.fastmail.com/jmap/api/' => Http::response([
+                'methodResponses' => [
+                    ['Email/get', [
+                        'list' => [
+                            [
+                                'id' => 'msg-by-id',
+                                'threadId' => 'thread-by-id',
+                                'mailboxIds' => ['mb-inbox' => true],
+                                'subject' => 'Single fetch',
+                                'from' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+                                'to' => [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+                                'cc' => [],
+                                'sentAt' => '2026-03-20T10:00:00Z',
+                                'receivedAt' => '2026-03-20T10:00:05Z',
+                                'textBody' => [['partId' => '1', 'type' => 'text/plain', 'value' => 'Single body']],
+                            ],
+                        ],
+                    ], 'g1'],
+                ],
+            ], 200),
+        ]);
+
+        $account = MailAccount::factory()->create();
+        $connector = app(FastmailConnector::class);
+
+        $message = $connector->fetchMessageById($account, 'msg-by-id');
+
+        $this->assertInstanceOf(NormalizedEmailMessage::class, $message);
+        $this->assertSame('msg-by-id', $message->providerMessageId);
+        $this->assertSame('Single fetch', $message->subject);
+        $this->assertSame('Single body', $message->bodyText);
+
+        Http::assertSent(function ($request) use ($account) {
+            if ($request->url() !== 'https://api.fastmail.com/jmap/api/') {
+                return false;
+            }
+
+            $calls = $request['methodCalls'] ?? [];
+            if (count($calls) !== 1 || ($calls[0][0] ?? null) !== 'Email/get') {
+                return false;
+            }
+
+            $args = $calls[0][1] ?? [];
+            if (! is_array($args)) {
+                return false;
+            }
+
+            $this->assertSame(
+                (string) ($account->credentials_json['account_id'] ?? ''),
+                (string) ($args['accountId'] ?? '')
+            );
+            $this->assertSame(['msg-by-id'], $args['ids'] ?? null);
+            $this->assertArrayNotHasKey('#ids', $args);
+            $this->assertEmailGetRequestsExplicitJmapBodyValues($args);
+
+            return true;
+        });
+    }
+
+    #[Test]
+    public function fetch_message_by_id_returns_null_when_not_found(): void
+    {
+        Http::fake([
+            'https://api.fastmail.com/jmap/api/' => Http::response([
+                'methodResponses' => [
+                    ['Email/get', [
+                        'list' => [],
+                        'notFound' => ['msg-missing'],
+                    ], 'g1'],
+                ],
+            ], 200),
+        ]);
+
+        $account = MailAccount::factory()->create();
+        $connector = app(FastmailConnector::class);
+
+        $this->assertNull($connector->fetchMessageById($account, 'msg-missing'));
     }
 }
