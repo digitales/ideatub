@@ -23,6 +23,11 @@ class BackfillEmailResearchLinksCommand extends Command
 
     private int $conflicted = 0;
 
+    /**
+     * @var array<string, true>
+     */
+    private array $seenResearchThoughtIds = [];
+
     public function handle(EmailNewsletterResearchService $newsletterResearch): int
     {
         $dryRun = (bool) $this->option('dry-run');
@@ -41,6 +46,14 @@ class BackfillEmailResearchLinksCommand extends Command
             ->orderBy('id')
             ->each(function (CapturedInboundEmail $row) use ($newsletterResearch, $dryRun): void {
                 $this->processStoredEmailRow($row, $newsletterResearch, $dryRun);
+            });
+
+        Thought::query()
+            ->matchingCanonicalSourceType('email')
+            ->matchingCanonicalMetadataType('research')
+            ->orderBy('created_at')
+            ->each(function (Thought $research) use ($newsletterResearch, $dryRun): void {
+                $this->processLegacyEmailSourcedResearchThought($research, $newsletterResearch, $dryRun);
             });
 
         $this->line('Scanned: '.$this->scanned);
@@ -86,6 +99,12 @@ class BackfillEmailResearchLinksCommand extends Command
             return;
         }
 
+        if ($this->markSeenResearchThought($research->id)) {
+            $this->skipped++;
+
+            return;
+        }
+
         $payload = $newsletterResearch->linkageFieldsForStoredEmail($row, $emailThought);
         if ($payload === null) {
             $this->skipped++;
@@ -110,18 +129,8 @@ class BackfillEmailResearchLinksCommand extends Command
             return;
         }
 
-        $sourceMetadata = is_array($research->source_metadata) ? $research->source_metadata : [];
-        $metadata = is_array($research->metadata) ? $research->metadata : [];
-
-        foreach (['email_thought_id', 'email_subject', 'email_sender'] as $key) {
-            $sourceMetadata[$key] = $payload[$key];
-            $metadata[$key] = $payload[$key];
-        }
-
-        $research->update([
-            'source_metadata' => $sourceMetadata,
-            'metadata' => $metadata,
-        ]);
+        $this->persistResearchLinkage($research, $payload);
+        $this->persistBackLinks($emailThought, $row, $research->id);
     }
 
     private function resolveEligibleResearchThought(string $researchThoughtId, int $userId): ?Thought
@@ -194,6 +203,179 @@ class BackfillEmailResearchLinksCommand extends Command
             }
         }
 
+        return $this->isCanonicalEmailSource($research->source);
+    }
+
+    private function processLegacyEmailSourcedResearchThought(
+        Thought $research,
+        EmailNewsletterResearchService $newsletterResearch,
+        bool $dryRun,
+    ): void {
+        if ($this->markSeenResearchThought($research->id)) {
+            return;
+        }
+
+        $emailThoughtId = trim((string) data_get($research->metadata, 'idea_id'));
+        if ($emailThoughtId === '') {
+            return;
+        }
+
+        $emailThought = $this->resolveEligibleEmailThought($emailThoughtId, (int) $research->user_id);
+        if ($emailThought === null) {
+            return;
+        }
+
+        $row = $this->resolveStoredEmailRowForThought($emailThought);
+        if ($row === null) {
+            return;
+        }
+
+        $this->scanned++;
+
+        $payload = $newsletterResearch->linkageFieldsForStoredEmail($row, $emailThought);
+        if ($payload === null) {
+            $this->skipped++;
+
+            return;
+        }
+
+        if ($this->hasLinkageConflict($research, $payload) || $this->hasBackLinkConflict($emailThought, $row, $research->id)) {
+            $this->conflicted++;
+
+            return;
+        }
+
+        if (! $this->needsLinkageWrite($research, $payload) && ! $this->needsBackLinkWrite($emailThought, $row, $research->id)) {
+            $this->skipped++;
+
+            return;
+        }
+
+        $this->updated++;
+        if ($dryRun) {
+            return;
+        }
+
+        $this->persistResearchLinkage($research, $payload);
+        $this->persistBackLinks($emailThought, $row, $research->id);
+    }
+
+    /**
+     * @param  array{email_thought_id: string, email_subject: string, email_sender: string}  $payload
+     */
+    private function persistResearchLinkage(Thought $research, array $payload): void
+    {
+        $sourceMetadata = is_array($research->source_metadata) ? $research->source_metadata : [];
+        $metadata = is_array($research->metadata) ? $research->metadata : [];
+
+        foreach (['email_thought_id', 'email_subject', 'email_sender'] as $key) {
+            $sourceMetadata[$key] = $payload[$key];
+            $metadata[$key] = $payload[$key];
+        }
+
+        $updates = [
+            'source_metadata' => $sourceMetadata,
+            'metadata' => $metadata,
+        ];
+
+        if ($this->isCanonicalEmailSource($research->source)) {
+            $updates['source'] = 'research';
+        }
+
+        $research->update($updates);
+    }
+
+    private function persistBackLinks(Thought $emailThought, ImportedEmail|CapturedInboundEmail $row, string $researchThoughtId): void
+    {
+        $emailMeta = is_array($emailThought->source_metadata) ? $emailThought->source_metadata : [];
+        $emailMeta['research_thought_id'] = $researchThoughtId;
+        $emailThought->update(['source_metadata' => $emailMeta]);
+
+        if ((string) ($row->research_thought_id ?? '') !== $researchThoughtId) {
+            $row->update(['research_thought_id' => $researchThoughtId]);
+        }
+    }
+
+    private function resolveStoredEmailRowForThought(Thought $emailThought): ImportedEmail|CapturedInboundEmail|null
+    {
+        $imported = $emailThought->importedEmail();
+        if ($imported !== null) {
+            return $imported;
+        }
+
+        $capturedId = data_get($emailThought->source_metadata, 'captured_inbound_email_id');
+        if ($capturedId !== null && (string) $capturedId !== '') {
+            $captured = CapturedInboundEmail::query()
+                ->where('user_id', $emailThought->user_id)
+                ->find($capturedId);
+            if ($captured !== null) {
+                return $captured;
+            }
+        }
+
+        return CapturedInboundEmail::query()
+            ->where('user_id', $emailThought->user_id)
+            ->where('thought_id', $emailThought->id)
+            ->first();
+    }
+
+    private function hasBackLinkConflict(
+        Thought $emailThought,
+        ImportedEmail|CapturedInboundEmail $row,
+        string $researchThoughtId,
+    ): bool {
+        $candidate = $this->normalizeId($researchThoughtId);
+        foreach ([
+            data_get($emailThought->source_metadata, 'research_thought_id'),
+            $row->research_thought_id,
+        ] as $raw) {
+            $existing = $this->normalizeId($raw);
+            if ($existing !== null && $existing !== $candidate) {
+                return true;
+            }
+        }
+
         return false;
+    }
+
+    private function needsBackLinkWrite(
+        Thought $emailThought,
+        ImportedEmail|CapturedInboundEmail $row,
+        string $researchThoughtId,
+    ): bool {
+        return $this->normalizeId(data_get($emailThought->source_metadata, 'research_thought_id')) !== $this->normalizeId($researchThoughtId)
+            || $this->normalizeId($row->research_thought_id) !== $this->normalizeId($researchThoughtId);
+    }
+
+    private function isCanonicalEmailSource(?string $source): bool
+    {
+        return in_array(mb_strtolower(trim((string) $source)), ['email', 'emails'], true);
+    }
+
+    private function markSeenResearchThought(?string $researchThoughtId): bool
+    {
+        $id = $this->normalizeId($researchThoughtId);
+        if ($id === null) {
+            return false;
+        }
+
+        if (isset($this->seenResearchThoughtIds[$id])) {
+            return true;
+        }
+
+        $this->seenResearchThoughtIds[$id] = true;
+
+        return false;
+    }
+
+    private function normalizeId(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $id = strtolower(trim((string) $value));
+
+        return $id === '' ? null : $id;
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\CapturedInboundEmail;
+use App\Models\ImportedEmail;
 use App\Models\Thought;
 
 /**
@@ -33,13 +35,25 @@ class ResearchService
             'tags' => ['research'],
         ]);
 
-        return Thought::create([
+        $emailLinkage = $this->buildEmailLinkagePayload($idea);
+        if ($emailLinkage !== null) {
+            $metadata = array_merge($metadata, $emailLinkage);
+        }
+
+        $research = Thought::create([
             'content' => $researchText,
             'embedding' => null,
             'metadata' => $metadata,
             'user_id' => $idea->user_id,
-            'source' => $source,
+            'source' => $this->shouldStoreAsResearchSource($idea, $source) ? 'research' : $source,
+            'source_metadata' => $emailLinkage,
         ]);
+
+        if ($emailLinkage !== null) {
+            $this->persistEmailResearchBackLinks($idea, $research);
+        }
+
+        return $research;
     }
 
     /**
@@ -88,5 +102,101 @@ class ResearchService
         }
 
         return ['idea' => $idea, 'research' => $research];
+    }
+
+    /**
+     * @return array{email_thought_id: string, email_subject: string, email_sender: string}|null
+     */
+    private function buildEmailLinkagePayload(Thought $idea): ?array
+    {
+        if (! $this->isCanonicalEmailSource($idea->source)) {
+            return null;
+        }
+
+        $subject = trim((string) ($idea->source_metadata['subject'] ?? $idea->source_metadata['email_subject'] ?? ''));
+        $sender = trim((string) ($idea->source_metadata['from'] ?? $idea->source_metadata['email_sender'] ?? ''));
+
+        $imported = $idea->importedEmail();
+        if ($imported !== null) {
+            $subject = trim((string) ($imported->subject ?? $subject));
+            $sender = $this->formatImportedEmailSender($imported) ?: $sender;
+        }
+
+        $captured = $this->resolveCapturedInboundEmail($idea);
+        if ($captured !== null) {
+            $subject = trim((string) ($captured->subject ?? $subject));
+            $sender = trim((string) ($captured->sender_email ?? $sender));
+        }
+
+        if ($subject === '' || $sender === '') {
+            return null;
+        }
+
+        return [
+            'email_thought_id' => (string) $idea->id,
+            'email_subject' => $subject,
+            'email_sender' => $sender,
+        ];
+    }
+
+    private function shouldStoreAsResearchSource(Thought $idea, string $source): bool
+    {
+        return $this->isCanonicalEmailSource($idea->source) || $source === 'research';
+    }
+
+    private function isCanonicalEmailSource(?string $source): bool
+    {
+        return in_array(mb_strtolower(trim((string) $source)), ['email', 'emails'], true);
+    }
+
+    private function persistEmailResearchBackLinks(Thought $emailThought, Thought $research): void
+    {
+        $emailMeta = is_array($emailThought->source_metadata) ? $emailThought->source_metadata : [];
+        $emailMeta['research_thought_id'] = $research->id;
+        $emailThought->update(['source_metadata' => $emailMeta]);
+
+        $imported = $emailThought->importedEmail();
+        if ($imported !== null) {
+            $imported->update(['research_thought_id' => $research->id]);
+        }
+
+        $captured = $this->resolveCapturedInboundEmail($emailThought);
+        if ($captured !== null) {
+            $captured->update(['research_thought_id' => $research->id]);
+        }
+    }
+
+    private function resolveCapturedInboundEmail(Thought $thought): ?CapturedInboundEmail
+    {
+        $capturedId = data_get($thought->source_metadata, 'captured_inbound_email_id');
+        if ($capturedId !== null && (string) $capturedId !== '') {
+            $row = CapturedInboundEmail::query()
+                ->where('user_id', $thought->user_id)
+                ->find($capturedId);
+            if ($row !== null) {
+                return $row;
+            }
+        }
+
+        return CapturedInboundEmail::query()
+            ->where('user_id', $thought->user_id)
+            ->where('thought_id', $thought->id)
+            ->first();
+    }
+
+    private function formatImportedEmailSender(ImportedEmail $row): string
+    {
+        $from = is_array($row->from_json) ? ($row->from_json[0] ?? null) : null;
+        if (! is_array($from)) {
+            return '';
+        }
+
+        $email = trim((string) ($from['email'] ?? ''));
+        $name = trim((string) ($from['name'] ?? ''));
+        if ($email === '') {
+            return '';
+        }
+
+        return $name !== '' ? $name.' <'.$email.'>' : $email;
     }
 }

@@ -7,12 +7,49 @@ use App\Models\ImportedEmail;
 use App\Models\MailAccount;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\Email\EmailNewsletterResearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class BackfillEmailResearchLinksCommandTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->mock(EmailNewsletterResearchService::class, function ($mock): void {
+            $mock->shouldReceive('linkageFieldsForStoredEmail')
+                ->andReturnUsing(function ($row, Thought $emailThought): ?array {
+                    $subject = trim((string) ($row->subject ?? data_get($emailThought->source_metadata, 'subject', '')));
+                    if ($subject === '') {
+                        return null;
+                    }
+
+                    if ($row instanceof ImportedEmail) {
+                        $from = $row->from_json[0] ?? null;
+                        $email = is_array($from) ? trim((string) ($from['email'] ?? '')) : '';
+                        $name = is_array($from) ? trim((string) ($from['name'] ?? '')) : '';
+                        $sender = $name !== '' && $email !== ''
+                            ? $name.' <'.$email.'>'
+                            : ($email !== '' ? $email : trim((string) ($row->rule_email ?? '')));
+                    } else {
+                        $sender = trim((string) ($row->sender_email ?? data_get($emailThought->source_metadata, 'from', '')));
+                    }
+
+                    if ($sender === '') {
+                        return null;
+                    }
+
+                    return [
+                        'email_thought_id' => (string) $emailThought->id,
+                        'email_subject' => $subject,
+                        'email_sender' => $sender,
+                    ];
+                });
+        });
+    }
 
     public function test_command_updates_imported_email_research_metadata_when_linkage_is_missing(): void
     {
@@ -393,5 +430,64 @@ class BackfillEmailResearchLinksCommandTest extends TestCase
             ->expectsOutputToContain('Scanned: 2')
             ->expectsOutputToContain('Updated: 0')
             ->expectsOutputToContain('Skipped: 2');
+    }
+
+    public function test_command_repairs_legacy_email_sourced_idea_research_thoughts(): void
+    {
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'content' => 'Ross Tweedie: Your GoDaddy Renewal Notice',
+            'metadata' => ['type' => 'note', 'tags' => ['godaddy']],
+            'source_metadata' => [
+                'subject' => 'Ross Tweedie: Your GoDaddy Renewal Notice',
+                'from' => 'GoDaddy Renewals <renewals@godaddy.com>',
+            ],
+        ]);
+
+        ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'legacy-email-research-msg',
+            'direction' => 'received',
+            'subject' => 'Ross Tweedie: Your GoDaddy Renewal Notice',
+            'from_json' => [['email' => 'renewals@godaddy.com', 'name' => 'GoDaddy Renewals']],
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => null,
+        ]);
+
+        $legacyResearch = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'content' => '### Research Brief: Ross Tweedie: Your GoDaddy Renewal Notice',
+            'metadata' => [
+                'type' => 'research',
+                'idea_id' => $emailThought->id,
+                'tags' => ['research'],
+            ],
+            'source_metadata' => null,
+        ]);
+
+        $this->artisan('email-research:backfill-links')
+            ->assertSuccessful()
+            ->expectsOutputToContain('Scanned: 1')
+            ->expectsOutputToContain('Updated: 1');
+
+        $legacyResearch->refresh();
+        $emailThought->refresh();
+        $stored = ImportedEmail::query()->where('thought_id', $emailThought->id)->firstOrFail();
+
+        $this->assertSame('research', $legacyResearch->source);
+        $this->assertSame($emailThought->id, $legacyResearch->metadata['email_thought_id'] ?? null);
+        $this->assertSame('Ross Tweedie: Your GoDaddy Renewal Notice', $legacyResearch->metadata['email_subject'] ?? null);
+        $this->assertSame('GoDaddy Renewals <renewals@godaddy.com>', $legacyResearch->metadata['email_sender'] ?? null);
+        $this->assertSame($emailThought->id, $legacyResearch->source_metadata['email_thought_id'] ?? null);
+        $this->assertSame($legacyResearch->id, data_get($emailThought->source_metadata, 'research_thought_id'));
+        $this->assertSame($legacyResearch->id, $stored->research_thought_id);
     }
 }

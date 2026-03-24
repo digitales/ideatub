@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\ImportedEmail;
+use App\Models\MailAccount;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\OpenRouterService;
@@ -101,6 +103,58 @@ class ResearchServiceTest extends TestCase
         $this->assertSame('An idea without research', $idea->getDecodedContent());
 
         $this->assertSame(0, Thought::where('metadata->type', 'research')->count());
+    }
+
+    public function test_run_research_for_email_thought_creates_research_source_and_persists_email_linkage(): void
+    {
+        $user = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'content' => 'Ross Tweedie: Your GoDaddy Renewal Notice',
+            'metadata' => ['type' => 'note', 'tags' => ['godaddy']],
+            'source_metadata' => [
+                'subject' => 'Ross Tweedie: Your GoDaddy Renewal Notice',
+                'from' => 'GoDaddy Renewals <renewals@godaddy.com>',
+            ],
+            'embedding' => null,
+        ]);
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $storedEmail = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'email-research-linkage-msg',
+            'direction' => 'received',
+            'subject' => 'Ross Tweedie: Your GoDaddy Renewal Notice',
+            'from_json' => [['email' => 'renewals@godaddy.com', 'name' => 'GoDaddy Renewals']],
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => null,
+        ]);
+
+        $researchText = '### Research Brief: Ross Tweedie: Your GoDaddy Renewal Notice';
+        $this->mock(OpenRouterService::class, function ($mock) use ($researchText): void {
+            $mock->shouldReceive('researchNote')
+                ->once()
+                ->with('Ross Tweedie: Your GoDaddy Renewal Notice')
+                ->andReturn($researchText);
+        });
+
+        $service = app(ResearchService::class);
+        $research = $service->runResearchForIdea($emailThought, 'email');
+
+        $this->assertSame('research', $research->source);
+        $this->assertSame($emailThought->id, $research->metadata['idea_id']);
+        $this->assertSame($emailThought->id, $research->metadata['email_thought_id'] ?? null);
+        $this->assertSame('Ross Tweedie: Your GoDaddy Renewal Notice', $research->metadata['email_subject'] ?? null);
+        $this->assertSame('GoDaddy Renewals <renewals@godaddy.com>', $research->metadata['email_sender'] ?? null);
+        $this->assertSame($emailThought->id, $research->source_metadata['email_thought_id'] ?? null);
+
+        $emailThought->refresh();
+        $storedEmail->refresh();
+        $this->assertSame($research->id, data_get($emailThought->source_metadata, 'research_thought_id'));
+        $this->assertSame($research->id, $storedEmail->research_thought_id);
     }
 
     public function test_create_idea_and_research_when_research_fails_keeps_idea_returns_null_research(): void
