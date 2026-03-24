@@ -87,11 +87,24 @@
             <p><span class="font-medium text-deep-indigo">Account: {{ $accountEmail }}</span></p>
         @endif
     </div>
-    @if (! empty($linkedResearchUrl))
-        <p class="mt-5 pt-4 border-t border-memory-violet/10">
-            <a href="{{ $linkedResearchUrl }}" class="text-[13px] font-medium text-memory-violet hover:underline">View research</a>
-        </p>
-    @endif
+    <div class="mt-5 pt-4 border-t border-memory-violet/10 space-y-2">
+        <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-3">Actions</p>
+        <form method="POST" action="{{ route('emails.idea-research', $thought) }}" x-data="{ submitting: false }" @submit="submitting = true">
+            @csrf
+            <button type="submit" :disabled="submitting" class="w-full text-left px-3 py-2 text-[12px] font-medium text-memory-violet border border-memory-violet/30 rounded-lg hover:bg-memory-violet/5 transition-colors disabled:opacity-50">
+                Run idea research
+            </button>
+        </form>
+        <form method="POST" action="{{ route('emails.newsletter-research', $thought) }}" x-data="{ submitting: false }" @submit="submitting = true">
+            @csrf
+            <button type="submit" :disabled="submitting" class="w-full text-left px-3 py-2 text-[12px] font-medium text-memory-violet border border-memory-violet/30 rounded-lg hover:bg-memory-violet/5 transition-colors disabled:opacity-50">
+                Run newsletter research
+            </button>
+        </form>
+        @if (! empty($linkedResearchUrl))
+            <a href="{{ $linkedResearchUrl }}" class="block text-[13px] font-medium text-memory-violet hover:underline pt-1">View research</a>
+        @endif
+    </div>
 
     @include('idea.partials.thought_detail_sender_rule_card', ['senderRuleContext' => $senderRuleContext])
 </aside>
