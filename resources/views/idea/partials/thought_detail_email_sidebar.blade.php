@@ -87,6 +87,9 @@
             <p><span class="font-medium text-deep-indigo">Account: {{ $accountEmail }}</span></p>
         @endif
     </div>
+    <div class="mt-4 flex flex-wrap items-center gap-2">
+        @include('idea.partials.email_newsletter_research_status', ['thought' => $thought])
+    </div>
     <div class="mt-5 pt-4 border-t border-memory-violet/10 space-y-2">
         <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-3">Actions</p>
         <form method="POST" action="{{ route('emails.idea-research', $thought) }}" x-data="{ submitting: false }" @submit="submitting = true">
