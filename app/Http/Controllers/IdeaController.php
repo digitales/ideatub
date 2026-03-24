@@ -153,6 +153,9 @@ class IdeaController extends Controller
         }
 
         $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl($thought);
+        $emailResearchPreview = $thought->source === 'email'
+            ? $this->buildEmailResearchPreview($thought)
+            : null;
 
         return view('idea.show', [
             'thought' => $thought,
@@ -160,6 +163,7 @@ class IdeaController extends Controller
             'senderRuleContext' => $senderRuleContext,
             'contentHtml' => $contentHtml,
             'linkedResearchUrl' => $linkedResearchUrl,
+            'emailResearchPreview' => $emailResearchPreview,
         ]);
     }
 
@@ -792,6 +796,16 @@ class IdeaController extends Controller
      */
     private function resolveEmailLinkedResearchUrl(Thought $thought): ?string
     {
+        $research = $this->resolveEmailLinkedResearchThought($thought);
+
+        return $research !== null ? route('idea.research.show', $research) : null;
+    }
+
+    /**
+     * Resolve the linked research thought for an email (metadata + durable stored email rows), or null when ambiguous or missing.
+     */
+    private function resolveEmailLinkedResearchThought(Thought $thought): ?Thought
+    {
         if ($thought->source !== 'email') {
             return null;
         }
@@ -823,17 +837,89 @@ class IdeaController extends Controller
             return null;
         }
 
-        $research = Thought::query()
+        return Thought::query()
             ->whereKey($candidateId)
             ->where('user_id', auth()->id())
             ->matchingCanonicalMetadataType('research')
             ->first();
+    }
 
-        if ($research === null) {
+    /**
+     * Preview payload for the email thought detail page: full research URL, rendered root HTML, and up to two section HTML chunks (child thoughts, same order as the full research page).
+     *
+     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
+     */
+    private function buildEmailResearchPreview(Thought $emailThought): ?array
+    {
+        $resolved = $this->resolveEmailLinkedResearchThought($emailThought);
+        if ($resolved === null) {
             return null;
         }
 
-        return route('idea.research.show', $research);
+        $documentRoot = $this->resolveResearchDocumentRootForPreview($resolved);
+        if ($documentRoot === null) {
+            return null;
+        }
+
+        $isResearchRoot = Thought::query()
+            ->whereKey($documentRoot->id)
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
+            ->exists();
+
+        if (! $isResearchRoot) {
+            return null;
+        }
+
+        $converter = new CommonMarkConverter;
+        $rootHtml = $converter->convert($documentRoot->content)->getContent();
+        $sections = $documentRoot->comments()->orderBy('created_at')->get();
+        $sectionHtmlChunks = $sections->take(2)->map(function (Thought $section) use ($converter) {
+            return $converter->convert($section->content)->getContent();
+        })->values()->all();
+
+        if (! $this->researchEmailPreviewHasRenderableBody($rootHtml, $sectionHtmlChunks)) {
+            return null;
+        }
+
+        return [
+            'full_research_url' => route('idea.research.show', $documentRoot),
+            'root_html' => $rootHtml,
+            'section_html_chunks' => $sectionHtmlChunks,
+        ];
+    }
+
+    private function resolveResearchDocumentRootForPreview(Thought $resolvedResearch): ?Thought
+    {
+        if ($resolvedResearch->parent_id === null) {
+            return $resolvedResearch;
+        }
+
+        return Thought::query()
+            ->whereKey($resolvedResearch->parent_id)
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
+            ->first();
+    }
+
+    /**
+     * @param  array<int, string>  $sectionHtmlChunks
+     */
+    private function researchEmailPreviewHasRenderableBody(string $rootHtml, array $sectionHtmlChunks): bool
+    {
+        $hasText = fn (string $html): bool => trim(strip_tags($html)) !== '';
+
+        if ($hasText($rootHtml)) {
+            return true;
+        }
+
+        foreach ($sectionHtmlChunks as $chunk) {
+            if ($hasText($chunk)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

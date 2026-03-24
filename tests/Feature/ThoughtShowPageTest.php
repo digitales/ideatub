@@ -17,6 +17,16 @@ class ThoughtShowPageTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const EMAIL_RESEARCH_PREVIEW_INTRO = 'Email research preview intro unique abc123.';
+
+    private const EMAIL_RESEARCH_PREVIEW_SECTION_ONE = 'Section one body unique def456.';
+
+    private const EMAIL_RESEARCH_PREVIEW_SECTION_TWO = 'Section two body unique ghi789.';
+
+    private const EMAIL_RESEARCH_PREVIEW_SECTION_THREE = 'Section three must not appear jkl012.';
+
+    private const EMAIL_RESEARCH_PREVIEW_EMPTY_ROOT_SECTION_BODY = 'Empty root section body unique mno345.';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -164,60 +174,137 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Direction: received');
     }
 
-    public function test_email_thought_detail_shows_view_research_link_when_source_metadata_matches_imported_email_research_thought(): void
+    public function test_email_thought_detail_research_preview_happy_path_shows_intro_two_sections_and_full_research_link(): void
+    {
+        [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedResearchPreviewFixture();
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $this->assertEmailDetailResearchPreviewContract($response, $researchThought);
+    }
+
+    public function test_email_thought_detail_omits_research_preview_and_cta_when_linked_research_is_missing(): void
     {
         $owner = User::factory()->create();
         $researchThought = Thought::factory()->create([
             'user_id' => $owner->id,
             'parent_id' => null,
             'embedding' => null,
-            'content' => '# Linked research',
+            'content' => '# Research later removed',
             'source' => 'web',
             'metadata' => ['type' => 'research', 'tags' => []],
         ]);
+        $staleResearchId = $researchThought->id;
 
         $emailThought = Thought::factory()->create([
             'user_id' => $owner->id,
-            'content' => 'Email body for research link',
+            'content' => 'Email body with missing research link',
             'source' => 'email',
             'source_metadata' => [
-                'subject' => 'Email with research',
-                'research_thought_id' => $researchThought->id,
+                'subject' => 'Missing research',
+                'research_thought_id' => $staleResearchId,
             ],
         ]);
 
-        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
-        $importedEmail = ImportedEmail::create([
-            'user_id' => $owner->id,
-            'mail_account_id' => $account->id,
-            'provider' => 'fastmail',
-            'provider_message_id' => 'msg-research-link',
-            'provider_thread_id' => 'thread-research-link',
-            'direction' => 'received',
-            'subject' => 'Imported subject',
-            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
-            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
-            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
-            'sent_at' => now()->subMinute(),
-            'received_at' => now(),
-            'body_text' => 'Body',
-            'processing_status' => 'imported',
-            'thought_id' => $emailThought->id,
-            'research_thought_id' => $researchThought->id,
-        ]);
+        $this->attachImportedEmailWithResearchThoughtId($owner, $emailThought, $staleResearchId);
 
-        $emailThought->update([
-            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
-                'imported_email_id' => $importedEmail->id,
-            ]),
-        ]);
+        $researchThought->delete();
+        $this->assertDatabaseMissing('thoughts', ['id' => $staleResearchId]);
 
-        $researchHref = route('idea.research.show', $researchThought);
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought->fresh()));
+
+        $this->assertEmailDetailOmitsResearchPreviewAndResearchCtas($response);
+    }
+
+    public function test_email_thought_detail_research_preview_shows_root_only_and_full_research_link(): void
+    {
+        [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedResearchContent(
+            self::EMAIL_RESEARCH_PREVIEW_INTRO,
+            []
+        );
+
         $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
 
         $response->assertOk();
-        $response->assertSee('View research', false);
-        $response->assertSee($researchHref, false);
+        $this->assertEmailResearchPreviewViewModel($response, $researchThought, [
+            'expect_intro_in_root_html' => true,
+            'expect_section_plain_text' => [],
+            'expect_absent_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE],
+        ]);
+        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
+        $response->assertSee('Research preview', false);
+        $response->assertSee('View full research', false);
+        $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_INTRO, false);
+        $response->assertDontSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, false);
+    }
+
+    public function test_email_thought_detail_research_preview_renders_when_root_empty_but_section_has_content(): void
+    {
+        [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedResearchContent(
+            '',
+            [
+                "## Preview after empty root\n\n".self::EMAIL_RESEARCH_PREVIEW_EMPTY_ROOT_SECTION_BODY,
+            ]
+        );
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $this->assertEmailResearchPreviewViewModel($response, $researchThought, [
+            'expect_intro_in_root_html' => false,
+            'expect_section_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_EMPTY_ROOT_SECTION_BODY],
+            'expect_absent_plain_text' => [],
+        ]);
+        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
+        $response->assertSee('Research preview', false);
+        $response->assertSee('View full research', false);
+        $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_EMPTY_ROOT_SECTION_BODY, false);
+    }
+
+    public function test_email_thought_detail_omits_research_preview_when_linked_research_has_no_previewable_content(): void
+    {
+        [$owner, $emailThought] = $this->createEmailThoughtWithLinkedResearchContent('', []);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $this->assertEmailDetailOmitsResearchPreviewViewModel($response);
+    }
+
+    public function test_email_thought_detail_research_preview_shows_root_and_single_section_only(): void
+    {
+        [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedResearchContent(
+            self::EMAIL_RESEARCH_PREVIEW_INTRO,
+            [
+                "## Only\n\n".self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE,
+            ]
+        );
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $this->assertEmailResearchPreviewViewModel($response, $researchThought, [
+            'expect_intro_in_root_html' => true,
+            'expect_section_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE],
+            'expect_absent_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO],
+        ]);
+        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
+        $response->assertSee('Research preview', false);
+        $response->assertSee('View full research', false);
+        $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, false);
+        $response->assertDontSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, false);
+    }
+
+    public function test_email_thought_detail_shows_research_preview_when_source_metadata_matches_imported_email_research_thought(): void
+    {
+        [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedImportedResearchPreviewFixture();
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
+        $this->assertNotNull($response->viewData('emailResearchPreview'));
+        $response->assertSee('Research preview', false);
+        $response->assertSee('View full research', false);
     }
 
     public function test_email_thought_detail_omits_view_research_link_when_research_thought_id_points_at_non_research_thought_for_same_user(): void
@@ -328,8 +415,7 @@ class ThoughtShowPageTest extends TestCase
         $researchHref = route('idea.research.show', $researchThought);
         $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
 
-        $response->assertOk();
-        $response->assertDontSee('View research', false);
+        $this->assertEmailDetailOmitsResearchPreviewAndResearchCtas($response);
         $response->assertDontSee($researchHref, false);
     }
 
@@ -467,10 +553,14 @@ class ThoughtShowPageTest extends TestCase
             ]),
         ]);
 
+        $metadataResearchHref = route('idea.research.show', $researchFromMetadata);
+        $storedEmailResearchHref = route('idea.research.show', $researchFromStoredEmail);
         $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
 
         $response->assertOk();
         $response->assertDontSee('View research', false);
+        $response->assertDontSee($metadataResearchHref, false);
+        $response->assertDontSee($storedEmailResearchHref, false);
     }
 
     public function test_email_thought_detail_omits_view_research_link_when_research_thought_id_does_not_resolve(): void
@@ -1266,5 +1356,201 @@ class ThoughtShowPageTest extends TestCase
         ]);
 
         return $thought->fresh();
+    }
+
+    /**
+     * @return array{0: User, 1: Thought, 2: Thought}
+     */
+    private function createEmailThoughtWithLinkedResearchPreviewFixture(): array
+    {
+        return $this->createEmailThoughtWithLinkedResearchContent(
+            self::EMAIL_RESEARCH_PREVIEW_INTRO,
+            [
+                "## First\n\n".self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE,
+                "## Second\n\n".self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO,
+                '## Third\n\n'.self::EMAIL_RESEARCH_PREVIEW_SECTION_THREE,
+            ],
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $sectionMarkdownBodies
+     * @return array{0: User, 1: Thought, 2: Thought}
+     */
+    private function createEmailThoughtWithLinkedResearchContent(string $researchRootMarkdown, array $sectionMarkdownBodies = []): array
+    {
+        $owner = User::factory()->create();
+        $researchThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => $researchRootMarkdown,
+            'source' => 'web',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        foreach ($sectionMarkdownBodies as $sectionBody) {
+            Thought::factory()->create([
+                'user_id' => $owner->id,
+                'parent_id' => $researchThought->id,
+                'embedding' => null,
+                'content' => $sectionBody,
+                'source' => 'web',
+                'metadata' => ['tags' => []],
+            ]);
+        }
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Email body for research preview',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Email with research',
+                'research_thought_id' => $researchThought->id,
+            ],
+        ]);
+
+        return [$owner, $emailThought->fresh(), $researchThought->fresh()];
+    }
+
+    private function attachImportedEmailWithResearchThoughtId(User $owner, Thought $emailThought, string $researchThoughtId): void
+    {
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-missing-research-'.uniqid(),
+            'provider_thread_id' => 'thread-missing-research',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchThoughtId,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+    }
+
+    private function assertEmailDetailOmitsResearchPreviewAndResearchCtas(TestResponse $response): void
+    {
+        $response->assertOk();
+        $this->assertEmailDetailOmitsResearchPreviewViewModel($response);
+        $response->assertViewHas('linkedResearchUrl', null);
+        $response->assertDontSee('View research', false);
+    }
+
+    private function assertEmailDetailOmitsResearchPreviewPanelAndFullResearchLink(TestResponse $response): void
+    {
+        $this->assertEmailDetailOmitsResearchPreviewViewModel($response);
+    }
+
+    private function assertEmailDetailOmitsResearchPreviewViewModel(TestResponse $response): void
+    {
+        $response->assertOk();
+        $response->assertViewHas('emailResearchPreview', null);
+        $response->assertDontSee('View full research', false);
+        $response->assertDontSee('Research preview', false);
+    }
+
+    /**
+     * @param  array{
+     *     expect_intro_in_root_html: bool,
+     *     expect_section_plain_text: array<int, string>,
+     *     expect_absent_plain_text: array<int, string>
+     * }  $expectations
+     */
+    private function assertEmailResearchPreviewViewModel(TestResponse $response, Thought $researchThought, array $expectations): void
+    {
+        $response->assertViewHas('emailResearchPreview', function ($preview) use ($researchThought, $expectations) {
+            $this->assertIsArray($preview);
+            $this->assertSame(route('idea.research.show', $researchThought), $preview['full_research_url']);
+            $this->assertArrayHasKey('root_html', $preview);
+            $this->assertArrayHasKey('section_html_chunks', $preview);
+            $this->assertIsArray($preview['section_html_chunks']);
+            $this->assertLessThanOrEqual(2, count($preview['section_html_chunks']));
+
+            if ($expectations['expect_intro_in_root_html']) {
+                $this->assertStringContainsString(self::EMAIL_RESEARCH_PREVIEW_INTRO, $preview['root_html']);
+            } else {
+                $this->assertStringNotContainsString(self::EMAIL_RESEARCH_PREVIEW_INTRO, $preview['root_html']);
+            }
+
+            $combined = $preview['root_html'].implode('', $preview['section_html_chunks']);
+            foreach ($expectations['expect_section_plain_text'] as $plain) {
+                $this->assertStringContainsString($plain, $combined);
+            }
+            foreach ($expectations['expect_absent_plain_text'] as $plain) {
+                $this->assertStringNotContainsString($plain, $combined);
+            }
+
+            return true;
+        });
+    }
+
+    /**
+     * @return array{0: User, 1: Thought, 2: Thought}
+     */
+    private function createEmailThoughtWithLinkedImportedResearchPreviewFixture(): array
+    {
+        [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedResearchPreviewFixture();
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-research-link',
+            'provider_thread_id' => 'thread-research-link',
+            'direction' => 'received',
+            'subject' => 'Imported subject',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [['role' => 'from', 'email' => 'sender@example.com', 'name' => 'Sender']],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Body',
+            'processing_status' => 'imported',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $researchThought->id,
+        ]);
+
+        $emailThought->update([
+            'source_metadata' => array_merge($emailThought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        return [$owner, $emailThought->fresh(), $researchThought->fresh()];
+    }
+
+    private function assertEmailDetailResearchPreviewContract(TestResponse $response, Thought $researchThought): void
+    {
+        $response->assertOk();
+        $this->assertEmailResearchPreviewViewModel($response, $researchThought, [
+            'expect_intro_in_root_html' => true,
+            'expect_section_plain_text' => [
+                self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE,
+                self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO,
+            ],
+            'expect_absent_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_SECTION_THREE],
+        ]);
+        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
+        $response->assertSee('Research preview', false);
+        $response->assertSee('View full research', false);
+        $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_INTRO, false);
+        $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, false);
+        $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, false);
+        $response->assertDontSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_THREE, false);
     }
 }
