@@ -201,4 +201,23 @@ class IdeaIdeasTest extends TestCase
         $response->assertSee($fullTail, false);
         $this->assertMatchesRegularExpression('/previewMaxLength\s*:\s*200/', $response->getContent());
     }
+
+    public function test_ideas_list_outer_card_element_carries_thought_id_for_dom_removal(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Delete me cleanly',
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-03-01'],
+            'embedding' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertStatus(200);
+        $this->assertMatchesRegularExpression(
+            '/<li\b[^>]*data-thought-id="'.preg_quote($thought->id, '/').'"[^>]*>/',
+            $response->getContent(),
+        );
+    }
 }

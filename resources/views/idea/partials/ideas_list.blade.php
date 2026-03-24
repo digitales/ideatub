@@ -14,7 +14,7 @@
             @php
                 $researchList = $researchByIdea->get($thought->id, collect());
             @endphp
-            <li class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3 flex items-start gap-3">
+            <li data-thought-id="{{ $thought->id }}" class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3 flex items-start gap-3">
                 <form method="POST" action="{{ route('ideas.toggle-completed', $thought) }}" class="flex-shrink-0 mt-0.5">
                     @csrf
                     @method('PATCH')
@@ -28,7 +28,7 @@
                         <span class="sr-only">Mark as {{ $thought->isIdeaCompleted() ? 'incomplete' : 'complete' }}</span>
                     </label>
                 </form>
-                <div class="min-w-0 flex-1 relative" data-thought-id="{{ $thought->id }}">
+                <div class="min-w-0 flex-1 relative">
                     <div class="absolute top-0 right-0 z-10">
                         @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
                     </div>
