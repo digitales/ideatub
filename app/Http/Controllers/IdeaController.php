@@ -12,6 +12,7 @@ use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
+use App\Support\IdeaCompletedAtSql;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -510,6 +511,20 @@ class IdeaController extends Controller
     }
 
     /**
+     * Completed ideas: metadata.type idea and completed, ordered via IdeaCompletedAtSql (timestamped first, then legacy).
+     */
+    public function completed(): View
+    {
+        $ideas = IdeaCompletedAtSql::applyCompletedIdeaOrdering(
+            Thought::query()
+                ->where('user_id', auth()->id())
+                ->completedIdeas()
+        )->paginate(20);
+
+        return view('idea.completed', ['ideas' => $ideas]);
+    }
+
+    /**
      * Ideas list: thoughts with metadata.type = 'idea', paginated. Add-idea form at top.
      * Loads research thoughts for each idea (newest first) for display.
      * For AJAX requests, returns JSON with first-page HTML for realtime refetch.
@@ -518,7 +533,7 @@ class IdeaController extends Controller
     {
         $ideas = Thought::query()
             ->where('user_id', auth()->id())
-            ->ideas()
+            ->incompleteIdeas()
             ->orderByDesc('created_at')
             ->paginate(20);
 
@@ -601,22 +616,33 @@ class IdeaController extends Controller
             return redirect()->route('idea.ideas')->with('error', 'Not an idea.')->setStatusCode(Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $completed = ! ($thought->metadata['completed'] ?? false);
-        $metadata = array_merge($thought->metadata ?? [], [
-            'type' => 'idea',
-            'completed' => $completed,
-            'logged_date' => $thought->metadata['logged_date'] ?? $thought->created_at->toDateString(),
-        ]);
-        if (isset($thought->metadata['tags']) && is_array($thought->metadata['tags'])) {
-            $metadata['tags'] = $thought->metadata['tags'];
+        $metadata = $thought->metadata ?? [];
+        $wasCompleted = $thought->isIdeaCompleted();
+        $completed = ! $wasCompleted;
+
+        $metadata['type'] = 'idea';
+        $metadata['completed'] = $completed;
+        $metadata['logged_date'] = $metadata['logged_date'] ?? $thought->created_at->toDateString();
+
+        if ($completed) {
+            $metadata['completed_at'] = now()->toIso8601String();
+        } else {
+            unset($metadata['completed_at']);
         }
+
         $thought->update(['metadata' => $metadata]);
+        $thought->refresh();
 
         if ($request->expectsJson()) {
-            return response()->json(['completed' => $completed]);
+            return response()->json([
+                'completed' => $completed,
+                'completed_at' => $completed ? ($thought->metadata['completed_at'] ?? null) : null,
+            ]);
         }
 
-        return redirect()->route('idea.ideas')->with('success', $completed ? 'Marked as complete.' : 'Marked as incomplete.');
+        return redirect()
+            ->back(fallback: route('idea.ideas'))
+            ->with('success', $completed ? 'Marked as complete.' : 'Marked as incomplete.');
     }
 
     /**

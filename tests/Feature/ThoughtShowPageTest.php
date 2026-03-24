@@ -49,6 +49,193 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Root thought body for detail view', false);
     }
 
+    public function test_completed_idea_detail_shows_reopen_control_posting_to_toggle_completed(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Completed idea on detail',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => true,
+                'logged_date' => '2025-02-01',
+                'completed_at' => '2026-03-24T12:00:00+00:00',
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee('Mark as incomplete', false);
+        $response->assertSee(route('ideas.toggle-completed', $thought), false);
+        $response->assertSee('method="POST"', false);
+        $response->assertSee('_method', false);
+    }
+
+    public function test_completed_idea_detail_shows_reopen_control_when_completed_at_is_present_but_flag_is_false(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Timestamp-only completed idea on detail',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => false,
+                'logged_date' => '2025-02-01',
+                'completed_at' => '2026-03-24T12:00:00+00:00',
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee('Mark as incomplete', false);
+        $response->assertSee(route('ideas.toggle-completed', $thought), false);
+    }
+
+    public function test_incomplete_idea_detail_does_not_show_reopen_control(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Open idea on detail',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => false,
+                'logged_date' => '2025-02-01',
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertDontSee('Mark as incomplete', false);
+    }
+
+    public function test_non_idea_detail_with_completed_flag_does_not_show_reopen_control(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Completed non-idea detail',
+            'metadata' => [
+                'type' => 'research',
+                'completed' => true,
+                'completed_at' => '2026-03-24T12:00:00+00:00',
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertDontSee('Mark as incomplete', false);
+        $response->assertDontSee(route('ideas.toggle-completed', $thought), false);
+    }
+
+    public function test_reopening_completed_idea_from_detail_redirects_to_detail_clears_completion_and_updates_lists(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Reopen me from detail unique xyz789',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => true,
+                'logged_date' => '2025-03-01',
+                'completed_at' => '2026-03-24T14:00:00+00:00',
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->from(route('thoughts.show', $thought))
+            ->patch(route('ideas.toggle-completed', $thought));
+
+        $response->assertRedirect(route('thoughts.show', $thought));
+
+        $thought->refresh();
+        $this->assertFalse((bool) ($thought->metadata['completed'] ?? false));
+        $this->assertArrayNotHasKey('completed_at', $thought->metadata ?? []);
+
+        $ideasPage = $this->actingAs($owner)->get(route('idea.ideas'));
+        $ideasPage->assertOk();
+        $ideasPage->assertSee('Reopen me from detail unique xyz789', false);
+
+        $completedPage = $this->actingAs($owner)->get(route('idea.completed'));
+        $completedPage->assertOk();
+        $completedPage->assertDontSee('Reopen me from detail unique xyz789', false);
+    }
+
+    public function test_reopening_timestamp_only_completed_idea_from_detail_clears_completion_and_updates_lists(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Timestamp only reopen from detail unique tsOnly42',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => false,
+                'logged_date' => '2025-03-01',
+                'completed_at' => '2026-03-24T15:00:00+00:00',
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)
+            ->from(route('thoughts.show', $thought))
+            ->patch(route('ideas.toggle-completed', $thought));
+
+        $response->assertRedirect(route('thoughts.show', $thought));
+
+        $thought->refresh();
+        $this->assertFalse((bool) ($thought->metadata['completed'] ?? false));
+        $this->assertArrayNotHasKey('completed_at', $thought->metadata ?? []);
+
+        $ideasPage = $this->actingAs($owner)->get(route('idea.ideas'));
+        $ideasPage->assertOk();
+        $ideasPage->assertSee('Timestamp only reopen from detail unique tsOnly42', false);
+
+        $completedPage = $this->actingAs($owner)->get(route('idea.completed'));
+        $completedPage->assertOk();
+        $completedPage->assertDontSee('Timestamp only reopen from detail unique tsOnly42', false);
+    }
+
+    public function test_non_owner_cannot_toggle_completion_for_another_users_idea(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Protected completion toggle',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => true,
+                'logged_date' => '2025-03-01',
+                'completed_at' => '2026-03-24T14:00:00+00:00',
+            ],
+        ]);
+
+        $response = $this->actingAs($other)->patch(route('ideas.toggle-completed', $thought));
+
+        $response->assertForbidden();
+
+        $thought->refresh();
+        $this->assertTrue((bool) ($thought->metadata['completed'] ?? false));
+        $this->assertSame('2026-03-24T14:00:00+00:00', $thought->metadata['completed_at'] ?? null);
+    }
+
     public function test_non_email_thought_detail_page_renders_markdown_content(): void
     {
         $owner = User::factory()->create();
