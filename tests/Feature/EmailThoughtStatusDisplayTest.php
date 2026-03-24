@@ -11,6 +11,12 @@ class EmailThoughtStatusDisplayTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+    }
+
     public function test_email_thought_research_queued_shows_queued_status_on_index_and_stream(): void
     {
         $user = User::factory()->create();
@@ -117,5 +123,155 @@ class EmailThoughtStatusDisplayTest extends TestCase
         $stream = $this->actingAs($user)->get(route('idea.stream'));
         $stream->assertStatus(200);
         $stream->assertDontSee('data-email-research-status=', false);
+    }
+
+    public function test_email_thought_research_skipped_with_reason_shows_reason_and_info_ui_on_index_and_stream(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Skipped newsletter email',
+            'source' => 'email',
+            'source_metadata' => [
+                'newsletter_research' => [
+                    'status' => 'research_skipped',
+                    'reason' => 'Not enough meaningful content to research.',
+                ],
+            ],
+        ]);
+
+        $index = $this->actingAs($user)->get(route('idea.index'));
+        $index->assertStatus(200);
+        $index->assertSee('data-email-research-status="research_skipped"', false);
+        $index->assertSee('Skipped: Not enough meaningful content to research.', false);
+        $index->assertSee('Why research was skipped', false);
+        $index->assertSee('aria-controls="email-research-skip-reason-'.$thought->id.'"', false);
+        $index->assertSee('id="email-research-skip-reason-'.$thought->id.'"', false);
+        $index->assertSee('data-email-research-skip-reason', false);
+        $index->assertSee('data-email-research-skip-hover-bridge', false);
+        $index->assertDontSee('role="tooltip"', false);
+
+        $stream = $this->actingAs($user)->get(route('idea.stream'));
+        $stream->assertStatus(200);
+        $stream->assertSee('data-email-research-status="research_skipped"', false);
+        $stream->assertSee('Skipped: Not enough meaningful content to research.', false);
+        $stream->assertSee('Why research was skipped', false);
+        $stream->assertSee('aria-controls="email-research-skip-reason-'.$thought->id.'"', false);
+        $stream->assertSee('id="email-research-skip-reason-'.$thought->id.'"', false);
+        $stream->assertSee('data-email-research-skip-reason', false);
+        $stream->assertSee('data-email-research-skip-hover-bridge', false);
+        $stream->assertDontSee('role="tooltip"', false);
+    }
+
+    public function test_email_thought_detail_page_shows_skipped_reason_and_info_ui(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'source' => 'email',
+            'content' => 'Email body',
+            'source_metadata' => [
+                'newsletter_research' => [
+                    'status' => 'research_skipped',
+                    'reason' => 'Not enough meaningful content to research.',
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('thoughts.show', $thought));
+
+        $response->assertStatus(200);
+        $response->assertSee('data-email-research-status="research_skipped"', false);
+        $response->assertSee('Skipped: Not enough meaningful content to research.', false);
+        $response->assertSee('Why research was skipped', false);
+        $response->assertSee('aria-controls="email-research-skip-reason-'.$thought->id.'"', false);
+        $response->assertSee('id="email-research-skip-reason-'.$thought->id.'"', false);
+        $response->assertSee('data-email-research-skip-reason', false);
+        $response->assertSee('data-email-research-skip-hover-bridge', false);
+        $response->assertDontSee('role="tooltip"', false);
+    }
+
+    public function test_skipped_status_without_reason_renders_only_badge_without_info_ui(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Skipped without reason',
+            'source' => 'email',
+            'source_metadata' => [
+                'newsletter_research' => [
+                    'status' => 'research_skipped',
+                    'reason' => '   ',
+                ],
+            ],
+        ]);
+
+        $index = $this->actingAs($user)->get(route('idea.index'));
+        $index->assertStatus(200);
+        $index->assertSee('data-email-research-status="research_skipped"', false);
+        $index->assertDontSee('Why research was skipped', false);
+        $index->assertDontSee('Skipped:', false);
+
+        $stream = $this->actingAs($user)->get(route('idea.stream'));
+        $stream->assertStatus(200);
+        $stream->assertSee('data-email-research-status="research_skipped"', false);
+        $stream->assertDontSee('Why research was skipped', false);
+        $stream->assertDontSee('Skipped:', false);
+    }
+
+    public function test_non_skipped_status_does_not_render_skipped_reason_ui(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Queued email',
+            'source' => 'email',
+            'source_metadata' => [
+                'newsletter_research' => [
+                    'status' => 'research_queued',
+                    'reason' => 'Not enough meaningful content to research.',
+                ],
+            ],
+        ]);
+
+        $index = $this->actingAs($user)->get(route('idea.index'));
+        $index->assertStatus(200);
+        $index->assertSee('data-email-research-status="research_queued"', false);
+        $index->assertDontSee('Why research was skipped', false);
+        $index->assertDontSee('Skipped:', false);
+
+        $stream = $this->actingAs($user)->get(route('idea.stream'));
+        $stream->assertStatus(200);
+        $stream->assertSee('data-email-research-status="research_queued"', false);
+        $stream->assertDontSee('Why research was skipped', false);
+        $stream->assertDontSee('Skipped:', false);
+    }
+
+    public function test_skipped_reason_is_escaped_in_rendered_output(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Escaping case',
+            'source' => 'email',
+            'source_metadata' => [
+                'newsletter_research' => [
+                    'status' => 'research_skipped',
+                    'reason' => '<script>alert(1)</script>',
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertStatus(200);
+        $response->assertDontSee('<script>alert(1)</script>', false);
+        $response->assertDontSee('Skipped: <script>alert(1)</script>', false);
+        $response->assertSee('Skipped: &lt;script&gt;alert(1)&lt;/script&gt;', false);
     }
 }
