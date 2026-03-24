@@ -101,9 +101,6 @@
                 Run newsletter research
             </button>
         </form>
-        @if (! empty($linkedResearchUrl))
-            <a href="{{ $linkedResearchUrl }}" class="block text-[13px] font-medium text-memory-violet hover:underline pt-1">View research</a>
-        @endif
     </div>
 
     @include('idea.partials.thought_detail_sender_rule_card', ['senderRuleContext' => $senderRuleContext])

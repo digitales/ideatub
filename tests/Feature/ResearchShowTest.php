@@ -12,6 +12,13 @@ class ResearchShowTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Blade layout loads Vite entrypoints; a fresh worktree may lack public/build/manifest.json.
+        $this->withoutVite();
+    }
+
     public function test_research_show_requires_authentication(): void
     {
         $user = User::factory()->create();
@@ -46,6 +53,43 @@ class ResearchShowTest extends TestCase
         $response->assertSee('bold', false);
         $response->assertSee('Back to Stream', false);
         $response->assertSee('Research', false);
+    }
+
+    public function test_research_show_still_renders_all_sections_after_shared_partial_refactor(): void
+    {
+        $user = User::factory()->create();
+        $rootBody = 'Research full-page guardrail root body unique rsrch-guard-1.';
+        $sectionBodies = [
+            'Research full-page guardrail section one unique rsrch-guard-2.',
+            'Research full-page guardrail section two unique rsrch-guard-3.',
+            'Research full-page guardrail section three unique rsrch-guard-4.',
+        ];
+
+        $root = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => "# Guardrail research title\n\n{$rootBody}",
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+        ]);
+
+        foreach ($sectionBodies as $body) {
+            Thought::factory()->create([
+                'user_id' => $user->id,
+                'parent_id' => $root->id,
+                'content' => "## Section\n\n{$body}",
+            ]);
+        }
+
+        $response = $this->actingAs($user)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $response->assertSee($rootBody, false);
+        foreach ($sectionBodies as $body) {
+            $response->assertSee($body, false);
+        }
     }
 
     public function test_research_show_redirects_to_parent_when_viewing_child_thought(): void
