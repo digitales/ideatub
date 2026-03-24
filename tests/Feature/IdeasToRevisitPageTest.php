@@ -37,6 +37,28 @@ class IdeasToRevisitPageTest extends TestCase
         $response->assertSee('No ideas to revisit');
     }
 
+    public function test_revisit_hides_idea_with_completed_at_even_if_completed_flag_false(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Has timestamp only',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => false,
+                'logged_date' => '2025-01-01',
+                'completed_at' => now()->toIso8601String(),
+            ],
+            'embedding' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.revisit'));
+
+        $response->assertStatus(200);
+        $response->assertSee('No ideas to revisit');
+        $response->assertDontSee('Has timestamp only');
+    }
+
     public function test_revisit_page_is_directly_accessible_and_shows_shared_secondary_nav_with_revisit_active(): void
     {
         $user = User::factory()->create();

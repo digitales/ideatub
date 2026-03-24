@@ -89,6 +89,33 @@ class IdeasToRevisitServiceTest extends TestCase
     }
 
     #[Test]
+    public function excludes_ideas_with_completed_at_even_when_completed_flag_is_false(): void
+    {
+        $user = User::factory()->create();
+        UserPreference::set($user, 'ideas_to_revisit_limit', 15);
+
+        $eligible = Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-01-01'],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => false,
+                'logged_date' => '2025-01-02',
+                'completed_at' => now()->toIso8601String(),
+            ],
+        ]);
+
+        $service = new IdeasToRevisitService;
+        $result = $service->forUser($user);
+
+        $this->assertCount(1, $result);
+        $this->assertSame($eligible->id, $result[0]->id);
+    }
+
+    #[Test]
     public function excludes_completed_ideas_only_incomplete_type_idea_returned(): void
     {
         $user = User::factory()->create();

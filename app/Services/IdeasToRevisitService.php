@@ -29,11 +29,7 @@ class IdeasToRevisitService
 
         $query = Thought::query()
             ->where('user_id', $user->id)
-            ->ideas()
-            ->where(function ($q): void {
-                $q->whereNull('metadata->completed')
-                    ->orWhere('metadata->completed', '!=', true);
-            });
+            ->incompleteIdeas();
 
         if ($minAgeDays !== null && $minAgeDays !== '') {
             $cutoff = Carbon::today()->subDays((int) $minAgeDays)->toDateString();
