@@ -66,6 +66,7 @@ class BackfillMailAccount implements ShouldQueue
             $run->save();
         } catch (InvalidMailAccountCredentialsException $exception) {
             $account->status = 'needs_reauth';
+            $account->last_synced_at = now();
             $account->save();
 
             $run->status = 'failed';
@@ -75,6 +76,9 @@ class BackfillMailAccount implements ShouldQueue
 
             return;
         } catch (Throwable $throwable) {
+            $account->last_synced_at = now();
+            $account->save();
+
             $run->status = 'failed';
             $run->finished_at = now();
             $run->error_summary = $throwable->getMessage();
