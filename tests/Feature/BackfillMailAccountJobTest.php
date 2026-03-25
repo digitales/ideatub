@@ -353,11 +353,48 @@ class BackfillMailAccountJobTest extends TestCase
             'id' => $account->id,
             'status' => 'needs_reauth',
         ]);
+        $this->assertNotNull($account->fresh()->last_synced_at);
+        $this->assertNull($account->fresh()->last_successful_sync_at);
         $this->assertDatabaseHas('mail_sync_runs', [
             'mail_account_id' => $account->id,
             'run_type' => 'backfill',
             'status' => 'failed',
             'error_summary' => 'Token revoked',
+        ]);
+    }
+
+    #[Test]
+    public function backfill_generic_failure_stamps_last_synced_at_but_not_last_successful_sync_at(): void
+    {
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+            'status' => 'active',
+        ]);
+
+        $connector = new class extends FastmailConnector
+        {
+            public function __construct() {}
+
+            public function fetchBackfillBatch(MailAccount $account, array $options): array
+            {
+                throw new RuntimeException('Provider exploded');
+            }
+        };
+        app()->instance(FastmailConnector::class, $connector);
+
+        try {
+            (new BackfillMailAccount($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
+        } catch (RuntimeException) {
+            // expected
+        }
+
+        $this->assertNotNull($account->fresh()->last_synced_at);
+        $this->assertNull($account->fresh()->last_successful_sync_at);
+        $this->assertDatabaseHas('mail_sync_runs', [
+            'mail_account_id' => $account->id,
+            'run_type' => 'backfill',
+            'status' => 'failed',
+            'error_summary' => 'Provider exploded',
         ]);
     }
 
@@ -390,11 +427,52 @@ class BackfillMailAccountJobTest extends TestCase
             'id' => $account->id,
             'status' => 'needs_reauth',
         ]);
+        $this->assertNotNull($account->fresh()->last_synced_at);
+        $this->assertNull($account->fresh()->last_successful_sync_at);
         $this->assertDatabaseHas('mail_sync_runs', [
             'mail_account_id' => $account->id,
             'run_type' => 'incremental',
             'status' => 'failed',
             'error_summary' => 'Token revoked',
+        ]);
+    }
+
+    #[Test]
+    public function incremental_generic_failure_stamps_last_synced_at_but_not_last_successful_sync_at(): void
+    {
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+            'status' => 'active',
+            'provider_checkpoint_json' => [
+                'query_state' => 'state-1',
+                'mailbox_id' => 'mb-inbox',
+            ],
+        ]);
+
+        $connector = new class extends FastmailConnector
+        {
+            public function __construct() {}
+
+            public function fetchIncrementalBatch(MailAccount $account): array
+            {
+                throw new RuntimeException('Provider exploded');
+            }
+        };
+        app()->instance(FastmailConnector::class, $connector);
+
+        try {
+            (new SyncMailAccountIncremental($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
+        } catch (RuntimeException) {
+            // expected
+        }
+
+        $this->assertNotNull($account->fresh()->last_synced_at);
+        $this->assertNull($account->fresh()->last_successful_sync_at);
+        $this->assertDatabaseHas('mail_sync_runs', [
+            'mail_account_id' => $account->id,
+            'run_type' => 'incremental',
+            'status' => 'failed',
+            'error_summary' => 'Provider exploded',
         ]);
     }
 
