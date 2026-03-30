@@ -606,6 +606,15 @@ Alpine.data('inboxPage', () => ({
     return null;
   },
 
+  nextAppliedRemainingCount(value) {
+    const parsed = this.parseRemainingCount(value);
+    if (parsed === null) return null;
+
+    // Concurrent removals can resolve out of order; never let a stale response
+    // raise the client-side actionable count again during this session.
+    return Math.min(this.inboxCount, parsed);
+  },
+
   storeReloadSuccess(message) {
     if (!message) return;
     try {
@@ -764,7 +773,7 @@ Alpine.data('inboxPage', () => ({
       }
 
       const previousInboxCount = this.inboxCount;
-      const remainingCount = this.parseRemainingCount(data.remaining_count);
+      const remainingCount = this.nextAppliedRemainingCount(data.remaining_count);
       if (remainingCount !== null) {
         this.applyRemainingCount(remainingCount);
       } else {
