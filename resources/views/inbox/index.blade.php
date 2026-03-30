@@ -3,7 +3,11 @@
 @section('title', 'Inbox — IdeaTub')
 
 @section('content')
-<div class="max-w-4xl mx-auto px-6 pt-16 pb-24">
+<div
+    class="max-w-4xl mx-auto px-6 pt-16 pb-24"
+    x-data="inboxPage()"
+    data-inbox-initial-count="{{ (int) ($inboxActionableCount ?? 0) }}"
+>
     @if (session('success'))
         <div class="mb-6 rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal">
             {{ session('success') }}
@@ -14,6 +18,9 @@
             {{ session('error') }}
         </div>
     @endif
+
+    <div x-show="flashSuccess" x-cloak class="mb-6 rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal" x-text="flashSuccess"></div>
+    <div x-show="flashError" x-cloak class="mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600" x-text="flashError"></div>
 
     <div class="mb-8">
         <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">Inbox</h1>
@@ -30,7 +37,7 @@
     @else
         <div class="space-y-4">
             @foreach ($items as $item)
-                <article class="rounded-2xl border border-memory-violet/20 bg-white/90 p-5 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+                <article data-inbox-item-id="{{ $item->id }}" class="rounded-2xl border border-memory-violet/20 bg-white/90 p-5 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-memory-violet/80">{{ str_replace('_', ' ', $item->generator_type) }}</p>
@@ -48,25 +55,25 @@
 
                     @if (($item->generator_type ?? '') === 'email_sender_review')
                         <div class="mt-4 flex flex-wrap gap-2">
-                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}">
+                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}" @submit.prevent="submitAction($event)">
                                 @csrf
                                 <input type="hidden" name="action" value="allow">
                                 <button type="submit" class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white">Allow sender</button>
                             </form>
 
-                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}">
+                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}" @submit.prevent="submitAction($event)">
                                 @csrf
                                 <input type="hidden" name="action" value="ignore">
                                 <button type="submit" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-brand">Ignore sender</button>
                             </form>
 
-                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}">
+                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}" @submit.prevent="submitAction($event)">
                                 @csrf
                                 <input type="hidden" name="action" value="extra_process">
                                 <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Extra process sender</button>
                             </form>
 
-                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}">
+                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}" @submit.prevent="submitAction($event)">
                                 @csrf
                                 <input type="hidden" name="action" value="save_thought">
                                 <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Save as thought</button>
@@ -74,24 +81,24 @@
                         </div>
                     @else
                         <div class="mt-4 flex flex-wrap gap-2">
-                            <form method="POST" action="{{ route('inbox.done', $item) }}">
+                            <form method="POST" action="{{ route('inbox.done', $item) }}" @submit.prevent="submitAction($event)">
                                 @csrf
                                 <button type="submit" class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white">Done</button>
                             </form>
 
-                            <form method="POST" action="{{ route('inbox.snooze', $item) }}">
+                            <form method="POST" action="{{ route('inbox.snooze', $item) }}" @submit.prevent="submitAction($event)">
                                 @csrf
                                 <input type="hidden" name="preset" value="tomorrow">
                                 <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-slate-brand">Tomorrow</button>
                             </form>
 
-                            <form method="POST" action="{{ route('inbox.snooze', $item) }}">
+                            <form method="POST" action="{{ route('inbox.snooze', $item) }}" @submit.prevent="submitAction($event)">
                                 @csrf
                                 <input type="hidden" name="preset" value="next_week">
                                 <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-slate-brand">Next week</button>
                             </form>
 
-                            <form method="POST" action="{{ route('inbox.save-thought', $item) }}">
+                            <form method="POST" action="{{ route('inbox.save-thought', $item) }}" @submit.prevent="submitAction($event)">
                                 @csrf
                                 <button type="submit" class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Save as thought</button>
                             </form>

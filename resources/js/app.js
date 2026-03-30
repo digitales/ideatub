@@ -543,6 +543,156 @@ Alpine.data('thoughtContentEditor', ({ content, updateUrl, editable = false, pre
   },
 }));
 
+Alpine.data('inboxPage', () => ({
+  flashSuccess: '',
+  flashError: '',
+  inboxCount: 0,
+
+  init() {
+    const raw = this.$el?.dataset?.inboxInitialCount;
+    this.inboxCount =
+      raw !== undefined && raw !== '' ? Number.parseInt(String(raw), 10) || 0 : 0;
+  },
+
+  get csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  },
+
+  accountMenuAriaLabel(count) {
+    const n = typeof count === 'number' ? count : Number.parseInt(String(count), 10) || 0;
+    if (n > 99) {
+      return 'Account menu, inbox has more than 99 actionable items';
+    }
+    if (n > 0) {
+      return `Account menu, inbox has ${n} actionable ${n === 1 ? 'item' : 'items'}`;
+    }
+    return 'Account menu';
+  },
+
+  applyRemainingCount(remaining) {
+    const count =
+      typeof remaining === 'number' ? remaining : Number.parseInt(String(remaining), 10) || 0;
+    this.inboxCount = count;
+
+    const avatarBtn = document.querySelector('[data-inbox-avatar-button]');
+    if (avatarBtn) {
+      avatarBtn.setAttribute('aria-label', this.accountMenuAriaLabel(count));
+    }
+
+    const badges = document.querySelectorAll('[data-inbox-badge]');
+    if (count <= 0) {
+      badges.forEach((el) => el.remove());
+      return;
+    }
+    const label = count > 99 ? '99+' : String(count);
+    badges.forEach((el) => {
+      el.textContent = label;
+    });
+  },
+
+  async submitAction(event) {
+    event.preventDefault();
+    const form = event.target;
+    if (!form || form.tagName !== 'FORM') {
+      return;
+    }
+
+    const submitter = event.submitter;
+    const usedSubmitter = submitter && submitter.matches('button[type="submit"]');
+
+    if (usedSubmitter) {
+      submitter.disabled = true;
+    }
+
+    const body = new FormData(form);
+    const url = form.getAttribute('action');
+    const token = body.get('_token') || this.csrfToken;
+
+    const reenable = () => {
+      if (usedSubmitter && submitter) {
+        submitter.disabled = false;
+      }
+    };
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        body,
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(token ? { 'X-CSRF-TOKEN': String(token) } : {}),
+        },
+      });
+
+      const ct = (res.headers.get('Content-Type') || '').toLowerCase();
+      const isJson = ct.includes('application/json');
+
+      if (res.ok && !isJson) {
+        window.location.href = window.location.href;
+        return;
+      }
+
+      let data = {};
+      if (isJson) {
+        try {
+          data = await res.json();
+        } catch {
+          data = {};
+        }
+      }
+
+      if (!res.ok) {
+        reenable();
+        this.flashError =
+          data.message ||
+          (res.status === 419
+            ? 'Session expired. Please refresh the page and try again.'
+            : 'Something went wrong. Please try again.');
+        this.flashSuccess = '';
+        return;
+      }
+
+      if (!data || data.ok !== true) {
+        window.location.href = window.location.href;
+        return;
+      }
+
+      const itemId = data.item_id;
+      if (itemId != null) {
+        const card = document.querySelector(`[data-inbox-item-id="${itemId}"]`);
+        if (card) {
+          card.remove();
+        }
+      }
+
+      const previousInboxCount = this.inboxCount;
+      if (typeof data.remaining_count === 'number') {
+        this.applyRemainingCount(data.remaining_count);
+      } else {
+        this.applyRemainingCount(Math.max(0, previousInboxCount - 1));
+      }
+
+      this.flashSuccess = data.message || 'Done.';
+      this.flashError = '';
+
+      const stillOnPage = document.querySelectorAll('[data-inbox-item-id]').length;
+      if (stillOnPage === 0) {
+        window.location.href = window.location.href;
+        return;
+      }
+
+      setTimeout(() => {
+        this.flashSuccess = '';
+      }, 4000);
+    } catch {
+      reenable();
+      this.flashError = 'Unable to complete action. Please try again.';
+      this.flashSuccess = '';
+    }
+  },
+}));
+
 Alpine.data('thoughtCardActions', (deleteUrl, thoughtId) => ({
   menuOpen: false,
   confirmOpen: false,
