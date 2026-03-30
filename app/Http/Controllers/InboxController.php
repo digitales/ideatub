@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\InboxItem;
+use App\Models\User;
 use App\Services\Email\EmailReviewActionService;
 use App\Services\Inbox\InboxActionService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -22,16 +24,25 @@ class InboxController extends Controller
         return view('inbox.index', ['items' => $items]);
     }
 
-    public function markDone(InboxItem $inboxItem, InboxActionService $actionService): RedirectResponse
+    public function markDone(Request $request, InboxItem $inboxItem, InboxActionService $actionService): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $inboxItem);
 
         $actionService->markDone($inboxItem);
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'message' => 'Inbox item marked done.',
+                'item_id' => $inboxItem->id,
+                'remaining_count' => $this->actionableInboxCountFor($request->user()),
+            ]);
+        }
+
         return redirect()->route('inbox.index')->with('success', 'Inbox item marked done.');
     }
 
-    public function snooze(Request $request, InboxItem $inboxItem, InboxActionService $actionService): RedirectResponse
+    public function snooze(Request $request, InboxItem $inboxItem, InboxActionService $actionService): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $inboxItem);
 
@@ -41,6 +52,15 @@ class InboxController extends Controller
 
         $actionService->snooze($inboxItem, $validated['preset']);
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'message' => 'Inbox item snoozed.',
+                'item_id' => $inboxItem->id,
+                'remaining_count' => $this->actionableInboxCountFor($request->user()),
+            ]);
+        }
+
         return redirect()->route('inbox.index')->with('success', 'Inbox item snoozed.');
     }
 
@@ -49,11 +69,14 @@ class InboxController extends Controller
         InboxItem $inboxItem,
         InboxActionService $actionService,
         EmailReviewActionService $reviewActionService,
-    ): RedirectResponse {
+    ): RedirectResponse|JsonResponse {
         $this->authorize('update', $inboxItem);
 
+        $isStandardSave = ($inboxItem->generator_type ?? '') !== 'email_sender_review';
+        $expectsJson = $request->expectsJson();
+
         try {
-            if (($inboxItem->generator_type ?? '') === 'email_sender_review') {
+            if (! $isStandardSave) {
                 $reviewActionService->saveReviewedEmailAsThought($inboxItem, $request->user());
             } else {
                 $actionService->saveAsThought($inboxItem);
@@ -61,7 +84,22 @@ class InboxController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
+            if ($expectsJson && $isStandardSave) {
+                return response()->json([
+                    'message' => 'Unable to save inbox item as a thought.',
+                ], 503);
+            }
+
             return redirect()->route('inbox.index')->with('error', 'Unable to save inbox item as a thought.');
+        }
+
+        if ($expectsJson && $isStandardSave) {
+            return response()->json([
+                'ok' => true,
+                'message' => 'Saved as thought.',
+                'item_id' => $inboxItem->id,
+                'remaining_count' => $this->actionableInboxCountFor($request->user()),
+            ]);
         }
 
         return redirect()->route('inbox.index')->with('success', 'Saved as thought.');
@@ -110,5 +148,13 @@ class InboxController extends Controller
         }
 
         return redirect()->route('inbox.index')->with('success', 'Sender classification saved.');
+    }
+
+    private function actionableInboxCountFor(User $user): int
+    {
+        return (int) InboxItem::query()
+            ->forUser($user)
+            ->actionable()
+            ->count();
     }
 }
