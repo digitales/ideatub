@@ -133,6 +133,37 @@ class IdeaPageTest extends TestCase
         $this->assertSame(0, $toggleInsideLink->length);
     }
 
+    public function test_idea_search_result_child_thought_does_not_get_preview_hooks(): void
+    {
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->with('reply preview gap')->andReturn($fakeEmbedding);
+        });
+
+        $parent = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Parent thought for reply search result',
+        ]);
+        $child = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $parent->id,
+            'content' => "Reply search result\nIDEATUB_REPLY_SCOPE_MARKER",
+            'embedding' => $fakeEmbedding,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index', ['q' => 'reply preview gap']));
+
+        $response->assertOk();
+        $response->assertSee('IDEATUB_REPLY_SCOPE_MARKER', false);
+
+        $xpath = $this->xpathFromResponse($response);
+        $card = $xpath->query('//*[@data-thought-id="'.$child->id.'"]')->item(0);
+        $this->assertNotNull($card);
+        $this->assertSame(0, $xpath->query('.//*[@data-thought-preview-region]', $card)->length);
+        $this->assertSame(0, $xpath->query('.//*[@data-thought-preview-toggle]', $card)->length);
+    }
+
     public function test_idea_page_recent_thoughts_exclude_jira(): void
     {
         $user = User::factory()->create();
