@@ -220,4 +220,27 @@ class IdeaIdeasTest extends TestCase
             $response->getContent(),
         );
     }
+
+    public function test_ideas_list_adds_safe_wrap_classes_for_long_card_content(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'https://advertise.tldr.tech/?utm_source=tldrai&utm_medium=newsletter&utm_campaign=advertisetopnav',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => false,
+                'logged_date' => '2025-03-01',
+                'tags' => ['https://links.tldrnewsletter.com/pRgBqs'],
+            ],
+            'embedding' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        $html = $response->getContent();
+        $this->assertStringContainsString('break-words [overflow-wrap:anywhere]', $html);
+        $this->assertStringContainsString('max-w-full break-words [overflow-wrap:anywhere]', $html);
+    }
 }

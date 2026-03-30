@@ -1,6 +1,6 @@
 @php
     $editable = $editable ?? (auth()->check() && auth()->id() === $thought->user_id);
-    $displayClass = $displayClass ?? 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line';
+    $displayClass = trim(($displayClass ?? 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line') . ' break-words [overflow-wrap:anywhere]');
     $editorClass = $editorClass ?? 'w-full text-[13.5px] text-deep-indigo leading-relaxed rounded-lg border border-memory-violet/20 focus:border-memory-violet focus:ring-memory-violet/20';
     $previewMaxLength = $previewMaxLength ?? null;
     $viewHref = $viewHref ?? null;

@@ -9,15 +9,15 @@
     $tags = is_array($thought->metadata ?? null) ? ($thought->metadata['tags'] ?? []) : [];
 @endphp
 <div
-    class="flex items-center gap-2 flex-wrap"
+    class="flex min-w-0 items-center gap-2 flex-wrap"
     x-data="thoughtTagRow({{ json_encode($tags) }}, '{{ e(route('ideas.update-tags', $thought)) }}', {{ $editable ? 'true' : 'false' }})"
     data-stream-base-url="{{ e(route('idea.stream')) }}"
 >
     <template x-for="(tag, index) in tags" :key="index">
-        <span class="inline-flex items-center gap-0.5">
+        <span class="inline-flex max-w-full items-center gap-0.5">
             <a
                 :href="streamBaseUrl + (streamBaseUrl.indexOf('?') !== -1 ? '&' : '?') + 'tag=' + slugify(tag)"
-                class="text-[10px] font-medium px-2 py-0.5 rounded-full hover:opacity-90"
+                class="max-w-full break-words [overflow-wrap:anywhere] text-[10px] font-medium px-2 py-0.5 rounded-full hover:opacity-90"
                 :class="tagPillClasses[index % 3]"
                 x-text="'#' + tag"
             ></a>
@@ -42,7 +42,7 @@
             >Edit</button>
         </template>
         <template x-if="editing">
-            <span class="inline-flex items-center gap-1.5 flex-wrap">
+            <span class="inline-flex min-w-0 items-center gap-1.5 flex-wrap">
                 <input
                     type="text"
                     x-ref="addInput"

@@ -23,9 +23,9 @@
             @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
         </div>
 
-        <div class="pr-8">
+        <div class="pr-8 min-w-0">
             @if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent)
-                <p class="text-[11px] text-slate-brand/50 mb-1">
+                <p class="text-[11px] text-slate-brand/50 mb-1 break-words [overflow-wrap:anywhere]">
                     Comment on: {{ Str::limit($thought->parent->content, 80) }}
                 </p>
             @endif
@@ -45,7 +45,7 @@
                     <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2" data-comments-list>
                         @foreach ($thought->comments as $comment)
                             <li>
-                                <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line">{{ Str::limit($comment->content, 200) }}</p>
+                                <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line break-words [overflow-wrap:anywhere]">{{ Str::limit($comment->content, 200) }}</p>
                                 <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
                             </li>
                         @endforeach
@@ -55,7 +55,7 @@
                 <ul class="comments-list mt-3 ml-3 pl-3 border-l border-memory-violet/15 space-y-2 hidden" data-comments-list aria-hidden="true"></ul>
             @endif
 
-            <div class="flex items-center gap-2 flex-wrap mt-2">
+            <div class="mt-2 flex min-w-0 items-center gap-2 flex-wrap">
                 <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
                 @include('idea.partials.thought_type_badge', ['thought' => $thought])
                 @include('idea.partials.email_newsletter_research_status', ['thought' => $thought])

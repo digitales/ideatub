@@ -385,6 +385,25 @@ class StreamPageTest extends TestCase
         $response->assertSee('data-stream-since="2026-03-20T12:00:00.000+0000"', false);
     }
 
+    public function test_stream_page_adds_safe_wrap_classes_for_long_card_content(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'https://a.tldrnewsletter.com/web-version?ep=1&lc=1b413ba4-f137-11ee-968d-21f49cdff0f5&p=a92b1a72-2c34-11f1-aae0-bfb3885f4da5&pt=campaign&t=1774879010&s=1576f251cc7b640509c29ebec53a68fbc4919111a43df01f92da39916b63e4b9',
+            'metadata' => [
+                'tags' => ['https://links.tldrnewsletter.com/kdBA4u'],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $html = $response->getContent();
+        $this->assertStringContainsString('break-words [overflow-wrap:anywhere]', $html);
+        $this->assertStringContainsString('max-w-full break-words [overflow-wrap:anywhere]', $html);
+    }
+
     private function assertStreamTypeNav(TestResponse $response, string $activeHref): void
     {
         $response->assertSee('data-testid="stream-type-nav"', false);

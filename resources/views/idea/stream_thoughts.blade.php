@@ -9,7 +9,7 @@
         <div class="absolute top-3 right-3">
             @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id, 'share' => $share])
         </div>
-        <div class="pr-8">
+        <div class="pr-8 min-w-0">
             @include('idea.partials.editable_thought_content', [
                 'thought' => $thought,
                 'editable' => auth()->check() && auth()->id() === $thought->user_id,
@@ -18,7 +18,7 @@
                 'viewLinkClass' => 'block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40',
             ])
 
-            <div class="flex items-center gap-2 flex-wrap mt-2">
+            <div class="mt-2 flex min-w-0 items-center gap-2 flex-wrap">
                 @if($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
                     <a href="{{ route('idea.research.show', $thought) }}" class="text-[10.5px] font-medium text-memory-violet hover:underline">View formatted</a>
                 @endif
@@ -49,7 +49,7 @@
                     <ul class="ml-3 pl-3 border-l border-memory-violet/15 space-y-2">
                         @foreach ($thought->comments as $comment)
                             <li>
-                                <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line">{{ $showFullSections ?? false ? $comment->content : Str::limit($comment->content, 200) }}</p>
+                                <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line break-words [overflow-wrap:anywhere]">{{ $showFullSections ?? false ? $comment->content : Str::limit($comment->content, 200) }}</p>
                                 <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
                             </li>
                         @endforeach
