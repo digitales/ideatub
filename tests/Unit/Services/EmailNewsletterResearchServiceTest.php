@@ -14,6 +14,7 @@ use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtChunkingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use League\CommonMark\CommonMarkConverter;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -108,6 +109,57 @@ class EmailNewsletterResearchServiceTest extends TestCase
         $this->assertSame('Weekly digest', $rsm['email_subject'] ?? null);
         $this->assertSame('Digest <digest@example.com>', $rsm['email_sender'] ?? null);
         $this->assertSame('digest@example.com', $rsm['sender_email'] ?? null);
+    }
+
+    #[Test]
+    public function newsletter_body_text_with_markdown_like_separators_stays_literal_when_rendered(): void
+    {
+        config(['app.name' => 'TestAppNewsletter']);
+        $this->bindOpenRouterMocks();
+
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'prov-msg-markdown-literal-1',
+            'direction' => 'received',
+            'subject' => 'Newsletter markdown literal',
+            'body_text' => "View this post on the web at https://example.com/post\n\nPermanent plus Access to My Skills Repo\n---\n\nOn March 11th, Anthropic slipped Skills into the sidebars of Excel and PowerPoint.\n\nThis trailing paragraph keeps the body long enough for research generation.",
+            'from_json' => [['email' => 'digest@example.com', 'name' => 'Digest']],
+            'processing_status' => 'research_queued',
+            'rule_action' => 'extra_process',
+            'rule_email' => 'digest@example.com',
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'sender_rule_action' => 'extra_process',
+            ],
+        ]);
+
+        $yt = Mockery::mock(YouTubeTranscriptService::class);
+        $yt->shouldReceive('fetchForUrl')->never();
+        $this->app->instance(YouTubeTranscriptService::class, $yt);
+
+        $result = app(EmailNewsletterResearchService::class)->createFromEmailThought(
+            $emailThought,
+            $imported,
+            'fastmail',
+            [],
+        );
+
+        $this->assertSame('created', $result['status']);
+
+        $html = (new CommonMarkConverter)->convert($result['research_thought']->content)->getContent();
+
+        $this->assertStringContainsString('Permanent plus Access to My Skills Repo', $html);
+        $this->assertStringNotContainsString('<h2>Permanent plus Access to My Skills Repo</h2>', $html);
+        $this->assertStringContainsString('On March 11th, Anthropic slipped Skills into the sidebars of Excel and PowerPoint.', $html);
     }
 
     #[Test]

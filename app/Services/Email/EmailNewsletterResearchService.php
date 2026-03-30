@@ -260,7 +260,7 @@ class EmailNewsletterResearchService
         $lines[] = '';
         $lines[] = '## Email content';
         $lines[] = '';
-        $lines[] = $body !== '' ? $body : '_No body text was available._';
+        $lines[] = $body !== '' ? $this->renderLiteralTextBlock($body) : '_No body text was available._';
         $lines[] = '';
         $lines[] = '## YouTube transcripts';
         $lines[] = '';
@@ -273,7 +273,7 @@ class EmailNewsletterResearchService
                 $lines[] = '### '.$url;
                 $lines[] = '';
                 if (($r['ok'] ?? false) === true && isset($r['transcript']) && is_string($r['transcript'])) {
-                    $lines[] = $r['transcript'];
+                    $lines[] = $this->renderLiteralTextBlock($r['transcript']);
                 } else {
                     $reason = is_string($r['reason'] ?? null) ? $r['reason'] : 'unknown';
                     $lines[] = '_Transcript unavailable ('.$reason.')_';
@@ -289,6 +289,29 @@ class EmailNewsletterResearchService
         }
 
         return trim(implode("\n", $lines));
+    }
+
+    private function renderLiteralTextBlock(string $text): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", trim($text));
+        if ($normalized === '') {
+            return '';
+        }
+
+        $paragraphs = preg_split("/\n{2,}/", $normalized) ?: [];
+        $html = [];
+
+        foreach ($paragraphs as $paragraph) {
+            $paragraph = trim($paragraph, "\n");
+            if ($paragraph === '') {
+                continue;
+            }
+
+            $escaped = e($paragraph);
+            $html[] = '<p>'.str_replace("\n", "<br />\n", $escaped).'</p>';
+        }
+
+        return implode("\n\n", $html);
     }
 
     private function resolveSenderEmail(ImportedEmail|CapturedInboundEmail $storedEmail): string
