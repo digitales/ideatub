@@ -547,6 +547,8 @@ Alpine.data('inboxPage', () => ({
   flashSuccess: '',
   flashError: '',
   inboxCount: 0,
+  activeRequestKey: '',
+  activeItemId: null,
 
   init() {
     const raw = this.$el?.dataset?.inboxInitialCount;
@@ -628,6 +630,30 @@ Alpine.data('inboxPage', () => ({
     }
   },
 
+  requestContextFor(form) {
+    const itemEl = form.closest('[data-inbox-item-id]');
+    const itemId = itemEl?.dataset?.inboxItemId || null;
+    const actionValue =
+      form.querySelector('input[name="action"]')?.value ||
+      form.querySelector('input[name="preset"]')?.value ||
+      form.getAttribute('action') ||
+      'submit';
+
+    return {
+      itemId,
+      requestKey: `${itemId || 'page'}:${actionValue}`,
+    };
+  },
+
+  firstFieldError(errors) {
+    if (!errors || typeof errors !== 'object') return '';
+    for (const value of Object.values(errors)) {
+      if (Array.isArray(value) && value[0]) return String(value[0]);
+      if (typeof value === 'string' && value) return value;
+    }
+    return '';
+  },
+
   async submitAction(event) {
     event.preventDefault();
     const form = event.target;
@@ -635,11 +661,23 @@ Alpine.data('inboxPage', () => ({
       return;
     }
 
+    const { itemId, requestKey } = this.requestContextFor(form);
+    if (this.activeRequestKey === requestKey || (itemId !== null && this.activeItemId === itemId)) {
+      return;
+    }
+
     const submitter = event.submitter;
     const usedSubmitter = submitter && submitter.matches('button[type="submit"]');
+    const fallbackButtons = usedSubmitter ? [] : Array.from(form.querySelectorAll('button[type="submit"]'));
 
+    this.activeRequestKey = requestKey;
+    this.activeItemId = itemId;
     if (usedSubmitter) {
       submitter.disabled = true;
+    } else {
+      fallbackButtons.forEach((button) => {
+        button.disabled = true;
+      });
     }
 
     const body = new FormData(form);
@@ -651,6 +689,11 @@ Alpine.data('inboxPage', () => ({
       if (usedSubmitter && submitter) {
         submitter.disabled = false;
       }
+      fallbackButtons.forEach((button) => {
+        button.disabled = false;
+      });
+      this.activeRequestKey = '';
+      this.activeItemId = null;
     };
 
     const reloadCurrentPage = () => {
@@ -687,11 +730,18 @@ Alpine.data('inboxPage', () => ({
       }
 
       if (!res.ok) {
-        this.flashError =
-          data.message ||
-          (res.status === 419
-            ? 'Session expired. Please refresh the page and try again.'
-            : 'Something went wrong. Please try again.');
+        if (res.status === 419) {
+          this.flashError = 'Session expired. Please refresh the page and try again.';
+        } else if (res.status === 401 || res.status === 403) {
+          this.flashError = 'Please sign in again.';
+        } else if (res.status === 422) {
+          this.flashError =
+            this.firstFieldError(data.errors) ||
+            data.message ||
+            'Something went wrong. Please try again.';
+        } else {
+          this.flashError = data.message || 'Something went wrong. Please try again.';
+        }
         this.flashSuccess = '';
         return;
       }

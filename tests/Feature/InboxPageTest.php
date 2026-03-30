@@ -35,6 +35,7 @@ class InboxPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('No inbox items right now.');
+        $response->assertSee('data-inbox-initial-count="0"', false);
     }
 
     public function test_inbox_shows_only_actionable_items_for_current_user(): void
