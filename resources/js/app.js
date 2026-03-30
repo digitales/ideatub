@@ -543,6 +543,266 @@ Alpine.data('thoughtContentEditor', ({ content, updateUrl, editable = false, pre
   },
 }));
 
+Alpine.data('inboxPage', () => ({
+  flashSuccess: '',
+  flashError: '',
+  inboxCount: 0,
+  activeRequestKey: '',
+  activeItemId: null,
+  nextCountRequestSequence: 0,
+  lastAppliedCountRequestSequence: 0,
+
+  init() {
+    const raw = this.$el?.dataset?.inboxInitialCount;
+    this.inboxCount =
+      raw !== undefined && raw !== '' ? Number.parseInt(String(raw), 10) || 0 : 0;
+    this.consumeReloadSuccess();
+  },
+
+  get csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  },
+
+  get reloadSuccessKey() {
+    return `ideatub:inbox-success:${window.location.pathname}${window.location.search}`;
+  },
+
+  accountMenuAriaLabel(count) {
+    const n = typeof count === 'number' ? count : Number.parseInt(String(count), 10) || 0;
+    if (n > 99) {
+      return 'Account menu, inbox has more than 99 actionable items';
+    }
+    if (n > 0) {
+      return `Account menu, inbox has ${n} actionable ${n === 1 ? 'item' : 'items'}`;
+    }
+    return 'Account menu';
+  },
+
+  applyRemainingCount(remaining) {
+    const count =
+      typeof remaining === 'number' ? remaining : Number.parseInt(String(remaining), 10) || 0;
+    this.inboxCount = count;
+
+    const avatarBtn = document.querySelector('[data-inbox-avatar-button]');
+    if (avatarBtn) {
+      avatarBtn.setAttribute('aria-label', this.accountMenuAriaLabel(count));
+    }
+
+    const badges = document.querySelectorAll('[data-inbox-badge]');
+    if (count <= 0) {
+      badges.forEach((el) => el.remove());
+      return;
+    }
+    const label = count > 99 ? '99+' : String(count);
+    badges.forEach((el) => {
+      el.textContent = label;
+    });
+  },
+
+  parseRemainingCount(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  },
+
+  shouldApplyCountUpdate(requestSequence) {
+    return requestSequence >= this.lastAppliedCountRequestSequence;
+  },
+
+  storeReloadSuccess(message) {
+    if (!message) return;
+    try {
+      window.sessionStorage.setItem(this.reloadSuccessKey, message);
+    } catch {
+      // ignore storage failures and fall back to reload without flash
+    }
+  },
+
+  consumeReloadSuccess() {
+    try {
+      const message = window.sessionStorage.getItem(this.reloadSuccessKey);
+      if (!message) return;
+      this.flashSuccess = message;
+      this.flashError = '';
+      window.sessionStorage.removeItem(this.reloadSuccessKey);
+      setTimeout(() => {
+        this.flashSuccess = '';
+      }, 4000);
+    } catch {
+      // ignore storage failures
+    }
+  },
+
+  requestContextFor(form) {
+    const itemEl = form.closest('[data-inbox-item-id]');
+    const itemId = itemEl?.dataset?.inboxItemId || null;
+    const actionValue =
+      form.querySelector('input[name="action"]')?.value ||
+      form.querySelector('input[name="preset"]')?.value ||
+      form.getAttribute('action') ||
+      'submit';
+
+    return {
+      itemId,
+      requestKey: `${itemId || 'page'}:${actionValue}`,
+    };
+  },
+
+  firstFieldError(errors) {
+    if (!errors || typeof errors !== 'object') return '';
+    for (const value of Object.values(errors)) {
+      if (Array.isArray(value) && value[0]) return String(value[0]);
+      if (typeof value === 'string' && value) return value;
+    }
+    return '';
+  },
+
+  async submitAction(event) {
+    event.preventDefault();
+    const form = event.target;
+    if (!form || form.tagName !== 'FORM') {
+      return;
+    }
+
+    const { itemId, requestKey } = this.requestContextFor(form);
+    if (this.activeRequestKey === requestKey || (itemId !== null && this.activeItemId === itemId)) {
+      return;
+    }
+
+    const submitter = event.submitter;
+    const usedSubmitter = submitter && submitter.matches('button[type="submit"]');
+    const fallbackButtons = usedSubmitter ? [] : Array.from(form.querySelectorAll('button[type="submit"]'));
+
+    this.activeRequestKey = requestKey;
+    this.activeItemId = itemId;
+    if (usedSubmitter) {
+      submitter.disabled = true;
+    } else {
+      fallbackButtons.forEach((button) => {
+        button.disabled = true;
+      });
+    }
+
+    const body = new FormData(form);
+    const url = form.getAttribute('action');
+    const token = body.get('_token') || this.csrfToken;
+    const requestSequence = ++this.nextCountRequestSequence;
+    let navigating = false;
+
+    const reenable = () => {
+      if (usedSubmitter && submitter) {
+        submitter.disabled = false;
+      }
+      fallbackButtons.forEach((button) => {
+        button.disabled = false;
+      });
+      this.activeRequestKey = '';
+      this.activeItemId = null;
+    };
+
+    const reloadCurrentPage = () => {
+      navigating = true;
+      window.location.href = window.location.href;
+    };
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        body,
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(token ? { 'X-CSRF-TOKEN': String(token) } : {}),
+        },
+      });
+
+      const ct = (res.headers.get('Content-Type') || '').toLowerCase();
+      const isJson = ct.includes('application/json');
+
+      if (res.ok && !isJson) {
+        reloadCurrentPage();
+        return;
+      }
+
+      let data = {};
+      if (isJson) {
+        try {
+          data = await res.json();
+        } catch {
+          data = {};
+        }
+      }
+
+      if (!res.ok) {
+        if (res.status === 419) {
+          this.flashError = 'Session expired. Please refresh the page and try again.';
+        } else if (res.status === 401 || res.status === 403) {
+          this.flashError = 'Please sign in again.';
+        } else if (res.status === 422) {
+          this.flashError =
+            this.firstFieldError(data.errors) ||
+            data.message ||
+            'Something went wrong. Please try again.';
+        } else {
+          this.flashError = data.message || 'Something went wrong. Please try again.';
+        }
+        this.flashSuccess = '';
+        return;
+      }
+
+      if (!data || data.ok !== true) {
+        reloadCurrentPage();
+        return;
+      }
+
+      const itemId = data.item_id;
+      if (itemId == null) {
+        this.storeReloadSuccess(data.message || 'Done.');
+        reloadCurrentPage();
+        return;
+      }
+
+      const card = document.querySelector(`[data-inbox-item-id="${itemId}"]`);
+      if (card) {
+        card.remove();
+      }
+
+      if (this.shouldApplyCountUpdate(requestSequence)) {
+        const previousInboxCount = this.inboxCount;
+        const remainingCount = this.parseRemainingCount(data.remaining_count);
+        if (remainingCount !== null) {
+          this.applyRemainingCount(remainingCount);
+        } else {
+          this.applyRemainingCount(Math.max(0, previousInboxCount - 1));
+        }
+        this.lastAppliedCountRequestSequence = requestSequence;
+      }
+
+      this.flashSuccess = data.message || 'Done.';
+      this.flashError = '';
+
+      const stillOnPage = document.querySelectorAll('[data-inbox-item-id]').length;
+      if (stillOnPage === 0) {
+        this.storeReloadSuccess(this.flashSuccess);
+        reloadCurrentPage();
+        return;
+      }
+
+      setTimeout(() => {
+        this.flashSuccess = '';
+      }, 4000);
+    } catch {
+      this.flashError = 'Unable to complete action. Please try again.';
+      this.flashSuccess = '';
+    } finally {
+      if (!navigating) reenable();
+    }
+  },
+}));
+
 Alpine.data('thoughtCardActions', (deleteUrl, thoughtId) => ({
   menuOpen: false,
   confirmOpen: false,
