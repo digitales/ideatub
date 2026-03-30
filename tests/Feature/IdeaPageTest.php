@@ -102,6 +102,37 @@ class IdeaPageTest extends TestCase
         $response->assertSee(route('thoughts.show', $thought), false);
     }
 
+    public function test_idea_index_feed_long_main_thought_has_preview_hooks_and_toggle_outside_detail_link(): void
+    {
+        $user = User::factory()->create();
+        $lines = array_fill(0, 25, 'This is a line of main thought body text that helps exceed fifteen lines when rendered.');
+        $uniqueTail = 'IDEATUB_PREVIEW_CLAMP_TAIL_MARKER';
+        $longContent = implode("\n", $lines)."\n".$uniqueTail;
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => $longContent,
+            'parent_id' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        $key = 'thought-preview-'.$thought->id;
+        $response->assertSee('data-thought-preview-region="'.$key.'"', false);
+        $response->assertSee('data-thought-preview-toggle="'.$key.'"', false);
+        $response->assertSee('line-clamp-[15]', false);
+        $response->assertSee('break-words [overflow-wrap:anywhere]', false);
+        $response->assertSee('id="'.$key.'"', false);
+        $response->assertSee('previewMode: true', false);
+        $response->assertSee($uniqueTail, false);
+
+        $xpath = $this->xpathFromResponse($response);
+        $card = $xpath->query('//*[@data-thought-id="'.$thought->id.'"]')->item(0);
+        $this->assertNotNull($card);
+        $toggleInsideLink = $xpath->query('.//a//button[@data-thought-preview-toggle]', $card);
+        $this->assertSame(0, $toggleInsideLink->length);
+    }
+
     public function test_idea_page_recent_thoughts_exclude_jira(): void
     {
         $user = User::factory()->create();

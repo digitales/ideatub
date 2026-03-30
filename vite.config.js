@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 
@@ -11,4 +12,8 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    test: {
+        environment: 'node',
+        include: ['resources/js/**/*.test.js'],
+    },
 });
