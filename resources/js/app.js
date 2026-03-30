@@ -552,10 +552,15 @@ Alpine.data('inboxPage', () => ({
     const raw = this.$el?.dataset?.inboxInitialCount;
     this.inboxCount =
       raw !== undefined && raw !== '' ? Number.parseInt(String(raw), 10) || 0 : 0;
+    this.consumeReloadSuccess();
   },
 
   get csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  },
+
+  get reloadSuccessKey() {
+    return `ideatub:inbox-success:${window.location.pathname}${window.location.search}`;
   },
 
   accountMenuAriaLabel(count) {
@@ -590,6 +595,39 @@ Alpine.data('inboxPage', () => ({
     });
   },
 
+  parseRemainingCount(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return null;
+  },
+
+  storeReloadSuccess(message) {
+    if (!message) return;
+    try {
+      window.sessionStorage.setItem(this.reloadSuccessKey, message);
+    } catch {
+      // ignore storage failures and fall back to reload without flash
+    }
+  },
+
+  consumeReloadSuccess() {
+    try {
+      const message = window.sessionStorage.getItem(this.reloadSuccessKey);
+      if (!message) return;
+      this.flashSuccess = message;
+      this.flashError = '';
+      window.sessionStorage.removeItem(this.reloadSuccessKey);
+      setTimeout(() => {
+        this.flashSuccess = '';
+      }, 4000);
+    } catch {
+      // ignore storage failures
+    }
+  },
+
   async submitAction(event) {
     event.preventDefault();
     const form = event.target;
@@ -607,11 +645,17 @@ Alpine.data('inboxPage', () => ({
     const body = new FormData(form);
     const url = form.getAttribute('action');
     const token = body.get('_token') || this.csrfToken;
+    let navigating = false;
 
     const reenable = () => {
       if (usedSubmitter && submitter) {
         submitter.disabled = false;
       }
+    };
+
+    const reloadCurrentPage = () => {
+      navigating = true;
+      window.location.href = window.location.href;
     };
 
     try {
@@ -629,7 +673,7 @@ Alpine.data('inboxPage', () => ({
       const isJson = ct.includes('application/json');
 
       if (res.ok && !isJson) {
-        window.location.href = window.location.href;
+        reloadCurrentPage();
         return;
       }
 
@@ -643,7 +687,6 @@ Alpine.data('inboxPage', () => ({
       }
 
       if (!res.ok) {
-        reenable();
         this.flashError =
           data.message ||
           (res.status === 419
@@ -654,21 +697,26 @@ Alpine.data('inboxPage', () => ({
       }
 
       if (!data || data.ok !== true) {
-        window.location.href = window.location.href;
+        reloadCurrentPage();
         return;
       }
 
       const itemId = data.item_id;
-      if (itemId != null) {
-        const card = document.querySelector(`[data-inbox-item-id="${itemId}"]`);
-        if (card) {
-          card.remove();
-        }
+      if (itemId == null) {
+        this.storeReloadSuccess(data.message || 'Done.');
+        reloadCurrentPage();
+        return;
+      }
+
+      const card = document.querySelector(`[data-inbox-item-id="${itemId}"]`);
+      if (card) {
+        card.remove();
       }
 
       const previousInboxCount = this.inboxCount;
-      if (typeof data.remaining_count === 'number') {
-        this.applyRemainingCount(data.remaining_count);
+      const remainingCount = this.parseRemainingCount(data.remaining_count);
+      if (remainingCount !== null) {
+        this.applyRemainingCount(remainingCount);
       } else {
         this.applyRemainingCount(Math.max(0, previousInboxCount - 1));
       }
@@ -678,7 +726,8 @@ Alpine.data('inboxPage', () => ({
 
       const stillOnPage = document.querySelectorAll('[data-inbox-item-id]').length;
       if (stillOnPage === 0) {
-        window.location.href = window.location.href;
+        this.storeReloadSuccess(this.flashSuccess);
+        reloadCurrentPage();
         return;
       }
 
@@ -686,9 +735,10 @@ Alpine.data('inboxPage', () => ({
         this.flashSuccess = '';
       }, 4000);
     } catch {
-      reenable();
       this.flashError = 'Unable to complete action. Please try again.';
       this.flashSuccess = '';
+    } finally {
+      if (!navigating) reenable();
     }
   },
 }));

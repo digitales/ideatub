@@ -70,6 +70,7 @@ class InboxPageTest extends TestCase
         $response->assertSee('Inbox');
         $response->assertSee('Visible item');
         $response->assertSee('data-inbox-item-id=', false);
+        $response->assertSee('data-inbox-initial-count="1"', false);
         $response->assertDontSee('Action buttons are added in Chunk 3.');
         $response->assertDontSee('Future snoozed item');
         $response->assertDontSee('Other users item');

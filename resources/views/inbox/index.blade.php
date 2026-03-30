@@ -6,7 +6,7 @@
 <div
     class="max-w-4xl mx-auto px-6 pt-16 pb-24"
     x-data="inboxPage()"
-    data-inbox-initial-count="{{ (int) ($inboxActionableCount ?? 0) }}"
+    data-inbox-initial-count="{{ $inboxInitialCount ?? 0 }}"
 >
     @if (session('success'))
         <div class="mb-6 rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal">

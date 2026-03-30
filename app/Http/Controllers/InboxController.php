@@ -21,7 +21,10 @@ class InboxController extends Controller
             ->orderByDesc('generated_at')
             ->paginate(20);
 
-        return view('inbox.index', ['items' => $items]);
+        return view('inbox.index', [
+            'items' => $items,
+            'inboxInitialCount' => (int) $items->total(),
+        ]);
     }
 
     public function markDone(Request $request, InboxItem $inboxItem, InboxActionService $actionService): RedirectResponse|JsonResponse
