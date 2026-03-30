@@ -105,7 +105,7 @@ class InboxController extends Controller
         return redirect()->route('inbox.index')->with('success', 'Saved as thought.');
     }
 
-    public function applyEmailReviewAction(Request $request, InboxItem $inboxItem, EmailReviewActionService $reviewActionService): RedirectResponse
+    public function applyEmailReviewAction(Request $request, InboxItem $inboxItem, EmailReviewActionService $reviewActionService): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $inboxItem);
 
@@ -113,13 +113,30 @@ class InboxController extends Controller
             'action' => 'required|in:allow,ignore,extra_process,save_thought',
         ]);
 
+        $expectsJson = $request->expectsJson();
+
         if ($validated['action'] === 'save_thought') {
             try {
                 $reviewActionService->saveReviewedEmailAsThought($inboxItem, $request->user());
             } catch (\Throwable $e) {
                 report($e);
 
+                if ($expectsJson) {
+                    return response()->json([
+                        'message' => 'Unable to save inbox item as a thought.',
+                    ], 503);
+                }
+
                 return redirect()->route('inbox.index')->with('error', 'Unable to save inbox item as a thought.');
+            }
+
+            if ($expectsJson) {
+                return response()->json([
+                    'ok' => true,
+                    'message' => 'Saved as thought.',
+                    'item_id' => $inboxItem->id,
+                    'remaining_count' => $this->actionableInboxCountFor($request->user()),
+                ]);
             }
 
             return redirect()->route('inbox.index')->with('success', 'Saved as thought.');
@@ -130,10 +147,25 @@ class InboxController extends Controller
         } catch (\InvalidArgumentException $e) {
             report($e);
 
+            if ($expectsJson) {
+                return response()->json([
+                    'message' => 'Unable to apply sender classification.',
+                ], 422);
+            }
+
             return redirect()->route('inbox.index')->with('error', 'Unable to apply sender classification.');
         }
 
         if (! $applied) {
+            if ($expectsJson) {
+                return response()->json([
+                    'ok' => true,
+                    'message' => 'Sender classification was already handled.',
+                    'item_id' => $inboxItem->id,
+                    'remaining_count' => $this->actionableInboxCountFor($request->user()),
+                ]);
+            }
+
             return redirect()->route('inbox.index')->with('success', 'Sender classification was already handled.');
         }
 
@@ -143,8 +175,26 @@ class InboxController extends Controller
             } catch (\Throwable $e) {
                 report($e);
 
+                if ($expectsJson) {
+                    return response()->json([
+                        'ok' => true,
+                        'message' => 'Sender rule saved. Could not import email as a thought.',
+                        'item_id' => $inboxItem->id,
+                        'remaining_count' => $this->actionableInboxCountFor($request->user()),
+                    ]);
+                }
+
                 return redirect()->route('inbox.index')->with('success', 'Sender rule saved. Could not import email as a thought.');
             }
+        }
+
+        if ($expectsJson) {
+            return response()->json([
+                'ok' => true,
+                'message' => 'Sender classification saved.',
+                'item_id' => $inboxItem->id,
+                'remaining_count' => $this->actionableInboxCountFor($request->user()),
+            ]);
         }
 
         return redirect()->route('inbox.index')->with('success', 'Sender classification saved.');
