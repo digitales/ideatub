@@ -131,6 +131,20 @@ class EmailResearchControllerTest extends TestCase
             'source_metadata' => ['newsletter_research' => ['status' => 'research_completed']],
         ]);
         $email = $this->attachImportedEmail($user, $thought);
+        $previousResearchThoughtId = $email->research_thought_id;
+        $this->assertNotNull($previousResearchThoughtId);
+
+        $staleSummary = ThoughtLinkSummary::factory()->create([
+            'user_id' => $user->id,
+            'source_thought_id' => $thought->id,
+            'parent_research_thought_id' => $previousResearchThoughtId,
+        ]);
+        $otherParentThought = Thought::factory()->create(['user_id' => $user->id]);
+        $unrelatedSummary = ThoughtLinkSummary::factory()->create([
+            'user_id' => $user->id,
+            'source_thought_id' => $thought->id,
+            'parent_research_thought_id' => $otherParentThought->id,
+        ]);
 
         $response = $this->actingAs($user)
             ->post(route('emails.newsletter-research', $thought));
@@ -147,48 +161,20 @@ class EmailResearchControllerTest extends TestCase
         $this->assertSame('prior failure', $email->failure_reason);
         $thought->refresh();
         $this->assertNull(data_get($thought->source_metadata, 'newsletter_research'));
-        Event::assertNotDispatched(IdeaResearchRequested::class);
-    }
-
-    public function test_newsletter_research_deletes_stale_thought_link_summaries_for_prior_research_thought(): void
-    {
-        Queue::fake();
-
-        $user = User::factory()->create();
-        $thought = $this->makeEmailThought($user, [
-            'source_metadata' => ['newsletter_research' => ['status' => 'research_completed']],
-        ]);
-        $email = $this->attachImportedEmail($user, $thought);
-        $previousResearchThoughtId = $email->research_thought_id;
-        $this->assertNotNull($previousResearchThoughtId);
-
-        $staleSummary = ThoughtLinkSummary::factory()->create([
-            'user_id' => $user->id,
-            'source_thought_id' => $thought->id,
-            'parent_research_thought_id' => $previousResearchThoughtId,
-        ]);
-
-        $otherParentThought = Thought::factory()->create(['user_id' => $user->id]);
-        $unrelatedSummary = ThoughtLinkSummary::factory()->create([
-            'user_id' => $user->id,
-            'source_thought_id' => $thought->id,
-            'parent_research_thought_id' => $otherParentThought->id,
-        ]);
-
-        $response = $this->actingAs($user)
-            ->post(route('emails.newsletter-research', $thought));
-
-        $response->assertRedirect();
         $this->assertDatabaseMissing('thought_link_summaries', ['id' => $staleSummary->id]);
         $this->assertDatabaseHas('thought_link_summaries', ['id' => $unrelatedSummary->id]);
+        Event::assertNotDispatched(IdeaResearchRequested::class);
     }
 
     public function test_newsletter_research_requeues_for_captured_inbound_email(): void
     {
         Queue::fake();
+        Event::fake();
 
         $user = User::factory()->create();
-        $thought = $this->makeEmailThought($user);
+        $thought = $this->makeEmailThought($user, [
+            'source_metadata' => ['newsletter_research' => ['status' => 'research_failed']],
+        ]);
         // Use a real Thought ID to satisfy any FK constraint on research_thought_id.
         $priorResearch = Thought::factory()->create(['user_id' => $user->id]);
         $captured = CapturedInboundEmail::query()->create([
@@ -201,6 +187,17 @@ class EmailResearchControllerTest extends TestCase
             'thought_id' => $thought->id,
             'research_thought_id' => $priorResearch->id,
         ]);
+        $staleSummary = ThoughtLinkSummary::factory()->create([
+            'user_id' => $user->id,
+            'source_thought_id' => $thought->id,
+            'parent_research_thought_id' => $priorResearch->id,
+        ]);
+        $otherParentThought = Thought::factory()->create(['user_id' => $user->id]);
+        $unrelatedSummary = ThoughtLinkSummary::factory()->create([
+            'user_id' => $user->id,
+            'source_thought_id' => $thought->id,
+            'parent_research_thought_id' => $otherParentThought->id,
+        ]);
 
         $this->actingAs($user)
             ->post(route('emails.newsletter-research', $thought))
@@ -212,6 +209,11 @@ class EmailResearchControllerTest extends TestCase
         $captured->refresh();
         $this->assertSame('research_queued', $captured->processing_status);
         $this->assertNull($captured->research_thought_id);
+        $thought->refresh();
+        $this->assertNull(data_get($thought->source_metadata, 'newsletter_research'));
+        $this->assertDatabaseMissing('thought_link_summaries', ['id' => $staleSummary->id]);
+        $this->assertDatabaseHas('thought_link_summaries', ['id' => $unrelatedSummary->id]);
+        Event::assertNotDispatched(IdeaResearchRequested::class);
     }
 
     public function test_newsletter_research_returns_404_when_no_email_row(): void
