@@ -188,6 +188,23 @@ class StreamPageTest extends TestCase
         $response->assertDontSee('web%20development', false);
     }
 
+    public function test_stream_tag_slug_handles_colon_delimited_document_tags(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Imported newsletter research',
+            'metadata' => ['tags' => ['research:newsletter-imported-625']],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream', ['tag' => 'research_newsletter_imported_625']));
+
+        $response->assertStatus(200);
+        $response->assertSee('Imported newsletter research');
+        $response->assertSee('research:newsletter-imported-625', false);
+        $response->assertDontSee('No thoughts with tag');
+    }
+
     public function test_stream_link_in_nav(): void
     {
         $user = User::factory()->create();

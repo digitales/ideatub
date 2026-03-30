@@ -13,6 +13,7 @@ use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
+use App\Support\TagSlug;
 use App\Support\IdeaCompletedAtSql;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -1213,7 +1214,7 @@ class IdeaController extends Controller
             ->values();
 
         foreach ($tags as $t) {
-            if (Str::slug($t, '_') === $tagSlug) {
+            if (TagSlug::from((string) $t) === $tagSlug) {
                 return $t;
             }
         }
