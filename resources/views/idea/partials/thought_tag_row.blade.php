@@ -16,7 +16,7 @@
     <template x-for="(tag, index) in tags" :key="index">
         <span class="inline-flex max-w-full items-center gap-0.5">
             <a
-                :href="streamBaseUrl + (streamBaseUrl.indexOf('?') !== -1 ? '&' : '?') + 'tag=' + slugify(tag)"
+                :href="streamBaseUrl + (streamBaseUrl.indexOf('?') !== -1 ? '&' : '?') + 'tag=' + tagSlug(tag)"
                 class="max-w-full break-words [overflow-wrap:anywhere] text-[10px] font-medium px-2 py-0.5 rounded-full hover:opacity-90"
                 :class="tagPillClasses[index % 3]"
                 x-text="'#' + tag"

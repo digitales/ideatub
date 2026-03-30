@@ -385,7 +385,8 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl, editable = false) => ({
     this.editable = editable !== undefined ? !!editable : false;
   },
 
-  slugify(tag) {
+  // Keep URL slug behavior aligned with App\Support\TagSlug::from().
+  tagSlug(tag) {
     return String(tag)
       .toLowerCase()
       .trim()
