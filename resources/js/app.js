@@ -1,4 +1,5 @@
 import './bootstrap';
+import { shouldShowReadMoreToggle } from './lib/thoughtPreview.js';
 import Alpine from 'alpinejs';
 import Pusher from 'pusher-js';
 import Echo from 'laravel-echo';
@@ -458,16 +459,77 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl, editable = false) => ({
   },
 }));
 
-Alpine.data('thoughtContentEditor', ({ content, updateUrl, editable = false, previewMaxLength = null }) => ({
+Alpine.data('thoughtContentEditor', ({ content, updateUrl, editable = false, previewMaxLength = null, previewMode = false }) => ({
   content: content || '',
   originalContent: content || '',
   draftContent: content || '',
   updateUrl: updateUrl || '',
   editable: !!editable,
   previewMaxLength: previewMaxLength == null || previewMaxLength === '' ? null : Number(previewMaxLength),
+  previewMode: !!previewMode,
+  previewExpanded: false,
+  previewHasOverflow: false,
   editing: false,
   saving: false,
   error: '',
+  _previewResizeHandler: null,
+
+  init() {
+    if (!this.previewMode) return;
+    this._previewResizeHandler = () => this.measurePreviewOverflow();
+    window.addEventListener('resize', this._previewResizeHandler);
+    this.$nextTick(() => {
+      this.$nextTick(() => this.measurePreviewOverflow());
+    });
+    this.$watch('editing', (isEditing) => {
+      if (!isEditing && this.previewMode) {
+        this.previewExpanded = false;
+        this.$nextTick(() => this.measurePreviewOverflow());
+      }
+    });
+    this.$watch('content', () => {
+      if (this.previewMode && !this.editing) {
+        this.$nextTick(() => this.measurePreviewOverflow());
+      }
+    });
+  },
+
+  destroy() {
+    if (this._previewResizeHandler) {
+      window.removeEventListener('resize', this._previewResizeHandler);
+      this._previewResizeHandler = null;
+    }
+  },
+
+  measurePreviewOverflow() {
+    if (!this.previewMode || this.editing) {
+      this.previewHasOverflow = false;
+      return;
+    }
+    const el = this.$refs.previewRegion;
+    if (!el) return;
+    if (this.previewExpanded) {
+      const wasExpanded = true;
+      this.previewExpanded = false;
+      this.$nextTick(() => {
+        const region = this.$refs.previewRegion;
+        if (region) {
+          this.previewHasOverflow = shouldShowReadMoreToggle(region.scrollHeight, region.clientHeight);
+        }
+        this.previewExpanded = wasExpanded;
+      });
+      return;
+    }
+    this.previewHasOverflow = shouldShowReadMoreToggle(el.scrollHeight, el.clientHeight);
+  },
+
+  togglePreviewExpanded() {
+    if (!this.previewMode) return;
+    this.previewExpanded = !this.previewExpanded;
+    if (!this.previewExpanded) {
+      this.$nextTick(() => this.measurePreviewOverflow());
+    }
+  },
 
   get viewContent() {
     if (this.previewMaxLength == null || Number.isNaN(this.previewMaxLength) || this.previewMaxLength <= 0) {
