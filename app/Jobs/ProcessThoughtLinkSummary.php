@@ -24,6 +24,8 @@ class ProcessThoughtLinkSummary implements ShouldQueue
 
     public int $backoff = 60;
 
+    public int $timeout = 180;
+
     public function __construct(
         public readonly int $thoughtLinkSummaryId,
     ) {}

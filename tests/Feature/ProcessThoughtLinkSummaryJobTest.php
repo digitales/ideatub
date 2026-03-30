@@ -46,6 +46,7 @@ class ProcessThoughtLinkSummaryJobTest extends TestCase
 
         $this->assertSame(3, $job->tries);
         $this->assertSame(60, $job->backoff);
+        $this->assertSame(180, $job->timeout);
     }
 
     #[Test]
