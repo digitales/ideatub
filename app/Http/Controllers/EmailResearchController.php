@@ -7,9 +7,8 @@ use App\Jobs\ProcessExtraEmailResearch;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\Thought;
-use App\Models\ThoughtLinkSummary;
+use App\Services\Email\ResetNewsletterResearchState;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
 
 class EmailResearchController extends Controller
 {
@@ -37,7 +36,7 @@ class EmailResearchController extends Controller
      * Re-trigger newsletter research on an email thought.
      * Resets processing state so ProcessExtraEmailResearch can run cleanly.
      */
-    public function newsletterResearch(Thought $thought): RedirectResponse
+    public function newsletterResearch(Thought $thought, ResetNewsletterResearchState $resetNewsletterResearchState): RedirectResponse
     {
         $this->authorize('update', $thought);
 
@@ -55,27 +54,7 @@ class EmailResearchController extends Controller
         $isImported = $stored instanceof ImportedEmail;
         $storedId = $stored->id;
 
-        DB::transaction(function () use ($stored, $thought): void {
-            $previousResearchThoughtId = $stored->research_thought_id;
-
-            // Reset so the job's research_thought_id guard does not bail early.
-            $stored->processing_status = 'research_queued';
-            $stored->research_thought_id = null;
-            $stored->save();
-
-            if ($previousResearchThoughtId !== null) {
-                ThoughtLinkSummary::query()
-                    ->where('source_thought_id', $thought->id)
-                    ->where('parent_research_thought_id', $previousResearchThoughtId)
-                    ->delete();
-            }
-
-            // Clear stale status from the thought so the badge resets.
-            $meta = $thought->source_metadata ?? [];
-            unset($meta['newsletter_research']);
-            $thought->source_metadata = $meta;
-            $thought->save();
-        });
+        $resetNewsletterResearchState->reset($thought, $stored);
 
         // Dispatch after the transaction commits so the job sees committed state.
         if ($isImported) {
