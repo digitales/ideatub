@@ -162,6 +162,7 @@ class OpenRouterServiceTest extends TestCase
                 return false;
             }
             $userMessage = $this->getUserMessageContent($request);
+
             return $userMessage !== null
                 && str_contains($userMessage, 'Topic/idea to research')
                 && str_contains($userMessage, 'build a small SaaS.')
@@ -173,7 +174,7 @@ class OpenRouterServiceTest extends TestCase
     public function research_note_uses_template_file_when_available(): void
     {
         $template = 'Idea to research: {{idea}}. Prior: {{existing_research}}.';
-        $tempPath = sys_get_temp_dir() . '/ideatub_research_prompt_' . uniqid() . '.md';
+        $tempPath = sys_get_temp_dir().'/ideatub_research_prompt_'.uniqid().'.md';
         file_put_contents($tempPath, $template);
 
         try {
@@ -240,6 +241,48 @@ class OpenRouterServiceTest extends TestCase
 
             return $userMessage !== null
                 && ! str_contains($userMessage, 'Existing research: .');
+        });
+    }
+
+    #[Test]
+    public function summarize_link_truncates_multibyte_text_without_breaking_utf8(): void
+    {
+        $json = json_encode([
+            'title' => 'Article headline',
+            'summary_text' => 'Two sentence summary of the page.',
+            'support_judgment' => 'supports',
+            'why_it_matters' => 'Useful for editorial review.',
+            'quality_notes' => null,
+            'usefulness_score' => 70,
+        ], JSON_THROW_ON_ERROR);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => $json,
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $fetchedText = 'a'.str_repeat('界', 4000);
+
+        $this->service->summarizeLink(
+            fetchedTitle: 'UTF-8 title',
+            fetchedText: $fetchedText,
+            sourceExcerpt: 'Newsletter context.',
+        );
+
+        Http::assertSent(function ($request) {
+            $userMessage = $this->getUserMessageContent($request);
+
+            return $userMessage !== null
+                && mb_check_encoding($userMessage, 'UTF-8')
+                && str_contains($userMessage, 'UTF-8 title')
+                && str_contains($userMessage, 'Newsletter context.');
         });
     }
 

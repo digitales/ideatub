@@ -6,6 +6,7 @@ use App\Events\IdeaResearchRequested;
 use App\Models\CapturedInboundEmail;
 use App\Models\ResearchShare;
 use App\Models\Thought;
+use App\Models\ThoughtLinkSummary;
 use App\Services\Email\ThoughtEmailSenderContextResolver;
 use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
@@ -17,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -808,13 +810,147 @@ class IdeaController extends Controller
         });
 
         $relatedEmail = $this->resolveResearchRelatedEmailCard($thought);
+        $editorialLinkSummaries = $this->buildResearchEditorialLinkSummaryViewModel($thought);
 
         return view('idea.research_show', [
             'root' => $thought,
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
             'relatedEmail' => $relatedEmail,
+            'editorialLinkSummaries' => $editorialLinkSummaries,
         ]);
+    }
+
+    /**
+     * View model for editorial link summaries on the research page: grouped by newsletter section, ordered by usefulness.
+     *
+     * @return array{
+     *     show: bool,
+     *     sections: list<array{label: string, section_order: int, items: list<array<string, mixed>}>},
+     *     pending_count: int,
+     *     failed_count: int
+     * }
+     */
+    private function buildResearchEditorialLinkSummaryViewModel(Thought $root): array
+    {
+        $rows = ThoughtLinkSummary::query()
+            ->where('parent_research_thought_id', $root->id)
+            ->where('user_id', $root->user_id)
+            ->get();
+
+        $editorial = $rows->filter(fn (ThoughtLinkSummary $row) => $row->classification === 'editorial')->values();
+
+        $pendingCount = $editorial
+            ->filter(fn (ThoughtLinkSummary $row) => in_array($row->processing_status, ['queued', 'fetching'], true))
+            ->count();
+        $failedCount = $editorial
+            ->filter(fn (ThoughtLinkSummary $row) => $row->processing_status === 'failed')
+            ->count();
+
+        $show = $editorial->isNotEmpty() || $pendingCount > 0 || $failedCount > 0;
+
+        if (! $show) {
+            return [
+                'show' => false,
+                'sections' => [],
+                'pending_count' => 0,
+                'failed_count' => 0,
+            ];
+        }
+
+        $groups = $editorial->groupBy(fn (ThoughtLinkSummary $row) => $row->newsletter_section_label ?? '');
+
+        $sections = $groups
+            ->map(function (Collection $items, string $labelKey) {
+                $minOrder = $items->pluck('newsletter_section_order')->filter(fn ($v) => $v !== null)->min();
+                $sectionOrder = $minOrder === null ? PHP_INT_MAX : (int) $minOrder;
+                $displayLabel = $labelKey === '' ? 'Other links' : $labelKey;
+
+                $sortedItems = $items
+                    ->sort(fn (ThoughtLinkSummary $a, ThoughtLinkSummary $b) => $this->compareEditorialLinkSummariesForDisplay($a, $b))
+                    ->values();
+
+                $mappedItems = $sortedItems
+                    ->map(fn (ThoughtLinkSummary $row) => $this->mapEditorialLinkSummaryRowForResearchView($row))
+                    ->all();
+
+                return [
+                    'label' => $displayLabel,
+                    'section_order' => $sectionOrder,
+                    'items' => $mappedItems,
+                ];
+            })
+            ->values()
+            ->sortBy('section_order')
+            ->values()
+            ->all();
+
+        return [
+            'show' => true,
+            'sections' => $sections,
+            'pending_count' => $pendingCount,
+            'failed_count' => $failedCount,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapEditorialLinkSummaryRowForResearchView(ThoughtLinkSummary $row): array
+    {
+        $title = $row->resolved_title;
+        if ($title === null || trim($title) === '') {
+            $title = $row->original_url;
+        }
+
+        return [
+            'title' => $title,
+            'url' => $row->original_url,
+            'summary_text' => $row->summary_text,
+            'relation_label' => $row->support_judgment,
+            'why_it_matters' => $row->why_it_matters,
+            'quality_notes' => $row->quality_notes,
+            'processing_status' => $row->processing_status,
+        ];
+    }
+
+    private function compareEditorialLinkSummariesForDisplay(ThoughtLinkSummary $a, ThoughtLinkSummary $b): int
+    {
+        $scoreA = $a->usefulness_score;
+        $scoreB = $b->usefulness_score;
+
+        if ($scoreA === null && $scoreB === null) {
+            return $this->compareEditorialLinkSummarySectionRank($a, $b);
+        }
+        if ($scoreA === null) {
+            return 1;
+        }
+        if ($scoreB === null) {
+            return -1;
+        }
+        if ($scoreA !== $scoreB) {
+            return $scoreB <=> $scoreA;
+        }
+
+        return $this->compareEditorialLinkSummarySectionRank($a, $b);
+    }
+
+    private function compareEditorialLinkSummarySectionRank(ThoughtLinkSummary $a, ThoughtLinkSummary $b): int
+    {
+        $rankA = $a->section_rank;
+        $rankB = $b->section_rank;
+
+        if ($rankA === null && $rankB === null) {
+            return 0;
+        }
+        if ($rankA === null) {
+            return 1;
+        }
+        if ($rankB === null) {
+            return -1;
+        }
+
+        return $rankA <=> $rankB;
     }
 
     /**

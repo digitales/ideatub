@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Jobs\ProcessExtraEmailResearch;
+use App\Jobs\ProcessThoughtLinkSummary;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\MailAccount;
 use App\Models\Thought;
+use App\Models\ThoughtLinkSummary;
 use App\Models\User;
 use App\Services\Email\EmailLinkExtractor;
 use App\Services\Email\EmailNewsletterResearchService;
@@ -16,6 +18,7 @@ use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtChunkingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -92,12 +95,14 @@ class ProcessExtraEmailResearchJobTest extends TestCase
         $this->assertSame('research_completed', $imported->processing_status);
         $this->assertSame('research_completed', $imported->processing_metadata_json['newsletter_research']['status'] ?? null);
         $this->assertSame('research_completed', $emailThought->source_metadata['newsletter_research']['status'] ?? null);
+        $this->assertIsString($emailThought->source_metadata['newsletter_research']['research_thought_id'] ?? null);
         $this->assertSame($imported->research_thought_id, $emailThought->source_metadata['newsletter_research']['research_thought_id'] ?? null);
 
         $research = Thought::query()->find($imported->research_thought_id);
         $this->assertNotNull($research);
         $this->assertSame('research', $research->source);
         $this->assertStringContainsString('Newsletter subject', $research->content);
+        $this->assertStringNotContainsString('## Extracted links', $research->content);
         $rsm = $research->source_metadata ?? [];
         $this->assertSame($emailThought->id, $rsm['email_thought_id'] ?? null);
         $this->assertSame('Newsletter subject', $rsm['email_subject'] ?? null);
@@ -337,6 +342,104 @@ class ProcessExtraEmailResearchJobTest extends TestCase
     }
 
     #[Test]
+    public function retry_with_existing_research_thought_backfills_missing_link_summary_rows_and_jobs(): void
+    {
+        config(['app.name' => 'JobTestApp']);
+        $this->bindOpenRouterMocks();
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $body = str_repeat('Retry-safe newsletter body paragraph. ', 20)."\n\n".<<<'TXT'
+HEADLINES & LAUNCHES
+
+First read: https://editorial-one.example.com/p/a
+
+DEEP DIVES & ANALYSIS
+
+Second read: https://editorial-two.example.com/p/b
+TXT;
+
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'job-msg-retry-backfill-1',
+            'direction' => 'received',
+            'subject' => 'Retryable newsletter',
+            'body_text' => $body,
+            'from_json' => [['email' => 'retry@example.com', 'name' => 'Retry']],
+            'processing_status' => 'research_queued',
+            'rule_action' => 'extra_process',
+            'processing_metadata_json' => [
+                'extracted_links' => [
+                    ['url' => 'https://editorial-one.example.com/p/a', 'type' => 'generic'],
+                    ['url' => 'https://editorial-two.example.com/p/b', 'type' => 'generic'],
+                ],
+            ],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'sender_rule_action' => 'extra_process',
+            ],
+        ]);
+
+        $imported->thought_id = $emailThought->id;
+        $imported->save();
+
+        $yt = Mockery::mock(YouTubeTranscriptService::class);
+        $yt->shouldReceive('fetchForUrl')->never();
+        $this->app->instance(YouTubeTranscriptService::class, $yt);
+
+        $result = app(EmailNewsletterResearchService::class)->createFromEmailThought(
+            $emailThought,
+            $imported,
+            'fastmail',
+            $imported->processing_metadata_json['extracted_links'],
+        );
+
+        $researchThought = $result['research_thought'];
+        $this->assertInstanceOf(Thought::class, $researchThought);
+        $this->assertDatabaseCount('thought_link_summaries', 0);
+
+        $countBeforeRetry = Thought::query()
+            ->where('user_id', $user->id)
+            ->where('source', 'research')
+            ->count();
+
+        $job = new ProcessExtraEmailResearch(importedEmailId: $imported->id);
+        $job->handle(
+            app(EmailNewsletterResearchService::class),
+            app(EmailLinkExtractor::class),
+        );
+
+        $imported->refresh();
+        $emailThought->refresh();
+
+        $this->assertSame($researchThought->id, $imported->research_thought_id);
+        $this->assertSame(
+            $countBeforeRetry,
+            Thought::query()->where('user_id', $user->id)->where('source', 'research')->count()
+        );
+        $this->assertSame('research_completed', $emailThought->source_metadata['newsletter_research']['status'] ?? null);
+        $this->assertIsString($emailThought->source_metadata['newsletter_research']['research_thought_id'] ?? null);
+        $this->assertSame($researchThought->id, $emailThought->source_metadata['newsletter_research']['research_thought_id'] ?? null);
+
+        Queue::assertPushed(ProcessThoughtLinkSummary::class, 2);
+
+        $rows = ThoughtLinkSummary::query()
+            ->where('parent_research_thought_id', $researchThought->id)
+            ->orderBy('newsletter_section_order')
+            ->get();
+
+        $this->assertCount(2, $rows);
+    }
+
+    #[Test]
     public function overlapping_run_with_existing_lock_releases_job_for_retry(): void
     {
         config(['app.name' => 'JobTestApp']);
@@ -398,5 +501,184 @@ class ProcessExtraEmailResearchJobTest extends TestCase
         $this->assertSame('research_queued', $imported->processing_status);
         $this->assertDatabaseCount('thoughts', 1);
         $this->assertSame([60], $job->releasedDelays);
+    }
+
+    #[Test]
+    public function job_dispatches_link_summary_jobs_and_persists_section_metadata_for_multi_link_newsletters(): void
+    {
+        config(['app.name' => 'JobTestApp']);
+        $this->bindOpenRouterMocks();
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $body = str_repeat('Newsletter narrative paragraph. ', 25)."\n\n".<<<'TXT'
+HEADLINES & LAUNCHES
+
+Read this story: https://editorial-one.example.com/p/a
+
+Another angle: https://editorial-three.example.com/p/c
+
+DEEP DIVES & ANALYSIS
+
+Long read: https://editorial-two.example.com/p/b
+TXT;
+
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'job-msg-link-summaries-1',
+            'direction' => 'received',
+            'subject' => 'Multi-link newsletter',
+            'body_text' => $body,
+            'from_json' => [['email' => 'news@example.com', 'name' => 'News']],
+            'processing_status' => 'research_queued',
+            'rule_action' => 'extra_process',
+            'processing_metadata_json' => [
+                'extracted_links' => [
+                    ['url' => 'https://editorial-one.example.com/p/a', 'type' => 'generic'],
+                    ['url' => 'https://editorial-three.example.com/p/c', 'type' => 'generic'],
+                    ['url' => 'https://editorial-two.example.com/p/b', 'type' => 'generic'],
+                ],
+            ],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'sender_rule_action' => 'extra_process',
+            ],
+        ]);
+
+        $imported->thought_id = $emailThought->id;
+        $imported->save();
+
+        $yt = Mockery::mock(YouTubeTranscriptService::class);
+        $yt->shouldReceive('fetchForUrl')->never();
+        $this->app->instance(YouTubeTranscriptService::class, $yt);
+
+        $job = new ProcessExtraEmailResearch(importedEmailId: $imported->id);
+        $job->handle(
+            app(EmailNewsletterResearchService::class),
+            app(EmailLinkExtractor::class),
+        );
+
+        $imported->refresh();
+        $research = Thought::query()->find($imported->research_thought_id);
+        $this->assertNotNull($research);
+
+        Queue::assertPushed(ProcessThoughtLinkSummary::class, 3);
+
+        $rows = ThoughtLinkSummary::query()
+            ->where('parent_research_thought_id', $research->id)
+            ->orderBy('newsletter_section_order')
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(3, $rows);
+        $this->assertSame('imported_email', $rows[0]->stored_email_type);
+        $this->assertSame($imported->id, (int) $rows[0]->stored_email_id);
+        $this->assertSame(1, (int) $rows[0]->newsletter_section_order);
+        $this->assertSame('HEADLINES & LAUNCHES', $rows[0]->newsletter_section_label);
+        $this->assertSame('https://editorial-one.example.com/p/a', $rows[0]->original_url);
+        $this->assertSame('editorial', $rows[0]->classification);
+        $this->assertSame(1, (int) $rows[0]->section_rank);
+        $this->assertSame(1, (int) $rows[1]->newsletter_section_order);
+        $this->assertSame('HEADLINES & LAUNCHES', $rows[1]->newsletter_section_label);
+        $this->assertSame('https://editorial-three.example.com/p/c', $rows[1]->original_url);
+        $this->assertSame('editorial', $rows[1]->classification);
+        $this->assertSame(2, (int) $rows[1]->section_rank);
+        $this->assertSame(2, (int) $rows[2]->newsletter_section_order);
+        $this->assertSame('DEEP DIVES & ANALYSIS', $rows[2]->newsletter_section_label);
+        $this->assertSame('https://editorial-two.example.com/p/b', $rows[2]->original_url);
+        $this->assertSame('editorial', $rows[2]->classification);
+        $this->assertSame(1, (int) $rows[2]->section_rank);
+    }
+
+    #[Test]
+    public function job_persists_sponsor_link_rows_without_dispatching_their_summarization_jobs(): void
+    {
+        config(['app.name' => 'JobTestApp']);
+        $this->bindOpenRouterMocks();
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $body = str_repeat('Intro body for length. ', 30)."\n\n".<<<'TXT'
+HEADLINES & LAUNCHES
+
+Editorial pick: https://editorial.example.com/story-one
+
+TOGETHER WITH DATAVIZ CO
+
+This placement is labeled (SPONSOR). Try their dashboard: https://sponsor.example.com/start
+
+DEEP DIVES & ANALYSIS
+
+Another editorial link https://editorial.example.com/story-two
+TXT;
+
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'job-msg-sponsor-skip-1',
+            'direction' => 'received',
+            'subject' => 'Sponsor block newsletter',
+            'body_text' => $body,
+            'from_json' => [['email' => 'news@example.com', 'name' => 'News']],
+            'processing_status' => 'research_queued',
+            'rule_action' => 'extra_process',
+            'processing_metadata_json' => [
+                'extracted_links' => [
+                    ['url' => 'https://editorial.example.com/story-one', 'type' => 'generic'],
+                    ['url' => 'https://sponsor.example.com/start', 'type' => 'generic'],
+                    ['url' => 'https://editorial.example.com/story-two', 'type' => 'generic'],
+                ],
+            ],
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'sender_rule_action' => 'extra_process',
+            ],
+        ]);
+
+        $imported->thought_id = $emailThought->id;
+        $imported->save();
+
+        $yt = Mockery::mock(YouTubeTranscriptService::class);
+        $yt->shouldReceive('fetchForUrl')->never();
+        $this->app->instance(YouTubeTranscriptService::class, $yt);
+
+        $job = new ProcessExtraEmailResearch(importedEmailId: $imported->id);
+        $job->handle(
+            app(EmailNewsletterResearchService::class),
+            app(EmailLinkExtractor::class),
+        );
+
+        $imported->refresh();
+        $research = Thought::query()->find($imported->research_thought_id);
+        $this->assertNotNull($research);
+
+        Queue::assertPushed(ProcessThoughtLinkSummary::class, 2);
+
+        $rows = ThoughtLinkSummary::query()
+            ->where('parent_research_thought_id', $research->id)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(3, $rows);
+
+        $sponsor = $rows->firstWhere('normalized_url', 'https://sponsor.example.com/start');
+        $this->assertNotNull($sponsor);
+        $this->assertSame('sponsor', $sponsor->classification);
+        $this->assertSame('excluded', $sponsor->processing_status);
     }
 }
