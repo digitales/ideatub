@@ -121,6 +121,7 @@ Route::middleware('auth')->group(function () {
     // Ideas list and store
     Route::get('/ideas', [IdeaController::class, 'ideas'])->name('idea.ideas');
     Route::get('/ideas/revisit', [IdeaController::class, 'revisit'])->name('idea.revisit');
+    Route::get('/ideas/completed', [IdeaController::class, 'completed'])->name('idea.completed');
     Route::post('/ideas', [IdeaController::class, 'storeIdea'])->name('ideas.store');
     Route::patch('/ideas/{thought}/completed', [IdeaController::class, 'toggleCompleted'])->name('ideas.toggle-completed');
     Route::patch('/ideas/{thought}/tags', [IdeaController::class, 'updateTags'])->name('ideas.update-tags');

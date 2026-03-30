@@ -126,6 +126,9 @@
                     @if ($latestRun)
                         <p class="mt-1 text-xs text-slate-brand/80">
                             Latest sync: {{ $latestRun->status }}
+                            @if ($mailAccount->last_synced_at)
+                                &mdash; {{ $mailAccount->last_synced_at->diffForHumans() }}
+                            @endif
                         </p>
                     @endif
                 </div>

@@ -126,10 +126,10 @@
                 {{-- Avatar / logout --}}
                 @auth
                     <div x-data="{ open: false }" class="relative ml-1">
-                        <button type="button" @click="open = !open" aria-haspopup="true" :aria-expanded="open.toString()" aria-label="{{$accountMenuLabel}}" class="relative w-8 h-8 rounded-full text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0" style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);">
+                        <button type="button" data-inbox-avatar-button @click="open = !open" aria-haspopup="true" :aria-expanded="open.toString()" aria-label="{{$accountMenuLabel}}" class="relative w-8 h-8 rounded-full text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0" style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);">
                             {{strtoupper(substr(auth()->user()->name ?? auth()->user()->email, 0, 2))}}
                             @if($inboxCount > 0)
-                                <span data-testid="avatar-inbox-badge" aria-hidden="true" class="pointer-events-none absolute -right-1 -top-1 inline-flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-memory-violet px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white">
+                                <span data-inbox-badge data-testid="avatar-inbox-badge" aria-hidden="true" class="pointer-events-none absolute -right-1 -top-1 inline-flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-memory-violet px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white">
                                     {{$inboxCount > 99 ? '99+' : $inboxCount}}
                                 </span>
                             @endif
@@ -138,7 +138,7 @@
                             <a href="{{route('inbox.index')}}" data-testid="account-menu-inbox-link" class="flex items-center justify-between gap-3 px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                                 <span>Inbox</span>
                                 @if($inboxCount > 0)
-                                    <span data-testid="account-menu-inbox-badge" aria-hidden="true" class="inline-flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-memory-violet px-1 text-[9px] font-bold leading-none text-white">
+                                    <span data-inbox-badge data-testid="account-menu-inbox-badge" aria-hidden="true" class="inline-flex min-h-[1rem] min-w-[1rem] items-center justify-center rounded-full bg-memory-violet px-1 text-[9px] font-bold leading-none text-white">
                                         {{$inboxCount > 99 ? '99+' : $inboxCount}}
                                     </span>
                                 @endif

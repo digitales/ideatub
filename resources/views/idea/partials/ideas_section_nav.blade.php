@@ -16,4 +16,9 @@
         class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors {{ $active === 'revisit' ? 'bg-memory-violet/15 text-deep-indigo' : 'text-slate-brand/70 hover:text-deep-indigo' }}"
         @if ($active === 'revisit') aria-current="page" @endif
     >Ideas to revisit</a>
+    <a
+        href="{{ route('idea.completed') }}"
+        class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors {{ $active === 'completed' ? 'bg-memory-violet/15 text-deep-indigo' : 'text-slate-brand/70 hover:text-deep-indigo' }}"
+        @if ($active === 'completed') aria-current="page" @endif
+    >Completed ideas</a>
 </nav>

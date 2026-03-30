@@ -140,6 +140,161 @@ class InboxActionsTest extends TestCase
         $this->actingAs($other)->post(route('inbox.save-thought', $item))->assertForbidden();
     }
 
+    public function test_json_mark_done_success(): void
+    {
+        $user = User::factory()->create();
+        $item = InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'dedupe_key' => 'json-done-item',
+            'snoozed_until' => now()->addDay(),
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.done', $item));
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Inbox item marked done.',
+                'item_id' => $item->id,
+                'remaining_count' => 0,
+            ]);
+        $item->refresh();
+        $this->assertSame('done', $item->status);
+    }
+
+    public function test_json_snooze_success(): void
+    {
+        $user = User::factory()->create();
+        $item = InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'dedupe_key' => 'json-snooze-item',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.snooze', $item), [
+            'preset' => 'tomorrow',
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Inbox item snoozed.',
+                'item_id' => $item->id,
+                'remaining_count' => 0,
+            ]);
+        $item->refresh();
+        $this->assertNotNull($item->snoozed_until);
+    }
+
+    public function test_json_mark_done_remaining_count_when_another_actionable_item_remains(): void
+    {
+        $user = User::factory()->create();
+        $first = InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'dedupe_key' => 'json-done-first',
+        ]);
+        InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'dedupe_key' => 'json-done-second',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.done', $first));
+
+        $response->assertOk()
+            ->assertJson([
+                'remaining_count' => 1,
+                'item_id' => $first->id,
+            ]);
+    }
+
+    public function test_json_invalid_snooze_preset_returns_validation_error(): void
+    {
+        $user = User::factory()->create();
+        $item = InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'dedupe_key' => 'json-invalid-snooze-item',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.snooze', $item), [
+            'preset' => 'later',
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['preset']);
+        $this->assertDatabaseMissing('inbox_item_actions', [
+            'inbox_item_id' => $item->id,
+            'action_type' => 'snooze',
+        ]);
+    }
+
+    public function test_json_save_as_thought_success(): void
+    {
+        $this->fakeOpenRouterForThoughtCapture();
+
+        $user = User::factory()->create();
+        $item = InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'JSON save as thought',
+            'body' => 'Body.',
+            'dedupe_key' => 'json-save-thought-item',
+            'generator_type' => 'weekly_revisit',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.save-thought', $item));
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Saved as thought.',
+                'item_id' => $item->id,
+                'remaining_count' => 0,
+            ]);
+        $this->assertDatabaseHas('inbox_items', [
+            'id' => $item->id,
+            'status' => 'done',
+        ]);
+    }
+
+    public function test_json_save_as_thought_failure_returns_error(): void
+    {
+        $user = User::factory()->create();
+        $item = InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'JSON save failure',
+            'body' => 'Body.',
+            'dedupe_key' => 'json-save-failure-item',
+            'generator_type' => 'weekly_revisit',
+        ]);
+
+        $this->mock(ThoughtCaptureService::class, function ($mock): void {
+            $mock->shouldReceive('create')->andThrow(new \RuntimeException('capture failed'));
+        });
+
+        $response = $this->actingAs($user)->postJson(route('inbox.save-thought', $item));
+
+        $response->assertStatus(503)
+            ->assertJson([
+                'message' => 'Unable to save inbox item as a thought.',
+            ]);
+        $this->assertDatabaseHas('inbox_items', [
+            'id' => $item->id,
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_json_user_cannot_mutate_another_users_inbox_item(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $item = InboxItem::factory()->create([
+            'user_id' => $owner->id,
+            'dedupe_key' => 'json-forbidden-item',
+        ]);
+
+        $this->actingAs($other)->postJson(route('inbox.done', $item))->assertForbidden();
+        $this->actingAs($other)->postJson(route('inbox.snooze', $item), ['preset' => 'tomorrow'])->assertForbidden();
+        $this->actingAs($other)->postJson(route('inbox.save-thought', $item))->assertForbidden();
+    }
+
     public function test_user_can_save_inbox_item_as_thought_and_item_is_completed(): void
     {
         $this->fakeOpenRouterForThoughtCapture();

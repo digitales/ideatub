@@ -6,7 +6,6 @@ use App\Exceptions\InvalidMailAccountCredentialsException;
 use App\Models\MailAccount;
 use App\Services\Email\NormalizedEmailMessage;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Arr;
 use Throwable;
 
 class FastmailConnector
@@ -33,7 +32,7 @@ class FastmailConnector
         } catch (Throwable) {
             throw new InvalidMailAccountCredentialsException('Unable to validate Fastmail credentials.');
         }
-        
+
         $accountEmail = (string) ($payload['username'] ?? $input['account_email'] ?? '');
         $accountId = (string) data_get($payload, 'primaryAccounts.urn:ietf:params:jmap:mail', '');
         $apiUrl = (string) ($payload['apiUrl'] ?? '');
@@ -102,14 +101,11 @@ class FastmailConnector
                     'sort' => [['property' => 'receivedAt', 'isAscending' => false]],
                     'limit' => $limit,
                 ], static fn ($value) => $value !== null), 'q1'],
-                ['Email/get', [
-                    'accountId' => $this->accountIdFor($account),
-                    '#ids' => [
-                        'resultOf' => 'q1',
-                        'name' => 'Email/query',
-                        'path' => '/ids/*',
-                    ],
-                ], 'g1'],
+                ['Email/get', $this->emailGetArguments($account, [
+                    'resultOf' => 'q1',
+                    'name' => 'Email/query',
+                    'path' => '/ids/*',
+                ]), 'g1'],
             ],
         ]);
 
@@ -144,14 +140,11 @@ class FastmailConnector
                     'sinceQueryState' => $checkpoint['query_state'] ?? '',
                     'filter' => $mailboxId ? ['inMailbox' => $mailboxId] : null,
                 ], static fn ($value) => $value !== null), 'c1'],
-                ['Email/get', [
-                    'accountId' => $this->accountIdFor($account),
-                    '#ids' => [
-                        'resultOf' => 'c1',
-                        'name' => 'Email/queryChanges',
-                        'path' => '/added/*/id',
-                    ],
-                ], 'g1'],
+                ['Email/get', $this->emailGetArguments($account, [
+                    'resultOf' => 'c1',
+                    'name' => 'Email/queryChanges',
+                    'path' => '/added/*/id',
+                ]), 'g1'],
             ],
         ]);
 
@@ -165,6 +158,30 @@ class FastmailConnector
                 'mailbox_id' => $mailboxId,
             ],
         ];
+    }
+
+    public function fetchMessageById(MailAccount $account, string $providerMessageId): ?NormalizedEmailMessage
+    {
+        $response = $this->httpClient->request($this->credentialsFor($account), [
+            'using' => [
+                'urn:ietf:params:jmap:core',
+                'urn:ietf:params:jmap:mail',
+            ],
+            'methodCalls' => [
+                ['Email/get', array_merge($this->emailGetBaseArguments($account), [
+                    'ids' => [$providerMessageId],
+                ]), 'g1'],
+            ],
+        ]);
+
+        $list = $this->responseData($response, 'Email/get')['list'] ?? [];
+        if ($list === []) {
+            return null;
+        }
+
+        $messages = $this->normalizeMessages($account, $list);
+
+        return $messages[0] ?? null;
     }
 
     /**
@@ -183,6 +200,47 @@ class FastmailConnector
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function emailGetBaseArguments(MailAccount $account): array
+    {
+        return [
+            'accountId' => $this->accountIdFor($account),
+            'properties' => [
+                'id',
+                'threadId',
+                'mailboxIds',
+                'subject',
+                'from',
+                'to',
+                'cc',
+                'sentAt',
+                'receivedAt',
+                'textBody',
+                'htmlBody',
+                'bodyValues',
+            ],
+            'bodyProperties' => [
+                'partId',
+                'type',
+            ],
+            'fetchTextBodyValues' => true,
+            'fetchHTMLBodyValues' => true,
+        ];
+    }
+
+    /**
+     * @param  array{resultOf: string, name: string, path: string}  $idsReference
+     * @return array<string, mixed>
+     */
+    private function emailGetArguments(MailAccount $account, array $idsReference): array
+    {
+        return array_merge($this->emailGetBaseArguments($account), [
+            '#ids' => $idsReference,
+        ]);
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $messages
      * @return array<int, NormalizedEmailMessage>
      */
@@ -190,8 +248,7 @@ class FastmailConnector
     {
         return array_map(function (array $message) use ($account) {
             $mailboxIds = array_keys($message['mailboxIds'] ?? []);
-            $bodyParts = $message['textBody'] ?? [];
-            $bodyText = (string) Arr::get($bodyParts, '0.value', '');
+            $bodyText = $this->normalizedBodyTextFromJmapEmail($message);
 
             return new NormalizedEmailMessage(
                 providerMessageId: (string) $message['id'],
@@ -207,6 +264,71 @@ class FastmailConnector
                 bodyText: $bodyText,
             );
         }, $messages);
+    }
+
+    /**
+     * @param  array<string, mixed>  $message
+     */
+    private function normalizedBodyTextFromJmapEmail(array $message): string
+    {
+        $bodyValues = $message['bodyValues'] ?? [];
+        $bodyValues = is_array($bodyValues) ? $bodyValues : [];
+
+        $textBody = $message['textBody'] ?? [];
+        $textBody = is_array($textBody) ? $textBody : [];
+        $textChunks = $this->collectBodyValuesForBodyParts($textBody, $bodyValues);
+        $plain = implode("\n\n", $textChunks);
+        if (trim($plain) !== '') {
+            return $plain;
+        }
+
+        $htmlBody = $message['htmlBody'] ?? [];
+        $htmlBody = is_array($htmlBody) ? $htmlBody : [];
+        $htmlChunks = $this->collectBodyValuesForBodyParts($htmlBody, $bodyValues);
+        $html = implode("\n\n", $htmlChunks);
+        if (trim($html) === '') {
+            return '';
+        }
+
+        return $this->htmlToPlainTextConservative($html);
+    }
+
+    /**
+     * @param  array<int, mixed>  $bodyParts
+     * @param  array<string, mixed>  $bodyValues
+     * @return array<int, string>
+     */
+    private function collectBodyValuesForBodyParts(array $bodyParts, array $bodyValues): array
+    {
+        $chunks = [];
+        foreach ($bodyParts as $part) {
+            if (! is_array($part)) {
+                continue;
+            }
+            $partId = (string) ($part['partId'] ?? '');
+            $value = '';
+            if ($partId !== '' && isset($bodyValues[$partId]) && is_array($bodyValues[$partId])) {
+                $value = (string) ($bodyValues[$partId]['value'] ?? '');
+            }
+            if ($value === '') {
+                $value = (string) ($part['value'] ?? '');
+            }
+            if ($value !== '') {
+                $chunks[] = $value;
+            }
+        }
+
+        return $chunks;
+    }
+
+    private function htmlToPlainTextConservative(string $html): string
+    {
+        $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $stripped = strip_tags($decoded);
+        $withNewlines = preg_replace('/\R+/u', "\n", $stripped) ?? $stripped;
+        $collapsed = preg_replace('/[ \t]+/u', ' ', $withNewlines) ?? $withNewlines;
+
+        return trim($collapsed);
     }
 
     /**

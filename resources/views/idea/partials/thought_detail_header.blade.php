@@ -13,4 +13,16 @@
     <div class="mt-4">
         @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
     </div>
+
+    @if (($thought->metadata['type'] ?? null) === 'idea' && $thought->isIdeaCompleted())
+        <div class="mt-4 pt-4 border-t border-memory-violet/10">
+            <form method="POST" action="{{ route('ideas.toggle-completed', $thought) }}" class="inline">
+                @csrf
+                @method('PATCH')
+                <button type="submit" class="text-[12px] font-medium text-neural-teal hover:underline">
+                    Mark as incomplete
+                </button>
+            </form>
+        </div>
+    @endif
 </div>

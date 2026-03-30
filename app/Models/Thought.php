@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Pgvector\Laravel\Distance;
 use Pgvector\Laravel\HasNeighbors;
@@ -309,11 +310,174 @@ class Thought extends Model
     }
 
     /**
-     * Whether this idea is completed (metadata.completed === true).
+     * Whether this idea is completed using the same semantics as completed idea listings:
+     * strict completed flag, or any non-empty completed_at value.
      */
     public function isIdeaCompleted(): bool
     {
-        return ($this->metadata['completed'] ?? false) === true;
+        return ($this->metadata['completed'] ?? false) === true
+            || $this->hasMeaningfulIdeaCompletedAt();
+    }
+
+    /**
+     * Parse metadata.completed_at to a Carbon instance, or null if missing/invalid.
+     */
+    public function getIdeaCompletedAt(): ?Carbon
+    {
+        $raw = data_get($this->metadata, 'completed_at');
+        if (! is_string($raw) || trim($raw) === '') {
+            return null;
+        }
+
+        if (preg_match('/^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/', $raw, $matches) === 1) {
+            if (! self::isValidIdeaCompletedAtDateParts($matches['year'], $matches['month'], $matches['day'])) {
+                return null;
+            }
+
+            try {
+                return Carbon::createFromFormat('Y-m-d H:i:sP', $raw.' 00:00:00+00:00');
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        if (preg_match('/^(?<date>\d{4}-\d{2}-\d{2})(?<separator>[T ])(?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})(?<fraction>\.\d+)?(?<timezone>Z|[+-]\d{2}:\d{2})$/', $raw, $matches) !== 1) {
+            return null;
+        }
+
+        [$year, $month, $day] = explode('-', $matches['date']);
+
+        if (! self::isValidIdeaCompletedAtDateParts($year, $month, $day)) {
+            return null;
+        }
+
+        if (! self::isValidIdeaCompletedAtTimeParts($matches['hour'], $matches['minute'], $matches['second'])) {
+            return null;
+        }
+
+        if (! self::isValidIdeaCompletedAtTimezone($matches['timezone'])) {
+            return null;
+        }
+
+        $normalized = $matches['date'].$matches['separator'].$matches['hour'].':'.$matches['minute'].':'.$matches['second'];
+
+        if (($matches['fraction'] ?? null) !== null) {
+            $fraction = substr(str_pad(substr($matches['fraction'], 1), 6, '0'), 0, 6);
+            $normalized .= '.'.$fraction;
+        }
+
+        $normalized .= $matches['timezone'] === 'Z' ? '+00:00' : $matches['timezone'];
+
+        try {
+            return Carbon::createFromFormat(
+                ($matches['separator'] === 'T' ? 'Y-m-d\TH:i:s' : 'Y-m-d H:i:s')
+                .(isset($fraction) ? '.u' : '')
+                .'P',
+                $normalized
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function hasMeaningfulIdeaCompletedAt(): bool
+    {
+        $completedAt = data_get($this->metadata, 'completed_at');
+
+        return is_string($completedAt) && trim($completedAt) !== '';
+    }
+
+    private static function isValidIdeaCompletedAtDateParts(string $year, string $month, string $day): bool
+    {
+        return checkdate((int) $month, (int) $day, (int) $year);
+    }
+
+    private static function isValidIdeaCompletedAtTimeParts(string $hour, string $minute, string $second): bool
+    {
+        return (int) $hour >= 0
+            && (int) $hour <= 23
+            && (int) $minute >= 0
+            && (int) $minute <= 59
+            && (int) $second >= 0
+            && (int) $second <= 59;
+    }
+
+    private static function isValidIdeaCompletedAtTimezone(string $timezone): bool
+    {
+        if ($timezone === 'Z') {
+            return true;
+        }
+
+        return preg_match('/^[+-](?<hour>\d{2}):(?<minute>\d{2})$/', $timezone, $matches) === 1
+            && (int) $matches['hour'] >= 0
+            && (int) $matches['hour'] <= 23
+            && (int) $matches['minute'] >= 0
+            && (int) $matches['minute'] <= 59;
+    }
+
+    /**
+     * Scope to incomplete ideas:
+     * metadata.completed is not strict true and metadata.completed_at is missing/null/empty.
+     *
+     * @param  Builder<Thought>  $query
+     * @return Builder<Thought>
+     */
+    public function scopeIncompleteIdeas(Builder $query): Builder
+    {
+        $query->ideas();
+
+        $driver = $query->getConnection()->getDriverName();
+
+        if ($driver === 'pgsql') {
+            return $query
+                ->whereRaw("(metadata->'completed')::jsonb IS DISTINCT FROM 'true'::jsonb")
+                ->whereRaw("((metadata->>'completed_at') IS NULL OR TRIM(metadata->>'completed_at') = '')");
+        }
+
+        if ($driver === 'sqlite') {
+            return $query
+                ->whereRaw("(json_type(metadata, '$.completed') IS NULL OR json_type(metadata, '$.completed') != 'true')")
+                ->whereRaw("((json_extract(metadata, '$.completed_at') IS NULL OR TRIM(COALESCE(json_extract(metadata, '$.completed_at'), '')) = ''))");
+        }
+
+        throw new \InvalidArgumentException(sprintf(
+            'Unsupported database driver [%s] for incomplete idea filtering.',
+            $driver
+        ));
+    }
+
+    /**
+     * Scope to completed ideas: metadata.type idea and either metadata.completed is strict JSON true,
+     * or metadata.completed_at is non-empty after trim (same non-empty rule as {@see scopeIncompleteIdeas}).
+     * Malformed timestamps still count as non-empty so they are listed with completed ideas, not orphaned.
+     *
+     * @param  Builder<Thought>  $query
+     * @return Builder<Thought>
+     */
+    public function scopeCompletedIdeas(Builder $query): Builder
+    {
+        $query->ideas();
+
+        $driver = $query->getConnection()->getDriverName();
+
+        if ($driver === 'pgsql') {
+            return $query->where(function (Builder $q): void {
+                $q->whereRaw("(metadata->'completed')::jsonb = 'true'::jsonb")
+                    ->orWhereRaw("(metadata->>'completed_at') IS NOT NULL AND TRIM(metadata->>'completed_at') <> ''");
+            });
+        }
+
+        if ($driver === 'sqlite') {
+            return $query->where(function (Builder $q): void {
+                $q->whereRaw("json_type(metadata, '$.completed') = 'true'")
+                    ->orWhereRaw('(json_extract(metadata, \'$.completed_at\') IS NOT NULL AND TRIM(COALESCE(json_extract(metadata, \'$.completed_at\'), \'\')) != \'\')');
+            });
+        }
+
+        throw new \InvalidArgumentException(sprintf(
+            'Unsupported database driver [%s] for completed idea filtering.',
+            $driver
+        ));
     }
 
     /**

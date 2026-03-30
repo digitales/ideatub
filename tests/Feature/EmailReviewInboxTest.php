@@ -11,6 +11,7 @@ use App\Models\InboxItem;
 use App\Models\MailAccount;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\ThoughtCaptureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
@@ -661,6 +662,230 @@ class EmailReviewInboxTest extends TestCase
         $response->assertSessionHas('success', 'Sender rule saved. Could not import email as a thought.');
         // No thought created
         $this->assertSame(0, Thought::query()->count());
+    }
+
+    public function test_json_email_review_allow_success(): void
+    {
+        $this->fakeOpenRouterForThoughtCapture();
+        Bus::fake([ReconcileIgnoredSenderThoughtVisibility::class]);
+
+        $user = User::factory()->create();
+        ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'allow',
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Sender classification saved.',
+                'item_id' => $inbox->id,
+                'remaining_count' => 0,
+            ]);
+    }
+
+    public function test_json_email_review_ignore_success(): void
+    {
+        Bus::fake();
+
+        $user = User::factory()->create();
+        ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'ignore',
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Sender classification saved.',
+                'item_id' => $inbox->id,
+                'remaining_count' => 0,
+            ]);
+    }
+
+    public function test_json_email_review_extra_process_success(): void
+    {
+        Bus::fake();
+
+        $user = User::factory()->create();
+        ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'extra_process',
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Sender classification saved.',
+                'item_id' => $inbox->id,
+                'remaining_count' => 0,
+            ]);
+    }
+
+    public function test_json_email_review_remaining_count_when_another_actionable_item_remains(): void
+    {
+        $this->fakeOpenRouterForThoughtCapture();
+        Bus::fake([ReconcileIgnoredSenderThoughtVisibility::class]);
+
+        $user = User::factory()->create();
+        ['inbox' => $reviewInbox] = $this->createImportedEmailReviewFixture($user);
+
+        InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'generator_type' => 'weekly_revisit',
+            'dedupe_key' => 'weekly-other-'.$user->id,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.email-review.action', $reviewInbox), [
+            'action' => 'allow',
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'remaining_count' => 1,
+                'item_id' => $reviewInbox->id,
+            ]);
+    }
+
+    public function test_json_email_review_repeat_classification_returns_already_handled_message(): void
+    {
+        $this->fakeOpenRouterForThoughtCapture();
+        Bus::fake([ReconcileIgnoredSenderThoughtVisibility::class]);
+
+        $user = User::factory()->create();
+        ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $this->actingAs($user)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'allow',
+        ])->assertOk();
+
+        $response = $this->actingAs($user)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'ignore',
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Sender classification was already handled.',
+                'item_id' => $inbox->id,
+                'remaining_count' => 0,
+            ]);
+    }
+
+    public function test_json_email_review_save_thought_success(): void
+    {
+        $this->fakeOpenRouterForThoughtCapture();
+
+        $user = User::factory()->create();
+        ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'save_thought',
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Saved as thought.',
+                'item_id' => $inbox->id,
+                'remaining_count' => 0,
+            ]);
+    }
+
+    public function test_json_email_review_save_thought_failure_returns_error(): void
+    {
+        $user = User::factory()->create();
+        ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $this->mock(ThoughtCaptureService::class, function ($mock): void {
+            $mock->shouldReceive('create')->andThrow(new \RuntimeException('capture failed'));
+        });
+
+        $response = $this->actingAs($user)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'save_thought',
+        ]);
+
+        $response->assertStatus(503)
+            ->assertJson([
+                'message' => 'Unable to save inbox item as a thought.',
+            ]);
+    }
+
+    public function test_json_email_review_allow_partial_success_when_thought_creation_fails(): void
+    {
+        config(['services.openrouter.api_key' => 'test-key']);
+        Http::fake([
+            'https://openrouter.ai/api/v1/embeddings' => Http::response([], 500),
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([], 500),
+        ]);
+        Bus::fake([ReconcileIgnoredSenderThoughtVisibility::class]);
+
+        $user = User::factory()->create();
+        ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'allow',
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Sender rule saved. Could not import email as a thought.',
+                'item_id' => $inbox->id,
+                'remaining_count' => 0,
+            ]);
+        $this->assertDatabaseHas('email_sender_rules', [
+            'user_id' => $user->id,
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+    }
+
+    public function test_json_email_review_invalid_sender_classification_returns_error(): void
+    {
+        $user = User::factory()->create();
+        ['imported' => $imported, 'inbox' => $inbox] = $this->createImportedEmailReviewFixture($user);
+
+        $inbox->update([
+            'source_data' => [
+                'stored_email_type' => 'imported_email',
+                'stored_email_id' => $imported->id,
+                'sender_email' => 'Wrong Sender <WRONG@example.com>',
+                'rule_action' => 'review',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'allow',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'message' => 'Unable to apply sender classification.',
+            ]);
+        $this->assertDatabaseMissing('email_sender_rules', [
+            'user_id' => $user->id,
+            'sender_email' => 'wrong@example.com',
+        ]);
+    }
+
+    public function test_json_email_review_authorization_failure_for_another_users_item(): void
+    {
+        $this->fakeOpenRouterForThoughtCapture();
+
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        ['inbox' => $inbox] = $this->createImportedEmailReviewFixture($owner);
+
+        $this->actingAs($other)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'allow',
+        ])->assertForbidden();
+
+        $this->actingAs($other)->postJson(route('inbox.email-review.action', $inbox), [
+            'action' => 'save_thought',
+        ])->assertForbidden();
     }
 
     /**

@@ -1,7 +1,7 @@
 {{-- Ideas list: "Your ideas" header, list or empty state, pagination --}}
 <div class="flex items-center justify-between mt-9 mb-3.5">
     <span class="text-[11px] font-semibold tracking-[0.1em] uppercase text-slate-brand/50">Your ideas</span>
-    <span class="text-[11px] text-slate-brand/30">{{ $ideas->total() }} total</span>
+    <span class="text-[11px] text-slate-brand/30">{{ $ideas->total() }} incomplete</span>
 </div>
 
 @if ($ideas->isEmpty())
@@ -22,10 +22,9 @@
                         <input
                             type="checkbox"
                             class="rounded border-slate-300 text-neural-teal focus:ring-memory-violet/30"
-                            {{ $thought->isIdeaCompleted() ? 'checked' : '' }}
                             onchange="this.form.submit()"
                         />
-                        <span class="sr-only">Mark as {{ $thought->isIdeaCompleted() ? 'incomplete' : 'complete' }}</span>
+                        <span class="sr-only">Mark as complete</span>
                     </label>
                 </form>
                 <div class="min-w-0 flex-1 relative">
@@ -36,7 +35,7 @@
                         @include('idea.partials.editable_thought_content', [
                             'thought' => $thought,
                             'editable' => auth()->check() && auth()->id() === $thought->user_id,
-                            'displayClass' => 'text-sm text-deep-indigo whitespace-pre-line mb-0 ' . ($thought->isIdeaCompleted() ? 'line-through text-slate-brand/70' : ''),
+                            'displayClass' => 'text-sm text-deep-indigo whitespace-pre-line mb-0 ',
                             'previewMaxLength' => 200,
                         ])
                     <p class="text-[11px] text-slate-brand/50 mt-1">{{ $thought->getLoggedDate() }}</p>
