@@ -549,6 +549,8 @@ Alpine.data('inboxPage', () => ({
   inboxCount: 0,
   activeRequestKey: '',
   activeItemId: null,
+  nextCountRequestSequence: 0,
+  lastAppliedCountRequestSequence: 0,
 
   init() {
     const raw = this.$el?.dataset?.inboxInitialCount;
@@ -606,13 +608,8 @@ Alpine.data('inboxPage', () => ({
     return null;
   },
 
-  nextAppliedRemainingCount(value) {
-    const parsed = this.parseRemainingCount(value);
-    if (parsed === null) return null;
-
-    // Concurrent removals can resolve out of order; never let a stale response
-    // raise the client-side actionable count again during this session.
-    return Math.min(this.inboxCount, parsed);
+  shouldApplyCountUpdate(requestSequence) {
+    return requestSequence >= this.lastAppliedCountRequestSequence;
   },
 
   storeReloadSuccess(message) {
@@ -692,6 +689,7 @@ Alpine.data('inboxPage', () => ({
     const body = new FormData(form);
     const url = form.getAttribute('action');
     const token = body.get('_token') || this.csrfToken;
+    const requestSequence = ++this.nextCountRequestSequence;
     let navigating = false;
 
     const reenable = () => {
@@ -772,12 +770,15 @@ Alpine.data('inboxPage', () => ({
         card.remove();
       }
 
-      const previousInboxCount = this.inboxCount;
-      const remainingCount = this.nextAppliedRemainingCount(data.remaining_count);
-      if (remainingCount !== null) {
-        this.applyRemainingCount(remainingCount);
-      } else {
-        this.applyRemainingCount(Math.max(0, previousInboxCount - 1));
+      if (this.shouldApplyCountUpdate(requestSequence)) {
+        const previousInboxCount = this.inboxCount;
+        const remainingCount = this.parseRemainingCount(data.remaining_count);
+        if (remainingCount !== null) {
+          this.applyRemainingCount(remainingCount);
+        } else {
+          this.applyRemainingCount(Math.max(0, previousInboxCount - 1));
+        }
+        this.lastAppliedCountRequestSequence = requestSequence;
       }
 
       this.flashSuccess = data.message || 'Done.';
