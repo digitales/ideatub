@@ -8,6 +8,7 @@ use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\MailAccount;
 use App\Models\Thought;
+use App\Models\ThoughtLinkSummary;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -32,7 +33,7 @@ class EmailResearchControllerTest extends TestCase
     {
         return Thought::factory()->create(array_merge([
             'user_id' => $user->id,
-            'source'  => 'email',
+            'source' => 'email',
         ], $overrides));
     }
 
@@ -43,19 +44,19 @@ class EmailResearchControllerTest extends TestCase
         $priorResearchThought = Thought::factory()->create(['user_id' => $user->id]);
 
         $email = ImportedEmail::query()->create([
-            'user_id'            => $user->id,
-            'mail_account_id'    => $account->id,
-            'provider'           => 'fastmail',
-            'provider_message_id'=> 'test-msg-'.uniqid(),
-            'direction'          => 'received',
-            'subject'            => 'Test newsletter',
-            'body_text'          => 'Test body.',
-            'from_json'          => [['email' => 'news@example.com', 'name' => 'News']],
-            'processing_status'  => 'research_completed',
-            'thought_id'         => $thought->id,
-            'research_thought_id'=> $priorResearchThought->id,
-            'failure_count'      => 1,
-            'failure_reason'     => 'prior failure',
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'test-msg-'.uniqid(),
+            'direction' => 'received',
+            'subject' => 'Test newsletter',
+            'body_text' => 'Test body.',
+            'from_json' => [['email' => 'news@example.com', 'name' => 'News']],
+            'processing_status' => 'research_completed',
+            'thought_id' => $thought->id,
+            'research_thought_id' => $priorResearchThought->id,
+            'failure_count' => 1,
+            'failure_reason' => 'prior failure',
         ]);
 
         return $email;
@@ -69,7 +70,7 @@ class EmailResearchControllerTest extends TestCase
     {
         Event::fake();
 
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $thought = $this->makeEmailThought($user);
 
         $response = $this->actingAs($user)
@@ -95,8 +96,8 @@ class EmailResearchControllerTest extends TestCase
     {
         Event::fake();
 
-        $owner   = User::factory()->create();
-        $other   = User::factory()->create();
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
         $thought = $this->makeEmailThought($owner);
 
         $this->actingAs($other)
@@ -108,7 +109,7 @@ class EmailResearchControllerTest extends TestCase
     {
         Event::fake();
 
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $thought = Thought::factory()->create(['user_id' => $user->id, 'source' => 'web']);
 
         $this->actingAs($user)
@@ -125,7 +126,7 @@ class EmailResearchControllerTest extends TestCase
         Queue::fake();
         Event::fake();
 
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $thought = $this->makeEmailThought($user, [
             'source_metadata' => ['newsletter_research' => ['status' => 'research_completed']],
         ]);
@@ -149,23 +150,56 @@ class EmailResearchControllerTest extends TestCase
         Event::assertNotDispatched(IdeaResearchRequested::class);
     }
 
+    public function test_newsletter_research_deletes_stale_thought_link_summaries_for_prior_research_thought(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $thought = $this->makeEmailThought($user, [
+            'source_metadata' => ['newsletter_research' => ['status' => 'research_completed']],
+        ]);
+        $email = $this->attachImportedEmail($user, $thought);
+        $previousResearchThoughtId = $email->research_thought_id;
+        $this->assertNotNull($previousResearchThoughtId);
+
+        $staleSummary = ThoughtLinkSummary::factory()->create([
+            'user_id' => $user->id,
+            'source_thought_id' => $thought->id,
+            'parent_research_thought_id' => $previousResearchThoughtId,
+        ]);
+
+        $otherParentThought = Thought::factory()->create(['user_id' => $user->id]);
+        $unrelatedSummary = ThoughtLinkSummary::factory()->create([
+            'user_id' => $user->id,
+            'source_thought_id' => $thought->id,
+            'parent_research_thought_id' => $otherParentThought->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->post(route('emails.newsletter-research', $thought));
+
+        $response->assertRedirect();
+        $this->assertDatabaseMissing('thought_link_summaries', ['id' => $staleSummary->id]);
+        $this->assertDatabaseHas('thought_link_summaries', ['id' => $unrelatedSummary->id]);
+    }
+
     public function test_newsletter_research_requeues_for_captured_inbound_email(): void
     {
         Queue::fake();
 
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $thought = $this->makeEmailThought($user);
         // Use a real Thought ID to satisfy any FK constraint on research_thought_id.
         $priorResearch = Thought::factory()->create(['user_id' => $user->id]);
         $captured = CapturedInboundEmail::query()->create([
-            'user_id'            => $user->id,
-            'message_id'         => 'cap-msg-'.uniqid(),
-            'sender_email'       => 'news@example.com',
-            'subject'            => 'Postmark newsletter',
-            'body_text'          => 'Body text.',
-            'processing_status'  => 'research_failed',
-            'thought_id'         => $thought->id,
-            'research_thought_id'=> $priorResearch->id,
+            'user_id' => $user->id,
+            'message_id' => 'cap-msg-'.uniqid(),
+            'sender_email' => 'news@example.com',
+            'subject' => 'Postmark newsletter',
+            'body_text' => 'Body text.',
+            'processing_status' => 'research_failed',
+            'thought_id' => $thought->id,
+            'research_thought_id' => $priorResearch->id,
         ]);
 
         $this->actingAs($user)
@@ -184,7 +218,7 @@ class EmailResearchControllerTest extends TestCase
     {
         Queue::fake();
 
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $thought = $this->makeEmailThought($user);
 
         // No ImportedEmail or CapturedInboundEmail linked.
@@ -206,8 +240,8 @@ class EmailResearchControllerTest extends TestCase
     {
         Queue::fake();
 
-        $owner   = User::factory()->create();
-        $other   = User::factory()->create();
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
         $thought = $this->makeEmailThought($owner);
 
         $this->actingAs($other)
@@ -219,7 +253,7 @@ class EmailResearchControllerTest extends TestCase
     {
         Queue::fake();
 
-        $user    = User::factory()->create();
+        $user = User::factory()->create();
         $thought = Thought::factory()->create(['user_id' => $user->id, 'source' => 'web']);
 
         $this->actingAs($user)

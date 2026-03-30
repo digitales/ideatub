@@ -262,21 +262,6 @@ class EmailNewsletterResearchService
         $lines[] = '';
         $lines[] = $body !== '' ? $body : '_No body text was available._';
         $lines[] = '';
-        $lines[] = '## Extracted links';
-        $lines[] = '';
-        if ($extractedLinks === []) {
-            $lines[] = '_No links were extracted._';
-        } else {
-            foreach ($extractedLinks as $link) {
-                $u = (string) ($link['url'] ?? '');
-                $t = (string) ($link['type'] ?? 'generic');
-                if ($u === '') {
-                    continue;
-                }
-                $lines[] = '- '.$u.' (`'.$t.'`)';
-            }
-        }
-        $lines[] = '';
         $lines[] = '## YouTube transcripts';
         $lines[] = '';
         if ($youtubeRows === []) {
@@ -436,7 +421,7 @@ class EmailNewsletterResearchService
             'status' => $degraded ? 'research_partial' : 'research_completed',
             'youtube_transcripts' => $this->summarizeYoutubeRows($youtubeRows),
             'degraded' => $degraded,
-            'research_thought_id' => $research->id,
+            'research_thought_id' => (string) $research->id,
             'email_thought_id' => $emailThought->id,
         ];
         $storedEmail->processing_metadata_json = $meta;
@@ -444,7 +429,7 @@ class EmailNewsletterResearchService
         $storedEmail->save();
 
         $emailMeta = $emailThought->source_metadata ?? [];
-        $emailMeta['research_thought_id'] = $research->id;
+        $emailMeta['research_thought_id'] = (string) $research->id;
         $emailThought->source_metadata = $emailMeta;
         $emailThought->save();
     }

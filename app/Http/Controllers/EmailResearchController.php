@@ -7,6 +7,7 @@ use App\Jobs\ProcessExtraEmailResearch;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\Thought;
+use App\Models\ThoughtLinkSummary;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -52,13 +53,22 @@ class EmailResearchController extends Controller
         }
 
         $isImported = $stored instanceof ImportedEmail;
-        $storedId   = $stored->id;
+        $storedId = $stored->id;
 
         DB::transaction(function () use ($stored, $thought): void {
+            $previousResearchThoughtId = $stored->research_thought_id;
+
             // Reset so the job's research_thought_id guard does not bail early.
             $stored->processing_status = 'research_queued';
             $stored->research_thought_id = null;
             $stored->save();
+
+            if ($previousResearchThoughtId !== null) {
+                ThoughtLinkSummary::query()
+                    ->where('source_thought_id', $thought->id)
+                    ->where('parent_research_thought_id', $previousResearchThoughtId)
+                    ->delete();
+            }
 
             // Clear stale status from the thought so the badge resets.
             $meta = $thought->source_metadata ?? [];

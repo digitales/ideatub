@@ -21,6 +21,7 @@
                 </p>
             </div>
         @endif
+        @include('idea.partials.research_editorial_link_summaries', ['editorialLinkSummaries' => $editorialLinkSummaries])
         @push('research-after-root')
             <p class="text-[11px] text-slate-brand/50 mt-4">{{ $root->created_at->diffForHumans() }}</p>
         @endpush

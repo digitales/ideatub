@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Thought;
+use App\Models\ThoughtLinkSummary;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -384,5 +385,435 @@ class ResearchShowTest extends TestCase
         $response->assertDontSee('Metadata subject line', false);
         $response->assertDontSee('metadata@example.com', false);
         $response->assertDontSee($wrongHref, false);
+    }
+
+    public function test_research_show_renders_editorial_link_summaries_grouped_by_newsletter_section_order(): void
+    {
+        $owner = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'Newsletter body for editorial sections',
+        ]);
+
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => "# Research with editorial links\n\nBody.",
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+            'source_metadata' => [
+                'email_thought_id' => $emailThought->id,
+                'email_subject' => 'Subject for section order test',
+                'email_sender' => 'editorial-sections@example.com',
+            ],
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/section-order-b',
+            'normalized_url' => 'https://example.com/section-order-b',
+            'normalized_url_hash' => sha1('https://example.com/section-order-b'),
+            'newsletter_section_label' => 'Later newsletter section',
+            'newsletter_section_order' => 2,
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'Title section order B unique elso-b',
+            'summary_text' => 'Summary B unique elso-b-sum',
+            'support_judgment' => 'supports',
+            'why_it_matters' => 'Why B matters unique elso-b-why',
+            'usefulness_score' => 5,
+            'section_rank' => 1,
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/section-order-a',
+            'normalized_url' => 'https://example.com/section-order-a',
+            'normalized_url_hash' => sha1('https://example.com/section-order-a'),
+            'newsletter_section_label' => 'Earlier newsletter section',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'Title section order A unique elso-a',
+            'summary_text' => 'Summary A unique elso-a-sum',
+            'support_judgment' => 'neutral',
+            'why_it_matters' => 'Why A matters unique elso-a-why',
+            'usefulness_score' => 5,
+            'section_rank' => 1,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $response->assertSee('Editorial link summaries', false);
+        $response->assertSeeInOrder([
+            'Earlier newsletter section',
+            'Later newsletter section',
+        ], false);
+    }
+
+    public function test_research_show_shows_pending_count_for_unsummarized_editorial_links(): void
+    {
+        $owner = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'Newsletter for pending count',
+        ]);
+
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research pending editorial',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+            'source_metadata' => [
+                'email_thought_id' => $emailThought->id,
+            ],
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/pending-one',
+            'normalized_url' => 'https://example.com/pending-one',
+            'normalized_url_hash' => sha1('https://example.com/pending-one'),
+            'newsletter_section_label' => 'Main',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'queued',
+            'resolved_title' => null,
+            'summary_text' => null,
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/pending-fetching',
+            'normalized_url' => 'https://example.com/pending-fetching',
+            'normalized_url_hash' => sha1('https://example.com/pending-fetching'),
+            'newsletter_section_label' => 'Main',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'fetching',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $response->assertSee('Editorial link summaries', false);
+        $response->assertSee('2', false);
+        $response->assertSee('pending', false);
+    }
+
+    public function test_research_show_orders_editorial_items_within_section_by_usefulness_score_descending(): void
+    {
+        $owner = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'Newsletter for usefulness order',
+        ]);
+
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research usefulness order',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+            'source_metadata' => [
+                'email_thought_id' => $emailThought->id,
+            ],
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/usefulness-low',
+            'normalized_url' => 'https://example.com/usefulness-low',
+            'normalized_url_hash' => sha1('https://example.com/usefulness-low'),
+            'newsletter_section_label' => 'Single section usefulness',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'Lower score title unique uscore-low',
+            'summary_text' => 'Low summary unique uscore-low-sum',
+            'usefulness_score' => 3,
+            'section_rank' => 1,
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/usefulness-high',
+            'normalized_url' => 'https://example.com/usefulness-high',
+            'normalized_url_hash' => sha1('https://example.com/usefulness-high'),
+            'newsletter_section_label' => 'Single section usefulness',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'Higher score title unique uscore-high',
+            'summary_text' => 'High summary unique uscore-high-sum',
+            'usefulness_score' => 9,
+            'section_rank' => 2,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertNotFalse($content);
+        $posHigh = mb_strpos($content, 'Higher score title unique uscore-high');
+        $posLow = mb_strpos($content, 'Lower score title unique uscore-low');
+        $this->assertNotFalse($posHigh);
+        $this->assertNotFalse($posLow);
+        $this->assertLessThan($posLow, $posHigh, 'Higher usefulness item should appear before lower in HTML');
+    }
+
+    public function test_research_show_orders_editorial_items_by_section_rank_when_usefulness_score_ties(): void
+    {
+        $owner = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'Newsletter for rank tie-break',
+        ]);
+
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research rank tie',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+            'source_metadata' => [
+                'email_thought_id' => $emailThought->id,
+            ],
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/rank-second',
+            'normalized_url' => 'https://example.com/rank-second',
+            'normalized_url_hash' => sha1('https://example.com/rank-second'),
+            'newsletter_section_label' => 'Rank tie section',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'Second rank title unique srank-2',
+            'summary_text' => 'Second summary',
+            'usefulness_score' => 7,
+            'section_rank' => 2,
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/rank-first',
+            'normalized_url' => 'https://example.com/rank-first',
+            'normalized_url_hash' => sha1('https://example.com/rank-first'),
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'First rank title unique srank-1',
+            'summary_text' => 'First summary',
+            'newsletter_section_label' => 'Rank tie section',
+            'newsletter_section_order' => 1,
+            'usefulness_score' => 7,
+            'section_rank' => 1,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertNotFalse($content);
+        $posFirst = mb_strpos($content, 'First rank title unique srank-1');
+        $posSecond = mb_strpos($content, 'Second rank title unique srank-2');
+        $this->assertNotFalse($posFirst);
+        $this->assertNotFalse($posSecond);
+        $this->assertLessThan($posSecond, $posFirst);
+    }
+
+    public function test_research_show_excludes_noise_and_sponsor_from_editorial_summary_block(): void
+    {
+        $owner = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'Newsletter for classification filter',
+        ]);
+
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research filter noise sponsor',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+            'source_metadata' => [
+                'email_thought_id' => $emailThought->id,
+            ],
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/noise-row',
+            'normalized_url' => 'https://example.com/noise-row',
+            'normalized_url_hash' => sha1('https://example.com/noise-row'),
+            'newsletter_section_label' => 'Noise sec',
+            'newsletter_section_order' => 1,
+            'classification' => 'noise',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'NOISE_UNIQUE_SHOULD_NOT_RENDER_9911',
+            'summary_text' => 'Noise summary should not show 9911',
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/sponsor-row',
+            'normalized_url' => 'https://example.com/sponsor-row',
+            'normalized_url_hash' => sha1('https://example.com/sponsor-row'),
+            'newsletter_section_label' => 'Sponsor sec',
+            'newsletter_section_order' => 2,
+            'classification' => 'sponsor',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'SPONSOR_UNIQUE_SHOULD_NOT_RENDER_9922',
+            'summary_text' => 'Sponsor summary should not show 9922',
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/editorial-kept',
+            'normalized_url' => 'https://example.com/editorial-kept',
+            'normalized_url_hash' => sha1('https://example.com/editorial-kept'),
+            'newsletter_section_label' => 'Editorial only section',
+            'newsletter_section_order' => 3,
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'EDITORIAL_VISIBLE_UNIQUE_9933',
+            'summary_text' => 'Editorial summary visible 9933',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $response->assertSee('EDITORIAL_VISIBLE_UNIQUE_9933', false);
+        $response->assertDontSee('NOISE_UNIQUE_SHOULD_NOT_RENDER_9911', false);
+        $response->assertDontSee('SPONSOR_UNIQUE_SHOULD_NOT_RENDER_9922', false);
+    }
+
+    public function test_research_show_renders_quality_notes_for_editorial_summaries(): void
+    {
+        $owner = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'Newsletter for quality notes',
+        ]);
+
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research quality notes',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+            'source_metadata' => [
+                'email_thought_id' => $emailThought->id,
+            ],
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/quality-notes',
+            'normalized_url' => 'https://example.com/quality-notes',
+            'normalized_url_hash' => sha1('https://example.com/quality-notes'),
+            'newsletter_section_label' => 'Qn section',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'Title with quality notes unique qn-8844',
+            'summary_text' => 'Body summary qn',
+            'quality_notes' => 'QUALITY_NOTES_UNIQUE_SUBDUED_8844',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $response->assertSee('QUALITY_NOTES_UNIQUE_SUBDUED_8844', false);
+    }
+
+    public function test_research_show_shows_failed_count_for_failed_editorial_links(): void
+    {
+        $owner = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'Newsletter for failed count',
+        ]);
+
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research failed editorial',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+            'source_metadata' => [
+                'email_thought_id' => $emailThought->id,
+            ],
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/failed-one',
+            'normalized_url' => 'https://example.com/failed-one',
+            'normalized_url_hash' => sha1('https://example.com/failed-one'),
+            'newsletter_section_label' => 'F',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'failed',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $response->assertSee('Editorial link summaries', false);
+        $response->assertSee('1', false);
+        $response->assertSee('failed', false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function createThoughtLinkSummaryRow(string $userId, string $sourceThoughtId, string $parentResearchThoughtId, array $overrides): ThoughtLinkSummary
+    {
+        $defaults = [
+            'user_id' => $userId,
+            'source_thought_id' => $sourceThoughtId,
+            'parent_research_thought_id' => $parentResearchThoughtId,
+            'source_type' => 'email_newsletter',
+            'original_url' => 'https://example.com/default',
+            'normalized_url' => 'https://example.com/default',
+            'normalized_url_hash' => sha1('https://example.com/default-'.uniqid('', true)),
+            'classification' => 'editorial',
+            'processing_status' => 'queued',
+        ];
+
+        return ThoughtLinkSummary::query()->create(array_merge($defaults, $overrides));
     }
 }

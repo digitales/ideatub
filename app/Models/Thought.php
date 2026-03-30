@@ -207,6 +207,26 @@ class Thought extends Model
         return $this->hasMany(Thought::class, 'parent_id');
     }
 
+    /**
+     * Link summary rows whose source content is this thought (e.g. newsletter email).
+     *
+     * @return HasMany<ThoughtLinkSummary, $this>
+     */
+    public function sourceLinkSummaries(): HasMany
+    {
+        return $this->hasMany(ThoughtLinkSummary::class, 'source_thought_id');
+    }
+
+    /**
+     * Link summary rows attached to this thought as parent research context.
+     *
+     * @return HasMany<ThoughtLinkSummary, $this>
+     */
+    public function researchLinkSummaries(): HasMany
+    {
+        return $this->hasMany(ThoughtLinkSummary::class, 'parent_research_thought_id');
+    }
+
     public function importedEmail(): ?ImportedEmail
     {
         $importedEmailId = data_get($this->source_metadata, 'imported_email_id');

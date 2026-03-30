@@ -9,6 +9,13 @@ use Tests\TestCase;
 
 class SharedResearchViewTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     public function test_unknown_token_returns_404(): void
     {
         $response = $this->get('/r/'.str_repeat('a', 32));

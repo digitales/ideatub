@@ -9,6 +9,13 @@ use Tests\TestCase;
 
 class SharedResearchControllerTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     public function test_store_requires_authentication(): void
     {
         $user = User::factory()->create();

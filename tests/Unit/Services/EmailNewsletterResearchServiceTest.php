@@ -90,12 +90,14 @@ class EmailNewsletterResearchServiceTest extends TestCase
         $this->assertSame('created', $result['status']);
         $this->assertInstanceOf(Thought::class, $result['research_thought']);
         $this->assertStringContainsString('Weekly digest', $result['research_thought']->content);
-        $this->assertStringContainsString('https://example.com/article', $result['research_thought']->content);
+        $this->assertStringNotContainsString('## Extracted links', $result['research_thought']->content);
+        $this->assertStringNotContainsString('https://example.com/article', $result['research_thought']->content);
 
         $imported->refresh();
         $this->assertSame($result['research_thought']->id, $imported->research_thought_id);
 
         $emailThought->refresh();
+        $this->assertIsString($emailThought->source_metadata['research_thought_id']);
         $this->assertSame($result['research_thought']->id, $emailThought->source_metadata['research_thought_id']);
         $this->assertSame('extra_process', $emailThought->source_metadata['sender_rule_action']);
         $this->assertSame($imported->id, $emailThought->source_metadata['imported_email_id']);
@@ -164,6 +166,7 @@ class EmailNewsletterResearchServiceTest extends TestCase
         $this->assertSame('created', $result['status']);
         $this->assertStringContainsString('Transcript line one', $result['research_thought']->content);
         $this->assertStringContainsString('dQw4w9WgXcQ', $result['research_thought']->content);
+        $this->assertStringNotContainsString('## Extracted links', $result['research_thought']->content);
     }
 
     #[Test]
@@ -218,6 +221,7 @@ class EmailNewsletterResearchServiceTest extends TestCase
         );
 
         $this->assertSame('created', $result['status']);
+        $this->assertStringNotContainsString('## Extracted links', $result['research_thought']->content);
         $this->assertTrue($result['degraded'] ?? false);
         $imported->refresh();
         $this->assertSame($result['research_thought']->id, $imported->research_thought_id);
@@ -322,6 +326,7 @@ class EmailNewsletterResearchServiceTest extends TestCase
 
         $this->assertSame('created', $result['status']);
         $research = $result['research_thought'];
+        $this->assertStringNotContainsString('## Extracted links', $research->content);
         $this->assertSame('research', $research->source);
 
         $sm = $research->source_metadata;
@@ -336,6 +341,7 @@ class EmailNewsletterResearchServiceTest extends TestCase
         $this->assertSame('PostmarkAppName', $sm['project'] ?? null);
 
         $emailThought->refresh();
+        $this->assertIsString($emailThought->source_metadata['research_thought_id']);
         $this->assertSame($research->id, $emailThought->source_metadata['research_thought_id']);
         $this->assertSame('extra_process', $emailThought->source_metadata['sender_rule_action']);
         $this->assertSame($captured->id, $emailThought->source_metadata['captured_inbound_email_id']);
@@ -397,6 +403,7 @@ class EmailNewsletterResearchServiceTest extends TestCase
         );
 
         $this->assertSame('created', $result['status']);
+        $this->assertStringNotContainsString('## Extracted links', $result['research_thought']->content);
         $rsm = $result['research_thought']->fresh()->source_metadata ?? [];
         $this->assertSame($emailThought->id, $rsm['email_thought_id'] ?? null);
         $this->assertSame('Subject from email thought', $rsm['email_subject'] ?? null);
