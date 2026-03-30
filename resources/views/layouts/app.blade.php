@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', config('app.name', 'IdeaTub') . ' - Personal knowledge system')</title>
-    <meta name="description" content="@yield('description', 'Capture and search thoughts via web or MCP. Semantic search, Evernote mirror.')">
+    <title>@yield('title', config('app.name', 'IdeaTub') . ' - Capture and search your ideas')</title>
+    <meta name="description" content="@yield('description', 'Capture and search thoughts with semantic search. Use in the browser or via MCP.')">
     <meta name="keywords" content="@yield('keywords', 'ideatub, knowledge, thoughts, mcp, semantic search')">
 
     <!-- Open Graph -->
     <meta property="og:title" content="@yield('title', config('app.name', 'IdeaTub'))">
-    <meta property="og:description" content="@yield('description', 'Personal knowledge system with semantic search')">
+    <meta property="og:description" content="@yield('description', 'Capture and search thoughts with semantic search. Use in the browser or via MCP.')">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ url()->current() }}">
 
@@ -78,7 +78,7 @@
                     <div>
                         <h3 class="text-sm font-semibold text-gray-400 tracking-wider uppercase">About</h3>
                         <p class="mt-4 text-base text-gray-500">
-                            {{ config('app.name', 'IdeaTub') }} — capture and search thoughts via web or MCP. Semantic search, optional Evernote mirror.
+                            {{ config('app.name', 'IdeaTub') }} — capture and search thoughts via web or MCP. Semantic search.
                         </p>
                     </div>
                     <div>
