@@ -73,7 +73,7 @@ final class StreamThoughtCardPresenter
     {
         $raw = (string) ($this->thought->content ?? '');
 
-        return $this->obfuscatedOrRaw($raw, 'stream_card_body', 'stream_thought_card_presenter.display_content');
+        return $this->obfuscatedOrRaw($raw, 'thought_content', 'stream_thought_card_presenter.display_content');
     }
 
     /**
@@ -86,7 +86,7 @@ final class StreamThoughtCardPresenter
                 $raw = $this->showFullSections
                     ? (string) ($comment->content ?? '')
                     : Str::limit($comment->content, 200);
-                $content = $this->obfuscatedOrRaw($raw, 'stream_comment_preview', 'stream_thought_card_presenter.comment_preview');
+                $content = $this->obfuscatedOrRaw($raw, 'thought_comment_preview', 'stream_thought_card_presenter.comment_preview');
 
                 return [
                     'content' => $content,

@@ -78,7 +78,7 @@ final class IdeaIndexCardPresenter
 
         $raw = Str::limit($this->thought->parent->content, 80);
 
-        return $this->obfuscatedOrRaw($raw, 'idea_index_parent_preview', 'idea_index_card_presenter.parent_preview');
+        return $this->obfuscatedOrRaw($raw, 'thought_parent_preview', 'idea_index_card_presenter.parent_preview');
     }
 
     public function showParentPreview(): bool
@@ -92,7 +92,7 @@ final class IdeaIndexCardPresenter
     {
         $raw = (string) ($this->thought->content ?? '');
 
-        return $this->obfuscatedOrRaw($raw, 'idea_index_card_body', 'idea_index_card_presenter.display_content');
+        return $this->obfuscatedOrRaw($raw, 'thought_content', 'idea_index_card_presenter.display_content');
     }
 
     /**
@@ -103,7 +103,7 @@ final class IdeaIndexCardPresenter
         return $this->thought->comments
             ->map(function (Thought $comment): array {
                 $raw = Str::limit($comment->content, 200);
-                $content = $this->obfuscatedOrRaw($raw, 'idea_index_comment_preview', 'idea_index_card_presenter.comment_preview');
+                $content = $this->obfuscatedOrRaw($raw, 'thought_comment_preview', 'idea_index_card_presenter.comment_preview');
 
                 return [
                     'content' => $content,

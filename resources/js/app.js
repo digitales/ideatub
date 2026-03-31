@@ -459,10 +459,10 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl, editable = false) => ({
   },
 }));
 
-Alpine.data('thoughtContentEditor', ({ content, updateUrl, editable = false, previewMaxLength = null, previewMode = false }) => ({
-  content: content || '',
-  originalContent: content || '',
-  draftContent: content || '',
+Alpine.data('thoughtContentEditor', ({ content, displayContent, rawEditorContent, updateUrl, editable = false, previewMaxLength = null, previewMode = false }) => ({
+  content: displayContent ?? content ?? '',
+  originalContent: rawEditorContent ?? content ?? displayContent ?? '',
+  draftContent: rawEditorContent ?? content ?? displayContent ?? '',
   updateUrl: updateUrl || '',
   editable: !!editable,
   previewMaxLength: previewMaxLength == null || previewMaxLength === '' ? null : Number(previewMaxLength),
@@ -552,14 +552,14 @@ Alpine.data('thoughtContentEditor', ({ content, updateUrl, editable = false, pre
   startEdit() {
     if (!this.editable) return;
     this.editing = true;
-    this.draftContent = this.content;
+    this.draftContent = this.originalContent;
     this.error = '';
     this.$nextTick(() => this.$el.querySelector('textarea')?.focus());
   },
 
   cancelEdit() {
     this.editing = false;
-    this.draftContent = this.content;
+    this.draftContent = this.originalContent;
     this.error = '';
   },
 

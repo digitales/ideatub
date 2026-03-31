@@ -8,6 +8,7 @@
                 'thought' => $card->thought(),
                 'editable' => $card->editable(),
                 'displayContent' => $card->displayContent(),
+                'rawEditorContent' => $card->editable() ? $card->thought()->content : $card->displayContent(),
                 'displayClass' => 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line',
                 'viewHref' => route('thoughts.show', $card->thought()),
                 'viewLinkClass' => 'block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40',
