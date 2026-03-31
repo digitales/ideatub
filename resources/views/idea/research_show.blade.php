@@ -1,6 +1,6 @@
 @extends('layouts.idea')
 
-@section('title', Str::limit($root->content, 50) . ' — IdeaTub')
+@section('title', ($pageTitle ?? Str::limit($root->content, 50)) . ' — IdeaTub')
 
 @section('content')
 <div class="max-w-4xl mx-auto px-6 md:px-8 pt-16 pb-24">

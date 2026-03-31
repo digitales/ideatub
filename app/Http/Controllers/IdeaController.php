@@ -1132,18 +1132,31 @@ class IdeaController extends Controller
         $sections = $thought->comments()->orderBy('created_at')->get();
         $converter = new CommonMarkConverter;
 
-        $rootHtml = $converter->convert($thought->content)->getContent();
-        $sectionsWithHtml = $sections->map(function ($section) use ($converter) {
+        $rootHtml = $this->renderDemoSafeMarkdown(
+            $converter,
+            $thought->content,
+            'research_show_root'
+        );
+        $sectionsWithHtml = $sections->map(function (Thought $section) use ($converter) {
             return (object) [
-                'content_html' => $converter->convert($section->content)->getContent(),
+                'content_html' => $this->renderDemoSafeMarkdown(
+                    $converter,
+                    $section->content,
+                    'research_show_section'
+                ),
             ];
         });
 
         $relatedEmail = $this->resolveResearchRelatedEmailCard($thought);
         $editorialLinkSummaries = $this->buildResearchEditorialLinkSummaryViewModel($thought);
+        $pageTitle = Str::limit(
+            preg_replace('/\s+/', ' ', trim(strip_tags($rootHtml))) ?: 'Research',
+            50
+        );
 
         return view('idea.research_show', [
             'root' => $thought,
+            'pageTitle' => $pageTitle,
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
             'relatedEmail' => $relatedEmail,
@@ -1234,12 +1247,26 @@ class IdeaController extends Controller
         }
 
         return [
-            'title' => $title,
+            'title' => $row->resolved_title !== null && trim($row->resolved_title) !== ''
+                ? $this->demoSafeResearchText($title, 'research_editorial_title', 'research_show.editorial_title') ?? 'Demo content hidden'
+                : $title,
             'url' => $row->original_url,
-            'summary_text' => $row->summary_text,
+            'summary_text' => $this->demoSafeResearchText(
+                $row->summary_text,
+                'research_editorial_summary',
+                'research_show.editorial_summary'
+            ),
             'relation_label' => $row->support_judgment,
-            'why_it_matters' => $row->why_it_matters,
-            'quality_notes' => $row->quality_notes,
+            'why_it_matters' => $this->demoSafeResearchText(
+                $row->why_it_matters,
+                'research_editorial_why',
+                'research_show.editorial_why'
+            ),
+            'quality_notes' => $this->demoSafeResearchText(
+                $row->quality_notes,
+                'research_editorial_quality_notes',
+                'research_show.editorial_quality_notes'
+            ),
             'processing_status' => $row->processing_status,
         ];
     }
@@ -1559,6 +1586,25 @@ class IdeaController extends Controller
         return $converter->convert($displayMarkdown)->getContent();
     }
 
+    private function demoSafeResearchText(?string $value, string $context, string $boundary): ?string
+    {
+        if ($value === null || $value === '' || ! app(DemoMode::class)->enabled()) {
+            return $value;
+        }
+
+        try {
+            return app(DemoObfuscator::class)->obfuscate($value, $context) ?? 'Demo content hidden';
+        } catch (\Throwable $e) {
+            Log::warning('Demo obfuscation failed for research page field.', [
+                'boundary' => $boundary,
+                'context' => $context,
+                'exception' => $e::class,
+            ]);
+
+            return 'Demo content hidden';
+        }
+    }
+
     /**
      * @return array{subject: string, sender: string, url: string}|null
      */
@@ -1588,7 +1634,11 @@ class IdeaController extends Controller
         }
 
         return [
-            'subject' => $subject,
+            'subject' => $this->demoSafeResearchText(
+                $subject,
+                'research_related_email_subject',
+                'research_show.related_email_subject'
+            ) ?? 'Demo content hidden',
             'sender' => $sender,
             'url' => route('thoughts.show', $emailThought),
         ];

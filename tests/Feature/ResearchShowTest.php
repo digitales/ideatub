@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\DemoMode;
 use App\Models\Thought;
 use App\Models\ThoughtLinkSummary;
 use App\Models\User;
@@ -844,6 +845,76 @@ class ResearchShowTest extends TestCase
         $response->assertSee('Editorial link summaries', false);
         $response->assertSee('1', false);
         $response->assertSee('failed', false);
+    }
+
+    public function test_demo_mode_obfuscates_private_research_page_narrative_content(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $owner = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'EMAIL_BODY_SHOULD_NOT_APPEAR_HERE',
+        ]);
+
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => "# DEMO_RESEARCH_ROOT_SECRET_TITLE\n\nDEMO_RESEARCH_ROOT_SECRET_BODY",
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+                'email_thought_id' => $emailThought->id,
+                'email_subject' => 'DEMO_RELATED_EMAIL_SUBJECT_SECRET',
+                'email_sender' => 'visible-sender@example.com',
+            ],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $root->id,
+            'embedding' => null,
+            'content' => "## DEMO_RESEARCH_SECTION_SECRET_TITLE\n\nDEMO_RESEARCH_SECTION_SECRET_BODY",
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/demo-editorial',
+            'normalized_url' => 'https://example.com/demo-editorial',
+            'normalized_url_hash' => sha1('https://example.com/demo-editorial'),
+            'newsletter_section_label' => 'Main section',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'DEMO_EDITORIAL_TITLE_SECRET',
+            'summary_text' => 'DEMO_EDITORIAL_SUMMARY_SECRET',
+            'support_judgment' => 'supports',
+            'why_it_matters' => 'DEMO_EDITORIAL_WHY_SECRET',
+            'quality_notes' => 'DEMO_EDITORIAL_QUALITY_SECRET',
+        ]);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'research-show-demo-seed',
+        ])->actingAs($owner)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $response->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+        $response->assertDontSee('DEMO_RESEARCH_ROOT_SECRET_TITLE', false);
+        $response->assertDontSee('DEMO_RESEARCH_ROOT_SECRET_BODY', false);
+        $response->assertDontSee('DEMO_RESEARCH_SECTION_SECRET_TITLE', false);
+        $response->assertDontSee('DEMO_RESEARCH_SECTION_SECRET_BODY', false);
+        $response->assertDontSee('DEMO_RELATED_EMAIL_SUBJECT_SECRET', false);
+        $response->assertDontSee('DEMO_EDITORIAL_TITLE_SECRET', false);
+        $response->assertDontSee('DEMO_EDITORIAL_SUMMARY_SECRET', false);
+        $response->assertDontSee('DEMO_EDITORIAL_WHY_SECRET', false);
+        $response->assertDontSee('DEMO_EDITORIAL_QUALITY_SECRET', false);
+        $response->assertSee('visible-sender@example.com', false);
+        $response->assertSee('https://example.com/demo-editorial', false);
+        $response->assertSee('supports', false);
+        $response->assertSee('Main section', false);
     }
 
     /**

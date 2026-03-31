@@ -9,6 +9,7 @@ Concise handoff for what demo mode v1 covers versus known exclusions. See `docs/
 - Stream (`idea.stream`): same card/preview rules as index for the main stream response and AJAX fragments.
 - Incomplete ideas (`idea.ideas`): idea body and research snippet rows; AJAX `html` fragments.
 - Completed ideas (`idea.completed`): list excerpts; date labels remain real.
+- Private research page (`idea.research.show`): research root/section bodies, related email subject, and editorial link summary narrative fields; URLs, counts, and status labels remain real.
 
 ## Intentional v1 exclusions / gaps
 

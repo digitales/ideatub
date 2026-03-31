@@ -23,6 +23,7 @@ use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\PricingController;
+use App\Http\Controllers\ProfileSettingsController;
 use App\Http\Controllers\ResearchSkillSettingsController;
 use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
@@ -154,6 +155,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/mcp-keys', [McpKeyController::class, 'index'])->name('settings.mcp-keys.index');
     Route::post('/settings/mcp-keys', [McpKeyController::class, 'store'])->name('settings.mcp-keys.store');
     Route::delete('/settings/mcp-keys/{mcpKey}', [McpKeyController::class, 'destroy'])->name('settings.mcp-keys.destroy');
+
+    Route::get('/settings/profile', [ProfileSettingsController::class, 'index'])->name('settings.profile.index');
+    Route::put('/settings/profile', [ProfileSettingsController::class, 'update'])->name('settings.profile.update');
 
     Route::get('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'index'])->name('settings.ideas-revisit.index');
     Route::put('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'update'])->name('settings.ideas-revisit.update');
