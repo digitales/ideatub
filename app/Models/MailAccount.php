@@ -46,6 +46,13 @@ class MailAccount extends Model
         return $this->hasMany(MailSyncRun::class);
     }
 
+    /**
+     * Latest sync run by `started_at` (via `latestOfMany('started_at')`), not by Eloquent's default
+     * `latest()` ordering on `syncRuns()` (typically `created_at`).
+     *
+     * Replaces the old Blade `syncRuns()->latest()->first()` semantics; `started_at` is the source of
+     * truth for which row represents the latest sync in UI.
+     */
     public function latestSyncRun(): HasOne
     {
         return $this->hasOne(MailSyncRun::class)->latestOfMany('started_at');

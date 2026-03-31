@@ -30,28 +30,30 @@ class MailAccountCardPresenterTest extends TestCase
     {
         Carbon::setTestNow(Carbon::parse('2026-03-31 12:00:00'));
 
-        $account = MailAccount::factory()->make([
-            'display_name' => 'Primary Fastmail',
-            'account_email' => 'owner@fastmail.fm',
-            'last_synced_at' => Carbon::parse('2026-03-31 11:00:00'),
-        ]);
+        try {
+            $account = MailAccount::factory()->make([
+                'display_name' => 'Primary Fastmail',
+                'account_email' => 'owner@fastmail.fm',
+                'last_synced_at' => Carbon::parse('2026-03-31 11:00:00'),
+            ]);
 
-        $run = new MailSyncRun([
-            'status' => 'completed',
-            'started_at' => Carbon::parse('2026-03-31 10:00:00'),
-        ]);
+            $run = new MailSyncRun([
+                'status' => 'completed',
+                'started_at' => Carbon::parse('2026-03-31 10:00:00'),
+            ]);
 
-        $account->setRelation('latestSyncRun', $run);
+            $account->setRelation('latestSyncRun', $run);
 
-        $presenter = new MailAccountCardPresenter($account);
+            $presenter = new MailAccountCardPresenter($account);
 
-        $this->assertSame('Primary Fastmail', $presenter->displayName());
-        $this->assertSame('owner@fastmail.fm', $presenter->accountEmail());
-        $this->assertTrue($presenter->hasLatestSyncRun());
-        $this->assertSame('completed', $presenter->latestSyncStatus());
-        $this->assertSame('1 hour ago', $presenter->lastSyncedHumanText());
-
-        Carbon::setTestNow();
+            $this->assertSame('Primary Fastmail', $presenter->displayName());
+            $this->assertSame('owner@fastmail.fm', $presenter->accountEmail());
+            $this->assertTrue($presenter->hasLatestSyncRun());
+            $this->assertSame('completed', $presenter->latestSyncStatus());
+            $this->assertSame('1 hour ago', $presenter->lastSyncedHumanText());
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     #[Test]
