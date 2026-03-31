@@ -2,13 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\RunResearchRun;
 use App\Models\ImportedEmail;
 use App\Models\MailAccount;
+use App\Models\ResearchRun;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class ResearchServiceTest extends TestCase
@@ -181,5 +184,58 @@ class ResearchServiceTest extends TestCase
 
         $researchCount = Thought::where('metadata->type', 'research')->count();
         $this->assertSame(0, $researchCount);
+    }
+
+    public function test_create_idea_and_queue_research_run_creates_queued_run_without_calling_research_note(): void
+    {
+        Bus::fake();
+        $user = User::factory()->create();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+            $mock->shouldNotReceive('researchNote');
+        });
+
+        $this->actingAs($user);
+        $service = app(ResearchService::class);
+        $result = $service->createIdeaAndQueueResearchRun('Queued from service test', 'mcp');
+
+        $this->assertArrayHasKey('idea', $result);
+        $this->assertArrayHasKey('run', $result);
+        $idea = $result['idea'];
+        $run = $result['run'];
+
+        $this->assertInstanceOf(Thought::class, $idea);
+        $this->assertSame('idea', $idea->metadata['type']);
+        $this->assertInstanceOf(ResearchRun::class, $run);
+        $this->assertSame($idea->id, $run->idea_thought_id);
+        $this->assertSame('mcp', $run->source);
+        $this->assertSame('queued', $run->status);
+
+        $this->assertSame(0, Thought::where('metadata->type', 'research')->count());
+
+        Bus::assertDispatched(RunResearchRun::class, fn (RunResearchRun $job) => $job->researchRunId === $run->id);
+    }
+
+    public function test_queue_research_run_for_idea_second_call_reuses_active_run(): void
+    {
+        Bus::fake();
+        $user = User::factory()->create();
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Idea for duplicate run guard',
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => now()->toDateString()],
+            'embedding' => null,
+        ]);
+
+        $this->actingAs($user);
+        $service = app(ResearchService::class);
+        $first = $service->queueResearchRunForIdea($idea, 'web');
+        $second = $service->queueResearchRunForIdea($idea, 'web');
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame(1, ResearchRun::query()->where('idea_thought_id', $idea->id)->count());
+        Bus::assertDispatchedTimes(RunResearchRun::class, 1);
     }
 }

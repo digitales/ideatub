@@ -54,10 +54,6 @@ class ResearchService
     }
 
     /**
-     * Create or reuse a research run for this idea and queue execution. At most one active
-     * (queued or running) run per idea; an existing active run is returned without dispatching again.
-     */
-    /**
      * Whether the user has a default research skill that may run automatically (Save idea + global auto-run).
      */
     public function hasEligibleDefaultAutoRunSkillForUser(User $user): bool
@@ -72,6 +68,10 @@ class ResearchService
             ->exists();
     }
 
+    /**
+     * Create or reuse a research run for this idea and queue execution. At most one active
+     * (queued or running) run per idea; an existing active run is returned without dispatching again.
+     */
     public function queueResearchRunForIdea(
         Thought $idea,
         string $source = 'web',
@@ -260,6 +260,19 @@ class ResearchService
         }
 
         return ['idea' => $idea, 'research' => $research];
+    }
+
+    /**
+     * Create an idea thought, then queue a research run (same path as web manual research).
+     *
+     * @return array{idea: Thought, run: ResearchRun}
+     */
+    public function createIdeaAndQueueResearchRun(string $ideaContent, string $source = 'web'): array
+    {
+        $idea = $this->createIdeaOnly($ideaContent, $source);
+        $run = $this->queueResearchRunForIdea($idea, $source);
+
+        return ['idea' => $idea, 'run' => $run];
     }
 
     /**

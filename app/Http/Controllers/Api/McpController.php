@@ -233,12 +233,12 @@ class McpController extends Controller
             ],
             [
                 'name' => 'research_idea',
-                'description' => 'Run AI research for an idea. Provide idea_id (UUID of existing idea) or content (new idea text); creates linked research thought.',
+                'description' => 'Queue AI research for an idea (runs in the background). Provide idea_id (UUID of existing idea) or content (new idea text). Returns idea_id and research_run_id; research_id is null until the run completes.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
-                        'idea_id' => ['type' => 'string', 'description' => 'UUID of an existing idea thought to run research for'],
-                        'content' => ['type' => 'string', 'description' => 'New idea text; creates idea and runs research (use when no idea_id)'],
+                        'idea_id' => ['type' => 'string', 'description' => 'UUID of an existing idea thought to queue research for'],
+                        'content' => ['type' => 'string', 'description' => 'New idea text; creates idea then queues research (use when no idea_id)'],
                     ],
                     'required' => [],
                 ],
@@ -535,10 +535,11 @@ class McpController extends Controller
     }
 
     /**
-     * research_idea: Run AI research for an idea. Either idea_id (existing idea) or content (new idea), or both (content creates new idea+research).
+     * research_idea: Queue AI research for an idea. Either idea_id (existing idea) or content (new idea);
+     * content creates the idea first, then queues a run (same service path as web).
      *
      * @param  array<string, mixed>  $params
-     * @return array{idea_id: string, research_id: string|null}
+     * @return array{idea_id: string, research_run_id: int, research_id: null}
      */
     private function researchIdea(array $params): array
     {
@@ -560,17 +561,18 @@ class McpController extends Controller
             }
         }
 
-        // If content provided, create idea and run research (idea_id is ignored when content is present).
+        // If content provided, create idea and queue research (idea_id is ignored when content is present).
         if ($content !== null) {
-            $result = $this->researchService->createIdeaAndResearch($content, 'mcp');
+            $result = $this->researchService->createIdeaAndQueueResearchRun($content, 'mcp');
 
             return [
                 'idea_id' => $result['idea']->id,
-                'research_id' => $result['research']?->id,
+                'research_run_id' => $result['run']->id,
+                'research_id' => null,
             ];
         }
 
-        // idea_id only: run research for existing idea.
+        // idea_id only: queue research for existing idea.
         $thought = Thought::find($ideaId);
         if ($thought === null) {
             throw new \InvalidArgumentException('Idea not found.');
@@ -583,11 +585,12 @@ class McpController extends Controller
             throw new \InvalidArgumentException('Thought is not an idea.');
         }
 
-        $researchThought = $this->researchService->runResearchForIdea($thought, 'mcp');
+        $run = $this->researchService->queueResearchRunForIdea($thought, 'mcp');
 
         return [
             'idea_id' => $thought->id,
-            'research_id' => $researchThought->id,
+            'research_run_id' => $run->id,
+            'research_id' => null,
         ];
     }
 
