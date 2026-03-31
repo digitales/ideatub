@@ -9,9 +9,11 @@ use App\Models\ResearchSkillVersion;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\Research\ResearchSkillManager;
+use App\Services\ResearchService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ResearchRunWorkflowTest extends TestCase
@@ -225,6 +227,9 @@ class ResearchRunWorkflowTest extends TestCase
         Queue::assertPushed(RunResearchRun::class, function (RunResearchRun $job) use ($runId): bool {
             return $job->researchRunId === $runId;
         });
+
+        $idea->refresh();
+        $this->assertTrue((bool) ($idea->metadata['research_pending'] ?? false));
     }
 
     public function test_idea_research_reuses_existing_active_run_and_does_not_dispatch_second_job(): void
@@ -254,5 +259,110 @@ class ResearchRunWorkflowTest extends TestCase
         Queue::assertPushedTimes(RunResearchRun::class, 1);
         $this->assertSame(1, ResearchRun::query()->where('idea_thought_id', $idea->id)->count());
         $this->assertSame($firstRunId, (int) ResearchRun::query()->where('idea_thought_id', $idea->id)->value('id'));
+    }
+
+    public function test_idea_research_uses_requested_manual_skill_when_provided(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        app(ResearchSkillManager::class)->create($user, [
+            'name' => 'Default',
+            'is_default' => true,
+        ]);
+        $selectedSkill = app(ResearchSkillManager::class)->create($user, [
+            'name' => 'Selected',
+            'is_default' => false,
+        ]);
+
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => [
+                'type' => 'idea',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->post(route('ideas.research', $idea), [
+            'research_skill_id' => $selectedSkill->id,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('research_runs', [
+            'idea_thought_id' => $idea->id,
+            'research_skill_id' => $selectedSkill->id,
+            'research_skill_version_id' => $selectedSkill->fresh()->latestVersion->id,
+        ]);
+
+        $idea->refresh();
+        $this->assertTrue((bool) ($idea->metadata['research_pending'] ?? false));
+    }
+
+    public function test_idea_research_clears_research_pending_when_queueing_fails(): void
+    {
+        $user = User::factory()->create();
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => [
+                'type' => 'idea',
+            ],
+        ]);
+
+        $this->mock(ResearchService::class, function (MockInterface $mock) use ($idea): void {
+            $mock->shouldReceive('queueResearchRunForIdea')
+                ->once()
+                ->withArgs(function (...$args) use ($idea): bool {
+                    [$queuedIdea, $source] = $args;
+                    $researchSkillId = $args[2] ?? null;
+
+                    return $queuedIdea->is($idea)
+                        && $source === 'web'
+                        && $researchSkillId === null;
+                })
+                ->andThrow(new \RuntimeException('Queue unavailable'));
+        });
+
+        $response = $this->actingAs($user)->post(route('ideas.research', $idea));
+
+        $response->assertRedirect();
+        $idea->refresh();
+        $this->assertFalse((bool) ($idea->metadata['research_pending'] ?? false));
+    }
+
+    public function test_research_new_clears_research_pending_when_queueing_fails(): void
+    {
+        $user = User::factory()->create();
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => [
+                'type' => 'idea',
+            ],
+        ]);
+
+        $this->mock(ResearchService::class, function (MockInterface $mock) use ($idea): void {
+            $mock->shouldReceive('createIdeaOnly')
+                ->once()
+                ->with('Queue this idea', 'web')
+                ->andReturn($idea);
+
+            $mock->shouldReceive('queueResearchRunForIdea')
+                ->once()
+                ->withArgs(function (...$args) use ($idea): bool {
+                    [$queuedIdea, $source] = $args;
+                    $researchSkillId = $args[2] ?? null;
+
+                    return $queuedIdea->is($idea)
+                        && $source === 'web'
+                        && $researchSkillId === null;
+                })
+                ->andThrow(new \RuntimeException('Queue unavailable'));
+        });
+
+        $response = $this->actingAs($user)->post(route('ideas.research-new'), [
+            'content' => 'Queue this idea',
+        ]);
+
+        $response->assertRedirect(route('idea.ideas'));
+        $idea->refresh();
+        $this->assertFalse((bool) ($idea->metadata['research_pending'] ?? false));
     }
 }
