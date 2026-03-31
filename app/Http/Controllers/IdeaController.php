@@ -79,9 +79,11 @@ class IdeaController extends Controller
 
                 if ($request->ajax()) {
                     $replyableOffset = (int) $request->input('replyable_offset', 0);
+                    $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection());
                     $html = view('idea.index_thought_cards', [
                         'thoughts' => $thoughts,
                         'replyableIndexStart' => $replyableOffset,
+                        'newsletterResearchStatuses' => $newsletterResearchStatuses,
                     ])->render();
 
                     return response()->json([
@@ -110,7 +112,12 @@ class IdeaController extends Controller
                 ->get();
 
             if ($request->ajax()) {
-                $html = view('idea.index_thought_cards', ['thoughts' => $thoughts, 'replyableIndexStart' => 0])->render();
+                $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts);
+                $html = view('idea.index_thought_cards', [
+                    'thoughts' => $thoughts,
+                    'replyableIndexStart' => 0,
+                    'newsletterResearchStatuses' => $newsletterResearchStatuses,
+                ])->render();
                 $latest = $thoughts->isEmpty() ? null : $thoughts->first()->created_at->toIso8601String();
 
                 return response()->json([
@@ -135,6 +142,7 @@ class IdeaController extends Controller
             'thoughts' => $thoughts,
             'query' => $query !== '' ? $query : null,
             'replyingTo' => $replyingTo,
+            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatuses($thoughts instanceof LengthAwarePaginator ? $thoughts->getCollection() : $thoughts),
         ]);
     }
 
@@ -160,6 +168,9 @@ class IdeaController extends Controller
         $emailResearchPreview = $thought->source === 'email'
             ? $this->buildEmailResearchPreview($thought)
             : null;
+        $newsletterResearchStatus = $thought->source === 'email'
+            ? $this->buildEmailNewsletterResearchStatus($thought)
+            : null;
 
         return view('idea.show', [
             'thought' => $thought,
@@ -168,6 +179,7 @@ class IdeaController extends Controller
             'contentHtml' => $contentHtml,
             'linkedResearchUrl' => $linkedResearchUrl,
             'emailResearchPreview' => $emailResearchPreview,
+            'newsletterResearchStatus' => $newsletterResearchStatus,
         ]);
     }
 
@@ -305,10 +317,12 @@ class IdeaController extends Controller
             ->keyBy('thought_id');
 
         if ($request->ajax()) {
+            $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection());
             $html = view('idea.stream_thoughts', [
                 'thoughts' => $thoughts,
                 'showFullSections' => $tagForDisplay !== null,
                 'shareByThoughtId' => $shareByThoughtId,
+                'newsletterResearchStatuses' => $newsletterResearchStatuses,
             ])->render();
 
             $streamSince = $this->firstPageCreatedAtCursor($thoughts, $canonicalTag !== null);
@@ -331,6 +345,7 @@ class IdeaController extends Controller
             'streamCollectionKey' => null,
             'streamSince' => $this->firstPageCreatedAtCursor($thoughts, $canonicalTag !== null),
             'shareByThoughtId' => $shareByThoughtId,
+            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection()),
         ]);
     }
 
@@ -464,10 +479,12 @@ class IdeaController extends Controller
             ->keyBy('thought_id');
 
         if ($request->ajax()) {
+            $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection());
             $html = view('idea.stream_thoughts', [
                 'thoughts' => $thoughts,
                 'showFullSections' => false,
                 'shareByThoughtId' => $shareByThoughtId,
+                'newsletterResearchStatuses' => $newsletterResearchStatuses,
             ])->render();
             $streamSince = $latestForAjax($thoughts);
 
@@ -489,6 +506,7 @@ class IdeaController extends Controller
             'streamCollectionKey' => $streamCollectionKey,
             'streamSince' => $latestForAjax($thoughts),
             'shareByThoughtId' => $shareByThoughtId,
+            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection()),
         ]);
     }
 
@@ -1005,6 +1023,63 @@ class IdeaController extends Controller
             ->where('user_id', auth()->id())
             ->matchingCanonicalMetadataType('research')
             ->first();
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Thought>  $thoughts
+     * @return array<string, array<string, string|bool>|null>
+     */
+    private function buildEmailNewsletterResearchStatuses(Collection $thoughts): array
+    {
+        $statuses = [];
+
+        foreach ($thoughts as $thought) {
+            $statuses[$thought->id] = $this->buildEmailNewsletterResearchStatus($thought);
+        }
+
+        return $statuses;
+    }
+
+    /**
+     * @return array{status: string, research_thought_id: string|null, skip_reason: string, show_research_link: bool, show_skip_info: bool}|null
+     */
+    private function buildEmailNewsletterResearchStatus(Thought $thought): ?array
+    {
+        if ($thought->source !== 'email') {
+            return null;
+        }
+
+        $newsletterResearch = data_get($thought->source_metadata, 'newsletter_research');
+        $metadataStatus = is_array($newsletterResearch) ? trim((string) ($newsletterResearch['status'] ?? '')) : '';
+        $metadataResearchThoughtId = is_array($newsletterResearch)
+            ? $this->normalizeResearchThoughtId($newsletterResearch['research_thought_id'] ?? null)
+            : null;
+        $reasonRaw = is_array($newsletterResearch) ? ($newsletterResearch['reason'] ?? null) : null;
+        $skipReason = is_string($reasonRaw)
+            ? trim($reasonRaw)
+            : (is_scalar($reasonRaw) ? trim((string) $reasonRaw) : '');
+
+        $linkedResearch = $this->resolveEmailLinkedResearchThought($thought);
+        $researchThoughtId = $linkedResearch?->id ?? $metadataResearchThoughtId;
+
+        $effectiveStatus = $metadataStatus !== '' ? $metadataStatus : null;
+        if ($linkedResearch !== null) {
+            $effectiveStatus = $metadataStatus === 'research_partial'
+                ? 'research_partial'
+                : 'research_completed';
+        }
+
+        if (! is_string($effectiveStatus) || $effectiveStatus === '') {
+            return null;
+        }
+
+        return [
+            'status' => $effectiveStatus,
+            'research_thought_id' => $researchThoughtId,
+            'skip_reason' => $skipReason,
+            'show_research_link' => $researchThoughtId !== null && in_array($effectiveStatus, ['research_completed', 'research_partial'], true),
+            'show_skip_info' => $effectiveStatus === 'research_skipped' && $skipReason !== '',
+        ];
     }
 
     /**

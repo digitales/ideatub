@@ -56,6 +56,7 @@
                 'thought' => $thought,
                 'importedEmail' => $importedEmail,
                 'senderRuleContext' => $senderRuleContext,
+                'newsletterResearchStatus' => $newsletterResearchStatus ?? null,
             ])
         @endif
     </div>

@@ -100,6 +100,49 @@ class EmailThoughtStatusDisplayTest extends TestCase
         $stream->assertSee(route('idea.research.show', $research), false);
     }
 
+    public function test_stale_queued_status_with_valid_linked_research_shows_ready_status_and_link(): void
+    {
+        $user = User::factory()->create();
+        $research = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => '# Research doc',
+            'source' => 'research',
+            'metadata' => ['type' => 'research'],
+        ]);
+
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Source email with stale queued status',
+            'source' => 'email',
+            'source_metadata' => [
+                'research_thought_id' => $research->id,
+                'newsletter_research' => [
+                    'status' => 'research_queued',
+                ],
+            ],
+        ]);
+
+        $index = $this->actingAs($user)->get(route('idea.index'));
+        $index->assertStatus(200);
+        $index->assertSee('data-email-research-status="research_completed"', false);
+        $index->assertDontSee('data-email-research-status="research_queued"', false);
+        $index->assertSee(route('idea.research.show', $research), false);
+
+        $stream = $this->actingAs($user)->get(route('idea.stream'));
+        $stream->assertStatus(200);
+        $stream->assertSee('data-email-research-status="research_completed"', false);
+        $stream->assertDontSee('data-email-research-status="research_queued"', false);
+        $stream->assertSee(route('idea.research.show', $research), false);
+
+        $detail = $this->actingAs($user)->get(route('thoughts.show', $thought));
+        $detail->assertStatus(200);
+        $detail->assertSee('data-email-research-status="research_completed"', false);
+        $detail->assertDontSee('data-email-research-status="research_queued"', false);
+        $detail->assertSee(route('idea.research.show', $research), false);
+    }
+
     public function test_non_email_thought_does_not_render_email_research_status(): void
     {
         $user = User::factory()->create();

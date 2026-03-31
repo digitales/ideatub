@@ -1,12 +1,11 @@
 @php
-    $showEmailResearch = ($thought->source ?? null) === 'email';
-    $nr = $showEmailResearch ? data_get($thought->source_metadata, 'newsletter_research') : null;
-    $researchStatus = is_array($nr) ? ($nr['status'] ?? null) : null;
-    $researchThoughtId = is_array($nr) ? ($nr['research_thought_id'] ?? null) : null;
-    $reasonRaw = is_array($nr) ? ($nr['reason'] ?? null) : null;
-    $skipReason = is_string($reasonRaw) ? trim($reasonRaw) : (is_scalar($reasonRaw) ? trim((string) $reasonRaw) : '');
+    $researchStatus = $newsletterResearchStatus['status'] ?? null;
+    $researchThoughtId = $newsletterResearchStatus['research_thought_id'] ?? null;
+    $skipReason = $newsletterResearchStatus['skip_reason'] ?? '';
+    $showResearchLink = (bool) ($newsletterResearchStatus['show_research_link'] ?? false);
+    $showSkipInfo = (bool) ($newsletterResearchStatus['show_skip_info'] ?? false);
 @endphp
-@if ($showEmailResearch && is_string($researchStatus) && $researchStatus !== '')
+@if (is_string($researchStatus) && $researchStatus !== '')
     @php
         $labels = [
             'research_queued' => 'Research queued',
@@ -16,10 +15,7 @@
             'research_failed' => 'Research failed',
         ];
         $label = $labels[$researchStatus] ?? ucfirst(str_replace('_', ' ', $researchStatus));
-        $showResearchLink = is_string($researchThoughtId) && $researchThoughtId !== ''
-            && in_array($researchStatus, ['research_completed', 'research_partial'], true);
-        $showSkipInfo = $researchStatus === 'research_skipped' && $skipReason !== '';
-        $skipReasonPopoverId = 'email-research-skip-reason-'.$thought->id;
+        $skipReasonPopoverId = 'email-research-skip-reason-'.($thought->id ?? 'status');
     @endphp
     <span
         class="inline-flex items-center rounded-md border border-memory-violet/20 bg-memory-violet/5 px-1.5 py-0.5 text-[10px] font-medium text-memory-violet/80"
