@@ -9,7 +9,7 @@ class NewsletterResearchStatusPresenterTest extends TestCase
 {
     public function test_from_array_returns_null_for_null_payload(): void
     {
-        $this->assertNull(NewsletterResearchStatusPresenter::fromArray(null, 'abc'));
+        $this->assertNull(NewsletterResearchStatusPresenter::fromArray(null, domIdSuffix: 'abc'));
     }
 
     public function test_label_maps_known_statuses(): void
@@ -29,7 +29,7 @@ class NewsletterResearchStatusPresenterTest extends TestCase
                 'skip_reason' => '',
                 'show_research_link' => false,
                 'show_skip_info' => false,
-            ], 'suffix');
+            ], domIdSuffix: 'suffix');
 
             $this->assertSame($expected, $p->label(), "status {$status}");
         }
@@ -43,7 +43,7 @@ class NewsletterResearchStatusPresenterTest extends TestCase
             'skip_reason' => '',
             'show_research_link' => false,
             'show_skip_info' => false,
-        ], 'x');
+        ], domIdSuffix: 'x');
 
         $this->assertSame('Custom thing here', $p->label());
     }
@@ -56,7 +56,7 @@ class NewsletterResearchStatusPresenterTest extends TestCase
             'skip_reason' => '',
             'show_research_link' => true,
             'show_skip_info' => false,
-        ], 't1');
+        ], domIdSuffix: 't1');
 
         $this->assertTrue($withLink->showsResearchLink());
         $this->assertFalse($withLink->showsSkipInfo());
@@ -68,7 +68,7 @@ class NewsletterResearchStatusPresenterTest extends TestCase
             'skip_reason' => 'Too short.',
             'show_research_link' => false,
             'show_skip_info' => true,
-        ], 't2');
+        ], domIdSuffix: 't2');
 
         $this->assertFalse($withSkip->showsResearchLink());
         $this->assertTrue($withSkip->showsSkipInfo());
@@ -83,7 +83,7 @@ class NewsletterResearchStatusPresenterTest extends TestCase
             'skip_reason' => 'x',
             'show_research_link' => false,
             'show_skip_info' => true,
-        ], 'thought-uuid-here');
+        ], domIdSuffix: 'thought-uuid-here');
 
         $this->assertSame('email-research-skip-reason-thought-uuid-here', $p->skipReasonPopoverId());
     }
@@ -96,7 +96,7 @@ class NewsletterResearchStatusPresenterTest extends TestCase
             'skip_reason' => '',
             'show_research_link' => false,
             'show_skip_info' => false,
-        ], 's');
+        ], domIdSuffix: 's');
 
         $this->assertSame('research_partial', $p->status());
     }

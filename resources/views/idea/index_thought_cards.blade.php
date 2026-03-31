@@ -59,7 +59,7 @@
             <div class="mt-2 flex min-w-0 items-center gap-2 flex-wrap">
                 <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
                 @include('idea.partials.thought_type_badge', ['thought' => $thought])
-                @include('idea.partials.email_newsletter_research_status', ['newsletterResearchStatus' => $newsletterResearchStatuses[$thought->id] ?? null])
+                @include('idea.partials.email_newsletter_research_status', ['newsletterResearchStatus' => $newsletterResearchStatusPresenters[$thought->id] ?? null])
                 @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
                 @if (!$thought->parent_id)
                     <a href="{{ route('idea.index', ['parent_id' => $thought->id]) }}"

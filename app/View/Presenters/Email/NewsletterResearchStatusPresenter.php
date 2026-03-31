@@ -21,13 +21,13 @@ class NewsletterResearchStatusPresenter
         private readonly string $skipReason,
         private readonly bool $showResearchLink,
         private readonly bool $showSkipInfo,
-        private readonly string $popoverSuffix,
+        private readonly string $domIdSuffix,
     ) {}
 
     /**
      * @param  array{status: string, research_thought_id: string|null, skip_reason: string, show_research_link: bool, show_skip_info: bool}|null  $payload
      */
-    public static function fromArray(?array $payload, string $popoverSuffix): ?self
+    public static function fromArray(?array $payload, string $domIdSuffix): ?self
     {
         if ($payload === null) {
             return null;
@@ -50,7 +50,7 @@ class NewsletterResearchStatusPresenter
             $skipReason,
             (bool) ($payload['show_research_link'] ?? false),
             (bool) ($payload['show_skip_info'] ?? false),
-            $popoverSuffix,
+            $domIdSuffix,
         );
     }
 
@@ -87,6 +87,6 @@ class NewsletterResearchStatusPresenter
 
     public function skipReasonPopoverId(): string
     {
-        return 'email-research-skip-reason-'.$this->popoverSuffix;
+        return 'email-research-skip-reason-'.$this->domIdSuffix;
     }
 }

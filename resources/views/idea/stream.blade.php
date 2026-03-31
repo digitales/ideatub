@@ -56,7 +56,7 @@
                 <div id="stream-thoughts-list"
                     data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
                     data-stream-since="{{ $streamSince }}">
-                    @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag, 'shareByThoughtId' => $shareByThoughtId ?? collect(), 'newsletterResearchStatuses' => $newsletterResearchStatuses ?? []])
+                    @include('idea.stream_thoughts', ['thoughts' => $thoughts, 'showFullSections' => (bool) $tag, 'shareByThoughtId' => $shareByThoughtId ?? collect(), 'newsletterResearchStatusPresenters' => $newsletterResearchStatusPresenters ?? []])
                 </div>
                 @if($thoughts->hasMorePages())
                     <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}" data-stream-total="{{$thoughts->total()}}"></div>

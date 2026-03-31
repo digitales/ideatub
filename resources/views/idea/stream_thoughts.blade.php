@@ -38,7 +38,7 @@
                 @endphp
                 <span class="text-[10.5px] text-slate-brand/40">{{ ($activityAt ?? $thought->created_at)->diffForHumans() }}</span>
                 @include('idea.partials.thought_type_badge', ['thought' => $thought])
-                @include('idea.partials.email_newsletter_research_status', ['newsletterResearchStatus' => $newsletterResearchStatuses[$thought->id] ?? null])
+                @include('idea.partials.email_newsletter_research_status', ['newsletterResearchStatus' => $newsletterResearchStatusPresenters[$thought->id] ?? null])
                 @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
             </div>
 
