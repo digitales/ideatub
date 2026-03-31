@@ -6,6 +6,7 @@ use App\Contracts\EvernoteApiGateway;
 use App\Events\IdeaResearchRequested;
 use App\Listeners\RunResearchForIdeaListener;
 use App\Models\InboxItem;
+use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
@@ -65,7 +66,11 @@ class AppServiceProvider extends ServiceProvider
                     ->count();
             }
 
+            $demoModeEnabled = (bool) config('services.demo_mode.enabled', false)
+                && app(DemoMode::class)->enabled();
+
             $view->with('inboxActionableCount', $count);
+            $view->with('demoModeEnabled', $demoModeEnabled);
         });
     }
 }

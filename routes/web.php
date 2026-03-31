@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DemoModeController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\EmailAccountSettingsController;
 use App\Http\Controllers\EmailResearchController;
@@ -95,6 +96,9 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+
+    Route::post('/demo-mode/enable', [DemoModeController::class, 'enable'])->name('demo-mode.enable');
+    Route::post('/demo-mode/disable', [DemoModeController::class, 'disable'])->name('demo-mode.disable');
 
     Route::get('/api/thoughts/realtime-check', [RealtimeCheckController::class, 'realtimeCheck'])->name('api.thoughts.realtime-check');
 
