@@ -2,11 +2,17 @@
 
 namespace App\Services;
 
+use App\Jobs\RunResearchRun;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\ResearchRun;
+use App\Models\ResearchSkill;
+use App\Models\ResearchSkillVersion;
 use App\Models\Thought;
+use App\Models\User;
+use App\Services\Research\ResearchSkillManager;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Runs research for ideas and creates linked research thoughts.
@@ -16,7 +22,8 @@ class ResearchService
 {
     public function __construct(
         private OpenRouterService $openRouter,
-        private ThoughtCaptureService $captureService
+        private ThoughtCaptureService $captureService,
+        private ResearchSkillManager $researchSkillManager,
     ) {}
 
     /**
@@ -43,6 +50,100 @@ class ResearchService
         $run->loadMissing('ideaThought');
 
         return $this->persistResearchForIdea($run->ideaThought, $researchText, $run->source ?? 'web');
+    }
+
+    /**
+     * Create or reuse a research run for this idea and queue execution. At most one active
+     * (queued or running) run per idea; an existing active run is returned without dispatching again.
+     */
+    public function queueResearchRunForIdea(Thought $idea, string $source = 'web'): ResearchRun
+    {
+        return DB::transaction(function () use ($idea, $source): ResearchRun {
+            $existing = ResearchRun::query()
+                ->where('idea_thought_id', $idea->id)
+                ->whereIn('status', ['queued', 'running'])
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing !== null) {
+                return $existing;
+            }
+
+            $version = $this->resolveManualResearchSkillVersionForIdea($idea);
+
+            $run = ResearchRun::query()->create([
+                'user_id' => $idea->user_id,
+                'idea_thought_id' => $idea->id,
+                'research_skill_id' => $version->research_skill_id,
+                'research_skill_version_id' => $version->id,
+                'source' => $source,
+                'status' => 'queued',
+                'workflow_type_snapshot' => $version->workflow_type,
+                'context_options_snapshot' => $version->context_options,
+                'output_shape_snapshot' => $version->output_shape,
+                'intensity_snapshot' => $version->intensity,
+                'current_stage' => 0,
+                'total_stages' => 1,
+                'usage_metadata' => null,
+                'final_research_thought_id' => null,
+                'error_summary' => null,
+            ]);
+
+            $runId = $run->id;
+            DB::afterCommit(function () use ($runId): void {
+                RunResearchRun::dispatch($runId);
+            });
+
+            return $run;
+        });
+    }
+
+    /**
+     * Clear research_pending on an idea thought after background research finishes or fails.
+     */
+    public function clearResearchPendingForIdeaThought(string $ideaThoughtId): void
+    {
+        $thought = Thought::find($ideaThoughtId);
+        if ($thought === null) {
+            return;
+        }
+
+        $metadata = $thought->metadata ?? [];
+        unset($metadata['research_pending']);
+        $thought->update(['metadata' => $metadata]);
+    }
+
+    private function resolveManualResearchSkillVersionForIdea(Thought $idea): ResearchSkillVersion
+    {
+        $user = User::query()->findOrFail($idea->user_id);
+
+        $skill = ResearchSkill::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('is_manual_enabled', true)
+            ->orderByDesc('is_default')
+            ->orderBy('id')
+            ->first();
+
+        if ($skill !== null) {
+            $version = $skill->latestVersion;
+            if ($version instanceof ResearchSkillVersion) {
+                return $version;
+            }
+        }
+
+        $skill = $this->researchSkillManager->create($user, [
+            'name' => 'Default research',
+            'is_default' => true,
+            'is_manual_enabled' => true,
+        ]);
+
+        $version = $skill->latestVersion;
+        if (! $version instanceof ResearchSkillVersion) {
+            throw new \RuntimeException('Research skill was created without a version.');
+        }
+
+        return $version;
     }
 
     public function persistResearchForIdea(Thought $idea, string $researchText, string $source = 'web'): Thought

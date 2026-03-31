@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\IdeaResearchRequested;
 use App\Jobs\ProcessExtraEmailResearch;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\Thought;
 use App\Services\Email\ResetNewsletterResearchState;
+use App\Services\ResearchService;
 use Illuminate\Http\RedirectResponse;
 
 class EmailResearchController extends Controller
 {
+    public function __construct(
+        private ResearchService $researchService
+    ) {}
+
     /**
      * Trigger general idea research on an email thought.
      */
@@ -27,7 +31,7 @@ class EmailResearchController extends Controller
             'metadata' => array_merge($thought->metadata ?? [], ['research_pending' => true]),
         ]);
 
-        IdeaResearchRequested::dispatch($thought, 'email');
+        $this->researchService->queueResearchRunForIdea($thought, 'email');
 
         return redirect()->back()->with('success', 'Idea research started. Refresh in a moment to see results.');
     }

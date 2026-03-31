@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\IdeaResearchRequested;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\ResearchShare;
@@ -895,7 +894,7 @@ class IdeaController extends Controller
         $metadata = array_merge($thought->metadata ?? [], ['research_pending' => true]);
         $thought->update(['metadata' => $metadata]);
 
-        IdeaResearchRequested::dispatch($thought, 'web');
+        $this->researchService->queueResearchRunForIdea($thought, 'web');
 
         return redirect()->back()->with('success', 'Research started. This may take a moment — refresh to see results.');
     }
@@ -923,7 +922,7 @@ class IdeaController extends Controller
         $metadata = array_merge($idea->metadata ?? [], ['research_pending' => true]);
         $idea->update(['metadata' => $metadata]);
 
-        IdeaResearchRequested::dispatch($idea, 'web');
+        $this->researchService->queueResearchRunForIdea($idea, 'web');
 
         return redirect()->route('idea.ideas')
             ->with('success', 'Idea saved. Research started — refresh in a moment to see results.');
