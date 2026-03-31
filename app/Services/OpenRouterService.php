@@ -111,6 +111,24 @@ class OpenRouterService
      */
     public function researchNote(string $ideaContent, ?string $existingResearch = null): string
     {
+        $userMessage = $this->buildResearchPrompt(trim($ideaContent), $existingResearch);
+
+        return $this->researchFromPrompt($userMessage);
+    }
+
+    /**
+     * Run a research-style completion using the full user prompt (no template merge).
+     *
+     * @throws RequestException On HTTP errors
+     * @throws \RuntimeException If OPENROUTER_API_KEY is not set or response missing content
+     */
+    public function researchFromPrompt(string $userPrompt): string
+    {
+        $userPrompt = trim($userPrompt);
+        if ($userPrompt === '') {
+            throw new \RuntimeException('Research prompt is empty.');
+        }
+
         $apiKey = config('services.openrouter.api_key');
         if (empty($apiKey)) {
             throw new \RuntimeException('OPENROUTER_API_KEY is not set.');
@@ -118,12 +136,10 @@ class OpenRouterService
 
         $model = config('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
 
-        $userMessage = $this->buildResearchPrompt(trim($ideaContent), $existingResearch);
-
         $payload = [
             'model' => $model,
             'messages' => [
-                ['role' => 'user', 'content' => $userMessage],
+                ['role' => 'user', 'content' => $userPrompt],
             ],
             'max_tokens' => config('research.max_tokens', 2048),
         ];

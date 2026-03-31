@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
+use App\Models\ResearchRun;
 use App\Models\Thought;
+use Illuminate\Http\Client\RequestException;
 
 /**
  * Runs research for ideas and creates linked research thoughts.
@@ -21,7 +23,8 @@ class ResearchService
      * Run research for an existing idea and create a linked research thought.
      *
      * @param  string  $source  'web' or 'mcp'
-     * @throws \Illuminate\Http\Client\RequestException
+     *
+     * @throws RequestException
      * @throws \RuntimeException
      */
     public function runResearchForIdea(Thought $idea, string $source = 'web'): Thought
@@ -29,6 +32,21 @@ class ResearchService
         // Rate-limit can be applied here when config('research.rate_limit_enabled') is true (e.g. throttle by user_id).
         $researchText = $this->openRouter->researchNote($idea->content);
 
+        return $this->persistResearchForIdea($idea, $researchText, $source);
+    }
+
+    /**
+     * Persist a completed research body for an idea (OpenRouter already ran elsewhere).
+     */
+    public function saveRunResult(ResearchRun $run, string $researchText): Thought
+    {
+        $run->loadMissing('ideaThought');
+
+        return $this->persistResearchForIdea($run->ideaThought, $researchText, $run->source ?? 'web');
+    }
+
+    public function persistResearchForIdea(Thought $idea, string $researchText, string $source = 'web'): Thought
+    {
         $metadata = Thought::normalizeMetadataTags([
             'type' => 'research',
             'idea_id' => $idea->id,
