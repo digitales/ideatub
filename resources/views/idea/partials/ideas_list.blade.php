@@ -13,7 +13,6 @@
         @foreach ($ideaRows as $row)
             @php
                 $thought = $row->thought();
-                $researchList = $row->researchList();
             @endphp
             <li data-thought-id="{{ $thought->id }}" class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3 flex items-start gap-3">
                 <form method="POST" action="{{ route('ideas.toggle-completed', $thought) }}" class="flex-shrink-0 mt-0.5">
@@ -30,12 +29,14 @@
                 </form>
                 <div class="min-w-0 flex-1 relative">
                     <div class="absolute top-0 right-0 z-10">
-                        @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id])
+                        @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => $row->contentEditable()])
                     </div>
                     <div class="pr-8">
                         @include('idea.partials.editable_thought_content', [
                             'thought' => $thought,
-                            'editable' => auth()->check() && auth()->id() === $thought->user_id,
+                            'editable' => $row->contentEditable(),
+                            'displayContent' => $row->displayContent(),
+                            'rawEditorContent' => $row->displayContent(),
                             'displayClass' => 'text-sm text-deep-indigo whitespace-pre-line mb-0 ',
                             'previewMaxLength' => 200,
                         ])
@@ -48,16 +49,16 @@
                                 <span class="inline-block size-3.5 rounded-full border-2 border-neural-teal/50 border-t-neural-teal animate-spin" aria-hidden="true"></span>
                                 Researching…
                             </p>
-                            @if ($researchList->isNotEmpty())
+                            @if ($row->researchList()->isNotEmpty())
                                 <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-2">Research</p>
-                                @foreach ($researchList as $research)
+                                @foreach ($row->researchPreviewRows() as $researchRow)
                                     <div class="text-sm text-slate-brand/80 mb-2">
-                                        <p>{{ Str::limit($research->content, 120) }}</p>
-                                        <a href="{{ route('idea.research.show', $research) . '?from=ideas' }}" class="text-xs font-medium text-neural-teal hover:underline">View formatted</a>
+                                        <p>{{ $researchRow['preview'] }}</p>
+                                        <a href="{{ route('idea.research.show', $researchRow['research']) . '?from=ideas' }}" class="text-xs font-medium text-neural-teal hover:underline">View formatted</a>
                                     </div>
                                 @endforeach
                             @endif
-                        @elseif ($researchList->isEmpty())
+                        @elseif ($row->researchList()->isEmpty())
                             <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
                                 @csrf
                                 <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">
@@ -70,10 +71,10 @@
                                 <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">Regenerate</button>
                             </form>
                             <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-1">Research</p>
-                            @foreach ($researchList as $research)
+                            @foreach ($row->researchPreviewRows() as $researchRow)
                                 <div class="text-sm text-slate-brand/80 mb-2">
-                                    <p>{{ Str::limit($research->content, 120) }}</p>
-                                    <a href="{{ route('idea.research.show', $research) . '?from=ideas' }}" class="text-xs font-medium text-neural-teal hover:underline">View formatted</a>
+                                    <p>{{ $researchRow['preview'] }}</p>
+                                    <a href="{{ route('idea.research.show', $researchRow['research']) . '?from=ideas' }}" class="text-xs font-medium text-neural-teal hover:underline">View formatted</a>
                                 </div>
                             @endforeach
                         @endif

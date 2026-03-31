@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\DemoMode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\Concerns\AssertsIdeasSectionNav;
@@ -276,5 +277,40 @@ class CompletedIdeasPageTest extends TestCase
         preg_match_all('/data-completed-idea-id="([^"]+)"/', $html, $matches);
 
         return $matches[1];
+    }
+
+    public function test_demo_mode_obfuscates_completed_excerpts_while_preserving_date_labels(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'IDEATUB_FEATURE_COMPLETED_EXCERPT_SECRET',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => true,
+                'logged_date' => '2025-04-01',
+                'completed_at' => '2026-03-24T15:30:00+00:00',
+            ],
+            'embedding' => null,
+        ]);
+
+        $demo = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'feat-seed-completed-ideas-demo',
+        ])->actingAs($user);
+
+        $page = $demo->get(route('idea.completed'));
+        $page->assertOk();
+        $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+        $page->assertDontSee('IDEATUB_FEATURE_COMPLETED_EXCERPT_SECRET', false);
+        $page->assertSee('April 1, 2025', false);
+        $page->assertSee('March 24, 2026', false);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normal = $this->actingAs($user)->get(route('idea.completed'));
+        $normal->assertOk();
+        $normal->assertSee('IDEATUB_FEATURE_COMPLETED_EXCERPT_SECRET', false);
     }
 }
