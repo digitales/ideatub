@@ -263,11 +263,9 @@ class EmailNewsletterResearchService
         $lines[] = '';
         $lines[] = $body !== '' ? $this->renderLiteralTextBlock($body) : '_No body text was available._';
         $lines[] = '';
-        $lines[] = '## YouTube transcripts';
-        $lines[] = '';
-        if ($youtubeRows === []) {
-            $lines[] = '_No YouTube URLs were present._';
-        } else {
+        if ($youtubeRows !== []) {
+            $lines[] = '## YouTube transcripts';
+            $lines[] = '';
             foreach ($youtubeRows as $row) {
                 $url = $row['url'];
                 $r = $row['result'];

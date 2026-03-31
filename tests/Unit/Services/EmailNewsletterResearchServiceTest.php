@@ -113,6 +113,53 @@ class EmailNewsletterResearchServiceTest extends TestCase
     }
 
     #[Test]
+    public function omits_youtube_transcripts_section_when_no_youtube_links_are_present(): void
+    {
+        config(['app.name' => 'TestAppNewsletter']);
+        $this->bindOpenRouterMocks();
+
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'prov-msg-no-youtube-section-1',
+            'direction' => 'received',
+            'subject' => 'Generic links only',
+            'body_text' => str_repeat('This newsletter body has enough substance for research generation. ', 20),
+            'from_json' => [['email' => 'digest@example.com', 'name' => 'Digest']],
+            'processing_status' => 'research_queued',
+            'rule_action' => 'extra_process',
+            'rule_email' => 'digest@example.com',
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'sender_rule_action' => 'extra_process',
+            ],
+        ]);
+
+        $yt = Mockery::mock(YouTubeTranscriptService::class);
+        $yt->shouldReceive('fetchForUrl')->never();
+        $this->app->instance(YouTubeTranscriptService::class, $yt);
+
+        $result = app(EmailNewsletterResearchService::class)->createFromEmailThought(
+            $emailThought,
+            $imported,
+            'fastmail',
+            [['url' => 'https://example.com/article', 'type' => 'generic']],
+        );
+
+        $this->assertSame('created', $result['status']);
+        $this->assertStringNotContainsString('## YouTube transcripts', $result['research_thought']->content);
+        $this->assertStringNotContainsString('_No YouTube URLs were present._', $result['research_thought']->content);
+    }
+
+    #[Test]
     public function newsletter_body_text_with_markdown_like_separators_stays_literal_when_rendered(): void
     {
         config(['app.name' => 'TestAppNewsletter']);
