@@ -27,7 +27,7 @@ class IdeaIdeasTest extends TestCase
         $response->assertSee('No ideas yet');
     }
 
-    public function test_ideas_ajax_refetch_returns_list_html_with_presenter_logged_date(): void
+    public function test_ideas_ajax_refetch_returns_list_html_with_presenter_logged_date_ymd(): void
     {
         $user = User::factory()->create();
         $thought = Thought::factory()->create([

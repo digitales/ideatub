@@ -31,7 +31,7 @@ final class IdeaListItemPresenter
         return $this->thought;
     }
 
-    public function loggedDateDisplay(): string
+    public function loggedDateYmd(): string
     {
         return $this->thought->getLoggedDate();
     }

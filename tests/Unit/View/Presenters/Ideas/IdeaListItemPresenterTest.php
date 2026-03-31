@@ -14,7 +14,7 @@ class IdeaListItemPresenterTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function it_exposes_logged_date_display_matching_get_logged_date(): void
+    public function it_exposes_logged_date_ymd_matching_get_logged_date(): void
     {
         $user = User::factory()->create();
         $thought = Thought::factory()->create([
@@ -25,8 +25,8 @@ class IdeaListItemPresenterTest extends TestCase
 
         $row = IdeaListItemPresenter::from($thought, collect());
 
-        $this->assertSame($thought->getLoggedDate(), $row->loggedDateDisplay());
-        $this->assertSame('2025-06-15', $row->loggedDateDisplay());
+        $this->assertSame($thought->getLoggedDate(), $row->loggedDateYmd());
+        $this->assertSame('2025-06-15', $row->loggedDateYmd());
     }
 
     #[Test]

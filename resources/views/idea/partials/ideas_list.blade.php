@@ -39,7 +39,7 @@
                             'displayClass' => 'text-sm text-deep-indigo whitespace-pre-line mb-0 ',
                             'previewMaxLength' => 200,
                         ])
-                    <p class="text-[11px] text-slate-brand/50 mt-1">{{ $row->loggedDateDisplay() }}</p>
+                    <p class="text-[11px] text-slate-brand/50 mt-1">{{ $row->loggedDateYmd() }}</p>
                     @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
                     {{-- Research block --}}
                     <div class="mt-2 pt-2 border-t border-memory-violet/10">
