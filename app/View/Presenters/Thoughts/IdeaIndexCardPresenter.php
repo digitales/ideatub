@@ -3,9 +3,12 @@
 namespace App\View\Presenters\Thoughts;
 
 use App\Models\Thought;
+use App\Services\DemoMode;
 use App\View\Presenters\Concerns\EnsuresPresenterDataIsLoaded;
+use App\View\Presenters\Concerns\ObfuscatesDemoText;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -14,14 +17,14 @@ use Illuminate\Support\Str;
 final class IdeaIndexCardPresenter
 {
     use EnsuresPresenterDataIsLoaded;
+    use ObfuscatesDemoText;
 
     private function __construct(
         private readonly Thought $thought,
         private readonly int $currentReplyableIndex,
         private readonly string $replyHref,
-        private readonly ?string $parentPreviewExcerpt,
         private readonly string $createdAtHuman,
-        private readonly bool $editable,
+        private readonly bool $ownerMayInlineEdit,
         private readonly bool $previewMode,
         private readonly ?NewsletterResearchStatusPresenter $newsletterResearchStatus,
     ) {
@@ -37,21 +40,16 @@ final class IdeaIndexCardPresenter
         ?NewsletterResearchStatusPresenter $newsletterResearchStatus = null,
     ): self {
         $replyHref = $thought->parent_id ? '' : route('idea.index', ['parent_id' => $thought->id]);
-        $parentPreview = null;
-        if ($thought->parent_id && $thought->relationLoaded('parent') && $thought->parent) {
-            $parentPreview = Str::limit($thought->parent->content, 80);
-        }
 
         $userId = Auth::id();
-        $editable = Auth::check() && $userId !== null && (int) $userId === (int) $thought->user_id;
+        $ownerMayInlineEdit = Auth::check() && $userId !== null && (int) $userId === (int) $thought->user_id;
 
         return new self(
             $thought,
             $currentReplyableIndex,
             $replyHref,
-            $parentPreview,
             $thought->created_at->diffForHumans(),
-            $editable,
+            $ownerMayInlineEdit,
             $thought->parent_id === null,
             $newsletterResearchStatus,
         );
@@ -72,14 +70,47 @@ final class IdeaIndexCardPresenter
         return $this->replyHref;
     }
 
-    public function parentPreviewExcerpt(): ?string
+    public function displayParentPreviewExcerpt(): ?string
     {
-        return $this->parentPreviewExcerpt;
+        if ($this->thought->parent_id === null || ! $this->thought->relationLoaded('parent') || ! $this->thought->parent) {
+            return null;
+        }
+
+        $raw = Str::limit($this->thought->parent->content, 80);
+
+        return $this->obfuscatedOrRaw($raw, 'idea_index_parent_preview', 'idea_index_card_presenter.parent_preview');
     }
 
     public function showParentPreview(): bool
     {
-        return $this->parentPreviewExcerpt !== null;
+        return $this->thought->parent_id !== null
+            && $this->thought->relationLoaded('parent')
+            && $this->thought->parent !== null;
+    }
+
+    public function displayContent(): string
+    {
+        $raw = (string) ($this->thought->content ?? '');
+
+        return $this->obfuscatedOrRaw($raw, 'idea_index_card_body', 'idea_index_card_presenter.display_content');
+    }
+
+    /**
+     * @return list<array{content: string, created_at_human: string}>
+     */
+    public function commentPreviewRows(): array
+    {
+        return $this->thought->comments
+            ->map(function (Thought $comment): array {
+                $raw = Str::limit($comment->content, 200);
+                $content = $this->obfuscatedOrRaw($raw, 'idea_index_comment_preview', 'idea_index_card_presenter.comment_preview');
+
+                return [
+                    'content' => $content,
+                    'created_at_human' => $comment->created_at->diffForHumans(),
+                ];
+            })
+            ->all();
     }
 
     public function createdAtHuman(): string
@@ -89,7 +120,11 @@ final class IdeaIndexCardPresenter
 
     public function editable(): bool
     {
-        return $this->editable;
+        if (app(DemoMode::class)->enabled()) {
+            return false;
+        }
+
+        return $this->ownerMayInlineEdit;
     }
 
     public function previewMode(): bool
@@ -105,5 +140,21 @@ final class IdeaIndexCardPresenter
     public function showReplyLink(): bool
     {
         return ! $this->thought->parent_id;
+    }
+
+    private function obfuscatedOrRaw(string $value, string $context, string $boundary): string
+    {
+        try {
+            return $this->demoText($value, $context) ?? '';
+        } catch (\Throwable $e) {
+            Log::warning('Demo obfuscation failed for idea index card presenter field.', [
+                'boundary' => $boundary,
+                'context' => $context,
+                'thought_id' => $this->thought->id,
+                'exception' => $e::class,
+            ]);
+
+            return 'Demo content hidden';
+        }
     }
 }
