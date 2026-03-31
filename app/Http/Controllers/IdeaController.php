@@ -18,6 +18,8 @@ use App\Support\IdeaCompletedAtSql;
 use App\Support\TagSlug;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
+use App\View\Presenters\Ideas\CompletedIdeaPresenter;
+use App\View\Presenters\Ideas\IdeaListItemPresenter;
 use App\View\Presenters\Thoughts\IdeaIndexCardPresenter;
 use App\View\Presenters\Thoughts\StreamThoughtCardPresenter;
 use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
@@ -641,7 +643,12 @@ class IdeaController extends Controller
                 ->completedIdeas()
         )->paginate(20);
 
-        return view('idea.completed', ['ideas' => $ideas]);
+        $completedRows = $this->buildCompletedIdeaPresenters($ideas);
+
+        return view('idea.completed', [
+            'ideas' => $ideas,
+            'completedRows' => $completedRows,
+        ]);
     }
 
     /**
@@ -673,8 +680,13 @@ class IdeaController extends Controller
             $researchByIdea = $researchThoughts->groupBy(fn (Thought $t) => $t->metadata['idea_id'] ?? '');
         }
 
+        $ideaRows = $this->buildIdeaListItemPresenters($ideas, $researchByIdea);
+
         if ($request->ajax()) {
-            $html = view('idea.partials.ideas_list', ['ideas' => $ideas, 'researchByIdea' => $researchByIdea])->render();
+            $html = view('idea.partials.ideas_list', [
+                'ideas' => $ideas,
+                'ideaRows' => $ideaRows,
+            ])->render();
             $latest = $ideas->isEmpty() ? null : $ideas->first()->created_at->toIso8601String();
 
             return response()->json(['html' => $html, 'latest_created_at' => $latest]);
@@ -682,8 +694,30 @@ class IdeaController extends Controller
 
         return view('idea.ideas', [
             'ideas' => $ideas,
-            'researchByIdea' => $researchByIdea,
+            'ideaRows' => $ideaRows,
         ]);
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, Thought>  $ideas
+     * @return Collection<int, IdeaListItemPresenter>
+     */
+    private function buildIdeaListItemPresenters(LengthAwarePaginator $ideas, Collection $researchByIdea): Collection
+    {
+        return $ideas->getCollection()->map(function (Thought $thought) use ($researchByIdea) {
+            $researchList = $researchByIdea->get($thought->id, collect());
+
+            return IdeaListItemPresenter::from($thought, $researchList);
+        })->values();
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, Thought>  $ideas
+     * @return Collection<int, CompletedIdeaPresenter>
+     */
+    private function buildCompletedIdeaPresenters(LengthAwarePaginator $ideas): Collection
+    {
+        return $ideas->getCollection()->map(fn (Thought $thought) => CompletedIdeaPresenter::from($thought))->values();
     }
 
     /**

@@ -10,9 +10,10 @@
     </div>
 @else
     <ul class="space-y-3">
-        @foreach ($ideas as $thought)
+        @foreach ($ideaRows as $row)
             @php
-                $researchList = $researchByIdea->get($thought->id, collect());
+                $thought = $row->thought();
+                $researchList = $row->researchList();
             @endphp
             <li data-thought-id="{{ $thought->id }}" class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3 flex items-start gap-3">
                 <form method="POST" action="{{ route('ideas.toggle-completed', $thought) }}" class="flex-shrink-0 mt-0.5">
@@ -38,11 +39,11 @@
                             'displayClass' => 'text-sm text-deep-indigo whitespace-pre-line mb-0 ',
                             'previewMaxLength' => 200,
                         ])
-                    <p class="text-[11px] text-slate-brand/50 mt-1">{{ $thought->getLoggedDate() }}</p>
+                    <p class="text-[11px] text-slate-brand/50 mt-1">{{ $row->loggedDateDisplay() }}</p>
                     @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
                     {{-- Research block --}}
                     <div class="mt-2 pt-2 border-t border-memory-violet/10">
-                        @if ($thought->isResearchPending())
+                        @if ($row->isResearchPending())
                             <p class="text-xs text-slate-brand/70 flex items-center gap-1.5">
                                 <span class="inline-block size-3.5 rounded-full border-2 border-neural-teal/50 border-t-neural-teal animate-spin" aria-hidden="true"></span>
                                 Researching…
