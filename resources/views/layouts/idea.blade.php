@@ -135,6 +135,9 @@
                             @endif
                         </button>
                         <div x-show="open" x-transition @click.away="open = false" class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-memory-violet/10 py-1 z-30">
+                            <a href="{{route('settings.profile.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                Profile
+                            </a>
                             <a href="{{route('inbox.index')}}" data-testid="account-menu-inbox-link" class="flex items-center justify-between gap-3 px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                                 <span>Inbox</span>
                                 @if($inboxCount > 0)
@@ -145,33 +148,6 @@
                             </a>
                             <a href="{{route('shared-research.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                                 Shared research
-                            </a>
-                            <a href="{{route('settings.mcp-keys.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                MCP key
-                            </a>
-                            <a href="{{route('settings.inbound-emails.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                Inbound email
-                            </a>
-                            @if(config('services.email_sender_policy.enabled'))
-                                <a href="{{route('settings.email-sender-rules.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                    Email Sender Rules
-                                </a>
-                            @endif
-                            @if(config('services.mail_sync.enabled', true))
-                                <a href="{{route('settings.email-accounts.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                    Email Accounts
-                                </a>
-                            @endif
-                            @if(config('services.jira.enabled', true))
-                                <a href="{{route('settings.jira.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                    Jira
-                                </a>
-                            @endif
-                            <a href="{{route('settings.ideas-revisit.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                Ideas to revisit settings
-                            </a>
-                            <a href="{{route('settings.research-skills.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                Research skills
                             </a>
                             <form method="POST" action="{{route('logout')}}">
                                 @csrf
@@ -190,28 +166,6 @@
                 Demo mode enabled. Sensitive text is obfuscated.
             </div>
         @endif
-
-        @auth
-            @if(config('services.demo_mode.enabled'))
-                <div class="px-6 md:px-8 py-2 flex justify-end border-b border-memory-violet/10 bg-white/40">
-                    @if(!empty($demoModeEnabled))
-                        <form method="POST" action="{{route('demo-mode.disable')}}" class="inline">
-                            @csrf
-                            <button type="submit" class="text-xs font-medium text-slate-brand hover:text-memory-violet px-2 py-1 rounded-lg hover:bg-memory-violet/8">
-                                Exit demo mode
-                            </button>
-                        </form>
-                    @else
-                        <form method="POST" action="{{route('demo-mode.enable')}}" class="inline">
-                            @csrf
-                            <button type="submit" class="text-xs font-medium text-slate-brand hover:text-memory-violet px-2 py-1 rounded-lg hover:bg-memory-violet/8">
-                                Enable demo mode
-                            </button>
-                        </form>
-                    @endif
-                </div>
-            @endif
-        @endauth
 
         {{-- Page content --}}
         <main>
