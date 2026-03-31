@@ -2,9 +2,18 @@
 
 namespace App\Services;
 
+use App\Jobs\RunResearchRun;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
+use App\Models\ResearchRun;
+use App\Models\ResearchSkill;
+use App\Models\ResearchSkillVersion;
 use App\Models\Thought;
+use App\Models\User;
+use App\Services\Research\ResearchSkillManager;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * Runs research for ideas and creates linked research thoughts.
@@ -12,16 +21,20 @@ use App\Models\Thought;
  */
 class ResearchService
 {
+    private const DEFAULT_MAX_ACTIVE_RUNS_PER_USER = 25;
+
     public function __construct(
         private OpenRouterService $openRouter,
-        private ThoughtCaptureService $captureService
+        private ThoughtCaptureService $captureService,
+        private ResearchSkillManager $researchSkillManager,
     ) {}
 
     /**
      * Run research for an existing idea and create a linked research thought.
      *
      * @param  string  $source  'web' or 'mcp'
-     * @throws \Illuminate\Http\Client\RequestException
+     *
+     * @throws RequestException
      * @throws \RuntimeException
      */
     public function runResearchForIdea(Thought $idea, string $source = 'web'): Thought
@@ -29,6 +42,176 @@ class ResearchService
         // Rate-limit can be applied here when config('research.rate_limit_enabled') is true (e.g. throttle by user_id).
         $researchText = $this->openRouter->researchNote($idea->content);
 
+        return $this->persistResearchForIdea($idea, $researchText, $source);
+    }
+
+    /**
+     * Persist a completed research body for an idea (OpenRouter already ran elsewhere).
+     */
+    public function saveRunResult(ResearchRun $run, string $researchText): Thought
+    {
+        $run->loadMissing('ideaThought');
+
+        return $this->persistResearchForIdea($run->ideaThought, $researchText, $run->source ?? 'web');
+    }
+
+    /**
+     * Whether the user has a default research skill that may run automatically (Save idea + global auto-run).
+     */
+    public function hasEligibleDefaultAutoRunSkillForUser(User $user): bool
+    {
+        return ResearchSkill::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('is_manual_enabled', true)
+            ->where('is_default', true)
+            ->where('allow_auto_run', true)
+            ->whereHas('latestVersion')
+            ->exists();
+    }
+
+    /**
+     * Create or reuse a research run for this idea and queue execution. At most one active
+     * (queued or running) run per idea; an existing active run is returned without dispatching again.
+     */
+    public function queueResearchRunForIdea(
+        Thought $idea,
+        string $source = 'web',
+        ?int $researchSkillId = null
+    ): ResearchRun {
+        return DB::transaction(function () use ($idea, $source, $researchSkillId): ResearchRun {
+            $existing = ResearchRun::query()
+                ->where('idea_thought_id', $idea->id)
+                ->whereIn('status', ['queued', 'running'])
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing !== null) {
+                return $existing;
+            }
+
+            $this->guardUserActiveRunLimit((int) $idea->user_id);
+
+            $version = $this->resolveManualResearchSkillVersionForIdea($idea, $researchSkillId);
+
+            $run = ResearchRun::query()->create([
+                'user_id' => $idea->user_id,
+                'idea_thought_id' => $idea->id,
+                'research_skill_id' => $version->research_skill_id,
+                'research_skill_version_id' => $version->id,
+                'source' => $source,
+                'status' => 'queued',
+                'workflow_type_snapshot' => $version->workflow_type,
+                'context_options_snapshot' => $version->context_options,
+                'output_shape_snapshot' => $version->output_shape,
+                'intensity_snapshot' => $version->intensity,
+                'current_stage' => 0,
+                'total_stages' => 1,
+                'usage_metadata' => null,
+                'final_research_thought_id' => null,
+                'error_summary' => null,
+            ]);
+
+            $runId = $run->id;
+            DB::afterCommit(function () use ($runId): void {
+                RunResearchRun::dispatch($runId);
+            });
+
+            return $run;
+        });
+    }
+
+    /**
+     * Clear research_pending on an idea thought after background research finishes or fails.
+     */
+    public function clearResearchPendingForIdeaThought(string $ideaThoughtId): void
+    {
+        $thought = Thought::find($ideaThoughtId);
+        if ($thought === null) {
+            return;
+        }
+
+        $metadata = $thought->metadata ?? [];
+        unset($metadata['research_pending']);
+        $thought->update(['metadata' => $metadata]);
+    }
+
+    private function guardUserActiveRunLimit(int $userId): void
+    {
+        $limit = (int) config('research.max_active_runs_per_user', self::DEFAULT_MAX_ACTIVE_RUNS_PER_USER);
+        if ($limit < 1) {
+            return;
+        }
+
+        $activeRunCount = ResearchRun::query()
+            ->where('user_id', $userId)
+            ->whereIn('status', ['queued', 'running'])
+            ->select('id')
+            ->lockForUpdate()
+            ->limit($limit)
+            ->get()
+            ->count();
+
+        if ($activeRunCount >= $limit) {
+            throw new \RuntimeException("Active research run limit reached ({$limit}).");
+        }
+    }
+
+    private function resolveManualResearchSkillVersionForIdea(Thought $idea, ?int $researchSkillId = null): ResearchSkillVersion
+    {
+        $user = User::query()->findOrFail($idea->user_id);
+
+        if ($researchSkillId !== null) {
+            $requestedSkill = ResearchSkill::query()
+                ->whereKey($researchSkillId)
+                ->where('user_id', $user->id)
+                ->where('is_active', true)
+                ->where('is_manual_enabled', true)
+                ->first();
+
+            if ($requestedSkill === null) {
+                throw new InvalidArgumentException('Requested research skill is not available.');
+            }
+
+            $requestedVersion = $requestedSkill->latestVersion;
+            if (! $requestedVersion instanceof ResearchSkillVersion) {
+                throw new \RuntimeException('Requested research skill has no version.');
+            }
+
+            return $requestedVersion;
+        }
+
+        $skill = ResearchSkill::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('is_manual_enabled', true)
+            ->orderByDesc('is_default')
+            ->orderBy('id')
+            ->first();
+
+        if ($skill !== null) {
+            $version = $skill->latestVersion;
+            if ($version instanceof ResearchSkillVersion) {
+                return $version;
+            }
+        }
+
+        $skill = $this->researchSkillManager->create($user, [
+            'name' => 'Default research',
+            'is_default' => true,
+            'is_manual_enabled' => true,
+        ]);
+
+        $version = $skill->latestVersion;
+        if (! $version instanceof ResearchSkillVersion) {
+            throw new \RuntimeException('Research skill was created without a version.');
+        }
+
+        return $version;
+    }
+
+    public function persistResearchForIdea(Thought $idea, string $researchText, string $source = 'web'): Thought
+    {
         $metadata = Thought::normalizeMetadataTags([
             'type' => 'research',
             'idea_id' => $idea->id,
@@ -57,12 +240,17 @@ class ResearchService
     }
 
     /**
-     * Create an idea thought only (no research). Use when research will run in the background via event.
+     * Create an idea thought only (no research). Use when research will run in the background job.
      *
      * @param  string  $source  'web' or 'mcp'
      */
     public function createIdeaOnly(string $ideaContent, string $source = 'web'): Thought
     {
+        $userId = auth()->id();
+        if (! is_int($userId) && ! ctype_digit((string) $userId)) {
+            throw new \RuntimeException('Authenticated user is required to create an idea.');
+        }
+
         $ideaMetadata = [
             'type' => 'idea',
             'completed' => false,
@@ -71,7 +259,7 @@ class ResearchService
 
         $result = $this->captureService->create([
             'content' => trim($ideaContent),
-            'user_id' => (int) auth()->id(),
+            'user_id' => (int) $userId,
             'source' => $source,
             'idea_metadata' => $ideaMetadata,
         ]);
@@ -102,6 +290,19 @@ class ResearchService
         }
 
         return ['idea' => $idea, 'research' => $research];
+    }
+
+    /**
+     * Create an idea thought, then queue a research run (same path as web manual research).
+     *
+     * @return array{idea: Thought, run: ResearchRun}
+     */
+    public function createIdeaAndQueueResearchRun(string $ideaContent, string $source = 'web'): array
+    {
+        $idea = $this->createIdeaOnly($ideaContent, $source);
+        $run = $this->queueResearchRunForIdea($idea, $source);
+
+        return ['idea' => $idea, 'run' => $run];
     }
 
     /**

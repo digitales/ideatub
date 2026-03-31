@@ -55,8 +55,11 @@
                     Save idea
                 </button>
             </div>
+            @if ($researchAutoRunEligible ?? false)
+                <p class="text-[11px] text-slate-brand/50 mt-2">Your default research skill runs automatically when you save.</p>
+            @endif
         </form>
-        <p class="text-[11px] text-slate-brand/50 mt-3 mb-1">Or add an idea and run research:</p>
+        <p class="text-[11px] text-slate-brand/50 mt-3 mb-1">Or save and start research now:</p>
         <form method="POST" action="{{ route('ideas.research-new') }}" class="flex flex-wrap items-end gap-2">
             @csrf
             <label class="flex-1 min-w-[200px]">
@@ -69,14 +72,31 @@
                     class="w-full rounded-lg border border-memory-violet/20 bg-white/80 px-3 py-2 text-sm text-deep-indigo placeholder-slate-brand/40 focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50"
                 />
             </label>
+            <label class="min-w-[170px]">
+                <span class="sr-only">Research skill</span>
+                <select
+                    name="research_skill_id"
+                    class="w-full rounded-lg border border-memory-violet/20 bg-white/80 px-3 py-2 text-sm text-deep-indigo focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50"
+                >
+                    <option value="">Default skill</option>
+                    @foreach (($manualResearchSkills ?? collect()) as $skill)
+                        <option value="{{ $skill->id }}" @selected((string) old('research_skill_id') === (string) $skill->id)>
+                            {{ $skill->name }}@if($skill->is_default) (default)@endif
+                        </option>
+                    @endforeach
+                </select>
+            </label>
             <button
                 type="submit"
                 class="text-xs font-medium text-white px-4 py-2 rounded-lg transition-opacity hover:opacity-90"
                 style="background: linear-gradient(135deg, #2A8C8C, #6D6AF7);"
             >
-                Research this idea
+                Save + research
             </button>
         </form>
+        @error('research_skill_id')
+            <p class="mt-2 text-xs text-red-500">{{ $message }}</p>
+        @enderror
     </div>
 
     {{-- Ideas list --}}

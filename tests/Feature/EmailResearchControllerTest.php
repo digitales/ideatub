@@ -2,17 +2,20 @@
 
 namespace Tests\Feature;
 
-use App\Events\IdeaResearchRequested;
 use App\Jobs\ProcessExtraEmailResearch;
+use App\Jobs\RunResearchRun;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\MailAccount;
+use App\Models\ResearchRun;
 use App\Models\Thought;
 use App\Models\ThoughtLinkSummary;
 use App\Models\User;
+use App\Services\Research\ResearchSkillManager;
+use App\Services\ResearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class EmailResearchControllerTest extends TestCase
@@ -66,22 +69,64 @@ class EmailResearchControllerTest extends TestCase
     // ideaResearch
     // -----------------------------------------------------------------------
 
-    public function test_idea_research_dispatches_event_for_email_thought(): void
+    public function test_idea_research_queues_run_job_for_email_thought(): void
     {
-        Event::fake();
+        Queue::fake();
 
         $user = User::factory()->create();
+        app(ResearchSkillManager::class)->create($user, [
+            'name' => 'Default',
+            'is_default' => true,
+        ]);
         $thought = $this->makeEmailThought($user);
 
         $response = $this->actingAs($user)
             ->post(route('emails.idea-research', $thought));
 
         $response->assertRedirect();
-        Event::assertDispatched(IdeaResearchRequested::class, function ($event) use ($thought) {
-            return $event->idea->id === $thought->id && $event->source === 'email';
+
+        $this->assertDatabaseHas('research_runs', [
+            'idea_thought_id' => $thought->id,
+            'user_id' => $user->id,
+            'status' => 'queued',
+            'source' => 'email',
+        ]);
+
+        $runId = (int) ResearchRun::query()->where('idea_thought_id', $thought->id)->value('id');
+
+        Queue::assertPushed(RunResearchRun::class, function (RunResearchRun $job) use ($runId): bool {
+            return $job->researchRunId === $runId;
         });
+
         $thought->refresh();
         $this->assertTrue((bool) ($thought->metadata['research_pending'] ?? false));
+    }
+
+    public function test_idea_research_clears_research_pending_when_queueing_fails(): void
+    {
+        $user = User::factory()->create();
+        $thought = $this->makeEmailThought($user);
+
+        $this->mock(ResearchService::class, function (MockInterface $mock) use ($thought): void {
+            $mock->shouldReceive('queueResearchRunForIdea')
+                ->once()
+                ->withArgs(function (...$args) use ($thought): bool {
+                    [$queuedIdea, $source] = $args;
+                    $researchSkillId = $args[2] ?? null;
+
+                    return $queuedIdea->is($thought)
+                        && $source === 'email'
+                        && $researchSkillId === null;
+                })
+                ->andThrow(new \RuntimeException('Queue unavailable'));
+        });
+
+        $response = $this->actingAs($user)
+            ->post(route('emails.idea-research', $thought));
+
+        $response->assertRedirect();
+        $thought->refresh();
+        $this->assertFalse((bool) ($thought->metadata['research_pending'] ?? false));
     }
 
     public function test_idea_research_requires_authentication(): void
@@ -94,8 +139,6 @@ class EmailResearchControllerTest extends TestCase
 
     public function test_idea_research_rejects_non_owner(): void
     {
-        Event::fake();
-
         $owner = User::factory()->create();
         $other = User::factory()->create();
         $thought = $this->makeEmailThought($owner);
@@ -107,8 +150,6 @@ class EmailResearchControllerTest extends TestCase
 
     public function test_idea_research_rejects_non_email_thought(): void
     {
-        Event::fake();
-
         $user = User::factory()->create();
         $thought = Thought::factory()->create(['user_id' => $user->id, 'source' => 'web']);
 
@@ -124,7 +165,6 @@ class EmailResearchControllerTest extends TestCase
     public function test_newsletter_research_requeues_for_imported_email(): void
     {
         Queue::fake();
-        Event::fake();
 
         $user = User::factory()->create();
         $thought = $this->makeEmailThought($user, [
@@ -163,13 +203,11 @@ class EmailResearchControllerTest extends TestCase
         $this->assertNull(data_get($thought->source_metadata, 'newsletter_research'));
         $this->assertDatabaseMissing('thought_link_summaries', ['id' => $staleSummary->id]);
         $this->assertDatabaseHas('thought_link_summaries', ['id' => $unrelatedSummary->id]);
-        Event::assertNotDispatched(IdeaResearchRequested::class);
     }
 
     public function test_newsletter_research_requeues_for_captured_inbound_email(): void
     {
         Queue::fake();
-        Event::fake();
 
         $user = User::factory()->create();
         $thought = $this->makeEmailThought($user, [
@@ -213,7 +251,6 @@ class EmailResearchControllerTest extends TestCase
         $this->assertNull(data_get($thought->source_metadata, 'newsletter_research'));
         $this->assertDatabaseMissing('thought_link_summaries', ['id' => $staleSummary->id]);
         $this->assertDatabaseHas('thought_link_summaries', ['id' => $unrelatedSummary->id]);
-        Event::assertNotDispatched(IdeaResearchRequested::class);
     }
 
     public function test_newsletter_research_returns_404_when_no_email_row(): void

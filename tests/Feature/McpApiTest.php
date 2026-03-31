@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\RunResearchRun;
 use App\Jobs\SyncUserJiraActivity;
+use App\Models\ResearchRun;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
@@ -547,18 +549,15 @@ class McpApiTest extends TestCase
         $this->assertSame('2025-03-01', $first['logged_date']);
     }
 
-    public function test_research_idea_with_content_creates_idea_and_research(): void
+    public function test_research_idea_with_content_creates_idea_and_queues_research_run(): void
     {
+        Bus::fake();
         [$key, $user] = $this->validKeyAndUser();
         $fakeEmbedding = array_fill(0, 1536, 0.01);
-        $researchText = 'Research: validate demand, then build MVP.';
-        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding, $researchText): void {
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
             $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
-            $mock->shouldReceive('researchNote')
-                ->once()
-                ->with('Ship a side project this quarter')
-                ->andReturn($researchText);
+            $mock->shouldNotReceive('researchNote');
         });
 
         $response = $this->postJson('/api/mcp?key='.$key, [
@@ -570,25 +569,28 @@ class McpApiTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('result.idea_id', fn ($id) => is_string($id) && strlen($id) > 0);
-        $response->assertJsonPath('result.research_id', fn ($id) => is_string($id) && strlen($id) > 0);
+        $response->assertJsonPath('result.research_run_id', fn ($id) => is_int($id) && $id > 0);
+        $response->assertJsonPath('result.research_id', null);
 
         $ideaId = $response->json('result.idea_id');
-        $researchId = $response->json('result.research_id');
+        $runId = $response->json('result.research_run_id');
 
         $idea = Thought::find($ideaId);
         $this->assertNotNull($idea);
         $this->assertSame($user->id, $idea->user_id);
         $this->assertSame('idea', $idea->metadata['type'] ?? null);
 
-        $research = Thought::find($researchId);
-        $this->assertNotNull($research);
-        $this->assertSame($ideaId, $research->metadata['idea_id'] ?? null);
-        $this->assertSame('research', $research->metadata['type'] ?? null);
-        $this->assertSame($researchText, $research->content);
+        $run = ResearchRun::find($runId);
+        $this->assertNotNull($run);
+        $this->assertSame($ideaId, $run->idea_thought_id);
+        $this->assertSame('queued', $run->status);
+
+        Bus::assertDispatched(RunResearchRun::class, fn (RunResearchRun $job) => $job->researchRunId === $runId);
     }
 
-    public function test_research_idea_with_idea_id_runs_research_returns_ids(): void
+    public function test_research_idea_with_idea_id_queues_run_returns_run_id(): void
     {
+        Bus::fake();
         [$key, $user] = $this->validKeyAndUser();
         $idea = Thought::factory()->create([
             'user_id' => $user->id,
@@ -597,12 +599,8 @@ class McpApiTest extends TestCase
             'embedding' => null,
         ]);
 
-        $researchText = 'Key considerations: market size, MVP scope.';
-        $this->mock(OpenRouterService::class, function ($mock) use ($researchText): void {
-            $mock->shouldReceive('researchNote')
-                ->once()
-                ->with('Build a small SaaS for vehicle analytics')
-                ->andReturn($researchText);
+        $this->mock(OpenRouterService::class, function ($mock): void {
+            $mock->shouldNotReceive('researchNote');
         });
 
         $response = $this->postJson('/api/mcp?key='.$key, [
@@ -614,13 +612,16 @@ class McpApiTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('result.idea_id', $idea->id);
-        $response->assertJsonPath('result.research_id', fn ($id) => is_string($id) && strlen($id) > 0);
+        $response->assertJsonPath('result.research_run_id', fn ($id) => is_int($id) && $id > 0);
+        $response->assertJsonPath('result.research_id', null);
 
-        $researchId = $response->json('result.research_id');
-        $research = Thought::find($researchId);
-        $this->assertNotNull($research);
-        $this->assertSame($idea->id, $research->metadata['idea_id']);
-        $this->assertSame('research', $research->metadata['type']);
+        $runId = $response->json('result.research_run_id');
+        $run = ResearchRun::find($runId);
+        $this->assertNotNull($run);
+        $this->assertSame($idea->id, $run->idea_thought_id);
+        $this->assertSame('queued', $run->status);
+
+        Bus::assertDispatched(RunResearchRun::class, fn (RunResearchRun $job) => $job->researchRunId === $runId);
     }
 
     public function test_research_idea_requires_idea_id_or_content(): void

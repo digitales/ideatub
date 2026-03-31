@@ -16,14 +16,15 @@ final class IdeaListItemPresenter
     private function __construct(
         private readonly Thought $thought,
         private readonly Collection $researchList,
+        private readonly IdeaResearchStatusPresenter $researchStatus,
     ) {}
 
     /**
      * @param  Collection<int, Thought>  $researchList  Pre-grouped research thoughts for this idea (newest first).
      */
-    public static function from(Thought $thought, Collection $researchList): self
+    public static function from(Thought $thought, Collection $researchList, IdeaResearchStatusPresenter $researchStatus): self
     {
-        return new self($thought, $researchList);
+        return new self($thought, $researchList, $researchStatus);
     }
 
     public function thought(): Thought
@@ -38,7 +39,12 @@ final class IdeaListItemPresenter
 
     public function isResearchPending(): bool
     {
-        return $this->thought->isResearchPending();
+        return $this->researchStatus->showsInProgress();
+    }
+
+    public function researchStatus(): IdeaResearchStatusPresenter
+    {
+        return $this->researchStatus;
     }
 
     /**

@@ -14,6 +14,9 @@
             @php
                 $thought = $row->thought();
                 $researchList = $row->researchList();
+                $researchStatus = $row->researchStatus();
+                $hasResearch = $researchList->isNotEmpty();
+                $actionLabel = $hasResearch ? 'Regenerate' : 'Research this idea';
             @endphp
             <li data-thought-id="{{ $thought->id }}" class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3 flex items-start gap-3">
                 <form method="POST" action="{{ route('ideas.toggle-completed', $thought) }}" class="flex-shrink-0 mt-0.5">
@@ -43,32 +46,33 @@
                     @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
                     {{-- Research block --}}
                     <div class="mt-2 pt-2 border-t border-memory-violet/10">
-                        @if ($row->isResearchPending())
+                        @if ($researchStatus->showsInProgress())
                             <p class="text-xs text-slate-brand/70 flex items-center gap-1.5">
                                 <span class="inline-block size-3.5 rounded-full border-2 border-neural-teal/50 border-t-neural-teal animate-spin" aria-hidden="true"></span>
-                                Researching…
+                                <span>{{ $researchStatus->statusLine() }}</span>
                             </p>
-                            @if ($researchList->isNotEmpty())
-                                <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-2">Research</p>
-                                @foreach ($researchList as $research)
-                                    <div class="text-sm text-slate-brand/80 mb-2">
-                                        <p>{{ Str::limit($research->content, 120) }}</p>
-                                        <a href="{{ route('idea.research.show', $research) . '?from=ideas' }}" class="text-xs font-medium text-neural-teal hover:underline">View formatted</a>
-                                    </div>
-                                @endforeach
-                            @endif
-                        @elseif ($researchList->isEmpty())
+                        @elseif ($researchStatus->showsFailed())
+                            <p class="text-xs text-red-600/90 mb-2">
+                                Research failed
+                                @if ($researchStatus->failedSkillName())
+                                    <span class="text-slate-brand/80">({{ $researchStatus->failedSkillName() }})</span>
+                                @endif
+                                @if ($researchStatus->failedSummary())
+                                    <span class="text-slate-brand/70">— {{ Str::limit($researchStatus->failedSummary(), 80) }}</span>
+                                @endif
+                            </p>
+                        @endif
+
+                        @if (! $researchStatus->showsInProgress())
                             <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
                                 @csrf
                                 <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">
-                                    Research this idea
+                                    {{ $actionLabel }}
                                 </button>
                             </form>
-                        @else
-                            <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
-                                @csrf
-                                <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">Regenerate</button>
-                            </form>
+                        @endif
+
+                        @if ($hasResearch)
                             <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-1">Research</p>
                             @foreach ($researchList as $research)
                                 <div class="text-sm text-slate-brand/80 mb-2">

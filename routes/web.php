@@ -22,6 +22,7 @@ use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\PricingController;
+use App\Http\Controllers\ResearchSkillSettingsController;
 use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
 use App\Http\Controllers\SocialAuthController;
@@ -152,6 +153,14 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'index'])->name('settings.ideas-revisit.index');
     Route::put('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'update'])->name('settings.ideas-revisit.update');
+
+    Route::get('/settings/research-skills/create', [ResearchSkillSettingsController::class, 'create'])->name('settings.research-skills.create');
+    Route::post('/settings/research-skills', [ResearchSkillSettingsController::class, 'store'])->name('settings.research-skills.store');
+    Route::put('/settings/research-skills/preferences', [ResearchSkillSettingsController::class, 'updatePreferences'])->name('settings.research-skills.preferences');
+    Route::get('/settings/research-skills', [ResearchSkillSettingsController::class, 'index'])->name('settings.research-skills.index');
+    Route::post('/settings/research-skills/{researchSkill}/default', [ResearchSkillSettingsController::class, 'setDefault'])->name('settings.research-skills.default');
+    Route::get('/settings/research-skills/{researchSkill}/edit', [ResearchSkillSettingsController::class, 'edit'])->name('settings.research-skills.edit');
+    Route::put('/settings/research-skills/{researchSkill}', [ResearchSkillSettingsController::class, 'update'])->name('settings.research-skills.update');
 
     Route::get('/settings/inbound-emails', [InboundEmailController::class, 'index'])->name('settings.inbound-emails.index');
     Route::post('/settings/inbound-emails', [InboundEmailController::class, 'store'])->name('settings.inbound-emails.store');

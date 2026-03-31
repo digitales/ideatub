@@ -5,6 +5,7 @@ namespace Tests\Unit\View\Presenters\Ideas;
 use App\Models\Thought;
 use App\Models\User;
 use App\View\Presenters\Ideas\IdeaListItemPresenter;
+use App\View\Presenters\Ideas\IdeaResearchStatusPresenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -23,7 +24,7 @@ class IdeaListItemPresenterTest extends TestCase
             'embedding' => null,
         ]);
 
-        $row = IdeaListItemPresenter::from($thought, collect());
+        $row = IdeaListItemPresenter::from($thought, collect(), IdeaResearchStatusPresenter::from($thought, null, null));
 
         $this->assertSame($thought->getLoggedDate(), $row->loggedDateYmd());
         $this->assertSame('2025-06-15', $row->loggedDateYmd());
@@ -44,8 +45,8 @@ class IdeaListItemPresenterTest extends TestCase
             'embedding' => null,
         ]);
 
-        $this->assertTrue(IdeaListItemPresenter::from($pending, collect())->isResearchPending());
-        $this->assertFalse(IdeaListItemPresenter::from($idle, collect())->isResearchPending());
+        $this->assertTrue(IdeaListItemPresenter::from($pending, collect(), IdeaResearchStatusPresenter::from($pending, null, null))->isResearchPending());
+        $this->assertFalse(IdeaListItemPresenter::from($idle, collect(), IdeaResearchStatusPresenter::from($idle, null, null))->isResearchPending());
     }
 
     #[Test]
@@ -65,7 +66,7 @@ class IdeaListItemPresenterTest extends TestCase
         ]);
         $research = collect([$r1]);
 
-        $row = IdeaListItemPresenter::from($idea, $research);
+        $row = IdeaListItemPresenter::from($idea, $research, IdeaResearchStatusPresenter::from($idea, null, null));
 
         $this->assertCount(1, $row->researchList());
         $this->assertTrue($row->researchList()->isNotEmpty());
@@ -82,7 +83,7 @@ class IdeaListItemPresenterTest extends TestCase
             'embedding' => null,
         ]);
 
-        $row = IdeaListItemPresenter::from($thought, collect());
+        $row = IdeaListItemPresenter::from($thought, collect(), IdeaResearchStatusPresenter::from($thought, null, null));
 
         $this->assertSame($thought->id, $row->thought()->id);
     }

@@ -62,7 +62,10 @@ class OpenRouterService
             throw new \RuntimeException('OPENROUTER_API_KEY is not set.');
         }
 
-        $model = config('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
+        $model = config(
+            'services.openrouter.research_model',
+            config('services.openrouter.metadata_model', 'openai/gpt-4o-mini')
+        );
 
         $systemPrompt = 'You extract metadata from a thought or note. Reply with only a single JSON object (no markdown, no explanation) with these keys: "type" (string: e.g. idea, note, task, meeting, quote), "tags" (array of strings: include topics, project names, client or organization names, product names, and other meaningful labels for finding this note later; e.g. "mastercard foundation" for a note about Mastercard Foundation), "people" (array of strings), "action_items" (array of strings). Use empty arrays or omit keys if none apply.';
 
@@ -111,19 +114,38 @@ class OpenRouterService
      */
     public function researchNote(string $ideaContent, ?string $existingResearch = null): string
     {
+        $userMessage = $this->buildResearchPrompt(trim($ideaContent), $existingResearch);
+
+        return $this->researchFromPrompt($userMessage);
+    }
+
+    /**
+     * Run a research-style completion using the full user prompt (no template merge).
+     *
+     * @throws RequestException On HTTP errors
+     * @throws \RuntimeException If OPENROUTER_API_KEY is not set or response missing content
+     */
+    public function researchFromPrompt(string $userPrompt): string
+    {
+        $userPrompt = trim($userPrompt);
+        if ($userPrompt === '') {
+            throw new \RuntimeException('Research prompt is empty.');
+        }
+
         $apiKey = config('services.openrouter.api_key');
         if (empty($apiKey)) {
             throw new \RuntimeException('OPENROUTER_API_KEY is not set.');
         }
 
-        $model = config('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
-
-        $userMessage = $this->buildResearchPrompt(trim($ideaContent), $existingResearch);
+        $model = config(
+            'services.openrouter.research_model',
+            config('services.openrouter.metadata_model', 'openai/gpt-4o-mini')
+        );
 
         $payload = [
             'model' => $model,
             'messages' => [
-                ['role' => 'user', 'content' => $userMessage],
+                ['role' => 'user', 'content' => $userPrompt],
             ],
             'max_tokens' => config('research.max_tokens', 2048),
         ];
