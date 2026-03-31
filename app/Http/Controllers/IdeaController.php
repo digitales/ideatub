@@ -18,6 +18,8 @@ use App\Support\IdeaCompletedAtSql;
 use App\Support\TagSlug;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
+use App\View\Presenters\Thoughts\IdeaIndexCardPresenter;
+use App\View\Presenters\Thoughts\StreamThoughtCardPresenter;
 use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -84,9 +86,7 @@ class IdeaController extends Controller
                     $replyableOffset = (int) $request->input('replyable_offset', 0);
                     $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
                     $html = view('idea.index_thought_cards', [
-                        'thoughts' => $thoughts,
-                        'replyableIndexStart' => $replyableOffset,
-                        'newsletterResearchStatusPresenters' => $newsletterResearchStatusPresenters,
+                        'cards' => $this->buildIdeaIndexCardPresenters($thoughts, $replyableOffset, $newsletterResearchStatusPresenters),
                     ])->render();
 
                     return response()->json([
@@ -117,9 +117,7 @@ class IdeaController extends Controller
             if ($request->ajax()) {
                 $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts);
                 $html = view('idea.index_thought_cards', [
-                    'thoughts' => $thoughts,
-                    'replyableIndexStart' => 0,
-                    'newsletterResearchStatusPresenters' => $newsletterResearchStatusPresenters,
+                    'cards' => $this->buildIdeaIndexCardPresenters($thoughts, 0, $newsletterResearchStatusPresenters),
                 ])->render();
                 $latest = $thoughts->isEmpty() ? null : $thoughts->first()->created_at->toIso8601String();
 
@@ -141,11 +139,16 @@ class IdeaController extends Controller
             }
         }
 
+        $indexThoughtCollection = $thoughts instanceof LengthAwarePaginator
+            ? $thoughts->getCollection()
+            : collect($thoughts);
+        $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($indexThoughtCollection);
+
         return view('idea.index', [
             'thoughts' => $thoughts,
             'query' => $query !== '' ? $query : null,
             'replyingTo' => $replyingTo,
-            'newsletterResearchStatusPresenters' => $this->buildEmailNewsletterResearchStatusPresenters($thoughts instanceof LengthAwarePaginator ? $thoughts->getCollection() : $thoughts),
+            'cards' => $this->buildIdeaIndexCardPresenters($thoughts, 0, $newsletterResearchStatusPresenters),
         ]);
     }
 
@@ -341,10 +344,12 @@ class IdeaController extends Controller
         if ($request->ajax()) {
             $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
             $html = view('idea.stream_thoughts', [
-                'thoughts' => $thoughts,
-                'showFullSections' => $tagForDisplay !== null,
-                'shareByThoughtId' => $shareByThoughtId,
-                'newsletterResearchStatusPresenters' => $newsletterResearchStatusPresenters,
+                'cards' => $this->buildStreamThoughtCardPresenters(
+                    $thoughts,
+                    $shareByThoughtId,
+                    $tagForDisplay !== null,
+                    $newsletterResearchStatusPresenters
+                ),
             ])->render();
 
             $streamSince = $this->firstPageCreatedAtCursor($thoughts, $canonicalTag !== null);
@@ -359,6 +364,8 @@ class IdeaController extends Controller
             ]);
         }
 
+        $streamNewsletterPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
+
         return view('idea.stream', [
             'thoughts' => $thoughts,
             'tag' => $tagForDisplay,
@@ -367,7 +374,12 @@ class IdeaController extends Controller
             'streamCollectionKey' => null,
             'streamSince' => $this->firstPageCreatedAtCursor($thoughts, $canonicalTag !== null),
             'shareByThoughtId' => $shareByThoughtId,
-            'newsletterResearchStatusPresenters' => $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection()),
+            'cards' => $this->buildStreamThoughtCardPresenters(
+                $thoughts,
+                $shareByThoughtId,
+                $tagForDisplay !== null,
+                $streamNewsletterPresenters
+            ),
         ]);
     }
 
@@ -503,10 +515,12 @@ class IdeaController extends Controller
         if ($request->ajax()) {
             $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
             $html = view('idea.stream_thoughts', [
-                'thoughts' => $thoughts,
-                'showFullSections' => false,
-                'shareByThoughtId' => $shareByThoughtId,
-                'newsletterResearchStatusPresenters' => $newsletterResearchStatusPresenters,
+                'cards' => $this->buildStreamThoughtCardPresenters(
+                    $thoughts,
+                    $shareByThoughtId,
+                    false,
+                    $newsletterResearchStatusPresenters
+                ),
             ])->render();
             $streamSince = $latestForAjax($thoughts);
 
@@ -520,6 +534,8 @@ class IdeaController extends Controller
             ]);
         }
 
+        $typedStreamNewsletterPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
+
         return view('idea.stream', [
             'thoughts' => $thoughts,
             'tag' => null,
@@ -528,8 +544,69 @@ class IdeaController extends Controller
             'streamCollectionKey' => $streamCollectionKey,
             'streamSince' => $latestForAjax($thoughts),
             'shareByThoughtId' => $shareByThoughtId,
-            'newsletterResearchStatusPresenters' => $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection()),
+            'cards' => $this->buildStreamThoughtCardPresenters(
+                $thoughts,
+                $shareByThoughtId,
+                false,
+                $typedStreamNewsletterPresenters
+            ),
         ]);
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, Thought>|\Illuminate\Database\Eloquent\Collection<int, Thought>|Collection<int, Thought>  $thoughts
+     * @param  array<string, NewsletterResearchStatusPresenter|null>  $newsletterPresenters
+     * @return Collection<int, IdeaIndexCardPresenter>
+     */
+    private function buildIdeaIndexCardPresenters(
+        LengthAwarePaginator|Collection $thoughts,
+        int $replyableIndexStart,
+        array $newsletterPresenters,
+    ): Collection {
+        $collection = $thoughts instanceof LengthAwarePaginator
+            ? $thoughts->getCollection()
+            : collect($thoughts);
+
+        $replyableIndex = $replyableIndexStart;
+
+        return $collection->map(function (Thought $thought) use (&$replyableIndex, $newsletterPresenters) {
+            if (! $thought->parent_id) {
+                $currentReplyable = $replyableIndex;
+                $replyableIndex++;
+            } else {
+                $currentReplyable = -1;
+            }
+
+            return IdeaIndexCardPresenter::fromThought(
+                $thought,
+                $currentReplyable,
+                $newsletterPresenters[$thought->id] ?? null
+            );
+        });
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, Thought>  $thoughts
+     * @param  array<string, NewsletterResearchStatusPresenter|null>  $newsletterPresenters
+     * @return Collection<int, StreamThoughtCardPresenter>
+     */
+    private function buildStreamThoughtCardPresenters(
+        LengthAwarePaginator $thoughts,
+        Collection $shareByThoughtId,
+        bool $showFullSections,
+        array $newsletterPresenters,
+    ): Collection {
+        return $thoughts->getCollection()->map(function (Thought $thought) use ($shareByThoughtId, $showFullSections, $newsletterPresenters) {
+            /** @var ResearchShare|null $share */
+            $share = $shareByThoughtId->get($thought->id);
+
+            return StreamThoughtCardPresenter::fromThought(
+                $thought,
+                $share,
+                $showFullSections,
+                $newsletterPresenters[$thought->id] ?? null
+            );
+        });
     }
 
     private function firstPageCreatedAtCursor(LengthAwarePaginator $thoughts, bool $ascending): ?string

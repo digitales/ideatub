@@ -322,4 +322,32 @@ class EmailThoughtStatusDisplayTest extends TestCase
         $response->assertDontSee('Skipped: <script>alert(1)</script>', false);
         $response->assertSee('Skipped: &lt;script&gt;alert(1)&lt;/script&gt;', false);
     }
+
+    public function test_email_research_status_renders_in_index_and_stream_ajax_fragments(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Email ajax fragment',
+            'source' => 'email',
+            'source_metadata' => [
+                'newsletter_research' => [
+                    'status' => 'research_queued',
+                ],
+            ],
+        ]);
+
+        $index = $this->actingAs($user)
+            ->withHeader('X-Requested-With', 'XMLHttpRequest')
+            ->get(route('idea.index'));
+        $index->assertOk();
+        $this->assertStringContainsString('data-email-research-status="research_queued"', $index->json('html'));
+
+        $stream = $this->actingAs($user)
+            ->withHeader('X-Requested-With', 'XMLHttpRequest')
+            ->get(route('idea.stream'));
+        $stream->assertOk();
+        $this->assertStringContainsString('data-email-research-status="research_queued"', $stream->json('html'));
+    }
 }
