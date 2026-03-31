@@ -391,6 +391,7 @@ class IdeaIdeasTest extends TestCase
         $page->assertDontSee('"IDEATUB_FEATURE_IDEAS_BODY_SECRET"', false);
         $page->assertSee('2025-08-20', false);
         $this->assertStringNotContainsString('requestEdit()', $page->getContent());
+        $page->assertDontSee('Edit tags', false);
 
         $ajax = $demo->withHeaders([
             'X-Requested-With' => 'XMLHttpRequest',
@@ -410,5 +411,6 @@ class IdeaIdeasTest extends TestCase
         $normal->assertSee('IDEATUB_FEATURE_IDEAS_BODY_SECRET', false);
         $normal->assertSee('IDEATUB_FEATURE_IDEAS_RESEARCH_SECRET', false);
         $normal->assertSee('requestEdit()', false);
+        $normal->assertSee('Edit tags', false);
     }
 }
