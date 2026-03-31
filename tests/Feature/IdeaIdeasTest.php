@@ -2,11 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\RunResearchRun;
+use App\Models\ResearchRun;
+use App\Models\ResearchSkill;
+use App\Models\ResearchSkillVersion;
 use App\Models\Thought;
 use App\Models\User;
+use App\Models\UserPreference;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Queue;
 use Tests\Concerns\AssertsIdeasSectionNav;
 use Tests\TestCase;
 
@@ -353,5 +359,138 @@ class IdeaIdeasTest extends TestCase
         $html = $response->getContent();
         $this->assertStringContainsString('break-words [overflow-wrap:anywhere]', $html);
         $this->assertStringContainsString('max-w-full break-words [overflow-wrap:anywhere]', $html);
+    }
+
+    public function test_save_idea_does_not_queue_research_when_auto_run_is_off(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        UserPreference::set($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, false);
+        $skill = ResearchSkill::factory()->create([
+            'user_id' => $user->id,
+            'is_default' => true,
+            'allow_auto_run' => true,
+            'is_manual_enabled' => true,
+            'is_active' => true,
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $skill->id]);
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $this->actingAs($user)->post(route('ideas.store'), [
+            'content' => 'No auto queue',
+            '_token' => csrf_token(),
+        ]);
+
+        $idea = Thought::where('user_id', $user->id)->where('metadata->type', 'idea')->first();
+        $this->assertNotNull($idea);
+        $this->assertSame(0, ResearchRun::where('idea_thought_id', $idea->id)->count());
+        Queue::assertNotPushed(RunResearchRun::class);
+    }
+
+    public function test_save_idea_queues_default_research_when_auto_run_on_and_skill_eligible(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        UserPreference::set($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, true);
+        $skill = ResearchSkill::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Auto default skill',
+            'is_default' => true,
+            'allow_auto_run' => true,
+            'is_manual_enabled' => true,
+            'is_active' => true,
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $skill->id]);
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->actingAs($user)->post(route('ideas.store'), [
+            'content' => 'Queue me',
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect(route('idea.ideas'));
+        $idea = Thought::where('user_id', $user->id)->where('metadata->type', 'idea')->first();
+        $this->assertNotNull($idea);
+        $run = ResearchRun::where('idea_thought_id', $idea->id)->first();
+        $this->assertNotNull($run);
+        $this->assertSame('queued', $run->status);
+        Queue::assertPushed(RunResearchRun::class);
+    }
+
+    public function test_save_idea_does_not_queue_when_auto_run_on_but_default_not_auto_eligible(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        UserPreference::set($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, true);
+        $skill = ResearchSkill::factory()->create([
+            'user_id' => $user->id,
+            'is_default' => true,
+            'allow_auto_run' => false,
+            'is_manual_enabled' => true,
+            'is_active' => true,
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $skill->id]);
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $this->actingAs($user)->post(route('ideas.store'), [
+            'content' => 'No queue without allow_auto_run',
+            '_token' => csrf_token(),
+        ]);
+
+        $idea = Thought::where('user_id', $user->id)->where('metadata->type', 'idea')->first();
+        $this->assertNotNull($idea);
+        $this->assertSame(0, ResearchRun::where('idea_thought_id', $idea->id)->count());
+        Queue::assertNotPushed(RunResearchRun::class);
+    }
+
+    public function test_ideas_page_shows_skill_name_for_queued_research_run(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Visible queued idea',
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-04-01'],
+            'embedding' => null,
+        ]);
+        $skill = ResearchSkill::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Stream skill label',
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $skill->id]);
+        ResearchRun::factory()->create([
+            'user_id' => $user->id,
+            'idea_thought_id' => $idea->id,
+            'research_skill_id' => $skill->id,
+            'research_skill_version_id' => $skill->fresh()->latestVersion->id,
+            'status' => 'queued',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertOk();
+        $response->assertSee('Stream skill label', false);
+    }
+
+    public function test_ideas_page_save_plus_research_button_label(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertOk();
+        $response->assertSee('Save + research', false);
     }
 }

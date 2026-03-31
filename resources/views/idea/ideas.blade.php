@@ -55,8 +55,11 @@
                     Save idea
                 </button>
             </div>
+            @if ($researchAutoRunEligible ?? false)
+                <p class="text-[11px] text-slate-brand/50 mt-2">Your default research skill runs automatically when you save.</p>
+            @endif
         </form>
-        <p class="text-[11px] text-slate-brand/50 mt-3 mb-1">Or add an idea and run research:</p>
+        <p class="text-[11px] text-slate-brand/50 mt-3 mb-1">Or save and start research now:</p>
         <form method="POST" action="{{ route('ideas.research-new') }}" class="flex flex-wrap items-end gap-2">
             @csrf
             <label class="flex-1 min-w-[200px]">
@@ -74,7 +77,7 @@
                 class="text-xs font-medium text-white px-4 py-2 rounded-lg transition-opacity hover:opacity-90"
                 style="background: linear-gradient(135deg, #2A8C8C, #6D6AF7);"
             >
-                Research this idea
+                Save + research
             </button>
         </form>
     </div>

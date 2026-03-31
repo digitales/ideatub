@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
+use App\Models\ResearchRun;
 use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Models\ThoughtLinkSummary;
+use App\Models\User;
+use App\Models\UserPreference;
 use App\Services\Email\ThoughtEmailSenderContextResolver;
 use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
@@ -19,6 +22,7 @@ use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
 use App\View\Presenters\Ideas\CompletedIdeaPresenter;
 use App\View\Presenters\Ideas\IdeaListItemPresenter;
+use App\View\Presenters\Ideas\IdeaResearchStatusPresenter;
 use App\View\Presenters\Thoughts\IdeaIndexCardPresenter;
 use App\View\Presenters\Thoughts\StreamThoughtCardPresenter;
 use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
@@ -27,6 +31,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use League\CommonMark\CommonMarkConverter;
@@ -679,7 +684,8 @@ class IdeaController extends Controller
             $researchByIdea = $researchThoughts->groupBy(fn (Thought $t) => $t->metadata['idea_id'] ?? '');
         }
 
-        $ideaRows = $this->buildIdeaListItemPresenters($ideas, $researchByIdea);
+        $researchRunsByIdeaId = $this->groupResearchRunsByIdeaId($ideaIds);
+        $ideaRows = $this->buildIdeaListItemPresenters($ideas, $researchByIdea, $researchRunsByIdeaId);
 
         if ($request->ajax()) {
             $html = view('idea.partials.ideas_list', [
@@ -691,22 +697,57 @@ class IdeaController extends Controller
             return response()->json(['html' => $html, 'latest_created_at' => $latest]);
         }
 
+        $user = $request->user();
+        $autoRunEnabled = $user instanceof User
+            && (bool) UserPreference::get($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, false);
+        $researchAutoRunEligible = $autoRunEnabled
+            && $this->researchService->hasEligibleDefaultAutoRunSkillForUser($user);
+
         return view('idea.ideas', [
             'ideas' => $ideas,
             'ideaRows' => $ideaRows,
+            'researchAutoRunEligible' => $researchAutoRunEligible,
         ]);
     }
 
     /**
+     * @param  Collection<int, string>  $ideaIds
+     * @return Collection<string, Collection<int, ResearchRun>>
+     */
+    private function groupResearchRunsByIdeaId(Collection $ideaIds): Collection
+    {
+        if ($ideaIds->isEmpty()) {
+            return collect();
+        }
+
+        $allRuns = ResearchRun::query()
+            ->whereIn('idea_thought_id', $ideaIds->all())
+            ->with('researchSkill')
+            ->orderByDesc('id')
+            ->get();
+
+        return $allRuns->groupBy('idea_thought_id');
+    }
+
+    /**
      * @param  LengthAwarePaginator<int, Thought>  $ideas
+     * @param  Collection<string, Collection<int, Thought>>  $researchByIdea
+     * @param  Collection<string, Collection<int, ResearchRun>>  $researchRunsByIdeaId
      * @return Collection<int, IdeaListItemPresenter>
      */
-    private function buildIdeaListItemPresenters(LengthAwarePaginator $ideas, Collection $researchByIdea): Collection
-    {
-        return $ideas->getCollection()->map(function (Thought $thought) use ($researchByIdea) {
+    private function buildIdeaListItemPresenters(
+        LengthAwarePaginator $ideas,
+        Collection $researchByIdea,
+        Collection $researchRunsByIdeaId,
+    ): Collection {
+        return $ideas->getCollection()->map(function (Thought $thought) use ($researchByIdea, $researchRunsByIdeaId) {
             $researchList = $researchByIdea->get($thought->id, collect());
+            $runs = $researchRunsByIdeaId->get($thought->id, collect());
+            $active = $runs->first(fn (ResearchRun $r) => in_array($r->status, ['queued', 'running'], true));
+            $latest = $runs->first();
+            $status = IdeaResearchStatusPresenter::from($thought, $active, $latest);
 
-            return IdeaListItemPresenter::from($thought, $researchList);
+            return IdeaListItemPresenter::from($thought, $researchList, $status);
         })->values();
     }
 
@@ -733,7 +774,7 @@ class IdeaController extends Controller
         $loggedDate = $validated['logged_date'] ?? now()->toDateString();
 
         try {
-            $this->captureService->create([
+            $result = $this->captureService->create([
                 'content' => $content,
                 'user_id' => auth()->id(),
                 'parent_id' => null,
@@ -751,7 +792,35 @@ class IdeaController extends Controller
             return redirect()->route('idea.ideas')->withInput()->with('error', 'Unable to save idea. Please try again.');
         }
 
-        return redirect()->route('idea.ideas')->with('success', 'Idea saved.');
+        $idea = $result['thought'] ?? $result['root'] ?? null;
+        if (! $idea instanceof Thought) {
+            return redirect()->route('idea.ideas')->with('error', 'Unable to save idea. Please try again.');
+        }
+
+        $user = $request->user();
+        $queuedResearch = false;
+        if (
+            $user instanceof User
+            && (bool) UserPreference::get($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, false)
+            && $this->researchService->hasEligibleDefaultAutoRunSkillForUser($user)
+        ) {
+            $this->markResearchPending($idea);
+            try {
+                $this->researchService->queueResearchRunForIdea($idea, 'web');
+                $queuedResearch = true;
+            } catch (\Throwable $e) {
+                report($e);
+                $this->clearResearchPending($idea);
+
+                return redirect()->route('idea.ideas')->withInput()->with('error', 'Idea saved, but research could not be queued. Please try again.');
+            }
+        }
+
+        $message = $queuedResearch
+            ? 'Idea saved. Research queued — refresh in a moment to see results.'
+            : 'Idea saved.';
+
+        return redirect()->route('idea.ideas')->with('success', $message);
     }
 
     /**
@@ -883,7 +952,7 @@ class IdeaController extends Controller
     /**
      * Run research for an existing idea in the background. Authorizes that the user owns the thought.
      */
-    public function research(Thought $thought): RedirectResponse
+    public function research(Request $request, Thought $thought): RedirectResponse
     {
         $this->authorize('update', $thought);
 
@@ -891,10 +960,33 @@ class IdeaController extends Controller
             return redirect()->route('idea.ideas')->with('error', 'Not an idea.');
         }
 
-        $metadata = array_merge($thought->metadata ?? [], ['research_pending' => true]);
-        $thought->update(['metadata' => $metadata]);
+        $validated = $request->validate([
+            'research_skill_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('research_skills', 'id')->where(function ($query) use ($thought) {
+                    $query
+                        ->where('user_id', $thought->user_id)
+                        ->where('is_active', true)
+                        ->where('is_manual_enabled', true);
+                }),
+            ],
+        ]);
 
-        $this->researchService->queueResearchRunForIdea($thought, 'web');
+        $this->markResearchPending($thought);
+
+        try {
+            $this->researchService->queueResearchRunForIdea(
+                $thought,
+                'web',
+                $validated['research_skill_id'] ?? null
+            );
+        } catch (\Throwable $e) {
+            report($e);
+            $this->clearResearchPending($thought);
+
+            return redirect()->back()->with('error', 'Unable to start research. Please try again.');
+        }
 
         return redirect()->back()->with('success', 'Research started. This may take a moment — refresh to see results.');
     }
@@ -919,13 +1011,35 @@ class IdeaController extends Controller
                 ->with('error', 'Unable to save idea. Please try again.');
         }
 
-        $metadata = array_merge($idea->metadata ?? [], ['research_pending' => true]);
-        $idea->update(['metadata' => $metadata]);
+        $this->markResearchPending($idea);
 
-        $this->researchService->queueResearchRunForIdea($idea, 'web');
+        try {
+            $this->researchService->queueResearchRunForIdea($idea, 'web');
+        } catch (\Throwable $e) {
+            report($e);
+            $this->clearResearchPending($idea);
+
+            return redirect()->route('idea.ideas')
+                ->with('error', 'Idea saved, but research could not be queued. Please try again.');
+        }
 
         return redirect()->route('idea.ideas')
             ->with('success', 'Idea saved. Research started — refresh in a moment to see results.');
+    }
+
+    private function markResearchPending(Thought $thought): void
+    {
+        $metadata = array_merge($thought->metadata ?? [], ['research_pending' => true]);
+        $thought->update(['metadata' => $metadata]);
+    }
+
+    private function clearResearchPending(Thought $thought): void
+    {
+        $thought->refresh();
+
+        $metadata = $thought->metadata ?? [];
+        unset($metadata['research_pending']);
+        $thought->update(['metadata' => $metadata]);
     }
 
     /**

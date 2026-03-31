@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Research\ResearchSkillManager;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * Runs research for ideas and creates linked research thoughts.
@@ -56,9 +57,27 @@ class ResearchService
      * Create or reuse a research run for this idea and queue execution. At most one active
      * (queued or running) run per idea; an existing active run is returned without dispatching again.
      */
-    public function queueResearchRunForIdea(Thought $idea, string $source = 'web'): ResearchRun
+    /**
+     * Whether the user has a default research skill that may run automatically (Save idea + global auto-run).
+     */
+    public function hasEligibleDefaultAutoRunSkillForUser(User $user): bool
     {
-        return DB::transaction(function () use ($idea, $source): ResearchRun {
+        return ResearchSkill::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('is_manual_enabled', true)
+            ->where('is_default', true)
+            ->where('allow_auto_run', true)
+            ->whereHas('latestVersion')
+            ->exists();
+    }
+
+    public function queueResearchRunForIdea(
+        Thought $idea,
+        string $source = 'web',
+        ?int $researchSkillId = null
+    ): ResearchRun {
+        return DB::transaction(function () use ($idea, $source, $researchSkillId): ResearchRun {
             $existing = ResearchRun::query()
                 ->where('idea_thought_id', $idea->id)
                 ->whereIn('status', ['queued', 'running'])
@@ -69,7 +88,7 @@ class ResearchService
                 return $existing;
             }
 
-            $version = $this->resolveManualResearchSkillVersionForIdea($idea);
+            $version = $this->resolveManualResearchSkillVersionForIdea($idea, $researchSkillId);
 
             $run = ResearchRun::query()->create([
                 'user_id' => $idea->user_id,
@@ -113,9 +132,29 @@ class ResearchService
         $thought->update(['metadata' => $metadata]);
     }
 
-    private function resolveManualResearchSkillVersionForIdea(Thought $idea): ResearchSkillVersion
+    private function resolveManualResearchSkillVersionForIdea(Thought $idea, ?int $researchSkillId = null): ResearchSkillVersion
     {
         $user = User::query()->findOrFail($idea->user_id);
+
+        if ($researchSkillId !== null) {
+            $requestedSkill = ResearchSkill::query()
+                ->whereKey($researchSkillId)
+                ->where('user_id', $user->id)
+                ->where('is_active', true)
+                ->where('is_manual_enabled', true)
+                ->first();
+
+            if ($requestedSkill === null) {
+                throw new InvalidArgumentException('Requested research skill is not available.');
+            }
+
+            $requestedVersion = $requestedSkill->latestVersion;
+            if (! $requestedVersion instanceof ResearchSkillVersion) {
+                throw new \RuntimeException('Requested research skill has no version.');
+            }
+
+            return $requestedVersion;
+        }
 
         $skill = ResearchSkill::query()
             ->where('user_id', $user->id)
@@ -176,7 +215,7 @@ class ResearchService
     }
 
     /**
-     * Create an idea thought only (no research). Use when research will run in the background via event.
+     * Create an idea thought only (no research). Use when research will run in the background job.
      *
      * @param  string  $source  'web' or 'mcp'
      */

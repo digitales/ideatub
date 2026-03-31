@@ -43,13 +43,43 @@
                     @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
                     {{-- Research block --}}
                     <div class="mt-2 pt-2 border-t border-memory-violet/10">
-                        @if ($row->isResearchPending())
+                        @if ($row->researchStatus()->showsInProgress())
                             <p class="text-xs text-slate-brand/70 flex items-center gap-1.5">
                                 <span class="inline-block size-3.5 rounded-full border-2 border-neural-teal/50 border-t-neural-teal animate-spin" aria-hidden="true"></span>
-                                Researching…
+                                <span>{{ $row->researchStatus()->statusLine() }}</span>
                             </p>
                             @if ($researchList->isNotEmpty())
                                 <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-2">Research</p>
+                                @foreach ($researchList as $research)
+                                    <div class="text-sm text-slate-brand/80 mb-2">
+                                        <p>{{ Str::limit($research->content, 120) }}</p>
+                                        <a href="{{ route('idea.research.show', $research) . '?from=ideas' }}" class="text-xs font-medium text-neural-teal hover:underline">View formatted</a>
+                                    </div>
+                                @endforeach
+                            @endif
+                        @elseif ($row->researchStatus()->showsFailed())
+                            <p class="text-xs text-red-600/90 mb-2">
+                                Research failed
+                                @if ($row->researchStatus()->failedSkillName())
+                                    <span class="text-slate-brand/80">({{ $row->researchStatus()->failedSkillName() }})</span>
+                                @endif
+                                @if ($row->researchStatus()->failedSummary())
+                                    <span class="text-slate-brand/70">— {{ Str::limit($row->researchStatus()->failedSummary(), 80) }}</span>
+                                @endif
+                            </p>
+                            @if ($researchList->isEmpty())
+                                <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
+                                    @csrf
+                                    <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">
+                                        Research this idea
+                                    </button>
+                                </form>
+                            @else
+                                <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
+                                    @csrf
+                                    <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">Regenerate</button>
+                                </form>
+                                <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-1">Research</p>
                                 @foreach ($researchList as $research)
                                     <div class="text-sm text-slate-brand/80 mb-2">
                                         <p>{{ Str::limit($research->content, 120) }}</p>
