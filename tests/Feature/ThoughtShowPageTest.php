@@ -8,6 +8,8 @@ use App\Models\ImportedEmail;
 use App\Models\MailAccount;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\DemoMode;
+use App\Services\DemoObfuscator;
 use App\Services\ThoughtCaptureService;
 use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,6 +34,142 @@ class ThoughtShowPageTest extends TestCase
     {
         parent::setUp();
         $this->withoutVite();
+    }
+
+    public function test_demo_mode_obfuscates_detail_page_content_without_mutating_the_record(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'source' => 'web',
+            'content' => 'Highly sensitive strategy note 42',
+        ]);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-123',
+        ])->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertDontSee('Highly sensitive strategy note 42', false);
+        $this->assertStringNotContainsString('Highly sensitive strategy note 42', $response->getContent());
+        $response->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+
+        $this->assertSame('Highly sensitive strategy note 42', $thought->fresh()->content);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+        $normal = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $normal->assertSee('Highly sensitive strategy note 42', false);
+    }
+
+    public function test_demo_mode_thought_detail_does_not_expose_tag_edit_affordance(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Tagged thought demo detail body',
+            'metadata' => ['tags' => ['alphademo', 'betademo']],
+        ]);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-detail-tags-demo',
+        ])->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertDontSee('Edit tags', false);
+        $response->assertDontSee('Add tag…', false);
+        $this->assertStringNotContainsString('aria-label="Edit tags"', $response->getContent());
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+        $normal = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $normal->assertOk();
+        $normal->assertSee('Edit tags', false);
+    }
+
+    public function test_demo_mode_obfuscates_email_thought_subject_and_body_without_mutating_imported_rows(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Fallback thought body unique demo fb 77',
+            'source' => 'email',
+            'source_metadata' => ['subject' => 'Meta subject should not win'],
+        ]);
+
+        $account = MailAccount::factory()->create(['user_id' => $owner->id]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-demo-mode-email-'.uniqid(),
+            'provider_thread_id' => 'thread-demo',
+            'direction' => 'received',
+            'subject' => 'Demo mode email subject secret xyz888',
+            'from_json' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+            'to_json' => [['email' => 'owner@example.com', 'name' => 'Owner']],
+            'participants_json' => [],
+            'sent_at' => now()->subMinute(),
+            'received_at' => now(),
+            'body_text' => 'Demo mode email body secret abc999',
+            'processing_status' => 'imported',
+            'thought_id' => $thought->id,
+        ]);
+
+        $thought->update([
+            'source_metadata' => array_merge($thought->source_metadata ?? [], ['imported_email_id' => $importedEmail->id]),
+        ]);
+        $thought = $thought->fresh();
+        $importedEmail = $importedEmail->fresh();
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-email-demo',
+        ])->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertDontSee('Demo mode email subject secret xyz888', false);
+        $response->assertDontSee('Demo mode email body secret abc999', false);
+        $response->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+        $response->assertSee('Direction: received', false);
+        $response->assertSee('Provider: fastmail', false);
+        $response->assertSee('sender@example.com', false);
+
+        $this->assertSame('Demo mode email subject secret xyz888', $importedEmail->fresh()->subject);
+        $this->assertSame('Demo mode email body secret abc999', $importedEmail->fresh()->body_text);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+        $normal = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $normal->assertSee('Demo mode email subject secret xyz888', false);
+        $normal->assertSee('Demo mode email body secret abc999', false);
+    }
+
+    public function test_demo_mode_throwing_obfuscator_shows_placeholder_instead_of_raw_content(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'source' => 'web',
+            'content' => 'Obfuscator throw marker secret content qqq111',
+        ]);
+
+        $real = app(DemoObfuscator::class);
+        $mock = \Mockery::mock($real)->makePartial();
+        $mock->shouldReceive('obfuscate')->andThrow(new \RuntimeException('simulated binding failure'));
+        $this->app->instance(DemoObfuscator::class, $mock);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-throw',
+        ])->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee('Demo content hidden', false);
+        $response->assertDontSee('Obfuscator throw marker secret content qqq111', false);
     }
 
     public function test_owner_can_view_thought_show_page(): void
@@ -318,6 +456,40 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Reply', false);
     }
 
+    public function test_demo_mode_obfuscates_reply_content_on_thought_detail_page_without_mutating_reply_records(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+
+        $owner = User::factory()->create();
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Parent detail root safe marker',
+            'source' => 'web',
+        ]);
+        $reply = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $root->id,
+            'content' => 'Reply secret marker zeta-444',
+            'source' => 'web',
+        ]);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-reply-detail',
+        ])->actingAs($owner)->get(route('thoughts.show', $root));
+
+        $response->assertOk();
+        $response->assertDontSee('Reply secret marker zeta-444', false);
+        $response->assertSee('Reply', false);
+        $this->assertSame('Reply secret marker zeta-444', $reply->fresh()->content);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normal = $this->actingAs($owner)->get(route('thoughts.show', $root));
+        $normal->assertOk();
+        $normal->assertSee('Reply secret marker zeta-444', false);
+    }
+
     public function test_email_thought_detail_page_shows_body_and_email_metadata(): void
     {
         $owner = User::factory()->create();
@@ -424,6 +596,47 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
 
         $this->assertEmailDetailResearchPreviewContract($response, $researchThought);
+    }
+
+    public function test_demo_mode_obfuscates_email_research_preview_without_mutating_research_records(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+
+        [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedResearchPreviewFixture();
+        $researchSections = $researchThought->comments()->orderBy('created_at')->get();
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-email-preview',
+        ])->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertSee('Research preview', false);
+        $response->assertDontSee(self::EMAIL_RESEARCH_PREVIEW_INTRO, false);
+        $response->assertDontSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, false);
+        $response->assertDontSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, false);
+        $response->assertViewHas('thoughtDetail', function (ThoughtDetailPresenter $detail): bool {
+            $preview = $detail->emailResearchPreview();
+            $this->assertIsArray($preview);
+
+            $combined = ($preview['root_html'] ?? '').implode('', $preview['section_html_chunks'] ?? []);
+            $this->assertStringNotContainsString(self::EMAIL_RESEARCH_PREVIEW_INTRO, $combined);
+            $this->assertStringNotContainsString(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, $combined);
+            $this->assertStringNotContainsString(self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, $combined);
+
+            return true;
+        });
+        $this->assertSame(self::EMAIL_RESEARCH_PREVIEW_INTRO, $researchThought->fresh()->content);
+        $this->assertSame("## First\n\n".self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, $researchSections[0]->fresh()->content);
+        $this->assertSame("## Second\n\n".self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, $researchSections[1]->fresh()->content);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normal = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+        $normal->assertOk();
+        $normal->assertSee(self::EMAIL_RESEARCH_PREVIEW_INTRO, false);
+        $normal->assertSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, false);
+        $normal->assertSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, false);
     }
 
     public function test_email_thought_detail_omits_research_preview_and_cta_when_linked_research_is_missing(): void

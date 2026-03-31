@@ -5,6 +5,7 @@ namespace Tests\Unit\View\Presenters\Email;
 use App\Models\ImportedEmail;
 use App\Models\MailAccount;
 use App\Models\Thought;
+use App\Services\DemoMode;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use Carbon\Carbon;
 use PHPUnit\Framework\Attributes\Test;
@@ -12,6 +13,13 @@ use Tests\TestCase;
 
 class EmailMetadataPresenterTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        session()->start();
+    }
+
     #[Test]
     public function it_prefers_imported_email_fields_over_source_metadata_fallbacks(): void
     {
@@ -158,5 +166,43 @@ class EmailMetadataPresenterTest extends TestCase
 
         $this->assertSame($sent->toDayDateTimeString(), $presenter->sentDisplay());
         $this->assertSame($received->toDayDateTimeString(), $presenter->receivedDisplay());
+    }
+
+    #[Test]
+    public function test_demo_mode_obfuscates_subject_while_direction_and_provider_stay_real(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        session([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'unit-seed-email-metadata',
+        ]);
+
+        $thought = Thought::factory()->make([
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Metadata subject',
+                'direction' => 'sent',
+                'provider' => 'postmark',
+            ],
+        ]);
+
+        $imported = new ImportedEmail([
+            'subject' => 'Real imported subject marker demo email sub 99',
+            'direction' => 'received',
+            'provider' => 'fastmail',
+        ]);
+        $imported->setRelation('mailAccount', null);
+
+        $presenter = EmailMetadataPresenter::from($thought, $imported);
+
+        $this->assertSame('received', $presenter->direction());
+        $this->assertSame('fastmail', $presenter->provider());
+        $this->assertNotSame('Real imported subject marker demo email sub 99', $presenter->subject());
+        $this->assertNotNull($presenter->subject());
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $presenterNormal = EmailMetadataPresenter::from($thought, $imported);
+        $this->assertSame('Real imported subject marker demo email sub 99', $presenterNormal->subject());
     }
 }

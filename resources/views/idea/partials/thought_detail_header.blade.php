@@ -11,7 +11,7 @@
     </div>
 
     <div class="mt-4">
-        @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
+        @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => $editable ?? true])
     </div>
 
     @if (($thought->metadata['type'] ?? null) === 'idea' && $thought->isIdeaCompleted())

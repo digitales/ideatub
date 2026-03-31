@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\EvernoteApiGateway;
 use App\Models\InboxItem;
+use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
@@ -61,6 +62,7 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $view->with('inboxActionableCount', $count);
+            $view->with('demoModeEnabled', app(DemoMode::class)->enabled());
         });
     }
 }

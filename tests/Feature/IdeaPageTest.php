@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\DemoMode;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
@@ -495,6 +496,84 @@ class IdeaPageTest extends TestCase
         $this->assertArrayHasKey('html', $data);
         $this->assertStringContainsString('Realtime fragment thought', $data['html']);
         $this->assertMatchesRegularExpression('/data-reply-href="[^"]*parent_id=/', $data['html']);
+    }
+
+    public function test_demo_mode_obfuscates_idea_index_cards_and_ajax_html_without_raw_alpine_leak(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        $root = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'IDEATUB_FEATURE_BODY_SECRET_IDX',
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $root->id,
+            'content' => 'IDEATUB_FEATURE_COMMENT_SECRET_IDX',
+        ]);
+
+        $demo = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'feat-seed-idea-index-demo',
+        ])->actingAs($user);
+
+        $page = $demo->get(route('idea.index'));
+        $page->assertOk();
+        $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+        $page->assertDontSee('IDEATUB_FEATURE_BODY_SECRET_IDX', false);
+        $page->assertDontSee('IDEATUB_FEATURE_COMMENT_SECRET_IDX', false);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_BODY_SECRET_IDX', $page->getContent());
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_COMMENT_SECRET_IDX', $page->getContent());
+        $page->assertDontSee('"IDEATUB_FEATURE_BODY_SECRET_IDX"', false);
+        $this->assertStringNotContainsString('thoughtCardActions(', $page->getContent());
+        $this->assertStringNotContainsString('requestEdit()', $page->getContent());
+
+        $ajax = $demo
+            ->withHeader('X-Requested-With', 'XMLHttpRequest')
+            ->get(route('idea.index'));
+        $ajax->assertOk();
+        $html = $ajax->json('html');
+        $this->assertIsString($html);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_BODY_SECRET_IDX', $html);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_COMMENT_SECRET_IDX', $html);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normal = $this->actingAs($user)->get(route('idea.index'));
+        $normal->assertOk();
+        $normal->assertSee('IDEATUB_FEATURE_BODY_SECRET_IDX', false);
+        $normal->assertSee('IDEATUB_FEATURE_COMMENT_SECRET_IDX', false);
+        $this->assertStringContainsString('thoughtCardActions(', $normal->getContent());
+        $this->assertStringContainsString('requestEdit()', $normal->getContent());
+    }
+
+    public function test_demo_mode_obfuscates_replying_to_excerpt_on_idea_index_with_parent_id(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        $parent = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'IDEATUB_REPLY_PARENT_LEAK_MARKER_parent_id_idx',
+        ]);
+
+        $demo = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'feat-seed-replying-to-preview',
+        ])->actingAs($user);
+
+        $page = $demo->get(route('idea.index', ['parent_id' => $parent->id]));
+        $page->assertOk();
+        $page->assertSee('Replying to', false);
+        $page->assertDontSee('IDEATUB_REPLY_PARENT_LEAK_MARKER_parent_id_idx', false);
+        $this->assertStringNotContainsString('IDEATUB_REPLY_PARENT_LEAK_MARKER_parent_id_idx', $page->getContent());
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normal = $this->actingAs($user)->get(route('idea.index', ['parent_id' => $parent->id]));
+        $normal->assertOk();
+        $normal->assertSee('IDEATUB_REPLY_PARENT_LEAK_MARKER_parent_id_idx', false);
     }
 
     private function xpathFromResponse(TestResponse $response): \DOMXPath

@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\DemoMode;
+use App\Services\DemoObfuscationGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -349,5 +351,111 @@ class EmailThoughtStatusDisplayTest extends TestCase
             ->get(route('idea.stream'));
         $stream->assertOk();
         $this->assertStringContainsString('data-email-research-status="research_queued"', $stream->json('html'));
+    }
+
+    public function test_demo_mode_obfuscates_newsletter_skip_reason_on_index_stream_and_detail(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        $secretReason = 'IDEATUB_SECRET_NEWSLETTER_SKIP_REASON_DEMO_PATH';
+        $seed = 'feat-seed-newsletter-skip-reason-demo';
+        $obfuscated = app(DemoObfuscationGenerator::class)->generate(
+            $secretReason,
+            'newsletter_research_skip_reason',
+            $seed
+        );
+        $skippedLabel = 'Skipped: '.$obfuscated;
+
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Skipped newsletter email demo',
+            'source' => 'email',
+            'source_metadata' => [
+                'newsletter_research' => [
+                    'status' => 'research_skipped',
+                    'reason' => $secretReason,
+                ],
+            ],
+        ]);
+
+        $demo = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => $seed,
+        ])->actingAs($user);
+
+        foreach ([
+            $demo->get(route('idea.index')),
+            $demo->get(route('idea.stream')),
+            $demo->get(route('thoughts.show', $thought)),
+        ] as $response) {
+            $response->assertOk();
+            $response->assertSee($skippedLabel, false);
+            $response->assertDontSee($secretReason, false);
+            $this->assertStringNotContainsString($secretReason, $response->getContent());
+        }
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normalIndex = $this->actingAs($user)->get(route('idea.index'));
+        $normalIndex->assertOk();
+        $normalIndex->assertSee('Skipped: '.$secretReason, false);
+
+        $normalStream = $this->actingAs($user)->get(route('idea.stream'));
+        $normalStream->assertOk();
+        $normalStream->assertSee('Skipped: '.$secretReason, false);
+
+        $normalDetail = $this->actingAs($user)->get(route('thoughts.show', $thought));
+        $normalDetail->assertOk();
+        $normalDetail->assertSee('Skipped: '.$secretReason, false);
+    }
+
+    public function test_demo_mode_obfuscates_newsletter_skip_reason_in_index_and_stream_ajax_fragments(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        $secretReason = 'IDEATUB_SECRET_NEWSLETTER_SKIP_AJAX_FRAGMENT';
+        $seed = 'feat-seed-newsletter-skip-ajax';
+        $obfuscated = app(DemoObfuscationGenerator::class)->generate(
+            $secretReason,
+            'newsletter_research_skip_reason',
+            $seed
+        );
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Email ajax skipped demo',
+            'source' => 'email',
+            'source_metadata' => [
+                'newsletter_research' => [
+                    'status' => 'research_skipped',
+                    'reason' => $secretReason,
+                ],
+            ],
+        ]);
+
+        $demo = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => $seed,
+        ])->actingAs($user);
+
+        $index = $demo
+            ->withHeader('X-Requested-With', 'XMLHttpRequest')
+            ->get(route('idea.index'));
+        $index->assertOk();
+        $htmlIndex = $index->json('html');
+        $this->assertStringContainsString('Skipped: '.$obfuscated, $htmlIndex);
+        $this->assertStringNotContainsString($secretReason, $htmlIndex);
+
+        $stream = $demo
+            ->withHeader('X-Requested-With', 'XMLHttpRequest')
+            ->get(route('idea.stream'));
+        $stream->assertOk();
+        $htmlStream = $stream->json('html');
+        $this->assertStringContainsString('Skipped: '.$obfuscated, $htmlStream);
+        $this->assertStringNotContainsString($secretReason, $htmlStream);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
     }
 }

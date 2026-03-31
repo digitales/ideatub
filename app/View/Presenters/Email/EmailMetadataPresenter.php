@@ -4,13 +4,17 @@ namespace App\View\Presenters\Email;
 
 use App\Models\ImportedEmail;
 use App\Models\Thought;
+use App\View\Presenters\Concerns\ObfuscatesDemoText;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Read-only shaping of email metadata for the thought detail sidebar.
  */
 final class EmailMetadataPresenter
 {
+    use ObfuscatesDemoText;
+
     private function __construct(
         private readonly Thought $thought,
         private readonly ?ImportedEmail $importedEmail,
@@ -24,8 +28,23 @@ final class EmailMetadataPresenter
     public function subject(): ?string
     {
         $v = $this->importedEmail?->subject ?? data_get($this->sourceMetadata(), 'subject');
+        $scalar = $this->displayScalar($v);
+        if ($scalar === null) {
+            return null;
+        }
 
-        return $this->displayScalar($v);
+        try {
+            return $this->demoText($scalar, 'email_subject');
+        } catch (\Throwable $e) {
+            Log::warning('Demo obfuscation failed for email subject presenter field.', [
+                'boundary' => 'email_metadata_presenter.subject',
+                'context' => 'email_subject',
+                'thought_id' => $this->thought->id,
+                'exception' => $e::class,
+            ]);
+
+            return 'Demo content hidden';
+        }
     }
 
     public function direction(): ?string

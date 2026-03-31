@@ -8,6 +8,7 @@ use App\Models\ResearchSkill;
 use App\Models\ResearchSkillVersion;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\DemoMode;
 use App\Models\UserPreference;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -359,6 +360,66 @@ class IdeaIdeasTest extends TestCase
         $html = $response->getContent();
         $this->assertStringContainsString('break-words [overflow-wrap:anywhere]', $html);
         $this->assertStringContainsString('max-w-full break-words [overflow-wrap:anywhere]', $html);
+    }
+
+    public function test_demo_mode_obfuscates_ideas_list_page_and_ajax_html_without_raw_alpine_leak(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'IDEATUB_FEATURE_IDEAS_BODY_SECRET',
+            'metadata' => [
+                'type' => 'idea',
+                'completed' => false,
+                'logged_date' => '2025-08-20',
+                'research_pending' => false,
+            ],
+            'embedding' => null,
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'IDEATUB_FEATURE_IDEAS_RESEARCH_SECRET',
+            'metadata' => ['type' => 'research', 'idea_id' => $idea->id],
+            'embedding' => null,
+        ]);
+
+        $demo = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'feat-seed-idea-ideas-demo',
+        ])->actingAs($user);
+
+        $page = $demo->get(route('idea.ideas'));
+        $page->assertOk();
+        $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+        $page->assertDontSee('IDEATUB_FEATURE_IDEAS_BODY_SECRET', false);
+        $page->assertDontSee('IDEATUB_FEATURE_IDEAS_RESEARCH_SECRET', false);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_IDEAS_BODY_SECRET', $page->getContent());
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_IDEAS_RESEARCH_SECRET', $page->getContent());
+        $page->assertDontSee('"IDEATUB_FEATURE_IDEAS_BODY_SECRET"', false);
+        $page->assertSee('2025-08-20', false);
+        $this->assertStringNotContainsString('requestEdit()', $page->getContent());
+        $page->assertDontSee('Edit tags', false);
+
+        $ajax = $demo->withHeaders([
+            'X-Requested-With' => 'XMLHttpRequest',
+            'Accept' => 'application/json',
+        ])->get(route('idea.ideas'));
+        $ajax->assertOk();
+        $html = $ajax->json('html');
+        $this->assertIsString($html);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_IDEAS_BODY_SECRET', $html);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_IDEAS_RESEARCH_SECRET', $html);
+        $this->assertStringContainsString('2025-08-20', $html);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normal = $this->actingAs($user)->get(route('idea.ideas'));
+        $normal->assertOk();
+        $normal->assertSee('IDEATUB_FEATURE_IDEAS_BODY_SECRET', false);
+        $normal->assertSee('IDEATUB_FEATURE_IDEAS_RESEARCH_SECRET', false);
+        $normal->assertSee('requestEdit()', false);
+        $normal->assertSee('Edit tags', false);
     }
 
     public function test_save_idea_does_not_queue_research_when_auto_run_is_off(): void

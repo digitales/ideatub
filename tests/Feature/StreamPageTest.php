@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\DemoMode;
 use DOMDocument;
 use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -467,6 +468,56 @@ class StreamPageTest extends TestCase
         $data = $response->json();
         $this->assertArrayHasKey('html', $data);
         $this->assertStringContainsString('Stream ajax fragment body', $data['html']);
+    }
+
+    public function test_demo_mode_obfuscates_stream_cards_and_ajax_html_without_raw_alpine_leak(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        $root = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'IDEATUB_FEATURE_STREAM_BODY_SECRET',
+        ]);
+        $reply = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $root->id,
+            'content' => 'IDEATUB_FEATURE_STREAM_COMMENT_SECRET',
+        ]);
+        $root->setRelation('comments', collect([$reply]));
+
+        $demo = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'feat-seed-stream-demo',
+        ])->actingAs($user);
+
+        $page = $demo->get(route('idea.stream'));
+        $page->assertOk();
+        $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+        $page->assertDontSee('IDEATUB_FEATURE_STREAM_BODY_SECRET', false);
+        $page->assertDontSee('IDEATUB_FEATURE_STREAM_COMMENT_SECRET', false);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_STREAM_BODY_SECRET', $page->getContent());
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_STREAM_COMMENT_SECRET', $page->getContent());
+        $page->assertDontSee('"IDEATUB_FEATURE_STREAM_BODY_SECRET"', false);
+        $this->assertStringNotContainsString('thoughtCardActions(', $page->getContent());
+        $this->assertStringNotContainsString('requestEdit()', $page->getContent());
+
+        $ajax = $demo
+            ->withHeader('X-Requested-With', 'XMLHttpRequest')
+            ->get(route('idea.stream'));
+        $ajax->assertOk();
+        $html = $ajax->json('html');
+        $this->assertIsString($html);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_STREAM_BODY_SECRET', $html);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_STREAM_COMMENT_SECRET', $html);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normal = $this->actingAs($user)->get(route('idea.stream'));
+        $normal->assertOk();
+        $normal->assertSee('IDEATUB_FEATURE_STREAM_BODY_SECRET', false);
+        $normal->assertSee('IDEATUB_FEATURE_STREAM_COMMENT_SECRET', false);
+        $this->assertStringContainsString('thoughtCardActions(', $normal->getContent());
+        $this->assertStringContainsString('requestEdit()', $normal->getContent());
     }
 
     private function assertStreamTypeNav(TestResponse $response, string $activeHref): void

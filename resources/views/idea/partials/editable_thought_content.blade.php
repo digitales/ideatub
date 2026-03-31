@@ -7,13 +7,16 @@
     $thoughtPreviewKey = 'thought-preview-'.$thought->id;
     $viewHref = $viewHref ?? null;
     $viewLinkClass = $viewLinkClass ?? '';
+    $displayContent = isset($displayContent) ? $displayContent : $thought->content;
+    $rawEditorContent = isset($rawEditorContent) ? $rawEditorContent : $displayContent;
 @endphp
 
 <!-- ideatub-thought-content-update:{{ route('ideas.update-content', $thought) }} -->
 
 <div
     x-data="thoughtContentEditor({
-        content: @js($thought->content),
+        displayContent: @js($displayContent),
+        rawEditorContent: @js($rawEditorContent),
         updateUrl: @js(route('ideas.update-content', $thought)),
         editable: @js($editable),
         previewMaxLength: @js($previewMaxLength),

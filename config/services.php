@@ -55,4 +55,8 @@ return [
         'default_days' => (int) env('JIRA_SYNC_DAYS', 14),
         'scheduled_sync_days' => (int) env('JIRA_SCHEDULED_SYNC_DAYS', 1),
     ],
+
+    'demo_mode' => [
+        'enabled' => filter_var(env('DEMO_MODE_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+    ],
 ];

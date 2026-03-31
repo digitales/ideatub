@@ -185,6 +185,34 @@
             </div>
         </nav>
 
+        @if(!empty($demoModeEnabled))
+            <div data-testid="demo-mode-banner" class="px-6 md:px-8 py-2.5 text-sm text-deep-indigo border-b border-amber-200/80 bg-amber-50/95" role="status">
+                Demo mode enabled. Sensitive text is obfuscated.
+            </div>
+        @endif
+
+        @auth
+            @if(config('services.demo_mode.enabled'))
+                <div class="px-6 md:px-8 py-2 flex justify-end border-b border-memory-violet/10 bg-white/40">
+                    @if(!empty($demoModeEnabled))
+                        <form method="POST" action="{{route('demo-mode.disable')}}" class="inline">
+                            @csrf
+                            <button type="submit" class="text-xs font-medium text-slate-brand hover:text-memory-violet px-2 py-1 rounded-lg hover:bg-memory-violet/8">
+                                Exit demo mode
+                            </button>
+                        </form>
+                    @else
+                        <form method="POST" action="{{route('demo-mode.enable')}}" class="inline">
+                            @csrf
+                            <button type="submit" class="text-xs font-medium text-slate-brand hover:text-memory-violet px-2 py-1 rounded-lg hover:bg-memory-violet/8">
+                                Enable demo mode
+                            </button>
+                        </form>
+                    @endif
+                </div>
+            @endif
+        @endauth
+
         {{-- Page content --}}
         <main>
             @yield('content')

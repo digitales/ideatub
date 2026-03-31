@@ -11,6 +11,8 @@ use App\Models\Thought;
 use App\Models\ThoughtLinkSummary;
 use App\Models\User;
 use App\Models\UserPreference;
+use App\Services\DemoMode;
+use App\Services\DemoObfuscator;
 use App\Services\Email\ThoughtEmailSenderContextResolver;
 use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
@@ -33,6 +35,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -147,6 +151,14 @@ class IdeaController extends Controller
             }
         }
 
+        $replyingToPreview = null;
+        if ($replyingTo !== null) {
+            $limited = Str::limit((string) $replyingTo->content, 80);
+            $replyingToPreview = app(DemoMode::class)->enabled()
+                ? app(DemoObfuscator::class)->obfuscate($limited, 'idea_index_replying_to_preview')
+                : $limited;
+        }
+
         $indexThoughtCollection = $thoughts instanceof LengthAwarePaginator
             ? $thoughts->getCollection()
             : collect($thoughts);
@@ -156,6 +168,7 @@ class IdeaController extends Controller
             'thoughts' => $thoughts,
             'query' => $query !== '' ? $query : null,
             'replyingTo' => $replyingTo,
+            'replyingToPreview' => $replyingToPreview,
             'cards' => $this->buildIdeaIndexCardPresenters($thoughts, 0, $newsletterResearchStatusPresenters),
         ]);
     }
@@ -179,7 +192,11 @@ class IdeaController extends Controller
         $contentHtml = null;
 
         if ($thought->source !== 'email') {
-            $contentHtml = (new CommonMarkConverter)->convert($thought->content)->getContent();
+            $contentHtml = $this->renderDemoSafeMarkdown(
+                new CommonMarkConverter,
+                $thought->content,
+                'thought_content'
+            );
         }
 
         $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl(
@@ -192,7 +209,9 @@ class IdeaController extends Controller
             : null;
         $newsletterResearchStatus = $emailDetailPreloadedImport
             ? NewsletterResearchStatusPresenter::fromArray(
-                $this->buildEmailNewsletterResearchStatus($thought, $importedEmail, usePreloadedImportedEmail: true),
+                $this->demoSafeNewsletterResearchStatusPayload(
+                    $this->buildEmailNewsletterResearchStatus($thought, $importedEmail, usePreloadedImportedEmail: true)
+                ),
                 domIdSuffix: (string) $thought->id
             )
             : null;
@@ -1355,7 +1374,7 @@ class IdeaController extends Controller
 
         foreach ($thoughts as $thought) {
             $presenters[$thought->id] = NewsletterResearchStatusPresenter::fromArray(
-                $payloads[$thought->id] ?? null,
+                $this->demoSafeNewsletterResearchStatusPayload($payloads[$thought->id] ?? null),
                 domIdSuffix: (string) $thought->id
             );
         }
@@ -1441,10 +1460,18 @@ class IdeaController extends Controller
         }
 
         $converter = new CommonMarkConverter;
-        $rootHtml = $converter->convert($documentRoot->content)->getContent();
+        $rootHtml = $this->renderDemoSafeMarkdown(
+            $converter,
+            $documentRoot->content,
+            'email_research_preview_root'
+        );
         $sections = $documentRoot->comments()->orderBy('created_at')->get();
         $sectionHtmlChunks = $sections->take(2)->map(function (Thought $section) use ($converter) {
-            return $converter->convert($section->content)->getContent();
+            return $this->renderDemoSafeMarkdown(
+                $converter,
+                $section->content,
+                'email_research_preview_section'
+            );
         })->values()->all();
 
         if (! $this->researchEmailPreviewHasRenderableBody($rootHtml, $sectionHtmlChunks)) {
@@ -1489,6 +1516,47 @@ class IdeaController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * @param  array{status: string, research_thought_id: string|null, skip_reason: string, show_research_link: bool, show_skip_info: bool}|null  $payload
+     * @return array{status: string, research_thought_id: string|null, skip_reason: string, show_research_link: bool, show_skip_info: bool}|null
+     */
+    private function demoSafeNewsletterResearchStatusPayload(?array $payload): ?array
+    {
+        if ($payload === null || ! app(DemoMode::class)->enabled()) {
+            return $payload;
+        }
+
+        $skip = $payload['skip_reason'] ?? '';
+        if (! is_string($skip) || $skip === '') {
+            return $payload;
+        }
+
+        $payload['skip_reason'] = app(DemoObfuscator::class)->obfuscate($skip, 'newsletter_research_skip_reason')
+            ?? 'Demo content hidden';
+
+        return $payload;
+    }
+
+    private function renderDemoSafeMarkdown(CommonMarkConverter $converter, ?string $markdown, string $context): string
+    {
+        $displayMarkdown = $markdown ?? '';
+
+        if (app(DemoMode::class)->enabled()) {
+            try {
+                $displayMarkdown = app(DemoObfuscator::class)->obfuscate($displayMarkdown, $context) ?? 'Demo content hidden';
+            } catch (\Throwable $e) {
+                Log::warning('Demo obfuscation failed before markdown render.', [
+                    'boundary' => 'idea_controller.render_demo_safe_markdown',
+                    'context' => $context,
+                    'exception' => $e::class,
+                ]);
+                $displayMarkdown = 'Demo content hidden';
+            }
+        }
+
+        return $converter->convert($displayMarkdown)->getContent();
     }
 
     /**

@@ -14,7 +14,7 @@
             >
                 <a href="{{ route('thoughts.show', $thought) }}" class="block min-w-0">
                     <p class="text-sm text-deep-indigo line-clamp-2">
-                        {{ Str::limit($thought->content, 200) }}
+                        {{ $row->displayExcerpt() }}
                     </p>
                     <p class="text-[11px] text-slate-brand/50 mt-1">Logged {{ $row->loggedFormatted() }}</p>
                     <p class="text-[11px] text-slate-brand/50 mt-0.5">Completed {{ $row->completedFormatted() }}</p>

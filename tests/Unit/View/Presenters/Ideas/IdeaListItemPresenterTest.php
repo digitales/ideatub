@@ -4,9 +4,12 @@ namespace Tests\Unit\View\Presenters\Ideas;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\DemoMode;
+use App\Services\DemoObfuscator;
 use App\View\Presenters\Ideas\IdeaListItemPresenter;
 use App\View\Presenters\Ideas\IdeaResearchStatusPresenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -86,5 +89,104 @@ class IdeaListItemPresenterTest extends TestCase
         $row = IdeaListItemPresenter::from($thought, collect(), IdeaResearchStatusPresenter::from($thought, null, null));
 
         $this->assertSame($thought->id, $row->thought()->id);
+    }
+
+    #[Test]
+    public function it_returns_raw_display_content_when_demo_mode_is_off(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'UNIT_IDEAS_LIST_BODY_MARKER',
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-01-01'],
+            'embedding' => null,
+        ]);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $this->actingAs($user);
+        $row = IdeaListItemPresenter::from($thought, collect(), IdeaResearchStatusPresenter::from($thought, null, null));
+
+        $this->assertSame('UNIT_IDEAS_LIST_BODY_MARKER', $row->displayContent());
+        $this->assertTrue($row->contentEditable());
+    }
+
+    #[Test]
+    public function it_obfuscates_display_content_and_research_previews_in_demo_mode_while_preserving_logged_date(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'UNIT_IDEAS_LIST_BODY_MARKER',
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-06-20'],
+            'embedding' => null,
+        ]);
+        $research = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'UNIT_IDEAS_LIST_RESEARCH_MARKER_'.str_repeat('x', 200),
+            'metadata' => ['type' => 'research', 'idea_id' => $idea->id],
+            'embedding' => null,
+        ]);
+
+        session([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'unit-seed-ideas-list-presenter',
+        ]);
+
+        $this->actingAs($user);
+        $row = IdeaListItemPresenter::from($idea, collect([$research]), IdeaResearchStatusPresenter::from($idea, null, null));
+
+        try {
+            $this->assertNotSame('UNIT_IDEAS_LIST_BODY_MARKER', $row->displayContent());
+            $this->assertSame(
+                app(DemoObfuscator::class)->obfuscate('UNIT_IDEAS_LIST_BODY_MARKER', 'thought_content'),
+                $row->displayContent(),
+            );
+            $this->assertFalse($row->contentEditable());
+            $this->assertSame('2025-06-20', $row->loggedDateYmd());
+
+            $rows = $row->researchPreviewRows();
+            $this->assertCount(1, $rows);
+            $this->assertArrayHasKey('preview', $rows[0]);
+            $this->assertArrayHasKey('research', $rows[0]);
+            $this->assertStringNotContainsString('UNIT_IDEAS_LIST_RESEARCH_MARKER_', $rows[0]['preview']);
+            $limitedRaw = Str::limit((string) $research->content, 120);
+            $this->assertSame(
+                app(DemoObfuscator::class)->obfuscate($limitedRaw, 'research_snippet'),
+                $rows[0]['preview'],
+            );
+        } finally {
+            session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+        }
+    }
+
+    #[Test]
+    public function it_returns_limited_raw_research_preview_when_demo_mode_is_off(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        $idea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-01-01'],
+            'embedding' => null,
+        ]);
+        $long = 'UNIT_RAW_RESEARCH_START'.str_repeat('y', 200);
+        $research = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => $long,
+            'metadata' => ['type' => 'research', 'idea_id' => $idea->id],
+            'embedding' => null,
+        ]);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+        $this->actingAs($user);
+
+        $row = IdeaListItemPresenter::from($idea, collect([$research]), IdeaResearchStatusPresenter::from($idea, null, null));
+        $preview = $row->researchPreviewRows()[0]['preview'];
+
+        $this->assertSame(Str::limit($long, 120), $preview);
+        $this->assertStringStartsWith('UNIT_RAW_RESEARCH_START', $preview);
     }
 }

@@ -4,6 +4,7 @@ namespace Tests\Unit\View\Presenters\Thoughts;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\DemoMode;
 use App\View\Presenters\MissingPresenterData;
 use App\View\Presenters\Thoughts\IdeaIndexCardPresenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -84,6 +85,54 @@ class IdeaIndexCardPresenterTest extends TestCase
         $this->assertFalse($card->showReplyLink());
         $this->assertFalse($card->previewMode());
         $this->assertTrue($card->showParentPreview());
-        $this->assertStringContainsString('Parent', $card->parentPreviewExcerpt() ?? '');
+        $this->assertStringContainsString('Parent', $card->displayParentPreviewExcerpt() ?? '');
+    }
+
+    #[Test]
+    public function it_obfuscates_display_fields_in_demo_mode_and_disables_editing(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        session([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'unit-seed-idea-index-card',
+        ]);
+
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $parent = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'IDEATUB_DEMO_PARENT_MARKER_IDX',
+        ]);
+        $child = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $parent->id,
+            'content' => 'IDEATUB_DEMO_BODY_MARKER_IDX',
+        ]);
+        $child->load('parent');
+        $comment = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $child->id,
+            'content' => 'IDEATUB_DEMO_COMMENT_MARKER_IDX_LONG_TEXT_'.str_repeat('x', 300),
+        ]);
+        $child->setRelation('comments', collect([$comment]));
+
+        $card = IdeaIndexCardPresenter::fromThought($child, -1);
+
+        $this->assertFalse($card->editable());
+        $this->assertStringNotContainsString('IDEATUB_DEMO_BODY_MARKER_IDX', $card->displayContent());
+        $this->assertStringNotContainsString('IDEATUB_DEMO_PARENT_MARKER_IDX', $card->displayParentPreviewExcerpt() ?? '');
+        $rows = $card->commentPreviewRows();
+        $this->assertCount(1, $rows);
+        $this->assertStringNotContainsString('IDEATUB_DEMO_COMMENT_MARKER_IDX', $rows[0]['content']);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $cardNormal = IdeaIndexCardPresenter::fromThought($child->fresh(['parent', 'comments']), -1);
+        $this->assertTrue($cardNormal->editable());
+        $this->assertSame('IDEATUB_DEMO_BODY_MARKER_IDX', $cardNormal->displayContent());
+        $this->assertStringContainsString('IDEATUB_DEMO_PARENT_MARKER_IDX', $cardNormal->displayParentPreviewExcerpt() ?? '');
+        $rowsNormal = $cardNormal->commentPreviewRows();
+        $this->assertStringContainsString('IDEATUB_DEMO_COMMENT_MARKER_IDX', $rowsNormal[0]['content']);
     }
 }
