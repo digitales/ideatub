@@ -13,14 +13,14 @@ use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
-use App\Support\TagSlug;
 use App\Support\IdeaCompletedAtSql;
+use App\Support\TagSlug;
+use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use League\CommonMark\CommonMarkConverter;
@@ -79,7 +79,7 @@ class IdeaController extends Controller
 
                 if ($request->ajax()) {
                     $replyableOffset = (int) $request->input('replyable_offset', 0);
-                    $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection());
+                    $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
                     $html = view('idea.index_thought_cards', [
                         'thoughts' => $thoughts,
                         'replyableIndexStart' => $replyableOffset,
@@ -112,7 +112,7 @@ class IdeaController extends Controller
                 ->get();
 
             if ($request->ajax()) {
-                $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts);
+                $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatusPresenters($thoughts);
                 $html = view('idea.index_thought_cards', [
                     'thoughts' => $thoughts,
                     'replyableIndexStart' => 0,
@@ -142,7 +142,7 @@ class IdeaController extends Controller
             'thoughts' => $thoughts,
             'query' => $query !== '' ? $query : null,
             'replyingTo' => $replyingTo,
-            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatuses($thoughts instanceof LengthAwarePaginator ? $thoughts->getCollection() : $thoughts),
+            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatusPresenters($thoughts instanceof LengthAwarePaginator ? $thoughts->getCollection() : $thoughts),
         ]);
     }
 
@@ -169,7 +169,10 @@ class IdeaController extends Controller
             ? $this->buildEmailResearchPreview($thought)
             : null;
         $newsletterResearchStatus = $thought->source === 'email'
-            ? $this->buildEmailNewsletterResearchStatus($thought)
+            ? NewsletterResearchStatusPresenter::fromArray(
+                $this->buildEmailNewsletterResearchStatus($thought),
+                (string) $thought->id
+            )
             : null;
 
         return view('idea.show', [
@@ -317,7 +320,7 @@ class IdeaController extends Controller
             ->keyBy('thought_id');
 
         if ($request->ajax()) {
-            $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection());
+            $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
             $html = view('idea.stream_thoughts', [
                 'thoughts' => $thoughts,
                 'showFullSections' => $tagForDisplay !== null,
@@ -345,7 +348,7 @@ class IdeaController extends Controller
             'streamCollectionKey' => null,
             'streamSince' => $this->firstPageCreatedAtCursor($thoughts, $canonicalTag !== null),
             'shareByThoughtId' => $shareByThoughtId,
-            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection()),
+            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection()),
         ]);
     }
 
@@ -479,7 +482,7 @@ class IdeaController extends Controller
             ->keyBy('thought_id');
 
         if ($request->ajax()) {
-            $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection());
+            $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
             $html = view('idea.stream_thoughts', [
                 'thoughts' => $thoughts,
                 'showFullSections' => false,
@@ -506,7 +509,7 @@ class IdeaController extends Controller
             'streamCollectionKey' => $streamCollectionKey,
             'streamSince' => $latestForAjax($thoughts),
             'shareByThoughtId' => $shareByThoughtId,
-            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection()),
+            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection()),
         ]);
     }
 
@@ -1026,7 +1029,7 @@ class IdeaController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, Thought>  $thoughts
+     * @param  Collection<int, Thought>  $thoughts
      * @return array<string, array<string, string|bool>|null>
      */
     private function buildEmailNewsletterResearchStatuses(Collection $thoughts): array
@@ -1038,6 +1041,25 @@ class IdeaController extends Controller
         }
 
         return $statuses;
+    }
+
+    /**
+     * @param  Collection<int, Thought>  $thoughts
+     * @return array<string, NewsletterResearchStatusPresenter|null>
+     */
+    private function buildEmailNewsletterResearchStatusPresenters(Collection $thoughts): array
+    {
+        $payloads = $this->buildEmailNewsletterResearchStatuses($thoughts);
+        $presenters = [];
+
+        foreach ($thoughts as $thought) {
+            $presenters[$thought->id] = NewsletterResearchStatusPresenter::fromArray(
+                $payloads[$thought->id] ?? null,
+                (string) $thought->id
+            );
+        }
+
+        return $presenters;
     }
 
     /**

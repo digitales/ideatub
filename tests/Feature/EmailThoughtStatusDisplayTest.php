@@ -76,7 +76,7 @@ class EmailThoughtStatusDisplayTest extends TestCase
             'metadata' => ['type' => 'research'],
         ]);
 
-        Thought::factory()->create([
+        $emailThought = Thought::factory()->create([
             'user_id' => $user->id,
             'parent_id' => null,
             'content' => 'Source email',
@@ -98,6 +98,11 @@ class EmailThoughtStatusDisplayTest extends TestCase
         $stream->assertStatus(200);
         $stream->assertSee('data-email-research-status="research_completed"', false);
         $stream->assertSee(route('idea.research.show', $research), false);
+
+        $detail = $this->actingAs($user)->get(route('thoughts.show', $emailThought));
+        $detail->assertStatus(200);
+        $detail->assertSee('data-email-research-status="research_completed"', false);
+        $detail->assertSee(route('idea.research.show', $research), false);
     }
 
     public function test_stale_queued_status_with_valid_linked_research_shows_ready_status_and_link(): void
