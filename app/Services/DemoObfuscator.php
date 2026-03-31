@@ -2,20 +2,13 @@
 
 namespace App\Services;
 
-class DemoObfuscator
+final class DemoObfuscator
 {
     private const PLACEHOLDER = 'Demo content hidden';
 
-    /** @var list<string> */
-    private const WORD_BANK = [
-        'amber', 'basin', 'coral', 'delta', 'ember', 'fjord', 'grove', 'harbor',
-        'ivory', 'juniper', 'kelp', 'lumen', 'meadow', 'nova', 'oasis', 'prairie',
-        'quartz', 'ridge', 'sable', 'terra', 'umbra', 'vista', 'willow', 'zenith',
-        'aurora', 'breeze', 'cedar', 'dune', 'elm', 'falcon', 'glacier', 'haven',
-    ];
-
     public function __construct(
-        private readonly ?string $seed
+        private readonly DemoMode $demoMode,
+        private readonly DemoObfuscationGenerator $generator,
     ) {}
 
     public function obfuscate(?string $text, string $fieldContext): ?string
@@ -29,7 +22,7 @@ class DemoObfuscator
                 return '';
             }
 
-            $seed = $this->seed;
+            $seed = $this->demoMode->seed();
             if ($seed === null || $seed === '') {
                 return self::PLACEHOLDER;
             }
@@ -40,13 +33,13 @@ class DemoObfuscator
                 return '';
             }
 
-            return $this->buildFakeContent($normalized, $fieldContext, $seed);
+            return $this->generator->generate($normalized, $fieldContext, $seed);
         } catch (\Throwable) {
             return self::PLACEHOLDER;
         }
     }
 
-    protected function normalizeInput(string $text): string
+    private function normalizeInput(string $text): string
     {
         $trimmed = trim($text);
 
@@ -65,8 +58,19 @@ class DemoObfuscator
 
         return $trimmed;
     }
+}
 
-    protected function buildFakeContent(string $normalized, string $fieldContext, string $seed): string
+class DemoObfuscationGenerator
+{
+    /** @var list<string> */
+    private const WORD_BANK = [
+        'amber', 'basin', 'coral', 'delta', 'ember', 'fjord', 'grove', 'harbor',
+        'ivory', 'juniper', 'kelp', 'lumen', 'meadow', 'nova', 'oasis', 'prairie',
+        'quartz', 'ridge', 'sable', 'terra', 'umbra', 'vista', 'willow', 'zenith',
+        'aurora', 'breeze', 'cedar', 'dune', 'elm', 'falcon', 'glacier', 'haven',
+    ];
+
+    public function generate(string $normalized, string $fieldContext, string $seed): string
     {
         $payload = $normalized."\0".$fieldContext;
         $digest = hash_hmac('sha256', $payload, $seed, true);

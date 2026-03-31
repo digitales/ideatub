@@ -7,16 +7,12 @@ use App\Services\DemoObfuscator;
 
 trait ObfuscatesDemoText
 {
-    protected function demoAwareText(?string $text, string $fieldContext): ?string
+    protected function demoText(?string $value, string $context): ?string
     {
-        $demoMode = app(DemoMode::class);
-
-        if (! $demoMode->enabled()) {
-            return $text;
+        if (! app(DemoMode::class)->enabled()) {
+            return $value;
         }
 
-        $obfuscator = new DemoObfuscator($demoMode->seed());
-
-        return $obfuscator->obfuscate($text, $fieldContext);
+        return app(DemoObfuscator::class)->obfuscate($value, $context);
     }
 }
