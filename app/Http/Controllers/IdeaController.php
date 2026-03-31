@@ -6,6 +6,7 @@ use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\ResearchRun;
 use App\Models\ResearchShare;
+use App\Models\ResearchSkill;
 use App\Models\Thought;
 use App\Models\ThoughtLinkSummary;
 use App\Models\User;
@@ -26,6 +27,7 @@ use App\View\Presenters\Ideas\IdeaResearchStatusPresenter;
 use App\View\Presenters\Thoughts\IdeaIndexCardPresenter;
 use App\View\Presenters\Thoughts\StreamThoughtCardPresenter;
 use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -662,7 +664,10 @@ class IdeaController extends Controller
      */
     public function ideas(Request $request): View|JsonResponse
     {
-        $ideas = Thought::query()
+        $ideas = $this->withIdeaResearchRunStateColumns(
+            Thought::query()
+                ->select('thoughts.*')
+        )
             ->where('user_id', auth()->id())
             ->incompleteIdeas()
             ->orderByDesc('created_at')
@@ -684,8 +689,7 @@ class IdeaController extends Controller
             $researchByIdea = $researchThoughts->groupBy(fn (Thought $t) => $t->metadata['idea_id'] ?? '');
         }
 
-        $researchRunsByIdeaId = $this->groupResearchRunsByIdeaId($ideaIds);
-        $ideaRows = $this->buildIdeaListItemPresenters($ideas, $researchByIdea, $researchRunsByIdeaId);
+        $ideaRows = $this->buildIdeaListItemPresenters($ideas, $researchByIdea);
 
         if ($request->ajax()) {
             $html = view('idea.partials.ideas_list', [
@@ -698,57 +702,86 @@ class IdeaController extends Controller
         }
 
         $user = $request->user();
-        $autoRunEnabled = $user instanceof User
-            && (bool) UserPreference::get($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, false);
-        $researchAutoRunEligible = $autoRunEnabled
-            && $this->researchService->hasEligibleDefaultAutoRunSkillForUser($user);
+        $manualResearchSkills = $user instanceof User
+            ? $this->manualResearchSkillsForUser($user)
+            : collect();
+        $hasEligibleDefaultSkill = $manualResearchSkills->contains(
+            fn (ResearchSkill $skill): bool => $skill->is_default && $skill->allow_auto_run && (bool) $skill->latest_version_exists
+        );
+        $autoRunEnabled = $user instanceof User && $hasEligibleDefaultSkill
+            ? (bool) UserPreference::get($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, false)
+            : false;
+        $researchAutoRunEligible = $autoRunEnabled && $hasEligibleDefaultSkill;
 
         return view('idea.ideas', [
             'ideas' => $ideas,
             'ideaRows' => $ideaRows,
             'researchAutoRunEligible' => $researchAutoRunEligible,
+            'manualResearchSkills' => $manualResearchSkills,
         ]);
     }
 
     /**
-     * @param  Collection<int, string>  $ideaIds
-     * @return Collection<string, Collection<int, ResearchRun>>
+     * @return Collection<int, ResearchSkill>
      */
-    private function groupResearchRunsByIdeaId(Collection $ideaIds): Collection
+    private function manualResearchSkillsForUser(User $user): Collection
     {
-        if ($ideaIds->isEmpty()) {
-            return collect();
-        }
-
-        $allRuns = ResearchRun::query()
-            ->whereIn('idea_thought_id', $ideaIds->all())
-            ->with('researchSkill')
-            ->orderByDesc('id')
-            ->get();
-
-        return $allRuns->groupBy('idea_thought_id');
+        return ResearchSkill::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('is_manual_enabled', true)
+            ->withExists('latestVersion')
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name', 'is_default', 'allow_auto_run']);
     }
 
     /**
      * @param  LengthAwarePaginator<int, Thought>  $ideas
      * @param  Collection<string, Collection<int, Thought>>  $researchByIdea
-     * @param  Collection<string, Collection<int, ResearchRun>>  $researchRunsByIdeaId
      * @return Collection<int, IdeaListItemPresenter>
      */
     private function buildIdeaListItemPresenters(
         LengthAwarePaginator $ideas,
         Collection $researchByIdea,
-        Collection $researchRunsByIdeaId,
     ): Collection {
-        return $ideas->getCollection()->map(function (Thought $thought) use ($researchByIdea, $researchRunsByIdeaId) {
+        return $ideas->getCollection()->map(function (Thought $thought) use ($researchByIdea) {
             $researchList = $researchByIdea->get($thought->id, collect());
-            $runs = $researchRunsByIdeaId->get($thought->id, collect());
-            $active = $runs->first(fn (ResearchRun $r) => in_array($r->status, ['queued', 'running'], true));
-            $latest = $runs->first();
-            $status = IdeaResearchStatusPresenter::from($thought, $active, $latest);
+            $status = IdeaResearchStatusPresenter::from($thought, null, null);
 
             return IdeaListItemPresenter::from($thought, $researchList, $status);
         })->values();
+    }
+
+    private function withIdeaResearchRunStateColumns(Builder $query): Builder
+    {
+        $latestRun = ResearchRun::query()
+            ->whereColumn('research_runs.idea_thought_id', 'thoughts.id')
+            ->orderByDesc('research_runs.id');
+        $activeRun = ResearchRun::query()
+            ->whereColumn('research_runs.idea_thought_id', 'thoughts.id')
+            ->whereIn('research_runs.status', ['queued', 'running'])
+            ->orderByDesc('research_runs.id');
+
+        return $query
+            ->selectSub((clone $latestRun)->select('research_runs.status')->limit(1), 'latest_research_run_status')
+            ->selectSub((clone $latestRun)->select('research_runs.error_summary')->limit(1), 'latest_research_run_error_summary')
+            ->selectSub(
+                (clone $latestRun)
+                    ->join('research_skills', 'research_skills.id', '=', 'research_runs.research_skill_id')
+                    ->select('research_skills.name')
+                    ->limit(1),
+                'latest_research_run_skill_name'
+            )
+            ->selectSub((clone $activeRun)->select('research_runs.status')->limit(1), 'active_research_run_status')
+            ->selectSub(
+                (clone $activeRun)
+                    ->join('research_skills', 'research_skills.id', '=', 'research_runs.research_skill_id')
+                    ->select('research_skills.name')
+                    ->limit(1),
+                'active_research_run_skill_name'
+            );
     }
 
     /**
@@ -961,16 +994,7 @@ class IdeaController extends Controller
         }
 
         $validated = $request->validate([
-            'research_skill_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('research_skills', 'id')->where(function ($query) use ($thought) {
-                    $query
-                        ->where('user_id', $thought->user_id)
-                        ->where('is_active', true)
-                        ->where('is_manual_enabled', true);
-                }),
-            ],
+            'research_skill_id' => $this->manualResearchSkillValidationRules($thought->user_id),
         ]);
 
         $this->markResearchPending($thought);
@@ -998,6 +1022,7 @@ class IdeaController extends Controller
     {
         $validated = $request->validate([
             'content' => 'required|string|max:65535',
+            'research_skill_id' => $this->manualResearchSkillValidationRules((int) auth()->id()),
         ]);
         $content = $validated['content'];
 
@@ -1014,7 +1039,11 @@ class IdeaController extends Controller
         $this->markResearchPending($idea);
 
         try {
-            $this->researchService->queueResearchRunForIdea($idea, 'web');
+            $this->researchService->queueResearchRunForIdea(
+                $idea,
+                'web',
+                $validated['research_skill_id'] ?? null
+            );
         } catch (\Throwable $e) {
             report($e);
             $this->clearResearchPending($idea);
@@ -1025,6 +1054,23 @@ class IdeaController extends Controller
 
         return redirect()->route('idea.ideas')
             ->with('success', 'Idea saved. Research started — refresh in a moment to see results.');
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function manualResearchSkillValidationRules(int $userId): array
+    {
+        return [
+            'nullable',
+            'integer',
+            Rule::exists('research_skills', 'id')->where(function ($query) use ($userId) {
+                $query
+                    ->where('user_id', $userId)
+                    ->where('is_active', true)
+                    ->where('is_manual_enabled', true);
+            }),
+        ];
     }
 
     private function markResearchPending(Thought $thought): void

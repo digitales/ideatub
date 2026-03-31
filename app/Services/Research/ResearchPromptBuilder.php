@@ -114,7 +114,19 @@ class ResearchPromptBuilder
     private function normalizeOutputSections(array $outputShape): array
     {
         if (isset($outputShape['sections']) && is_array($outputShape['sections'])) {
-            $sections = array_values(array_filter($outputShape['sections'], fn ($s) => is_string($s) && $s !== ''));
+            $sections = [];
+            foreach ($outputShape['sections'] as $section) {
+                if (! is_string($section)) {
+                    continue;
+                }
+
+                $section = trim($section);
+                if ($section === '') {
+                    continue;
+                }
+
+                $sections[] = $section;
+            }
 
             return $sections !== [] ? $sections : ['summary'];
         }
@@ -124,7 +136,17 @@ class ResearchPromptBuilder
         }
 
         if ($this->isStringList($outputShape)) {
-            return array_values(array_filter($outputShape, fn ($s) => $s !== ''));
+            $sections = [];
+            foreach ($outputShape as $section) {
+                $section = trim($section);
+                if ($section === '') {
+                    continue;
+                }
+
+                $sections[] = $section;
+            }
+
+            return $sections !== [] ? $sections : ['summary'];
         }
 
         return ['summary'];

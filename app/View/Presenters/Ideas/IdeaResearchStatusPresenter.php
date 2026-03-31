@@ -23,7 +23,7 @@ final class IdeaResearchStatusPresenter
 
     public function showsInProgress(): bool
     {
-        if ($this->activeRun !== null) {
+        if ($this->activeRun !== null || $this->activeRunStatus() !== null) {
             return true;
         }
 
@@ -32,14 +32,14 @@ final class IdeaResearchStatusPresenter
 
     public function activeSkillName(): ?string
     {
-        if ($this->activeRun === null) {
-            return null;
+        if ($this->activeRun !== null) {
+            $this->activeRun->loadMissing('researchSkill');
+            $name = $this->activeRun->researchSkill?->name;
+
+            return is_string($name) && $name !== '' ? $name : null;
         }
 
-        $this->activeRun->loadMissing('researchSkill');
-        $name = $this->activeRun->researchSkill?->name;
-
-        return is_string($name) && $name !== '' ? $name : null;
+        return $this->preloadedString('active_research_run_skill_name');
     }
 
     public function statusLine(): string
@@ -49,10 +49,13 @@ final class IdeaResearchStatusPresenter
         }
 
         $skill = $this->activeSkillName();
+        $prefix = $this->activeRunStatus() === 'queued'
+            ? 'Queued'
+            : 'Researching';
 
         return $skill !== null
-            ? "Researching ({$skill})…"
-            : 'Researching…';
+            ? "{$prefix} ({$skill})…"
+            : "{$prefix}…";
     }
 
     public function showsFailed(): bool
@@ -61,7 +64,7 @@ final class IdeaResearchStatusPresenter
             return false;
         }
 
-        return $this->latestRun !== null && $this->latestRun->status === 'failed';
+        return $this->latestRunStatus() === 'failed';
     }
 
     public function failedSummary(): ?string
@@ -70,7 +73,7 @@ final class IdeaResearchStatusPresenter
             return null;
         }
 
-        $s = $this->latestRun?->error_summary;
+        $s = $this->latestRun?->error_summary ?? $this->preloadedString('latest_research_run_error_summary');
 
         return is_string($s) ? $s : null;
     }
@@ -81,9 +84,38 @@ final class IdeaResearchStatusPresenter
             return null;
         }
 
-        $this->latestRun?->loadMissing('researchSkill');
-        $name = $this->latestRun?->researchSkill?->name;
+        if ($this->latestRun !== null) {
+            $this->latestRun->loadMissing('researchSkill');
+            $name = $this->latestRun->researchSkill?->name;
 
-        return is_string($name) && $name !== '' ? $name : null;
+            return is_string($name) && $name !== '' ? $name : null;
+        }
+
+        return $this->preloadedString('latest_research_run_skill_name');
+    }
+
+    private function activeRunStatus(): ?string
+    {
+        if ($this->activeRun !== null) {
+            return $this->activeRun->status;
+        }
+
+        return $this->preloadedString('active_research_run_status');
+    }
+
+    private function latestRunStatus(): ?string
+    {
+        if ($this->latestRun !== null) {
+            return $this->latestRun->status;
+        }
+
+        return $this->preloadedString('latest_research_run_status');
+    }
+
+    private function preloadedString(string $key): ?string
+    {
+        $value = $this->idea->getAttribute($key);
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 }

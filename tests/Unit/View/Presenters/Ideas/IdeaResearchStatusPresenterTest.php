@@ -45,7 +45,7 @@ class IdeaResearchStatusPresenterTest extends TestCase
 
         $this->assertTrue($p->showsInProgress());
         $this->assertSame('Deep dive', $p->activeSkillName());
-        $this->assertStringContainsString('Deep dive', $p->statusLine());
+        $this->assertSame('Queued (Deep dive)…', $p->statusLine());
         $this->assertFalse($p->showsFailed());
     }
 
@@ -76,6 +76,7 @@ class IdeaResearchStatusPresenterTest extends TestCase
 
         $this->assertTrue($p->showsInProgress());
         $this->assertSame('Quick scan', $p->activeSkillName());
+        $this->assertSame('Researching (Quick scan)…', $p->statusLine());
     }
 
     #[Test]
@@ -92,6 +93,7 @@ class IdeaResearchStatusPresenterTest extends TestCase
 
         $this->assertTrue($p->showsInProgress());
         $this->assertNull($p->activeSkillName());
+        $this->assertSame('Researching…', $p->statusLine());
     }
 
     #[Test]

@@ -42,12 +42,22 @@ class ResearchWorkflowRunnerTest extends TestCase
     }
 
     #[Test]
-    public function runner_marks_failed_on_error_and_does_not_create_research(): void
+    public function runner_marks_failed_on_error_and_does_not_replace_or_mutate_existing_research(): void
     {
         $run = ResearchRun::factory()->create(['status' => 'queued']);
         $ideaId = $run->idea_thought_id;
+        $existingResearch = Thought::factory()->create([
+            'user_id' => $run->user_id,
+            'content' => 'Existing linked research body',
+            'metadata' => [
+                'type' => 'research',
+                'idea_id' => $ideaId,
+                'tags' => ['research'],
+            ],
+            'source_metadata' => ['note' => 'keep me unchanged'],
+        ]);
 
-        $before = Thought::researchForIdea($ideaId)->count();
+        $before = Thought::researchForIdea($ideaId)->get();
 
         $this->mock(OpenRouterService::class, function ($mock): void {
             $mock->shouldReceive('researchFromPrompt')
@@ -60,9 +70,38 @@ class ResearchWorkflowRunnerTest extends TestCase
         $run->refresh();
 
         $this->assertSame('failed', $run->status);
+        $this->assertSame(0, $run->current_stage);
         $this->assertStringContainsString('OpenRouter unavailable', (string) $run->error_summary);
         $this->assertNull($run->final_research_thought_id);
-        $this->assertSame($before, Thought::researchForIdea($ideaId)->count());
+        $after = Thought::researchForIdea($ideaId)->get();
+        $this->assertCount($before->count(), $after);
+
+        $existingResearch->refresh();
+        $this->assertTrue($after->sole()->is($existingResearch));
+        $this->assertSame('Existing linked research body', $existingResearch->content);
+        $this->assertSame(['note' => 'keep me unchanged'], $existingResearch->source_metadata);
+    }
+
+    #[Test]
+    public function runner_does_not_continue_cancelled_run_execution(): void
+    {
+        $run = ResearchRun::factory()->create([
+            'status' => 'cancelled',
+            'current_stage' => 0,
+        ]);
+
+        $this->mock(OpenRouterService::class, function ($mock): void {
+            $mock->shouldNotReceive('researchFromPrompt');
+        });
+
+        app(ResearchWorkflowRunner::class)->run($run->fresh());
+
+        $run->refresh();
+
+        $this->assertSame('cancelled', $run->status);
+        $this->assertSame(0, $run->current_stage);
+        $this->assertNull($run->final_research_thought_id);
+        $this->assertSame(0, Thought::query()->where('metadata->type', 'research')->count());
     }
 
     #[Test]

@@ -16,14 +16,15 @@ return new class extends Migration
             $table->foreignId('research_skill_id')->constrained('research_skills')->cascadeOnDelete();
             $table->unsignedInteger('version');
             $table->string('workflow_type');
-            $table->text('instructions');
-            $table->json('context_options');
+            $table->text('instructions')->default('');
+            $table->json('context_options')->nullable();
             $table->json('output_shape')->nullable();
-            $table->string('intensity')->nullable();
+            $table->string('intensity');
             $table->boolean('is_auto_run_eligible')->default(false);
             $table->timestamps();
 
             $table->unique(['research_skill_id', 'version']);
+            $table->unique(['research_skill_id', 'id']);
         });
     }
 

@@ -9,6 +9,7 @@ use App\Models\ResearchRun;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\OpenRouterService;
+use App\Services\Research\ResearchSkillManager;
 use App\Services\ResearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -237,5 +238,66 @@ class ResearchServiceTest extends TestCase
         $this->assertSame($first->id, $second->id);
         $this->assertSame(1, ResearchRun::query()->where('idea_thought_id', $idea->id)->count());
         Bus::assertDispatchedTimes(RunResearchRun::class, 1);
+    }
+
+    public function test_queue_research_run_for_idea_respects_active_run_limit(): void
+    {
+        Bus::fake();
+        config(['research.max_active_runs_per_user' => 2]);
+
+        $user = User::factory()->create();
+        $skill = app(ResearchSkillManager::class)->create($user, [
+            'name' => 'Default',
+            'is_default' => true,
+        ]);
+
+        Thought::factory()->count(2)->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => now()->toDateString()],
+            'embedding' => null,
+        ])->each(function (Thought $idea) use ($user, $skill): void {
+            ResearchRun::factory()->create([
+                'user_id' => $user->id,
+                'idea_thought_id' => $idea->id,
+                'research_skill_id' => $skill->id,
+                'research_skill_version_id' => $skill->fresh()->latestVersion->id,
+                'status' => 'queued',
+            ]);
+        });
+
+        $newIdea = Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => now()->toDateString()],
+            'embedding' => null,
+        ]);
+
+        $this->actingAs($user);
+        $service = app(ResearchService::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Active research run limit reached');
+
+        try {
+            $service->queueResearchRunForIdea($newIdea, 'web');
+        } finally {
+            $this->assertSame(2, ResearchRun::query()->where('user_id', $user->id)->count());
+            Bus::assertNothingDispatched();
+        }
+    }
+
+    public function test_create_idea_only_requires_authenticated_user(): void
+    {
+        $this->mock(OpenRouterService::class, function ($mock): void {
+            $mock->shouldNotReceive('embed');
+            $mock->shouldNotReceive('extractMetadata');
+            $mock->shouldNotReceive('researchNote');
+        });
+
+        $service = app(ResearchService::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Authenticated user is required to create an idea.');
+
+        $service->createIdeaOnly('This should fail without a user', 'mcp');
     }
 }

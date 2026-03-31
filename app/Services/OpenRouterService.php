@@ -62,7 +62,10 @@ class OpenRouterService
             throw new \RuntimeException('OPENROUTER_API_KEY is not set.');
         }
 
-        $model = config('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
+        $model = config(
+            'services.openrouter.research_model',
+            config('services.openrouter.metadata_model', 'openai/gpt-4o-mini')
+        );
 
         $systemPrompt = 'You extract metadata from a thought or note. Reply with only a single JSON object (no markdown, no explanation) with these keys: "type" (string: e.g. idea, note, task, meeting, quote), "tags" (array of strings: include topics, project names, client or organization names, product names, and other meaningful labels for finding this note later; e.g. "mastercard foundation" for a note about Mastercard Foundation), "people" (array of strings), "action_items" (array of strings). Use empty arrays or omit keys if none apply.';
 
@@ -134,7 +137,10 @@ class OpenRouterService
             throw new \RuntimeException('OPENROUTER_API_KEY is not set.');
         }
 
-        $model = config('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
+        $model = config(
+            'services.openrouter.research_model',
+            config('services.openrouter.metadata_model', 'openai/gpt-4o-mini')
+        );
 
         $payload = [
             'model' => $model,

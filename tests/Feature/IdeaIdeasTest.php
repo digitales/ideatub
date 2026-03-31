@@ -481,7 +481,7 @@ class IdeaIdeasTest extends TestCase
         $response = $this->actingAs($user)->get(route('idea.ideas'));
 
         $response->assertOk();
-        $response->assertSee('Stream skill label', false);
+        $response->assertSee('Queued (Stream skill label)…', false);
     }
 
     public function test_ideas_page_save_plus_research_button_label(): void
@@ -492,5 +492,110 @@ class IdeaIdeasTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Save + research', false);
+    }
+
+    public function test_ideas_page_lists_only_manual_enabled_active_skills_for_save_plus_research(): void
+    {
+        $user = User::factory()->create();
+        $manualEnabled = ResearchSkill::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Manual enabled',
+            'is_manual_enabled' => true,
+            'is_active' => true,
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $manualEnabled->id]);
+
+        $inactive = ResearchSkill::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Inactive skill',
+            'is_manual_enabled' => true,
+            'is_active' => false,
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $inactive->id]);
+
+        $manualDisabled = ResearchSkill::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Manual disabled',
+            'is_manual_enabled' => false,
+            'is_active' => true,
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $manualDisabled->id]);
+
+        $otherUserSkill = ResearchSkill::factory()->create([
+            'user_id' => User::factory()->create()->id,
+            'name' => 'Other user skill',
+            'is_manual_enabled' => true,
+            'is_active' => true,
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $otherUserSkill->id]);
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertOk();
+        $response->assertSee('name="research_skill_id"', false);
+        $response->assertSee('Manual enabled', false);
+        $response->assertDontSee('Inactive skill', false);
+        $response->assertDontSee('Manual disabled', false);
+        $response->assertDontSee('Other user skill', false);
+    }
+
+    public function test_save_plus_research_queues_the_selected_manual_skill(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $selectedSkill = ResearchSkill::factory()->create([
+            'user_id' => $user->id,
+            'name' => 'Selected skill',
+            'is_manual_enabled' => true,
+            'is_active' => true,
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $selectedSkill->id]);
+
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->actingAs($user)->post(route('ideas.research-new'), [
+            'content' => 'Research with selected skill',
+            'research_skill_id' => $selectedSkill->id,
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect(route('idea.ideas'));
+        $idea = Thought::where('user_id', $user->id)->where('metadata->type', 'idea')->first();
+        $this->assertNotNull($idea);
+        $this->assertDatabaseHas('research_runs', [
+            'idea_thought_id' => $idea->id,
+            'research_skill_id' => $selectedSkill->id,
+            'research_skill_version_id' => $selectedSkill->fresh()->latestVersion->id,
+        ]);
+    }
+
+    public function test_save_plus_research_rejects_skill_selection_from_another_user(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $otherSkill = ResearchSkill::factory()->create([
+            'user_id' => User::factory()->create()->id,
+            'is_manual_enabled' => true,
+            'is_active' => true,
+        ]);
+        ResearchSkillVersion::factory()->create(['research_skill_id' => $otherSkill->id]);
+
+        $response = $this->actingAs($user)
+            ->from(route('idea.ideas'))
+            ->post(route('ideas.research-new'), [
+                'content' => 'Invalid skill selection',
+                'research_skill_id' => $otherSkill->id,
+                '_token' => csrf_token(),
+            ]);
+
+        $response->assertRedirect(route('idea.ideas'));
+        $response->assertSessionHasErrors('research_skill_id');
+        $this->assertSame(0, Thought::where('user_id', $user->id)->where('metadata->type', 'idea')->count());
+        $this->assertSame(0, ResearchRun::query()->count());
+        Queue::assertNothingPushed();
     }
 }

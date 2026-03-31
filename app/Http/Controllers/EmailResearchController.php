@@ -27,11 +27,16 @@ class EmailResearchController extends Controller
             abort(422);
         }
 
-        $thought->update([
-            'metadata' => array_merge($thought->metadata ?? [], ['research_pending' => true]),
-        ]);
+        $this->markResearchPending($thought);
 
-        $this->researchService->queueResearchRunForIdea($thought, 'email');
+        try {
+            $this->researchService->queueResearchRunForIdea($thought, 'email');
+        } catch (\Throwable $e) {
+            report($e);
+            $this->clearResearchPending($thought);
+
+            return redirect()->back()->with('error', 'Unable to start idea research. Please try again.');
+        }
 
         return redirect()->back()->with('success', 'Idea research started. Refresh in a moment to see results.');
     }
@@ -68,5 +73,21 @@ class EmailResearchController extends Controller
         }
 
         return redirect()->back()->with('success', 'Newsletter research queued. Refresh in a moment to see results.');
+    }
+
+    private function markResearchPending(Thought $thought): void
+    {
+        $thought->update([
+            'metadata' => array_merge($thought->metadata ?? [], ['research_pending' => true]),
+        ]);
+    }
+
+    private function clearResearchPending(Thought $thought): void
+    {
+        $thought->refresh();
+
+        $metadata = $thought->metadata ?? [];
+        unset($metadata['research_pending']);
+        $thought->update(['metadata' => $metadata]);
     }
 }

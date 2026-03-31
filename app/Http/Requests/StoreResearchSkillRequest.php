@@ -4,10 +4,29 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 class StoreResearchSkillRequest extends FormRequest
 {
+    /**
+     * @var array<int, string>
+     */
+    private const CONTEXT_OPTIONS = [
+        'idea',
+        'tags',
+        'related_thoughts',
+        'existing_research',
+    ];
+
+    /**
+     * @var array<int, string>
+     */
+    private const OUTPUT_SECTIONS = [
+        'summary',
+        'evidence',
+        'risks',
+        'next_steps',
+    ];
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -24,6 +43,9 @@ class StoreResearchSkillRequest extends FormRequest
             'workflow_type' => ['required', 'string', Rule::in(['quick_brief'])],
             'instructions' => ['nullable', 'string', 'max:100000'],
             'context_options' => ['nullable', 'array'],
+            'context_options.*' => ['string', Rule::in(self::CONTEXT_OPTIONS)],
+            'output_sections' => ['nullable', 'array'],
+            'output_sections.*' => ['string', Rule::in(self::OUTPUT_SECTIONS)],
             'output_shape' => ['nullable', 'array'],
             'intensity' => ['required', 'string', Rule::in(['concise', 'standard', 'thorough'])],
             'is_manual_enabled' => ['sometimes', 'boolean'],
@@ -35,33 +57,38 @@ class StoreResearchSkillRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->mergeJsonTextareaIntoArrayField('context_options');
-        $this->mergeJsonTextareaIntoArrayField('output_shape');
+        $contextOptions = $this->normalizeSelections($this->input('context_options'));
+        $outputSections = $this->normalizeSelections($this->input('output_sections'));
+
+        $this->merge([
+            'context_options' => $contextOptions === [] ? null : $contextOptions,
+            'output_sections' => $outputSections === [] ? null : $outputSections,
+            'output_shape' => $outputSections === [] ? null : ['sections' => $outputSections],
+        ]);
     }
 
-    private function mergeJsonTextareaIntoArrayField(string $field): void
+    /**
+     * @return array<int, string>
+     */
+    private function normalizeSelections(mixed $value): array
     {
-        $jsonKey = $field.'_json';
-        if (! $this->has($jsonKey)) {
-            return;
+        if ($value === null || $value === '') {
+            return [];
         }
 
-        $raw = trim((string) $this->input($jsonKey, ''));
-        $this->request->remove($jsonKey);
+        $values = is_array($value) ? $value : [$value];
+        $normalized = [];
 
-        if ($raw === '') {
-            $this->merge([$field => null]);
+        foreach ($values as $candidate) {
+            $candidate = trim((string) $candidate);
 
-            return;
+            if ($candidate === '') {
+                continue;
+            }
+
+            $normalized[] = $candidate;
         }
 
-        $decoded = json_decode($raw, true);
-        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
-            throw ValidationException::withMessages([
-                $jsonKey => ['Must be valid JSON object or array.'],
-            ]);
-        }
-
-        $this->merge([$field => $decoded]);
+        return array_values(array_unique($normalized));
     }
 }

@@ -33,7 +33,7 @@ class ResearchSkillManager
                 'latest_version_number' => 0,
             ]);
 
-            $snapshot = $this->buildVersionSnapshotFromState($skill, $state);
+            $snapshot = $this->buildVersionSnapshotFromState($state);
             $this->insertVersion($skill, 1, $snapshot);
             $skill->update(['latest_version_number' => 1]);
 
@@ -70,10 +70,10 @@ class ResearchSkillManager
             ]);
             $skill->refresh();
 
-            $candidate = $this->buildVersionSnapshotFromState($skill, $merged);
+            $candidate = $this->buildVersionSnapshotFromState($merged);
 
             if ($this->versionSemanticsDiffer($latest, $candidate)) {
-                $next = $skill->latest_version_number + 1;
+                $next = $latest->version + 1;
                 $this->insertVersion($skill, $next, $candidate);
                 $skill->update(['latest_version_number' => $next]);
             }
@@ -133,7 +133,7 @@ class ResearchSkillManager
      * @param  array<string, mixed>  $state
      * @return array{workflow_type: string, instructions: string, context_options: mixed, output_shape: mixed, intensity: string, is_auto_run_eligible: bool}
      */
-    private function buildVersionSnapshotFromState(ResearchSkill $skill, array $state): array
+    private function buildVersionSnapshotFromState(array $state): array
     {
         $workflowType = (string) $state['workflow_type'];
 

@@ -156,7 +156,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/research-skills/create', [ResearchSkillSettingsController::class, 'create'])->name('settings.research-skills.create');
     Route::post('/settings/research-skills', [ResearchSkillSettingsController::class, 'store'])->name('settings.research-skills.store');
-    Route::put('/settings/research-skills/preferences', [ResearchSkillSettingsController::class, 'updatePreferences'])->name('settings.research-skills.preferences.update');
+    Route::put('/settings/research-skills/preferences', [ResearchSkillSettingsController::class, 'updatePreferences'])->name('settings.research-skills.preferences');
     Route::get('/settings/research-skills', [ResearchSkillSettingsController::class, 'index'])->name('settings.research-skills.index');
     Route::post('/settings/research-skills/{researchSkill}/default', [ResearchSkillSettingsController::class, 'setDefault'])->name('settings.research-skills.default');
     Route::get('/settings/research-skills/{researchSkill}/edit', [ResearchSkillSettingsController::class, 'edit'])->name('settings.research-skills.edit');

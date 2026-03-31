@@ -24,6 +24,10 @@ class ResearchWorkflowRunner
     {
         $run->load(['ideaThought', 'researchSkillVersion']);
 
+        if ($run->status === 'cancelled') {
+            return;
+        }
+
         if ($run->workflow_type_snapshot !== 'quick_brief') {
             throw new InvalidArgumentException('Unsupported workflow type: '.$run->workflow_type_snapshot);
         }
@@ -69,6 +73,8 @@ class ResearchWorkflowRunner
         } catch (Throwable $e) {
             $run->update([
                 'status' => 'failed',
+                'current_stage' => 0,
+                'final_research_thought_id' => null,
                 'error_summary' => $this->truncateErrorSummary($e->getMessage()),
             ]);
         }

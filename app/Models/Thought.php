@@ -232,9 +232,19 @@ class Thought extends Model
      *
      * @return HasMany<ResearchRun, $this>
      */
-    public function ideaResearchRuns(): HasMany
+    public function researchRuns(): HasMany
     {
         return $this->hasMany(ResearchRun::class, 'idea_thought_id');
+    }
+
+    /**
+     * Research runs where this thought is the idea being researched.
+     *
+     * @return HasMany<ResearchRun, $this>
+     */
+    public function ideaResearchRuns(): HasMany
+    {
+        return $this->researchRuns();
     }
 
     public function importedEmail(): ?ImportedEmail

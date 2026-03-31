@@ -21,6 +21,8 @@ use InvalidArgumentException;
  */
 class ResearchService
 {
+    private const DEFAULT_MAX_ACTIVE_RUNS_PER_USER = 25;
+
     public function __construct(
         private OpenRouterService $openRouter,
         private ThoughtCaptureService $captureService,
@@ -88,6 +90,8 @@ class ResearchService
                 return $existing;
             }
 
+            $this->guardUserActiveRunLimit((int) $idea->user_id);
+
             $version = $this->resolveManualResearchSkillVersionForIdea($idea, $researchSkillId);
 
             $run = ResearchRun::query()->create([
@@ -130,6 +134,27 @@ class ResearchService
         $metadata = $thought->metadata ?? [];
         unset($metadata['research_pending']);
         $thought->update(['metadata' => $metadata]);
+    }
+
+    private function guardUserActiveRunLimit(int $userId): void
+    {
+        $limit = (int) config('research.max_active_runs_per_user', self::DEFAULT_MAX_ACTIVE_RUNS_PER_USER);
+        if ($limit < 1) {
+            return;
+        }
+
+        $activeRunCount = ResearchRun::query()
+            ->where('user_id', $userId)
+            ->whereIn('status', ['queued', 'running'])
+            ->select('id')
+            ->lockForUpdate()
+            ->limit($limit)
+            ->get()
+            ->count();
+
+        if ($activeRunCount >= $limit) {
+            throw new \RuntimeException("Active research run limit reached ({$limit}).");
+        }
     }
 
     private function resolveManualResearchSkillVersionForIdea(Thought $idea, ?int $researchSkillId = null): ResearchSkillVersion
@@ -221,6 +246,11 @@ class ResearchService
      */
     public function createIdeaOnly(string $ideaContent, string $source = 'web'): Thought
     {
+        $userId = auth()->id();
+        if (! is_int($userId) && ! ctype_digit((string) $userId)) {
+            throw new \RuntimeException('Authenticated user is required to create an idea.');
+        }
+
         $ideaMetadata = [
             'type' => 'idea',
             'completed' => false,
@@ -229,7 +259,7 @@ class ResearchService
 
         $result = $this->captureService->create([
             'content' => trim($ideaContent),
-            'user_id' => (int) auth()->id(),
+            'user_id' => (int) $userId,
             'source' => $source,
             'idea_metadata' => $ideaMetadata,
         ]);

@@ -99,4 +99,46 @@ class ResearchPromptBuilderTest extends TestCase
 
         $this->assertStringContainsString('Prior note about competitors.', $payload);
     }
+
+    #[Test]
+    public function prompt_builder_falls_back_to_summary_for_blank_flat_output_sections(): void
+    {
+        $idea = Thought::factory()->make([
+            'content' => 'Validate a new idea.',
+            'metadata' => ['type' => 'idea'],
+        ]);
+
+        $payload = app(ResearchPromptBuilder::class)->buildQuickBriefPrompt(
+            idea: $idea,
+            instructions: '',
+            contextOptions: ['idea'],
+            outputShape: ['', '   '],
+            intensity: 'standard',
+            relatedThoughts: [],
+        );
+
+        $this->assertStringContainsString('**summary**', $payload);
+        $this->assertStringNotContainsString('**, **', $payload);
+    }
+
+    #[Test]
+    public function prompt_builder_falls_back_to_summary_for_blank_nested_output_sections(): void
+    {
+        $idea = Thought::factory()->make([
+            'content' => 'Validate a new idea.',
+            'metadata' => ['type' => 'idea'],
+        ]);
+
+        $payload = app(ResearchPromptBuilder::class)->buildQuickBriefPrompt(
+            idea: $idea,
+            instructions: '',
+            contextOptions: ['idea'],
+            outputShape: ['sections' => ['', '   ']],
+            intensity: 'standard',
+            relatedThoughts: [],
+        );
+
+        $this->assertStringContainsString('**summary**', $payload);
+        $this->assertStringNotContainsString('**, **', $payload);
+    }
 }

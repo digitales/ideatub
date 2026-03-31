@@ -51,8 +51,8 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'description' => 'For quick checks',
             'workflow_type' => 'quick_brief',
             'instructions' => 'Summarize clearly.',
-            'context_options' => ['idea' => true],
-            'output_shape' => ['sections' => ['summary']],
+            'context_options' => ['idea', 'tags', 'existing_research'],
+            'output_sections' => ['summary', 'evidence'],
             'intensity' => 'standard',
             'is_manual_enabled' => true,
             'allow_auto_run' => false,
@@ -72,6 +72,10 @@ class ResearchSkillSettingsControllerTest extends TestCase
         $skill = ResearchSkill::query()->where('user_id', $user->id)->first();
         $this->assertNotNull($skill);
         $this->assertSame(1, $skill->latest_version_number);
+        $latest = $this->manager()->latestVersion($skill);
+        $this->assertNotNull($latest);
+        $this->assertSame(['idea', 'tags', 'existing_research'], $latest->context_options);
+        $this->assertSame(['sections' => ['summary', 'evidence']], $latest->output_shape);
     }
 
     public function test_store_rejects_invalid_workflow_type(): void
@@ -136,8 +140,8 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'description' => '',
             'workflow_type' => 'quick_brief',
             'instructions' => 'New instructions',
-            'context_options' => null,
-            'output_shape' => null,
+            'context_options' => ['related_thoughts', 'existing_research'],
+            'output_sections' => ['summary', 'risks', 'next_steps'],
             'intensity' => 'concise',
             'is_manual_enabled' => true,
             'allow_auto_run' => true,
@@ -154,6 +158,8 @@ class ResearchSkillSettingsControllerTest extends TestCase
         $this->assertNotNull($latest);
         $this->assertSame('New instructions', $latest->instructions);
         $this->assertSame('concise', $latest->intensity);
+        $this->assertSame(['related_thoughts', 'existing_research'], $latest->context_options);
+        $this->assertSame(['sections' => ['summary', 'risks', 'next_steps']], $latest->output_shape);
     }
 
     public function test_user_cannot_update_another_users_skill(): void
@@ -233,7 +239,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->put(route('settings.research-skills.preferences.update'), [
+        $response = $this->actingAs($user)->put(route('settings.research-skills.preferences'), [
             'research_auto_run_enabled' => true,
         ]);
 
@@ -241,7 +247,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
         $response->assertSessionHas('success');
         $this->assertTrue(UserPreference::get($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, false));
 
-        $this->actingAs($user)->put(route('settings.research-skills.preferences.update'), [
+        $this->actingAs($user)->put(route('settings.research-skills.preferences'), [
             'research_auto_run_enabled' => false,
         ]);
 

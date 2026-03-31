@@ -144,6 +144,52 @@ class ResearchSkillManagerTest extends TestCase
     }
 
     #[Test]
+    public function update_uses_latest_version_row_when_latest_version_number_is_stale(): void
+    {
+        $user = User::factory()->create();
+        $skill = $this->manager()->create($user, [
+            'name' => 'N',
+            'workflow_type' => 'quick_brief',
+            'instructions' => 'v1',
+            'intensity' => 'standard',
+        ]);
+
+        ResearchSkillVersion::query()->create([
+            'research_skill_id' => $skill->id,
+            'version' => 2,
+            'workflow_type' => 'quick_brief',
+            'instructions' => 'v2',
+            'context_options' => null,
+            'output_shape' => null,
+            'intensity' => 'standard',
+            'is_auto_run_eligible' => false,
+        ]);
+
+        ResearchSkillVersion::query()->create([
+            'research_skill_id' => $skill->id,
+            'version' => 3,
+            'workflow_type' => 'quick_brief',
+            'instructions' => 'v3',
+            'context_options' => null,
+            'output_shape' => null,
+            'intensity' => 'standard',
+            'is_auto_run_eligible' => false,
+        ]);
+
+        $skill->update(['latest_version_number' => 1]);
+
+        $this->manager()->update($skill, ['instructions' => 'v4']);
+
+        $skill->refresh();
+        $this->assertSame(4, $skill->latest_version_number);
+
+        $latest = $this->manager()->latestVersion($skill);
+        $this->assertNotNull($latest);
+        $this->assertSame(4, $latest->version);
+        $this->assertSame('v4', $latest->instructions);
+    }
+
+    #[Test]
     public function update_appends_version_when_auto_run_eligibility_changes(): void
     {
         $user = User::factory()->create();

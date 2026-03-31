@@ -18,7 +18,7 @@ class ResearchSkillFactory extends Factory
         return [
             'user_id' => User::factory(),
             'name' => fake()->words(3, true),
-            'description' => fake()->optional()->sentence(),
+            'description' => '',
             'is_manual_enabled' => true,
             'allow_auto_run' => false,
             'is_default' => false,

@@ -535,8 +535,8 @@ class McpController extends Controller
     }
 
     /**
-     * research_idea: Queue AI research for an idea. Either idea_id (existing idea) or content (new idea);
-     * content creates the idea first, then queues a run (same service path as web).
+     * research_idea: Queue AI research for an idea. Accepts exactly one of idea_id (existing idea)
+     * or content (new idea); content creates the idea first, then queues a run (same service path as web).
      *
      * @param  array<string, mixed>  $params
      * @return array{idea_id: string, research_run_id: int, research_id: null}
@@ -552,6 +552,10 @@ class McpController extends Controller
 
         if ($ideaId === null && $content === null) {
             throw new \InvalidArgumentException('At least one of idea_id or content is required.');
+        }
+
+        if ($ideaId !== null && $content !== null) {
+            throw new \InvalidArgumentException('Provide only one of idea_id or content.');
         }
 
         if ($ideaId !== null) {

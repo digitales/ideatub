@@ -65,6 +65,11 @@ class ResearchRun extends Model
         return $this->belongsTo(ResearchSkillVersion::class);
     }
 
+    public function skillVersion(): BelongsTo
+    {
+        return $this->researchSkillVersion();
+    }
+
     public function finalResearchThought(): BelongsTo
     {
         return $this->belongsTo(Thought::class, 'final_research_thought_id');
