@@ -104,6 +104,7 @@ class EmailNewsletterResearchServiceTest extends TestCase
         $this->assertSame($imported->id, $emailThought->source_metadata['imported_email_id']);
 
         $research = $result['research_thought']->fresh();
+        $this->assertSame('research', $research->metadata['type'] ?? null);
         $rsm = $research->source_metadata ?? [];
         $this->assertSame($emailThought->id, $rsm['email_thought_id'] ?? null);
         $this->assertSame('Weekly digest', $rsm['email_subject'] ?? null);

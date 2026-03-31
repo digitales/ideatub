@@ -490,4 +490,61 @@ class BackfillEmailResearchLinksCommandTest extends TestCase
         $this->assertSame($legacyResearch->id, data_get($emailThought->source_metadata, 'research_thought_id'));
         $this->assertSame($legacyResearch->id, $stored->research_thought_id);
     }
+
+    public function test_command_repairs_research_sourced_thought_when_metadata_type_is_note(): void
+    {
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'metadata' => ['type' => 'note', 'tags' => []],
+            'source_metadata' => [
+                'subject' => 'Leadership and availability',
+                'from' => 'TLDR Product <dan@tldrnewsletter.com>',
+            ],
+        ]);
+
+        $research = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'research',
+            'metadata' => [
+                'type' => 'note',
+                'tags' => ['newsletter'],
+            ],
+            'source_metadata' => [
+                'doc_type' => 'research',
+                'email_thought_id' => $emailThought->id,
+                'email_subject' => 'Leadership and availability',
+                'email_sender' => 'TLDR Product <dan@tldrnewsletter.com>',
+            ],
+        ]);
+
+        ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'repair-research-type-msg',
+            'direction' => 'received',
+            'subject' => 'Leadership and availability',
+            'from_json' => [['email' => 'dan@tldrnewsletter.com', 'name' => 'TLDR Product']],
+            'processing_status' => 'research_completed',
+            'thought_id' => $emailThought->id,
+            'research_thought_id' => $research->id,
+        ]);
+
+        $this->artisan('email-research:backfill-links')
+            ->assertSuccessful()
+            ->expectsOutputToContain('Scanned: 1')
+            ->expectsOutputToContain('Updated: 1');
+
+        $research->refresh();
+
+        $this->assertSame('research', $research->source);
+        $this->assertSame('research', $research->metadata['type'] ?? null);
+        $this->assertSame($emailThought->id, $research->metadata['email_thought_id'] ?? null);
+        $this->assertSame('Leadership and availability', $research->metadata['email_subject'] ?? null);
+        $this->assertSame('TLDR Product <dan@tldrnewsletter.com>', $research->metadata['email_sender'] ?? null);
+    }
 }

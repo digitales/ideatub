@@ -6,6 +6,7 @@ use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\Thought;
 use App\Services\Email\EmailNewsletterResearchService;
+use App\Support\ThoughtTypeNavigation;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -203,7 +204,8 @@ class BackfillEmailResearchLinksCommand extends Command
             }
         }
 
-        return $this->isCanonicalEmailSource($research->source);
+        return $this->isCanonicalEmailSource($research->source)
+            || ! $this->isCanonicalResearchMetadataType(data_get($research->metadata, 'type'));
     }
 
     private function processLegacyEmailSourcedResearchThought(
@@ -267,6 +269,7 @@ class BackfillEmailResearchLinksCommand extends Command
     {
         $sourceMetadata = is_array($research->source_metadata) ? $research->source_metadata : [];
         $metadata = is_array($research->metadata) ? $research->metadata : [];
+        $metadata['type'] = 'research';
 
         foreach (['email_thought_id', 'email_subject', 'email_sender'] as $key) {
             $sourceMetadata[$key] = $payload[$key];
@@ -350,6 +353,15 @@ class BackfillEmailResearchLinksCommand extends Command
     private function isCanonicalEmailSource(?string $source): bool
     {
         return in_array(mb_strtolower(trim((string) $source)), ['email', 'emails'], true);
+    }
+
+    private function isCanonicalResearchMetadataType(mixed $value): bool
+    {
+        return in_array(
+            mb_strtolower(trim((string) $value)),
+            ThoughtTypeNavigation::storedValuesForCollection('research'),
+            true
+        );
     }
 
     private function markSeenResearchThought(?string $researchThoughtId): bool

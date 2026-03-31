@@ -76,6 +76,7 @@ class EmailNewsletterResearchService
             'user_id' => (int) $emailThought->user_id,
             'source' => 'research',
             'source_metadata' => $researchSourceMetadata,
+            'idea_metadata' => ['type' => 'research'],
             'doc_type' => 'research',
             'plan_slug' => $planSlug,
             'project' => $project,
