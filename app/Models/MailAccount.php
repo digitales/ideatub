@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class MailAccount extends Model
 {
@@ -43,6 +44,11 @@ class MailAccount extends Model
     public function syncRuns(): HasMany
     {
         return $this->hasMany(MailSyncRun::class);
+    }
+
+    public function latestSyncRun(): HasOne
+    {
+        return $this->hasOne(MailSyncRun::class)->latestOfMany('started_at');
     }
 
     public function importedEmails(): HasMany

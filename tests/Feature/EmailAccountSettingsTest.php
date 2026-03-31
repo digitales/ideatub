@@ -209,4 +209,20 @@ class EmailAccountSettingsTest extends TestCase
         $response->assertSee('completed');
         $response->assertSee('owner@fastmail.fm');
     }
+
+    public function test_email_accounts_index_does_not_lazy_load_mail_account_relations(): void
+    {
+        MailAccount::preventLazyLoading();
+
+        try {
+            $user = User::factory()->create();
+            MailAccount::factory()->create(['user_id' => $user->id]);
+
+            $response = $this->actingAs($user)->get(route('settings.email-accounts.index'));
+
+            $response->assertOk();
+        } finally {
+            MailAccount::preventLazyLoading(false);
+        }
+    }
 }
