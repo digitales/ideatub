@@ -495,6 +495,8 @@ class StreamPageTest extends TestCase
         $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
         $page->assertDontSee('IDEATUB_FEATURE_STREAM_BODY_SECRET', false);
         $page->assertDontSee('IDEATUB_FEATURE_STREAM_COMMENT_SECRET', false);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_STREAM_BODY_SECRET', $page->getContent());
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_STREAM_COMMENT_SECRET', $page->getContent());
         $page->assertDontSee('"IDEATUB_FEATURE_STREAM_BODY_SECRET"', false);
         $this->assertStringNotContainsString('thoughtCardActions(', $page->getContent());
         $this->assertStringNotContainsString('requestEdit()', $page->getContent());

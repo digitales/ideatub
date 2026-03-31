@@ -388,6 +388,8 @@ class IdeaIdeasTest extends TestCase
         $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
         $page->assertDontSee('IDEATUB_FEATURE_IDEAS_BODY_SECRET', false);
         $page->assertDontSee('IDEATUB_FEATURE_IDEAS_RESEARCH_SECRET', false);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_IDEAS_BODY_SECRET', $page->getContent());
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_IDEAS_RESEARCH_SECRET', $page->getContent());
         $page->assertDontSee('"IDEATUB_FEATURE_IDEAS_BODY_SECRET"', false);
         $page->assertSee('2025-08-20', false);
         $this->assertStringNotContainsString('requestEdit()', $page->getContent());

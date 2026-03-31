@@ -523,6 +523,8 @@ class IdeaPageTest extends TestCase
         $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
         $page->assertDontSee('IDEATUB_FEATURE_BODY_SECRET_IDX', false);
         $page->assertDontSee('IDEATUB_FEATURE_COMMENT_SECRET_IDX', false);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_BODY_SECRET_IDX', $page->getContent());
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_COMMENT_SECRET_IDX', $page->getContent());
         $page->assertDontSee('"IDEATUB_FEATURE_BODY_SECRET_IDX"', false);
         $this->assertStringNotContainsString('thoughtCardActions(', $page->getContent());
         $this->assertStringNotContainsString('requestEdit()', $page->getContent());

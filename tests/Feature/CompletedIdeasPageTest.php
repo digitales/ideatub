@@ -304,6 +304,7 @@ class CompletedIdeasPageTest extends TestCase
         $page->assertOk();
         $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
         $page->assertDontSee('IDEATUB_FEATURE_COMPLETED_EXCERPT_SECRET', false);
+        $this->assertStringNotContainsString('IDEATUB_FEATURE_COMPLETED_EXCERPT_SECRET', $page->getContent());
         $page->assertSee('April 1, 2025', false);
         $page->assertSee('March 24, 2026', false);
 

@@ -53,6 +53,7 @@ class ThoughtShowPageTest extends TestCase
 
         $response->assertOk();
         $response->assertDontSee('Highly sensitive strategy note 42', false);
+        $this->assertStringNotContainsString('Highly sensitive strategy note 42', $response->getContent());
         $response->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
 
         $this->assertSame('Highly sensitive strategy note 42', $thought->fresh()->content);

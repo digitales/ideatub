@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Thought;
 use App\Models\User;
 use App\Services\DemoMode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -63,6 +64,24 @@ class DemoModeToggleTest extends TestCase
 
         $page->assertOk();
         $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+    }
+
+    public function test_after_enabling_demo_mode_idea_index_response_excludes_raw_thought_markers(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'DEMO_TOGGLE_REGRESSION_LEAK_MARKER_9c2e',
+        ]);
+
+        $this->actingAs($user)->post(route('demo-mode.enable'));
+
+        $page = $this->actingAs($user)->get(route('idea.index'));
+        $page->assertOk();
+        $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+        $page->assertDontSee('DEMO_TOGGLE_REGRESSION_LEAK_MARKER_9c2e', false);
+        $this->assertStringNotContainsString('DEMO_TOGGLE_REGRESSION_LEAK_MARKER_9c2e', $page->getContent());
     }
 
     public function test_authenticated_user_can_disable_demo_mode_and_clear_session_state(): void
