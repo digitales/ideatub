@@ -4,6 +4,7 @@ namespace App\View\Presenters\Thoughts;
 
 use App\Models\ImportedEmail;
 use App\Models\Thought;
+use App\View\Presenters\Concerns\ObfuscatesDemoText;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
 
@@ -22,6 +23,8 @@ use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
  */
 final class ThoughtDetailPresenter
 {
+    use ObfuscatesDemoText;
+
     /**
      * @param  array<string, mixed>|null  $senderRuleContext
      * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $emailResearchPreview
@@ -112,11 +115,20 @@ final class ThoughtDetailPresenter
     public function emailBodyText(): string
     {
         if ($this->thought->source !== 'email') {
-            return $this->thought->content;
+            $raw = $this->thought->content ?? '';
+
+            return $raw;
         }
 
         $body = $this->importedEmailForBody?->body_text;
+        $raw = (is_string($body) && $body !== '') ? $body : ($this->thought->content ?? '');
 
-        return (is_string($body) && $body !== '') ? $body : $this->thought->content;
+        try {
+            $obfuscated = $this->demoText($raw, 'email_body_text');
+        } catch (\Throwable) {
+            return 'Demo content hidden';
+        }
+
+        return $obfuscated ?? 'Demo content hidden';
     }
 }

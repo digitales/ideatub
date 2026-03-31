@@ -4,6 +4,7 @@ namespace App\View\Presenters\Email;
 
 use App\Models\ImportedEmail;
 use App\Models\Thought;
+use App\View\Presenters\Concerns\ObfuscatesDemoText;
 use Illuminate\Support\Carbon;
 
 /**
@@ -11,6 +12,8 @@ use Illuminate\Support\Carbon;
  */
 final class EmailMetadataPresenter
 {
+    use ObfuscatesDemoText;
+
     private function __construct(
         private readonly Thought $thought,
         private readonly ?ImportedEmail $importedEmail,
@@ -24,8 +27,16 @@ final class EmailMetadataPresenter
     public function subject(): ?string
     {
         $v = $this->importedEmail?->subject ?? data_get($this->sourceMetadata(), 'subject');
+        $scalar = $this->displayScalar($v);
+        if ($scalar === null) {
+            return null;
+        }
 
-        return $this->displayScalar($v);
+        try {
+            return $this->demoText($scalar, 'email_subject');
+        } catch (\Throwable) {
+            return 'Demo content hidden';
+        }
     }
 
     public function direction(): ?string

@@ -8,6 +8,8 @@ use App\Models\ImportedEmail;
 use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Models\ThoughtLinkSummary;
+use App\Services\DemoMode;
+use App\Services\DemoObfuscator;
 use App\Services\Email\ThoughtEmailSenderContextResolver;
 use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
@@ -173,7 +175,16 @@ class IdeaController extends Controller
         $contentHtml = null;
 
         if ($thought->source !== 'email') {
-            $contentHtml = (new CommonMarkConverter)->convert($thought->content)->getContent();
+            $displayMarkdown = $thought->content ?? '';
+            if (app(DemoMode::class)->enabled()) {
+                try {
+                    $obfuscated = app(DemoObfuscator::class)->obfuscate($displayMarkdown, 'thought_content');
+                    $displayMarkdown = $obfuscated ?? 'Demo content hidden';
+                } catch (\Throwable) {
+                    $displayMarkdown = 'Demo content hidden';
+                }
+            }
+            $contentHtml = (new CommonMarkConverter)->convert($displayMarkdown)->getContent();
         }
 
         $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl(
