@@ -187,6 +187,19 @@ class InboxPageTest extends TestCase
         $response->assertSee('data-pending-label="Extra processing sender..."', false);
     }
 
+    public function test_inbox_flash_messages_render_in_fixed_overlay_region(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->withSession(['success' => 'Inbox item marked done.'])
+            ->get(route('inbox.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-inbox-flash-region', false);
+        $response->assertSee('class="pointer-events-none fixed inset-x-0 top-20 z-20', false);
+    }
+
     private function xpathFromResponse(TestResponse $response): \DOMXPath
     {
         libxml_use_internal_errors(true);

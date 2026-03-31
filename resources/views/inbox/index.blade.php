@@ -8,19 +8,23 @@
     x-data="inboxPage()"
     data-inbox-initial-count="{{ $inboxInitialCount ?? 0 }}"
 >
-    @if (session('success'))
-        <div class="mb-6 rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal">
-            {{ session('success') }}
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
-            {{ session('error') }}
-        </div>
-    @endif
+    <div data-inbox-flash-region class="pointer-events-none fixed inset-x-0 top-20 z-20 px-6">
+        <div class="mx-auto max-w-4xl space-y-3">
+            @if (session('success'))
+                <div class="pointer-events-auto rounded-xl border border-neural-teal/25 bg-neural-teal/10 px-4 py-3 text-sm text-neural-teal shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+                    {{ session('success') }}
+                </div>
+            @endif
+            @if (session('error'))
+                <div class="pointer-events-auto rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+                    {{ session('error') }}
+                </div>
+            @endif
 
-    <div x-show="flashSuccess" x-cloak class="mb-6 rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal" x-text="flashSuccess"></div>
-    <div x-show="flashError" x-cloak class="mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600" x-text="flashError"></div>
+            <div x-show="flashSuccess" x-cloak class="pointer-events-auto rounded-xl border border-neural-teal/25 bg-neural-teal/10 px-4 py-3 text-sm text-neural-teal shadow-[0_4px_24px_rgba(109,106,247,0.08)]" x-text="flashSuccess"></div>
+            <div x-show="flashError" x-cloak class="pointer-events-auto rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 shadow-[0_4px_24px_rgba(109,106,247,0.08)]" x-text="flashError"></div>
+        </div>
+    </div>
 
     <div class="mb-8">
         <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">Inbox</h1>
