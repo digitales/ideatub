@@ -10,6 +10,6 @@
 
     @include('idea.partials.ideas_section_nav', ['active' => 'completed'])
 
-    @include('idea.partials.completed_ideas_list', ['ideas' => $ideas])
+    @include('idea.partials.completed_ideas_list', ['ideas' => $ideas, 'completedRows' => $completedRows])
 </div>
 @endsection

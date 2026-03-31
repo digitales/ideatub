@@ -176,6 +176,8 @@ class CompletedIdeasPageTest extends TestCase
         $response->assertSee('April 1, 2025', false);
         $response->assertSee('March 24, 2026', false);
         $response->assertDontSee('2025-04-01');
+        $response->assertSee('Logged April 1, 2025', false);
+        $response->assertSee('Completed March 24, 2026', false);
     }
 
     public function test_completed_page_treats_malformed_completed_at_like_legacy_row_and_shows_fallback_marker(): void

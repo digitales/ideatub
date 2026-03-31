@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\IdeaResearchRequested;
 use App\Models\CapturedInboundEmail;
+use App\Models\ImportedEmail;
 use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Models\ThoughtLinkSummary;
@@ -13,14 +14,20 @@ use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
-use App\Support\TagSlug;
 use App\Support\IdeaCompletedAtSql;
+use App\Support\TagSlug;
+use App\View\Presenters\Email\EmailMetadataPresenter;
+use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
+use App\View\Presenters\Ideas\CompletedIdeaPresenter;
+use App\View\Presenters\Ideas\IdeaListItemPresenter;
+use App\View\Presenters\Thoughts\IdeaIndexCardPresenter;
+use App\View\Presenters\Thoughts\StreamThoughtCardPresenter;
+use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use League\CommonMark\CommonMarkConverter;
@@ -79,11 +86,9 @@ class IdeaController extends Controller
 
                 if ($request->ajax()) {
                     $replyableOffset = (int) $request->input('replyable_offset', 0);
-                    $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection());
+                    $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
                     $html = view('idea.index_thought_cards', [
-                        'thoughts' => $thoughts,
-                        'replyableIndexStart' => $replyableOffset,
-                        'newsletterResearchStatuses' => $newsletterResearchStatuses,
+                        'cards' => $this->buildIdeaIndexCardPresenters($thoughts, $replyableOffset, $newsletterResearchStatusPresenters),
                     ])->render();
 
                     return response()->json([
@@ -112,11 +117,9 @@ class IdeaController extends Controller
                 ->get();
 
             if ($request->ajax()) {
-                $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts);
+                $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts);
                 $html = view('idea.index_thought_cards', [
-                    'thoughts' => $thoughts,
-                    'replyableIndexStart' => 0,
-                    'newsletterResearchStatuses' => $newsletterResearchStatuses,
+                    'cards' => $this->buildIdeaIndexCardPresenters($thoughts, 0, $newsletterResearchStatusPresenters),
                 ])->render();
                 $latest = $thoughts->isEmpty() ? null : $thoughts->first()->created_at->toIso8601String();
 
@@ -138,11 +141,16 @@ class IdeaController extends Controller
             }
         }
 
+        $indexThoughtCollection = $thoughts instanceof LengthAwarePaginator
+            ? $thoughts->getCollection()
+            : collect($thoughts);
+        $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($indexThoughtCollection);
+
         return view('idea.index', [
             'thoughts' => $thoughts,
             'query' => $query !== '' ? $query : null,
             'replyingTo' => $replyingTo,
-            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatuses($thoughts instanceof LengthAwarePaginator ? $thoughts->getCollection() : $thoughts),
+            'cards' => $this->buildIdeaIndexCardPresenters($thoughts, 0, $newsletterResearchStatusPresenters),
         ]);
     }
 
@@ -155,8 +163,12 @@ class IdeaController extends Controller
 
         $thought->load(['comments' => fn ($q) => $q->orderBy('created_at')]);
         $importedEmail = $thought->source === 'email' ? $thought->importedEmail() : null;
-        $senderRuleContext = $thought->source === 'email'
-            ? $this->thoughtEmailSenderContextResolver->resolve($thought)
+        if ($importedEmail !== null) {
+            $importedEmail->loadMissing('mailAccount');
+        }
+        $emailDetailPreloadedImport = $thought->source === 'email';
+        $senderRuleContext = $emailDetailPreloadedImport
+            ? $this->thoughtEmailSenderContextResolver->resolve($thought, $importedEmail, usePreloadedImportedEmail: true)
             : null;
         $contentHtml = null;
 
@@ -164,22 +176,37 @@ class IdeaController extends Controller
             $contentHtml = (new CommonMarkConverter)->convert($thought->content)->getContent();
         }
 
-        $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl($thought);
-        $emailResearchPreview = $thought->source === 'email'
-            ? $this->buildEmailResearchPreview($thought)
+        $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl(
+            $thought,
+            $importedEmail,
+            $emailDetailPreloadedImport
+        );
+        $emailResearchPreview = $emailDetailPreloadedImport
+            ? $this->buildEmailResearchPreview($thought, $importedEmail, usePreloadedImportedEmail: true)
             : null;
-        $newsletterResearchStatus = $thought->source === 'email'
-            ? $this->buildEmailNewsletterResearchStatus($thought)
+        $newsletterResearchStatus = $emailDetailPreloadedImport
+            ? NewsletterResearchStatusPresenter::fromArray(
+                $this->buildEmailNewsletterResearchStatus($thought, $importedEmail, usePreloadedImportedEmail: true),
+                domIdSuffix: (string) $thought->id
+            )
+            : null;
+        $emailMetadata = $thought->source === 'email'
+            ? EmailMetadataPresenter::from($thought, $importedEmail)
             : null;
 
+        $thoughtDetail = ThoughtDetailPresenter::forShow(
+            thought: $thought,
+            contentHtml: $contentHtml,
+            linkedResearchUrl: $linkedResearchUrl,
+            emailResearchPreview: $emailResearchPreview,
+            newsletterResearchStatus: $newsletterResearchStatus,
+            senderRuleContext: $senderRuleContext,
+            emailMetadata: $emailMetadata,
+            importedEmailForBody: $importedEmail,
+        );
+
         return view('idea.show', [
-            'thought' => $thought,
-            'importedEmail' => $importedEmail,
-            'senderRuleContext' => $senderRuleContext,
-            'contentHtml' => $contentHtml,
-            'linkedResearchUrl' => $linkedResearchUrl,
-            'emailResearchPreview' => $emailResearchPreview,
-            'newsletterResearchStatus' => $newsletterResearchStatus,
+            'thoughtDetail' => $thoughtDetail,
         ]);
     }
 
@@ -317,12 +344,14 @@ class IdeaController extends Controller
             ->keyBy('thought_id');
 
         if ($request->ajax()) {
-            $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection());
+            $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
             $html = view('idea.stream_thoughts', [
-                'thoughts' => $thoughts,
-                'showFullSections' => $tagForDisplay !== null,
-                'shareByThoughtId' => $shareByThoughtId,
-                'newsletterResearchStatuses' => $newsletterResearchStatuses,
+                'cards' => $this->buildStreamThoughtCardPresenters(
+                    $thoughts,
+                    $shareByThoughtId,
+                    $tagForDisplay !== null,
+                    $newsletterResearchStatusPresenters
+                ),
             ])->render();
 
             $streamSince = $this->firstPageCreatedAtCursor($thoughts, $canonicalTag !== null);
@@ -337,6 +366,8 @@ class IdeaController extends Controller
             ]);
         }
 
+        $streamNewsletterPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
+
         return view('idea.stream', [
             'thoughts' => $thoughts,
             'tag' => $tagForDisplay,
@@ -345,7 +376,12 @@ class IdeaController extends Controller
             'streamCollectionKey' => null,
             'streamSince' => $this->firstPageCreatedAtCursor($thoughts, $canonicalTag !== null),
             'shareByThoughtId' => $shareByThoughtId,
-            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection()),
+            'cards' => $this->buildStreamThoughtCardPresenters(
+                $thoughts,
+                $shareByThoughtId,
+                $tagForDisplay !== null,
+                $streamNewsletterPresenters
+            ),
         ]);
     }
 
@@ -479,12 +515,14 @@ class IdeaController extends Controller
             ->keyBy('thought_id');
 
         if ($request->ajax()) {
-            $newsletterResearchStatuses = $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection());
+            $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
             $html = view('idea.stream_thoughts', [
-                'thoughts' => $thoughts,
-                'showFullSections' => false,
-                'shareByThoughtId' => $shareByThoughtId,
-                'newsletterResearchStatuses' => $newsletterResearchStatuses,
+                'cards' => $this->buildStreamThoughtCardPresenters(
+                    $thoughts,
+                    $shareByThoughtId,
+                    false,
+                    $newsletterResearchStatusPresenters
+                ),
             ])->render();
             $streamSince = $latestForAjax($thoughts);
 
@@ -498,6 +536,8 @@ class IdeaController extends Controller
             ]);
         }
 
+        $typedStreamNewsletterPresenters = $this->buildEmailNewsletterResearchStatusPresenters($thoughts->getCollection());
+
         return view('idea.stream', [
             'thoughts' => $thoughts,
             'tag' => null,
@@ -506,8 +546,69 @@ class IdeaController extends Controller
             'streamCollectionKey' => $streamCollectionKey,
             'streamSince' => $latestForAjax($thoughts),
             'shareByThoughtId' => $shareByThoughtId,
-            'newsletterResearchStatuses' => $this->buildEmailNewsletterResearchStatuses($thoughts->getCollection()),
+            'cards' => $this->buildStreamThoughtCardPresenters(
+                $thoughts,
+                $shareByThoughtId,
+                false,
+                $typedStreamNewsletterPresenters
+            ),
         ]);
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, Thought>|\Illuminate\Database\Eloquent\Collection<int, Thought>|Collection<int, Thought>  $thoughts
+     * @param  array<string, NewsletterResearchStatusPresenter|null>  $newsletterPresenters
+     * @return Collection<int, IdeaIndexCardPresenter>
+     */
+    private function buildIdeaIndexCardPresenters(
+        LengthAwarePaginator|Collection $thoughts,
+        int $replyableIndexStart,
+        array $newsletterPresenters,
+    ): Collection {
+        $collection = $thoughts instanceof LengthAwarePaginator
+            ? $thoughts->getCollection()
+            : collect($thoughts);
+
+        $replyableIndex = $replyableIndexStart;
+
+        return $collection->map(function (Thought $thought) use (&$replyableIndex, $newsletterPresenters) {
+            if (! $thought->parent_id) {
+                $currentReplyable = $replyableIndex;
+                $replyableIndex++;
+            } else {
+                $currentReplyable = -1;
+            }
+
+            return IdeaIndexCardPresenter::fromThought(
+                $thought,
+                $currentReplyable,
+                $newsletterPresenters[$thought->id] ?? null
+            );
+        });
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, Thought>  $thoughts
+     * @param  array<string, NewsletterResearchStatusPresenter|null>  $newsletterPresenters
+     * @return Collection<int, StreamThoughtCardPresenter>
+     */
+    private function buildStreamThoughtCardPresenters(
+        LengthAwarePaginator $thoughts,
+        Collection $shareByThoughtId,
+        bool $showFullSections,
+        array $newsletterPresenters,
+    ): Collection {
+        return $thoughts->getCollection()->map(function (Thought $thought) use ($shareByThoughtId, $showFullSections, $newsletterPresenters) {
+            /** @var ResearchShare|null $share */
+            $share = $shareByThoughtId->get($thought->id);
+
+            return StreamThoughtCardPresenter::fromThought(
+                $thought,
+                $share,
+                $showFullSections,
+                $newsletterPresenters[$thought->id] ?? null
+            );
+        });
     }
 
     private function firstPageCreatedAtCursor(LengthAwarePaginator $thoughts, bool $ascending): ?string
@@ -542,7 +643,12 @@ class IdeaController extends Controller
                 ->completedIdeas()
         )->paginate(20);
 
-        return view('idea.completed', ['ideas' => $ideas]);
+        $completedRows = $this->buildCompletedIdeaPresenters($ideas);
+
+        return view('idea.completed', [
+            'ideas' => $ideas,
+            'completedRows' => $completedRows,
+        ]);
     }
 
     /**
@@ -574,8 +680,13 @@ class IdeaController extends Controller
             $researchByIdea = $researchThoughts->groupBy(fn (Thought $t) => $t->metadata['idea_id'] ?? '');
         }
 
+        $ideaRows = $this->buildIdeaListItemPresenters($ideas, $researchByIdea);
+
         if ($request->ajax()) {
-            $html = view('idea.partials.ideas_list', ['ideas' => $ideas, 'researchByIdea' => $researchByIdea])->render();
+            $html = view('idea.partials.ideas_list', [
+                'ideas' => $ideas,
+                'ideaRows' => $ideaRows,
+            ])->render();
             $latest = $ideas->isEmpty() ? null : $ideas->first()->created_at->toIso8601String();
 
             return response()->json(['html' => $html, 'latest_created_at' => $latest]);
@@ -583,8 +694,30 @@ class IdeaController extends Controller
 
         return view('idea.ideas', [
             'ideas' => $ideas,
-            'researchByIdea' => $researchByIdea,
+            'ideaRows' => $ideaRows,
         ]);
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, Thought>  $ideas
+     * @return Collection<int, IdeaListItemPresenter>
+     */
+    private function buildIdeaListItemPresenters(LengthAwarePaginator $ideas, Collection $researchByIdea): Collection
+    {
+        return $ideas->getCollection()->map(function (Thought $thought) use ($researchByIdea) {
+            $researchList = $researchByIdea->get($thought->id, collect());
+
+            return IdeaListItemPresenter::from($thought, $researchList);
+        })->values();
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, Thought>  $ideas
+     * @return Collection<int, CompletedIdeaPresenter>
+     */
+    private function buildCompletedIdeaPresenters(LengthAwarePaginator $ideas): Collection
+    {
+        return $ideas->getCollection()->map(fn (Thought $thought) => CompletedIdeaPresenter::from($thought))->values();
     }
 
     /**
@@ -974,26 +1107,38 @@ class IdeaController extends Controller
 
     /**
      * Resolve a URL for the research document linked from an email thought (metadata + durable stored email only).
+     *
+     * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this row (or null) for durable imported-email linkage instead of calling {@see Thought::importedEmail()}.
      */
-    private function resolveEmailLinkedResearchUrl(Thought $thought): ?string
-    {
-        $research = $this->resolveEmailLinkedResearchThought($thought);
+    private function resolveEmailLinkedResearchUrl(
+        Thought $thought,
+        ?ImportedEmail $preloadedImportedEmail = null,
+        bool $usePreloadedImportedEmail = false,
+    ): ?string {
+        $research = $this->resolveEmailLinkedResearchThought($thought, $preloadedImportedEmail, $usePreloadedImportedEmail);
 
         return $research !== null ? route('idea.research.show', $research) : null;
     }
 
     /**
      * Resolve the linked research thought for an email (metadata + durable stored email rows), or null when ambiguous or missing.
+     *
+     * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this row (or null) instead of calling {@see Thought::importedEmail()}.
      */
-    private function resolveEmailLinkedResearchThought(Thought $thought): ?Thought
-    {
+    private function resolveEmailLinkedResearchThought(
+        Thought $thought,
+        ?ImportedEmail $preloadedImportedEmail = null,
+        bool $usePreloadedImportedEmail = false,
+    ): ?Thought {
         if ($thought->source !== 'email') {
             return null;
         }
 
         $metaId = $this->normalizeResearchThoughtId(data_get($thought->source_metadata, 'research_thought_id'));
 
-        $imported = $thought->importedEmail();
+        $imported = $usePreloadedImportedEmail
+            ? $preloadedImportedEmail
+            : $thought->importedEmail();
         $importedResearchId = $this->normalizeResearchThoughtId($imported?->research_thought_id);
 
         $captured = $this->resolveCapturedInboundEmailForThought($thought);
@@ -1026,7 +1171,7 @@ class IdeaController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, Thought>  $thoughts
+     * @param  Collection<int, Thought>  $thoughts
      * @return array<string, array<string, string|bool>|null>
      */
     private function buildEmailNewsletterResearchStatuses(Collection $thoughts): array
@@ -1041,10 +1186,33 @@ class IdeaController extends Controller
     }
 
     /**
+     * @param  Collection<int, Thought>  $thoughts
+     * @return array<string, NewsletterResearchStatusPresenter|null>
+     */
+    private function buildEmailNewsletterResearchStatusPresenters(Collection $thoughts): array
+    {
+        $payloads = $this->buildEmailNewsletterResearchStatuses($thoughts);
+        $presenters = [];
+
+        foreach ($thoughts as $thought) {
+            $presenters[$thought->id] = NewsletterResearchStatusPresenter::fromArray(
+                $payloads[$thought->id] ?? null,
+                domIdSuffix: (string) $thought->id
+            );
+        }
+
+        return $presenters;
+    }
+
+    /**
+     * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this row (or null) instead of calling {@see Thought::importedEmail()}.
      * @return array{status: string, research_thought_id: string|null, skip_reason: string, show_research_link: bool, show_skip_info: bool}|null
      */
-    private function buildEmailNewsletterResearchStatus(Thought $thought): ?array
-    {
+    private function buildEmailNewsletterResearchStatus(
+        Thought $thought,
+        ?ImportedEmail $preloadedImportedEmail = null,
+        bool $usePreloadedImportedEmail = false,
+    ): ?array {
         if ($thought->source !== 'email') {
             return null;
         }
@@ -1059,7 +1227,7 @@ class IdeaController extends Controller
             ? trim($reasonRaw)
             : (is_scalar($reasonRaw) ? trim((string) $reasonRaw) : '');
 
-        $linkedResearch = $this->resolveEmailLinkedResearchThought($thought);
+        $linkedResearch = $this->resolveEmailLinkedResearchThought($thought, $preloadedImportedEmail, $usePreloadedImportedEmail);
         $researchThoughtId = $linkedResearch?->id ?? $metadataResearchThoughtId;
 
         $effectiveStatus = $metadataStatus !== '' ? $metadataStatus : null;
@@ -1085,11 +1253,15 @@ class IdeaController extends Controller
     /**
      * Preview payload for the email thought detail page: full research URL, rendered root HTML, and up to two section HTML chunks (child thoughts, same order as the full research page).
      *
+     * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this row (or null) instead of calling {@see Thought::importedEmail()}.
      * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
      */
-    private function buildEmailResearchPreview(Thought $emailThought): ?array
-    {
-        $resolved = $this->resolveEmailLinkedResearchThought($emailThought);
+    private function buildEmailResearchPreview(
+        Thought $emailThought,
+        ?ImportedEmail $preloadedImportedEmail = null,
+        bool $usePreloadedImportedEmail = false,
+    ): ?array {
+        $resolved = $this->resolveEmailLinkedResearchThought($emailThought, $preloadedImportedEmail, $usePreloadedImportedEmail);
         if ($resolved === null) {
             return null;
         }

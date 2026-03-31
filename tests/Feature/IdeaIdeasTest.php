@@ -27,6 +27,29 @@ class IdeaIdeasTest extends TestCase
         $response->assertSee('No ideas yet');
     }
 
+    public function test_ideas_ajax_refetch_returns_list_html_with_presenter_logged_date_ymd(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Ajax list idea',
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-08-20'],
+            'embedding' => null,
+        ]);
+
+        $response = $this->actingAs($user)->withHeaders([
+            'X-Requested-With' => 'XMLHttpRequest',
+            'Accept' => 'application/json',
+        ])->get(route('idea.ideas'));
+
+        $response->assertOk();
+        $response->assertJsonStructure(['html', 'latest_created_at']);
+        $html = $response->json('html');
+        $this->assertStringContainsString('Ajax list idea', $html);
+        $this->assertStringContainsString('data-thought-id="'.$thought->id.'"', $html);
+        $this->assertStringContainsString('2025-08-20', $html);
+    }
+
     public function test_ideas_page_shows_shared_secondary_nav_with_ideas_active(): void
     {
         $user = User::factory()->create();

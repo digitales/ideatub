@@ -451,6 +451,24 @@ class StreamPageTest extends TestCase
         $this->assertStringContainsString('max-w-full break-words [overflow-wrap:anywhere]', $html);
     }
 
+    public function test_stream_ajax_returns_presenter_backed_cards_html(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Stream ajax fragment body',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->withHeader('X-Requested-With', 'XMLHttpRequest')
+            ->get(route('idea.stream'));
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertArrayHasKey('html', $data);
+        $this->assertStringContainsString('Stream ajax fragment body', $data['html']);
+    }
+
     private function assertStreamTypeNav(TestResponse $response, string $activeHref): void
     {
         $response->assertSee('data-testid="stream-type-nav"', false);

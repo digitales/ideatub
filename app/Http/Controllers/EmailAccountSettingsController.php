@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\InvalidMailAccountCredentialsException;
 use App\Jobs\BackfillMailAccount;
 use App\Jobs\SyncMailAccountIncremental;
-use App\Exceptions\InvalidMailAccountCredentialsException;
 use App\Models\MailAccount;
 use App\Services\Fastmail\FastmailConnector;
+use App\View\Presenters\Settings\MailAccountCardPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -21,8 +22,15 @@ class EmailAccountSettingsController extends Controller
     {
         abort_unless(config('services.mail_sync.enabled', true), 404);
 
+        $mailAccounts = $request->user()
+            ->mailAccounts()
+            ->with('latestSyncRun')
+            ->latest()
+            ->get()
+            ->map(fn (MailAccount $account) => new MailAccountCardPresenter($account));
+
         return view('settings.email-accounts', [
-            'mailAccounts' => $request->user()->mailAccounts()->latest()->get(),
+            'mailAccounts' => $mailAccounts,
         ]);
     }
 

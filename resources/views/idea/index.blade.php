@@ -213,7 +213,7 @@
             @if(!$query) data-index-refetch-url="{{ route('idea.index') }}"
                 data-index-since="{{ $thoughts->first()->created_at->toIso8601String() }}"
             @endif>
-            @include('idea.index_thought_cards', ['thoughts' => $thoughts, 'replyableIndexStart' => 0, 'newsletterResearchStatuses' => $newsletterResearchStatuses ?? []])
+            @include('idea.index_thought_cards', ['cards' => $cards])
         </div>
     @else
         <div class="rounded-xl border border-memory-violet/10 bg-white/50 px-4 py-8 text-center text-sm text-slate-brand/50">
