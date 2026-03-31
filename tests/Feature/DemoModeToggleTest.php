@@ -75,6 +75,12 @@ class DemoModeToggleTest extends TestCase
             'content' => 'DEMO_TOGGLE_REGRESSION_LEAK_MARKER_9c2e',
         ]);
 
+        $normalPage = $this->actingAs($user)->get(route('idea.index'));
+        $normalPage->assertOk();
+        $normalPage->assertDontSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+        $normalPage->assertSee('DEMO_TOGGLE_REGRESSION_LEAK_MARKER_9c2e', false);
+        $this->assertStringContainsString('DEMO_TOGGLE_REGRESSION_LEAK_MARKER_9c2e', $normalPage->getContent());
+
         $this->actingAs($user)->post(route('demo-mode.enable'));
 
         $page = $this->actingAs($user)->get(route('idea.index'));
