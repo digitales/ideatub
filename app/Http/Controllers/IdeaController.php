@@ -15,7 +15,9 @@ use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Support\IdeaCompletedAtSql;
 use App\Support\TagSlug;
+use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
+use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -155,6 +157,9 @@ class IdeaController extends Controller
 
         $thought->load(['comments' => fn ($q) => $q->orderBy('created_at')]);
         $importedEmail = $thought->source === 'email' ? $thought->importedEmail() : null;
+        if ($importedEmail !== null) {
+            $importedEmail->loadMissing('mailAccount');
+        }
         $senderRuleContext = $thought->source === 'email'
             ? $this->thoughtEmailSenderContextResolver->resolve($thought)
             : null;
@@ -174,15 +179,23 @@ class IdeaController extends Controller
                 domIdSuffix: (string) $thought->id
             )
             : null;
+        $emailMetadata = $thought->source === 'email'
+            ? EmailMetadataPresenter::from($thought, $importedEmail)
+            : null;
+
+        $thoughtDetail = ThoughtDetailPresenter::forShow(
+            thought: $thought,
+            contentHtml: $contentHtml,
+            linkedResearchUrl: $linkedResearchUrl,
+            emailResearchPreview: $emailResearchPreview,
+            newsletterResearchStatus: $newsletterResearchStatus,
+            senderRuleContext: $senderRuleContext,
+            emailMetadata: $emailMetadata,
+            importedEmailForBody: $importedEmail,
+        );
 
         return view('idea.show', [
-            'thought' => $thought,
-            'importedEmail' => $importedEmail,
-            'senderRuleContext' => $senderRuleContext,
-            'contentHtml' => $contentHtml,
-            'linkedResearchUrl' => $linkedResearchUrl,
-            'emailResearchPreview' => $emailResearchPreview,
-            'newsletterResearchStatus' => $newsletterResearchStatus,
+            'thoughtDetail' => $thoughtDetail,
         ]);
     }
 
