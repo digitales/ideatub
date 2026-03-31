@@ -49,7 +49,7 @@
                 @include('idea.partials.email_newsletter_research_status', ['newsletterResearchStatus' => $card->newsletterResearchStatus()])
                 @include('idea.partials.thought_tag_row', ['thought' => $card->thought(), 'editable' => true])
                 @if ($card->showReplyLink())
-                    <a href="{{ route('idea.index', ['parent_id' => $card->thought()->id]) }}"
+                    <a href="{{ $card->replyHref() }}"
                        class="text-[10.5px] text-memory-violet/60 hover:text-memory-violet transition-colors ml-auto">
                         Reply
                     </a>

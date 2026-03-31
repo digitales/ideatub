@@ -30,25 +30,26 @@ class StreamThoughtCardPresenterTest extends TestCase
     public function it_uses_jira_updated_at_for_activity_when_present(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-03-31 12:00:00', 'UTC'));
+        try {
+            $user = User::factory()->create();
+            $this->actingAs($user);
 
-        $user = User::factory()->create();
-        $this->actingAs($user);
+            $thought = Thought::factory()->create([
+                'user_id' => $user->id,
+                'source' => 'jira',
+                'source_metadata' => [
+                    'jira_updated_at' => '2026-03-20T12:00:00.000+0000',
+                ],
+            ]);
+            $thought->setRelation('comments', collect());
 
-        $thought = Thought::factory()->create([
-            'user_id' => $user->id,
-            'source' => 'jira',
-            'source_metadata' => [
-                'jira_updated_at' => '2026-03-20T12:00:00.000+0000',
-            ],
-        ]);
-        $thought->setRelation('comments', collect());
+            $card = StreamThoughtCardPresenter::fromThought($thought, null, false);
 
-        $card = StreamThoughtCardPresenter::fromThought($thought, null, false);
-
-        $expected = Carbon::parse('2026-03-20T12:00:00.000+0000')->diffForHumans();
-        $this->assertSame($expected, $card->activityAtHuman());
-
-        Carbon::setTestNow();
+            $expected = Carbon::parse('2026-03-20T12:00:00.000+0000')->diffForHumans();
+            $this->assertSame($expected, $card->activityAtHuman());
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     #[Test]
