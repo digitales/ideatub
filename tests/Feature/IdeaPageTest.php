@@ -524,6 +524,8 @@ class IdeaPageTest extends TestCase
         $page->assertDontSee('IDEATUB_FEATURE_BODY_SECRET_IDX', false);
         $page->assertDontSee('IDEATUB_FEATURE_COMMENT_SECRET_IDX', false);
         $page->assertDontSee('"IDEATUB_FEATURE_BODY_SECRET_IDX"', false);
+        $this->assertStringNotContainsString('thoughtCardActions(', $page->getContent());
+        $this->assertStringNotContainsString('requestEdit()', $page->getContent());
 
         $ajax = $demo
             ->withHeader('X-Requested-With', 'XMLHttpRequest')
@@ -540,6 +542,8 @@ class IdeaPageTest extends TestCase
         $normal->assertOk();
         $normal->assertSee('IDEATUB_FEATURE_BODY_SECRET_IDX', false);
         $normal->assertSee('IDEATUB_FEATURE_COMMENT_SECRET_IDX', false);
+        $this->assertStringContainsString('thoughtCardActions(', $normal->getContent());
+        $this->assertStringContainsString('requestEdit()', $normal->getContent());
     }
 
     private function xpathFromResponse(TestResponse $response): \DOMXPath

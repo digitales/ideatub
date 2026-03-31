@@ -496,6 +496,8 @@ class StreamPageTest extends TestCase
         $page->assertDontSee('IDEATUB_FEATURE_STREAM_BODY_SECRET', false);
         $page->assertDontSee('IDEATUB_FEATURE_STREAM_COMMENT_SECRET', false);
         $page->assertDontSee('"IDEATUB_FEATURE_STREAM_BODY_SECRET"', false);
+        $this->assertStringNotContainsString('thoughtCardActions(', $page->getContent());
+        $this->assertStringNotContainsString('requestEdit()', $page->getContent());
 
         $ajax = $demo
             ->withHeader('X-Requested-With', 'XMLHttpRequest')
@@ -512,6 +514,8 @@ class StreamPageTest extends TestCase
         $normal->assertOk();
         $normal->assertSee('IDEATUB_FEATURE_STREAM_BODY_SECRET', false);
         $normal->assertSee('IDEATUB_FEATURE_STREAM_COMMENT_SECRET', false);
+        $this->assertStringContainsString('thoughtCardActions(', $normal->getContent());
+        $this->assertStringContainsString('requestEdit()', $normal->getContent());
     }
 
     private function assertStreamTypeNav(TestResponse $response, string $activeHref): void
