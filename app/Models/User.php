@@ -132,6 +132,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Persisted research skills owned by this user.
+     */
+    public function researchSkills()
+    {
+        return $this->hasMany(ResearchSkill::class);
+    }
+
+    /**
+     * Research workflow runs initiated by this user.
+     */
+    public function researchRuns()
+    {
+        return $this->hasMany(ResearchRun::class);
+    }
+
+    /**
      * Check if user has unlimited access (Pro or Lifetime).
      */
     public function hasUnlimitedAccess(): bool

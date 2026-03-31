@@ -227,6 +227,16 @@ class Thought extends Model
         return $this->hasMany(ThoughtLinkSummary::class, 'parent_research_thought_id');
     }
 
+    /**
+     * Research runs where this thought is the idea being researched.
+     *
+     * @return HasMany<ResearchRun, $this>
+     */
+    public function ideaResearchRuns(): HasMany
+    {
+        return $this->hasMany(ResearchRun::class, 'idea_thought_id');
+    }
+
     public function importedEmail(): ?ImportedEmail
     {
         $importedEmailId = data_get($this->source_metadata, 'imported_email_id');
