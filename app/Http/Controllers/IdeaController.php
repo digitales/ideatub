@@ -203,7 +203,9 @@ class IdeaController extends Controller
             : null;
         $newsletterResearchStatus = $emailDetailPreloadedImport
             ? NewsletterResearchStatusPresenter::fromArray(
-                $this->buildEmailNewsletterResearchStatus($thought, $importedEmail, usePreloadedImportedEmail: true),
+                $this->demoSafeNewsletterResearchStatusPayload(
+                    $this->buildEmailNewsletterResearchStatus($thought, $importedEmail, usePreloadedImportedEmail: true)
+                ),
                 domIdSuffix: (string) $thought->id
             )
             : null;
@@ -1213,7 +1215,7 @@ class IdeaController extends Controller
 
         foreach ($thoughts as $thought) {
             $presenters[$thought->id] = NewsletterResearchStatusPresenter::fromArray(
-                $payloads[$thought->id] ?? null,
+                $this->demoSafeNewsletterResearchStatusPayload($payloads[$thought->id] ?? null),
                 domIdSuffix: (string) $thought->id
             );
         }
@@ -1355,6 +1357,27 @@ class IdeaController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * @param  array{status: string, research_thought_id: string|null, skip_reason: string, show_research_link: bool, show_skip_info: bool}|null  $payload
+     * @return array{status: string, research_thought_id: string|null, skip_reason: string, show_research_link: bool, show_skip_info: bool}|null
+     */
+    private function demoSafeNewsletterResearchStatusPayload(?array $payload): ?array
+    {
+        if ($payload === null || ! app(DemoMode::class)->enabled()) {
+            return $payload;
+        }
+
+        $skip = $payload['skip_reason'] ?? '';
+        if (! is_string($skip) || $skip === '') {
+            return $payload;
+        }
+
+        $payload['skip_reason'] = app(DemoObfuscator::class)->obfuscate($skip, 'newsletter_research_skip_reason')
+            ?? 'Demo content hidden';
+
+        return $payload;
     }
 
     private function renderDemoSafeMarkdown(CommonMarkConverter $converter, ?string $markdown, string $context): string
