@@ -723,6 +723,20 @@ Alpine.data('inboxPage', () => ({
     return '';
   },
 
+  buttonLabels(button) {
+    if (!button) return { idle: '', pending: '' };
+    const fallback = button.textContent?.trim() || '';
+    const idle = button.dataset.idleLabel || fallback;
+    const pending = button.dataset.pendingLabel || idle;
+
+    return { idle, pending };
+  },
+
+  setButtonLabel(button, label) {
+    if (!button || !label) return;
+    button.textContent = label;
+  },
+
   async submitAction(event) {
     event.preventDefault();
     const form = event.target;
@@ -738,14 +752,21 @@ Alpine.data('inboxPage', () => ({
     const submitter = event.submitter;
     const usedSubmitter = submitter && submitter.matches('button[type="submit"]');
     const fallbackButtons = usedSubmitter ? [] : Array.from(form.querySelectorAll('button[type="submit"]'));
+    const submitterLabels = usedSubmitter ? this.buttonLabels(submitter) : null;
+    const fallbackButtonStates = fallbackButtons.map((button) => ({
+      button,
+      labels: this.buttonLabels(button),
+    }));
 
     this.activeRequestKey = requestKey;
     this.activeItemId = itemId;
     if (usedSubmitter) {
       submitter.disabled = true;
+      this.setButtonLabel(submitter, submitterLabels?.pending);
     } else {
-      fallbackButtons.forEach((button) => {
+      fallbackButtonStates.forEach(({ button, labels }) => {
         button.disabled = true;
+        this.setButtonLabel(button, labels.pending);
       });
     }
 
@@ -758,9 +779,11 @@ Alpine.data('inboxPage', () => ({
     const reenable = () => {
       if (usedSubmitter && submitter) {
         submitter.disabled = false;
+        this.setButtonLabel(submitter, submitterLabels?.idle);
       }
-      fallbackButtons.forEach((button) => {
+      fallbackButtonStates.forEach(({ button, labels }) => {
         button.disabled = false;
+        this.setButtonLabel(button, labels.idle);
       });
       this.activeRequestKey = '';
       this.activeItemId = null;

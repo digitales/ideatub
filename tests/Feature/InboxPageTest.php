@@ -164,6 +164,29 @@ class InboxPageTest extends TestCase
         $response->assertDontSee('Manage sender rules', false);
     }
 
+    public function test_email_review_buttons_render_pending_ajax_labels(): void
+    {
+        Config::set('services.email_sender_policy.enabled', true);
+
+        $user = User::factory()->create();
+
+        InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'Review sender',
+            'dedupe_key' => 'email-review-pending-labels',
+            'generator_type' => 'email_sender_review',
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('inbox.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-idle-label="Allow sender"', false);
+        $response->assertSee('data-pending-label="Allowing sender..."', false);
+        $response->assertSee('data-pending-label="Ignoring sender..."', false);
+        $response->assertSee('data-pending-label="Extra processing sender..."', false);
+    }
+
     private function xpathFromResponse(TestResponse $response): \DOMXPath
     {
         libxml_use_internal_errors(true);
