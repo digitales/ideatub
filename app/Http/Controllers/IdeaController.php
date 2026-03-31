@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\IdeaResearchRequested;
 use App\Models\CapturedInboundEmail;
+use App\Models\ImportedEmail;
 use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Models\ThoughtLinkSummary;
@@ -160,8 +161,9 @@ class IdeaController extends Controller
         if ($importedEmail !== null) {
             $importedEmail->loadMissing('mailAccount');
         }
-        $senderRuleContext = $thought->source === 'email'
-            ? $this->thoughtEmailSenderContextResolver->resolve($thought)
+        $emailDetailPreloadedImport = $thought->source === 'email';
+        $senderRuleContext = $emailDetailPreloadedImport
+            ? $this->thoughtEmailSenderContextResolver->resolve($thought, $importedEmail, usePreloadedImportedEmail: true)
             : null;
         $contentHtml = null;
 
@@ -169,13 +171,17 @@ class IdeaController extends Controller
             $contentHtml = (new CommonMarkConverter)->convert($thought->content)->getContent();
         }
 
-        $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl($thought);
-        $emailResearchPreview = $thought->source === 'email'
-            ? $this->buildEmailResearchPreview($thought)
+        $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl(
+            $thought,
+            $importedEmail,
+            $emailDetailPreloadedImport
+        );
+        $emailResearchPreview = $emailDetailPreloadedImport
+            ? $this->buildEmailResearchPreview($thought, $importedEmail, usePreloadedImportedEmail: true)
             : null;
-        $newsletterResearchStatus = $thought->source === 'email'
+        $newsletterResearchStatus = $emailDetailPreloadedImport
             ? NewsletterResearchStatusPresenter::fromArray(
-                $this->buildEmailNewsletterResearchStatus($thought),
+                $this->buildEmailNewsletterResearchStatus($thought, $importedEmail, usePreloadedImportedEmail: true),
                 domIdSuffix: (string) $thought->id
             )
             : null;
@@ -990,26 +996,38 @@ class IdeaController extends Controller
 
     /**
      * Resolve a URL for the research document linked from an email thought (metadata + durable stored email only).
+     *
+     * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this row (or null) for durable imported-email linkage instead of calling {@see Thought::importedEmail()}.
      */
-    private function resolveEmailLinkedResearchUrl(Thought $thought): ?string
-    {
-        $research = $this->resolveEmailLinkedResearchThought($thought);
+    private function resolveEmailLinkedResearchUrl(
+        Thought $thought,
+        ?ImportedEmail $preloadedImportedEmail = null,
+        bool $usePreloadedImportedEmail = false,
+    ): ?string {
+        $research = $this->resolveEmailLinkedResearchThought($thought, $preloadedImportedEmail, $usePreloadedImportedEmail);
 
         return $research !== null ? route('idea.research.show', $research) : null;
     }
 
     /**
      * Resolve the linked research thought for an email (metadata + durable stored email rows), or null when ambiguous or missing.
+     *
+     * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this row (or null) instead of calling {@see Thought::importedEmail()}.
      */
-    private function resolveEmailLinkedResearchThought(Thought $thought): ?Thought
-    {
+    private function resolveEmailLinkedResearchThought(
+        Thought $thought,
+        ?ImportedEmail $preloadedImportedEmail = null,
+        bool $usePreloadedImportedEmail = false,
+    ): ?Thought {
         if ($thought->source !== 'email') {
             return null;
         }
 
         $metaId = $this->normalizeResearchThoughtId(data_get($thought->source_metadata, 'research_thought_id'));
 
-        $imported = $thought->importedEmail();
+        $imported = $usePreloadedImportedEmail
+            ? $preloadedImportedEmail
+            : $thought->importedEmail();
         $importedResearchId = $this->normalizeResearchThoughtId($imported?->research_thought_id);
 
         $captured = $this->resolveCapturedInboundEmailForThought($thought);
@@ -1076,10 +1094,14 @@ class IdeaController extends Controller
     }
 
     /**
+     * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this row (or null) instead of calling {@see Thought::importedEmail()}.
      * @return array{status: string, research_thought_id: string|null, skip_reason: string, show_research_link: bool, show_skip_info: bool}|null
      */
-    private function buildEmailNewsletterResearchStatus(Thought $thought): ?array
-    {
+    private function buildEmailNewsletterResearchStatus(
+        Thought $thought,
+        ?ImportedEmail $preloadedImportedEmail = null,
+        bool $usePreloadedImportedEmail = false,
+    ): ?array {
         if ($thought->source !== 'email') {
             return null;
         }
@@ -1094,7 +1116,7 @@ class IdeaController extends Controller
             ? trim($reasonRaw)
             : (is_scalar($reasonRaw) ? trim((string) $reasonRaw) : '');
 
-        $linkedResearch = $this->resolveEmailLinkedResearchThought($thought);
+        $linkedResearch = $this->resolveEmailLinkedResearchThought($thought, $preloadedImportedEmail, $usePreloadedImportedEmail);
         $researchThoughtId = $linkedResearch?->id ?? $metadataResearchThoughtId;
 
         $effectiveStatus = $metadataStatus !== '' ? $metadataStatus : null;
@@ -1120,11 +1142,15 @@ class IdeaController extends Controller
     /**
      * Preview payload for the email thought detail page: full research URL, rendered root HTML, and up to two section HTML chunks (child thoughts, same order as the full research page).
      *
+     * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this row (or null) instead of calling {@see Thought::importedEmail()}.
      * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
      */
-    private function buildEmailResearchPreview(Thought $emailThought): ?array
-    {
-        $resolved = $this->resolveEmailLinkedResearchThought($emailThought);
+    private function buildEmailResearchPreview(
+        Thought $emailThought,
+        ?ImportedEmail $preloadedImportedEmail = null,
+        bool $usePreloadedImportedEmail = false,
+    ): ?array {
+        $resolved = $this->resolveEmailLinkedResearchThought($emailThought, $preloadedImportedEmail, $usePreloadedImportedEmail);
         if ($resolved === null) {
             return null;
         }
