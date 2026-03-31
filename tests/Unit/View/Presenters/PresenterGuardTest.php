@@ -5,18 +5,34 @@ namespace Tests\Unit\View\Presenters;
 use App\Models\Thought;
 use App\View\Presenters\Concerns\EnsuresPresenterDataIsLoaded;
 use App\View\Presenters\MissingPresenterData;
+use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class PresenterGuardTest extends TestCase
 {
+    private function presenterGuardDouble(): object
+    {
+        return new class
+        {
+            use EnsuresPresenterDataIsLoaded;
+
+            public function guardRelation(Model $model, string $relation): void
+            {
+                $this->requireRelationLoaded($model, $relation);
+            }
+
+            public function guardLookup(array $lookup, string $key): void
+            {
+                $this->requireLookupKey($lookup, $key);
+            }
+        };
+    }
+
     #[Test]
     public function require_relation_loaded_throws_when_relation_is_not_loaded(): void
     {
-        $presenter = new class
-        {
-            use EnsuresPresenterDataIsLoaded;
-        };
+        $presenter = $this->presenterGuardDouble();
 
         $thought = Thought::factory()->make();
 
@@ -25,23 +41,20 @@ class PresenterGuardTest extends TestCase
             'Presenter requires relation [comments] to be loaded on '.Thought::class.'.'
         );
 
-        $presenter->requireRelationLoaded($thought, 'comments');
+        $presenter->guardRelation($thought, 'comments');
     }
 
     #[Test]
     public function require_lookup_key_throws_when_key_is_missing(): void
     {
-        $presenter = new class
-        {
-            use EnsuresPresenterDataIsLoaded;
-        };
+        $presenter = $this->presenterGuardDouble();
 
         $this->expectException(MissingPresenterData::class);
         $this->expectExceptionMessage(
             'Presenter requires lookup key [newsletterStatusByThoughtId] to be present in the preloaded payload.'
         );
 
-        $presenter->requireLookupKey([], 'newsletterStatusByThoughtId');
+        $presenter->guardLookup([], 'newsletterStatusByThoughtId');
     }
 
     #[Test]
@@ -49,15 +62,12 @@ class PresenterGuardTest extends TestCase
     {
         $this->expectNotToPerformAssertions();
 
-        $presenter = new class
-        {
-            use EnsuresPresenterDataIsLoaded;
-        };
+        $presenter = $this->presenterGuardDouble();
 
         $thought = Thought::factory()->make();
         $thought->setRelation('comments', collect());
 
-        $presenter->requireRelationLoaded($thought, 'comments');
+        $presenter->guardRelation($thought, 'comments');
     }
 
     #[Test]
@@ -65,11 +75,8 @@ class PresenterGuardTest extends TestCase
     {
         $this->expectNotToPerformAssertions();
 
-        $presenter = new class
-        {
-            use EnsuresPresenterDataIsLoaded;
-        };
+        $presenter = $this->presenterGuardDouble();
 
-        $presenter->requireLookupKey(['newsletterStatusByThoughtId' => null], 'newsletterStatusByThoughtId');
+        $presenter->guardLookup(['newsletterStatusByThoughtId' => null], 'newsletterStatusByThoughtId');
     }
 }
