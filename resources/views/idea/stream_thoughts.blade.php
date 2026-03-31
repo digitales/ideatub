@@ -1,56 +1,37 @@
-@php
-    $shareByThoughtId = $shareByThoughtId ?? collect();
-@endphp
-@foreach ($thoughts as $thought)
-    @php
-        $share = $shareByThoughtId[$thought->id] ?? null;
-    @endphp
-    <div data-thought-id="{{ $thought->id }}" class="relative rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all">
+@foreach ($cards as $card)
+    <div data-thought-id="{{ $card->thought()->id }}" class="relative rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all">
         <div class="absolute top-3 right-3">
-            @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => auth()->check() && auth()->id() === $thought->user_id, 'share' => $share])
+            @include('idea.partials.thought_card_actions', ['thought' => $card->thought(), 'editable' => $card->editable(), 'share' => $card->share()])
         </div>
         <div class="pr-8 min-w-0">
             @include('idea.partials.editable_thought_content', [
-                'thought' => $thought,
-                'editable' => auth()->check() && auth()->id() === $thought->user_id,
+                'thought' => $card->thought(),
+                'editable' => $card->editable(),
                 'displayClass' => 'text-[13.5px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line',
-                'viewHref' => route('thoughts.show', $thought),
+                'viewHref' => route('thoughts.show', $card->thought()),
                 'viewLinkClass' => 'block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40',
                 'previewMode' => true,
             ])
 
             <div class="mt-2 flex min-w-0 items-center gap-2 flex-wrap">
-                @if($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
-                    <a href="{{ route('idea.research.show', $thought) }}" class="text-[10.5px] font-medium text-memory-violet hover:underline">View formatted</a>
+                @if($card->showViewFormattedLink())
+                    <a href="{{ route('idea.research.show', $card->thought()) }}" class="text-[10.5px] font-medium text-memory-violet hover:underline">View formatted</a>
                 @endif
-                @php
-                    $activityAt = null;
-                    if (($thought->source ?? null) === 'jira') {
-                        $jiraUpdatedAt = data_get($thought->source_metadata, 'jira_updated_at');
-                        if (is_string($jiraUpdatedAt) && trim($jiraUpdatedAt) !== '') {
-                            try {
-                                $activityAt = \Carbon\Carbon::parse($jiraUpdatedAt);
-                            } catch (\Throwable) {
-                                $activityAt = null;
-                            }
-                        }
-                    }
-                @endphp
-                <span class="text-[10.5px] text-slate-brand/40">{{ ($activityAt ?? $thought->created_at)->diffForHumans() }}</span>
-                @include('idea.partials.thought_type_badge', ['thought' => $thought])
-                @include('idea.partials.email_newsletter_research_status', ['newsletterResearchStatus' => $newsletterResearchStatuses[$thought->id] ?? null])
-                @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => true])
+                <span class="text-[10.5px] text-slate-brand/40">{{ $card->activityAtHuman() }}</span>
+                @include('idea.partials.thought_type_badge', ['thought' => $card->thought()])
+                @include('idea.partials.email_newsletter_research_status', ['newsletterResearchStatus' => $card->newsletterResearchStatus()])
+                @include('idea.partials.thought_tag_row', ['thought' => $card->thought(), 'editable' => true])
             </div>
 
-            @if ($thought->relationLoaded('comments') && $thought->comments->isNotEmpty())
+            @if ($card->showCommentsBlock())
                 <a
-                    href="{{ route('thoughts.show', $thought) }}"
+                    href="{{ route('thoughts.show', $card->thought()) }}"
                     class="block rounded-lg -mx-1 px-1 py-0.5 mt-2 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40"
                 >
                     <ul class="ml-3 pl-3 border-l border-memory-violet/15 space-y-2">
-                        @foreach ($thought->comments as $comment)
+                        @foreach ($card->thought()->comments as $comment)
                             <li>
-                                <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line break-words [overflow-wrap:anywhere]">{{ $showFullSections ?? false ? $comment->content : Str::limit($comment->content, 200) }}</p>
+                                <p class="text-[12.5px] text-slate-brand leading-relaxed whitespace-pre-line break-words [overflow-wrap:anywhere]">{{ $card->showFullSections() ? $comment->content : Str::limit($comment->content, 200) }}</p>
                                 <p class="text-[10px] text-slate-brand/40 mt-0.5">{{ $comment->created_at->diffForHumans() }}</p>
                             </li>
                         @endforeach

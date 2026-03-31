@@ -116,33 +116,32 @@
         </form>
     </div>
 
-    @foreach ($mailAccounts as $mailAccount)
+    @foreach ($mailAccounts as $mailAccountCard)
         <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h3 class="text-lg font-semibold text-deep-indigo">{{ $mailAccount->display_name }}</h3>
-                    <p class="text-sm text-slate-brand">{{ $mailAccount->account_email }}</p>
-                    @php($latestRun = $mailAccount->syncRuns()->latest()->first())
-                    @if ($latestRun)
+                    <h3 class="text-lg font-semibold text-deep-indigo">{{ $mailAccountCard->displayName() }}</h3>
+                    <p class="text-sm text-slate-brand">{{ $mailAccountCard->accountEmail() }}</p>
+                    @if ($mailAccountCard->hasLatestSyncRun())
                         <p class="mt-1 text-xs text-slate-brand/80">
-                            Latest sync: {{ $latestRun->status }}
-                            @if ($mailAccount->last_synced_at)
-                                &mdash; {{ $mailAccount->last_synced_at->diffForHumans() }}
+                            Latest sync: {{ $mailAccountCard->latestSyncStatus() }}
+                            @if ($mailAccountCard->lastSyncedHumanText())
+                                &mdash; {{ $mailAccountCard->lastSyncedHumanText() }}
                             @endif
                         </p>
                     @endif
                 </div>
 
                 <div class="flex flex-wrap gap-3 text-xs font-medium">
-                    <form method="POST" action="{{ route('settings.email-accounts.backfill', $mailAccount) }}">
+                    <form method="POST" action="{{ route('settings.email-accounts.backfill', $mailAccountCard->mailAccount()) }}">
                         @csrf
                         <button type="submit" class="text-neural-teal hover:underline">Run backfill</button>
                     </form>
-                    <form method="POST" action="{{ route('settings.email-accounts.sync', $mailAccount) }}">
+                    <form method="POST" action="{{ route('settings.email-accounts.sync', $mailAccountCard->mailAccount()) }}">
                         @csrf
                         <button type="submit" class="text-neural-teal hover:underline">Sync now</button>
                     </form>
-                    <form method="POST" action="{{ route('settings.email-accounts.destroy', $mailAccount) }}">
+                    <form method="POST" action="{{ route('settings.email-accounts.destroy', $mailAccountCard->mailAccount()) }}">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="text-red-600 hover:underline">Disconnect</button>

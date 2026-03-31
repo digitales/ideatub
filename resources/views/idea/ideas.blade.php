@@ -83,7 +83,7 @@
     <div id="ideas-list-container"
         data-ideas-refetch-url="{{ route('idea.ideas') }}"
         data-ideas-since="{{ $ideas->isEmpty() ? '' : $ideas->first()->created_at->toIso8601String() }}">
-        @include('idea.partials.ideas_list', ['ideas' => $ideas, 'researchByIdea' => $researchByIdea])
+        @include('idea.partials.ideas_list', ['ideas' => $ideas, 'ideaRows' => $ideaRows])
     </div>
 </div>
 

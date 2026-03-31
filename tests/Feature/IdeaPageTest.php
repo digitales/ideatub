@@ -478,6 +478,25 @@ class IdeaPageTest extends TestCase
         $this->assertNotContains('Plans', $labels);
     }
 
+    public function test_idea_index_ajax_recent_returns_presenter_backed_cards_html(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Realtime fragment thought',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->withHeader('X-Requested-With', 'XMLHttpRequest')
+            ->get(route('idea.index'));
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertArrayHasKey('html', $data);
+        $this->assertStringContainsString('Realtime fragment thought', $data['html']);
+        $this->assertMatchesRegularExpression('/data-reply-href="[^"]*parent_id=/', $data['html']);
+    }
+
     private function xpathFromResponse(TestResponse $response): \DOMXPath
     {
         libxml_use_internal_errors(true);
@@ -486,5 +505,4 @@ class IdeaPageTest extends TestCase
 
         return new \DOMXPath($dom);
     }
-
 }

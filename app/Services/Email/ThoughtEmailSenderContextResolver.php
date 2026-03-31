@@ -14,6 +14,7 @@ final class ThoughtEmailSenderContextResolver
     ) {}
 
     /**
+     * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this value (including null) instead of calling {@see Thought::importedEmail()}.
      * @return array{
      *     enabled: bool,
      *     sender_available: bool,
@@ -24,14 +25,16 @@ final class ThoughtEmailSenderContextResolver
      *     rule: EmailSenderRule|null
      * }
      */
-    public function resolve(Thought $thought): array
+    public function resolve(Thought $thought, ?ImportedEmail $preloadedImportedEmail = null, bool $usePreloadedImportedEmail = false): array
     {
         if ($thought->source !== 'email' || ! config('services.email_sender_policy.enabled')) {
             return $this->emptyContext(enabled: false);
         }
 
         $sourceMetadata = $thought->source_metadata ?? [];
-        $importedEmail = $thought->importedEmail();
+        $importedEmail = $usePreloadedImportedEmail
+            ? $preloadedImportedEmail
+            : $thought->importedEmail();
 
         if ($importedEmail !== null) {
             return $this->buildContext(

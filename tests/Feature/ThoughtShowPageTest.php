@@ -9,6 +9,7 @@ use App\Models\MailAccount;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\ThoughtCaptureService;
+use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -361,6 +362,61 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Direction: received');
     }
 
+    public function test_email_thought_detail_sidebar_shows_provider_mailbox_thread_account_and_cc_lines(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Sidebar contract body',
+            'source' => 'email',
+            'source_metadata' => [
+                'subject' => 'Should not win',
+            ],
+        ]);
+
+        $account = MailAccount::factory()->create([
+            'user_id' => $owner->id,
+            'account_email' => 'synced-account@example.test',
+        ]);
+        $importedEmail = ImportedEmail::create([
+            'user_id' => $owner->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'msg-sidebar-contract',
+            'provider_thread_id' => 'thread-sidebar-contract',
+            'provider_mailbox_name' => 'Newsletters',
+            'direction' => 'received',
+            'subject' => 'Sidebar subject',
+            'from_json' => [['email' => 'from@example.test', 'name' => 'From Person']],
+            'to_json' => [['email' => 'to@example.test', 'name' => 'To Person']],
+            'cc_json' => [['email' => 'cc@example.test', 'name' => 'Cc Person']],
+            'participants_json' => [],
+            'sent_at' => now()->subHour(),
+            'received_at' => now(),
+            'body_text' => 'Sidebar imported body',
+            'processing_status' => 'imported',
+            'thought_id' => $thought->id,
+        ]);
+
+        $thought->update([
+            'source_metadata' => array_merge($thought->source_metadata ?? [], [
+                'imported_email_id' => $importedEmail->id,
+            ]),
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought->fresh()));
+
+        $response->assertOk();
+        $response->assertSee('Sidebar subject');
+        $response->assertSee('Provider: fastmail');
+        $response->assertSee('Mailbox: Newsletters');
+        $response->assertSee('Thread ID: thread-sidebar-contract');
+        $response->assertSee('Account: synced-account@example.test');
+        $response->assertSee('Cc: Cc Person <cc@example.test>');
+        $response->assertSee('Sent:', false);
+        $response->assertSee('Received:', false);
+    }
+
     public function test_email_thought_detail_research_preview_happy_path_shows_intro_two_sections_and_full_research_link(): void
     {
         [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedResearchPreviewFixture();
@@ -418,7 +474,7 @@ class ThoughtShowPageTest extends TestCase
             'expect_section_plain_text' => [],
             'expect_absent_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE],
         ]);
-        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
+        $response->assertViewHas('thoughtDetail', fn (ThoughtDetailPresenter $d) => $d->linkedResearchUrl() === route('idea.research.show', $researchThought));
         $response->assertSee('Research preview', false);
         $response->assertSee('View full research', false);
         $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_INTRO, false);
@@ -442,7 +498,7 @@ class ThoughtShowPageTest extends TestCase
             'expect_section_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_EMPTY_ROOT_SECTION_BODY],
             'expect_absent_plain_text' => [],
         ]);
-        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
+        $response->assertViewHas('thoughtDetail', fn (ThoughtDetailPresenter $d) => $d->linkedResearchUrl() === route('idea.research.show', $researchThought));
         $response->assertSee('Research preview', false);
         $response->assertSee('View full research', false);
         $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_EMPTY_ROOT_SECTION_BODY, false);
@@ -474,7 +530,7 @@ class ThoughtShowPageTest extends TestCase
             'expect_section_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE],
             'expect_absent_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO],
         ]);
-        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
+        $response->assertViewHas('thoughtDetail', fn (ThoughtDetailPresenter $d) => $d->linkedResearchUrl() === route('idea.research.show', $researchThought));
         $response->assertSee('Research preview', false);
         $response->assertSee('View full research', false);
         $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, false);
@@ -488,8 +544,8 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
 
         $response->assertOk();
-        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
-        $this->assertNotNull($response->viewData('emailResearchPreview'));
+        $response->assertViewHas('thoughtDetail', fn (ThoughtDetailPresenter $d) => $d->linkedResearchUrl() === route('idea.research.show', $researchThought));
+        $this->assertNotNull($response->viewData('thoughtDetail')->emailResearchPreview());
         $response->assertSee('Research preview', false);
         $response->assertSee('View full research', false);
     }
@@ -1633,7 +1689,7 @@ class ThoughtShowPageTest extends TestCase
     {
         $response->assertOk();
         $this->assertEmailDetailOmitsResearchPreviewViewModel($response);
-        $response->assertViewHas('linkedResearchUrl', null);
+        $response->assertViewHas('thoughtDetail', fn (ThoughtDetailPresenter $d) => $d->linkedResearchUrl() === null);
         $response->assertDontSee('View research', false);
     }
 
@@ -1645,7 +1701,7 @@ class ThoughtShowPageTest extends TestCase
     private function assertEmailDetailOmitsResearchPreviewViewModel(TestResponse $response): void
     {
         $response->assertOk();
-        $response->assertViewHas('emailResearchPreview', null);
+        $response->assertViewHas('thoughtDetail', fn (ThoughtDetailPresenter $d) => $d->emailResearchPreview() === null);
         $response->assertDontSee('View full research', false);
         $response->assertDontSee('Research preview', false);
     }
@@ -1659,7 +1715,9 @@ class ThoughtShowPageTest extends TestCase
      */
     private function assertEmailResearchPreviewViewModel(TestResponse $response, Thought $researchThought, array $expectations): void
     {
-        $response->assertViewHas('emailResearchPreview', function ($preview) use ($researchThought, $expectations) {
+        $response->assertViewHas('thoughtDetail', function ($detail) use ($researchThought, $expectations) {
+            $this->assertInstanceOf(ThoughtDetailPresenter::class, $detail);
+            $preview = $detail->emailResearchPreview();
             $this->assertIsArray($preview);
             $this->assertSame(route('idea.research.show', $researchThought), $preview['full_research_url']);
             $this->assertArrayHasKey('root_html', $preview);
@@ -1732,7 +1790,7 @@ class ThoughtShowPageTest extends TestCase
             ],
             'expect_absent_plain_text' => [self::EMAIL_RESEARCH_PREVIEW_SECTION_THREE],
         ]);
-        $response->assertViewHas('linkedResearchUrl', route('idea.research.show', $researchThought));
+        $response->assertViewHas('thoughtDetail', fn (ThoughtDetailPresenter $d) => $d->linkedResearchUrl() === route('idea.research.show', $researchThought));
         $response->assertSee('Research preview', false);
         $response->assertSee('View full research', false);
         $response->assertSee(self::EMAIL_RESEARCH_PREVIEW_INTRO, false);

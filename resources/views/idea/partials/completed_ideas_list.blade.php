@@ -4,14 +4,9 @@
     </div>
 @else
     <ul class="space-y-3">
-        @foreach ($ideas as $thought)
+        @foreach ($completedRows as $row)
             @php
-                $loggedLabel = \Illuminate\Support\Carbon::parse($thought->getLoggedDate(), config('app.timezone'))
-                    ->format('F j, Y');
-                $completedAt = $thought->getIdeaCompletedAt();
-                $completedLabel = $completedAt !== null
-                    ? $completedAt->timezone(config('app.timezone'))->format('F j, Y')
-                    : '—';
+                $thought = $row->thought();
             @endphp
             <li
                 data-completed-idea-id="{{ $thought->id }}"
@@ -21,8 +16,8 @@
                     <p class="text-sm text-deep-indigo line-clamp-2">
                         {{ Str::limit($thought->content, 200) }}
                     </p>
-                    <p class="text-[11px] text-slate-brand/50 mt-1">Logged {{ $loggedLabel }}</p>
-                    <p class="text-[11px] text-slate-brand/50 mt-0.5">Completed {{ $completedLabel }}</p>
+                    <p class="text-[11px] text-slate-brand/50 mt-1">Logged {{ $row->loggedFormatted() }}</p>
+                    <p class="text-[11px] text-slate-brand/50 mt-0.5">Completed {{ $row->completedFormatted() }}</p>
                 </a>
             </li>
         @endforeach
