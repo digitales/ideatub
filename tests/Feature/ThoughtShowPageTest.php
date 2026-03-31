@@ -63,6 +63,32 @@ class ThoughtShowPageTest extends TestCase
         $normal->assertSee('Highly sensitive strategy note 42', false);
     }
 
+    public function test_demo_mode_thought_detail_does_not_expose_tag_edit_affordance(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Tagged thought demo detail body',
+            'metadata' => ['tags' => ['alphademo', 'betademo']],
+        ]);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-detail-tags-demo',
+        ])->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertDontSee('Edit tags', false);
+        $response->assertDontSee('Add tag…', false);
+        $this->assertStringNotContainsString('aria-label="Edit tags"', $response->getContent());
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+        $normal = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $normal->assertOk();
+        $normal->assertSee('Edit tags', false);
+    }
+
     public function test_demo_mode_obfuscates_email_thought_subject_and_body_without_mutating_imported_rows(): void
     {
         config(['services.demo_mode.enabled' => true]);

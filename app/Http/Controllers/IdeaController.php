@@ -31,6 +31,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use League\CommonMark\CommonMarkConverter;
@@ -144,6 +145,14 @@ class IdeaController extends Controller
             }
         }
 
+        $replyingToPreview = null;
+        if ($replyingTo !== null) {
+            $limited = Str::limit((string) $replyingTo->content, 80);
+            $replyingToPreview = app(DemoMode::class)->enabled()
+                ? app(DemoObfuscator::class)->obfuscate($limited, 'idea_index_replying_to_preview')
+                : $limited;
+        }
+
         $indexThoughtCollection = $thoughts instanceof LengthAwarePaginator
             ? $thoughts->getCollection()
             : collect($thoughts);
@@ -153,6 +162,7 @@ class IdeaController extends Controller
             'thoughts' => $thoughts,
             'query' => $query !== '' ? $query : null,
             'replyingTo' => $replyingTo,
+            'replyingToPreview' => $replyingToPreview,
             'cards' => $this->buildIdeaIndexCardPresenters($thoughts, 0, $newsletterResearchStatusPresenters),
         ]);
     }

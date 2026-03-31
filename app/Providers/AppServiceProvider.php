@@ -66,11 +66,8 @@ class AppServiceProvider extends ServiceProvider
                     ->count();
             }
 
-            $demoModeEnabled = (bool) config('services.demo_mode.enabled', false)
-                && app(DemoMode::class)->enabled();
-
             $view->with('inboxActionableCount', $count);
-            $view->with('demoModeEnabled', $demoModeEnabled);
+            $view->with('demoModeEnabled', app(DemoMode::class)->enabled());
         });
     }
 }

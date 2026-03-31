@@ -18,6 +18,7 @@ class DemoModeTest extends TestCase
     #[Test]
     public function enable_sets_enabled_flag_and_seed_once(): void
     {
+        config(['services.demo_mode.enabled' => true]);
         $mode = app(DemoMode::class);
 
         $mode->enable();
@@ -33,6 +34,7 @@ class DemoModeTest extends TestCase
     #[Test]
     public function disable_clears_enabled_and_seed(): void
     {
+        config(['services.demo_mode.enabled' => true]);
         $mode = app(DemoMode::class);
 
         $mode->enable();
@@ -48,6 +50,7 @@ class DemoModeTest extends TestCase
     #[Test]
     public function seed_returns_current_seed_or_null(): void
     {
+        config(['services.demo_mode.enabled' => true]);
         $mode = app(DemoMode::class);
 
         $this->assertNull($mode->seed());
@@ -57,5 +60,17 @@ class DemoModeTest extends TestCase
 
         $mode->disable();
         $this->assertNull($mode->seed());
+    }
+
+    #[Test]
+    public function enabled_is_false_when_feature_flag_is_off_even_if_session_keys_remain(): void
+    {
+        config(['services.demo_mode.enabled' => false]);
+        session([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'stale-seed',
+        ]);
+
+        $this->assertFalse(app(DemoMode::class)->enabled());
     }
 }

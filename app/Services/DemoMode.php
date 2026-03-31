@@ -10,8 +10,16 @@ final class DemoMode
 
     public const SEED_SESSION_KEY = 'demo_mode.seed';
 
+    /**
+     * True when the demo feature is enabled in config and this session has opted in.
+     * All obfuscation and demo-safe UI gating should use this (not the session flag alone).
+     */
     public function enabled(): bool
     {
+        if (! (bool) config('services.demo_mode.enabled', false)) {
+            return false;
+        }
+
         return (bool) session(self::ENABLED_SESSION_KEY, false);
     }
 

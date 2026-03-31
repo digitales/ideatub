@@ -122,6 +122,27 @@ class DemoModeToggleTest extends TestCase
         $page->assertDontSee('Demo mode enabled. Sensitive text is obfuscated.', false);
     }
 
+    public function test_feature_flag_off_with_stale_demo_session_does_not_obfuscate_idea_index_cards(): void
+    {
+        config(['services.demo_mode.enabled' => false]);
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'STALE_SESSION_INDEX_CARD_MARKER_a7f3',
+        ]);
+
+        $page = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'stale-seed',
+        ])
+            ->actingAs($user)
+            ->get(route('idea.index'));
+
+        $page->assertOk();
+        $page->assertSee('STALE_SESSION_INDEX_CARD_MARKER_a7f3', false);
+        $this->assertStringContainsString('STALE_SESSION_INDEX_CARD_MARKER_a7f3', $page->getContent());
+    }
+
     public function test_demo_mode_routes_return_not_found_when_feature_disabled(): void
     {
         config(['services.demo_mode.enabled' => false]);

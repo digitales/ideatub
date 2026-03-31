@@ -41,6 +41,7 @@ class ObfuscatesDemoTextTest extends TestCase
     #[Test]
     public function demo_mode_on_with_session_seed_returns_obfuscated_text(): void
     {
+        config(['services.demo_mode.enabled' => true]);
         session([
             DemoMode::ENABLED_SESSION_KEY => true,
             DemoMode::SEED_SESSION_KEY => 'trait-seed-123',
