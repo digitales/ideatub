@@ -1,12 +1,17 @@
+@php
+    $thought = $thoughtDetail->thought();
+    $replyRows = $thoughtDetail->replyRows();
+@endphp
+
 <section class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
     <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80">Replies</p>
 
-    @if ($thought->comments->isNotEmpty())
+    @if ($replyRows !== [])
         <ul class="mt-4 space-y-3">
-            @foreach ($thought->comments as $comment)
+            @foreach ($replyRows as $reply)
                 <li class="rounded-xl border border-memory-violet/15 bg-white/70 px-4 py-3">
-                    <p class="text-[13px] text-slate-brand leading-relaxed whitespace-pre-line">{{ $comment->content }}</p>
-                    <p class="text-[10px] text-slate-brand/40 mt-1">{{ $comment->created_at->diffForHumans() }}</p>
+                    <p class="text-[13px] text-slate-brand leading-relaxed whitespace-pre-line">{{ $reply['content'] }}</p>
+                    <p class="text-[10px] text-slate-brand/40 mt-1">{{ $reply['created_at_human'] }}</p>
                 </li>
             @endforeach
         </ul>

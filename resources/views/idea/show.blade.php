@@ -61,6 +61,6 @@
         @endif
     </div>
 
-    @include('idea.partials.thought_detail_replies', ['thought' => $thought])
+    @include('idea.partials.thought_detail_replies', ['thoughtDetail' => $thoughtDetail])
 </div>
 @endsection

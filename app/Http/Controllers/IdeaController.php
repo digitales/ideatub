@@ -175,16 +175,11 @@ class IdeaController extends Controller
         $contentHtml = null;
 
         if ($thought->source !== 'email') {
-            $displayMarkdown = $thought->content ?? '';
-            if (app(DemoMode::class)->enabled()) {
-                try {
-                    $obfuscated = app(DemoObfuscator::class)->obfuscate($displayMarkdown, 'thought_content');
-                    $displayMarkdown = $obfuscated ?? 'Demo content hidden';
-                } catch (\Throwable) {
-                    $displayMarkdown = 'Demo content hidden';
-                }
-            }
-            $contentHtml = (new CommonMarkConverter)->convert($displayMarkdown)->getContent();
+            $contentHtml = $this->renderDemoSafeMarkdown(
+                new CommonMarkConverter,
+                $thought->content,
+                'thought_content'
+            );
         }
 
         $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl(
@@ -1293,10 +1288,18 @@ class IdeaController extends Controller
         }
 
         $converter = new CommonMarkConverter;
-        $rootHtml = $converter->convert($documentRoot->content)->getContent();
+        $rootHtml = $this->renderDemoSafeMarkdown(
+            $converter,
+            $documentRoot->content,
+            'email_research_preview_root'
+        );
         $sections = $documentRoot->comments()->orderBy('created_at')->get();
         $sectionHtmlChunks = $sections->take(2)->map(function (Thought $section) use ($converter) {
-            return $converter->convert($section->content)->getContent();
+            return $this->renderDemoSafeMarkdown(
+                $converter,
+                $section->content,
+                'email_research_preview_section'
+            );
         })->values()->all();
 
         if (! $this->researchEmailPreviewHasRenderableBody($rootHtml, $sectionHtmlChunks)) {
@@ -1341,6 +1344,21 @@ class IdeaController extends Controller
         }
 
         return false;
+    }
+
+    private function renderDemoSafeMarkdown(CommonMarkConverter $converter, ?string $markdown, string $context): string
+    {
+        $displayMarkdown = $markdown ?? '';
+
+        if (app(DemoMode::class)->enabled()) {
+            try {
+                $displayMarkdown = app(DemoObfuscator::class)->obfuscate($displayMarkdown, $context) ?? 'Demo content hidden';
+            } catch (\Throwable) {
+                $displayMarkdown = 'Demo content hidden';
+            }
+        }
+
+        return $converter->convert($displayMarkdown)->getContent();
     }
 
     /**

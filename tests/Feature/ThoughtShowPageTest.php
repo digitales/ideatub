@@ -429,6 +429,40 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Reply', false);
     }
 
+    public function test_demo_mode_obfuscates_reply_content_on_thought_detail_page_without_mutating_reply_records(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+
+        $owner = User::factory()->create();
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Parent detail root safe marker',
+            'source' => 'web',
+        ]);
+        $reply = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $root->id,
+            'content' => 'Reply secret marker zeta-444',
+            'source' => 'web',
+        ]);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-reply-detail',
+        ])->actingAs($owner)->get(route('thoughts.show', $root));
+
+        $response->assertOk();
+        $response->assertDontSee('Reply secret marker zeta-444', false);
+        $response->assertSee('Reply', false);
+        $this->assertSame('Reply secret marker zeta-444', $reply->fresh()->content);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normal = $this->actingAs($owner)->get(route('thoughts.show', $root));
+        $normal->assertOk();
+        $normal->assertSee('Reply secret marker zeta-444', false);
+    }
+
     public function test_email_thought_detail_page_shows_body_and_email_metadata(): void
     {
         $owner = User::factory()->create();
@@ -535,6 +569,47 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
 
         $this->assertEmailDetailResearchPreviewContract($response, $researchThought);
+    }
+
+    public function test_demo_mode_obfuscates_email_research_preview_without_mutating_research_records(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+
+        [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedResearchPreviewFixture();
+        $researchSections = $researchThought->comments()->orderBy('created_at')->get();
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-email-preview',
+        ])->actingAs($owner)->get(route('thoughts.show', $emailThought));
+
+        $response->assertOk();
+        $response->assertSee('Research preview', false);
+        $response->assertDontSee(self::EMAIL_RESEARCH_PREVIEW_INTRO, false);
+        $response->assertDontSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, false);
+        $response->assertDontSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, false);
+        $response->assertViewHas('thoughtDetail', function (ThoughtDetailPresenter $detail): bool {
+            $preview = $detail->emailResearchPreview();
+            $this->assertIsArray($preview);
+
+            $combined = ($preview['root_html'] ?? '').implode('', $preview['section_html_chunks'] ?? []);
+            $this->assertStringNotContainsString(self::EMAIL_RESEARCH_PREVIEW_INTRO, $combined);
+            $this->assertStringNotContainsString(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, $combined);
+            $this->assertStringNotContainsString(self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, $combined);
+
+            return true;
+        });
+        $this->assertSame(self::EMAIL_RESEARCH_PREVIEW_INTRO, $researchThought->fresh()->content);
+        $this->assertSame("## First\n\n".self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, $researchSections[0]->fresh()->content);
+        $this->assertSame("## Second\n\n".self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, $researchSections[1]->fresh()->content);
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+
+        $normal = $this->actingAs($owner)->get(route('thoughts.show', $emailThought));
+        $normal->assertOk();
+        $normal->assertSee(self::EMAIL_RESEARCH_PREVIEW_INTRO, false);
+        $normal->assertSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_ONE, false);
+        $normal->assertSee(self::EMAIL_RESEARCH_PREVIEW_SECTION_TWO, false);
     }
 
     public function test_email_thought_detail_omits_research_preview_and_cta_when_linked_research_is_missing(): void

@@ -112,6 +112,27 @@ final class ThoughtDetailPresenter
         return $this->emailMetadata;
     }
 
+    /**
+     * @return array<int, array{content: string, created_at_human: string}>
+     */
+    public function replyRows(): array
+    {
+        return $this->thought->comments
+            ->map(function (Thought $comment): array {
+                try {
+                    $content = $this->demoText($comment->content, 'thought_comment_preview');
+                } catch (\Throwable) {
+                    $content = 'Demo content hidden';
+                }
+
+                return [
+                    'content' => $content ?? 'Demo content hidden',
+                    'created_at_human' => $comment->created_at->diffForHumans(),
+                ];
+            })
+            ->all();
+    }
+
     public function emailBodyText(): string
     {
         if ($this->thought->source !== 'email') {
