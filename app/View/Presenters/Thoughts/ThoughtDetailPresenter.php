@@ -7,6 +7,7 @@ use App\Models\Thought;
 use App\View\Presenters\Concerns\ObfuscatesDemoText;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
+use Illuminate\Support\Facades\Log;
 
 /**
  * View contract for the thought detail (`idea.show`) page.
@@ -121,7 +122,14 @@ final class ThoughtDetailPresenter
             ->map(function (Thought $comment): array {
                 try {
                     $content = $this->demoText($comment->content, 'thought_comment_preview');
-                } catch (\Throwable) {
+                } catch (\Throwable $e) {
+                    $this->logDemoObfuscationFailure(
+                        boundary: 'thought_detail_presenter.reply_rows',
+                        context: 'thought_comment_preview',
+                        exception: $e,
+                        subjectThoughtId: $comment->id
+                    );
+
                     $content = 'Demo content hidden';
                 }
 
@@ -146,10 +154,27 @@ final class ThoughtDetailPresenter
 
         try {
             $obfuscated = $this->demoText($raw, 'email_body_text');
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            $this->logDemoObfuscationFailure(
+                boundary: 'thought_detail_presenter.email_body_text',
+                context: 'email_body_text',
+                exception: $e
+            );
+
             return 'Demo content hidden';
         }
 
         return $obfuscated ?? 'Demo content hidden';
+    }
+
+    private function logDemoObfuscationFailure(string $boundary, string $context, \Throwable $exception, ?string $subjectThoughtId = null): void
+    {
+        Log::warning('Demo obfuscation failed for thought detail presenter field.', [
+            'boundary' => $boundary,
+            'context' => $context,
+            'thought_id' => $this->thought->id,
+            'subject_thought_id' => $subjectThoughtId,
+            'exception' => $exception::class,
+        ]);
     }
 }

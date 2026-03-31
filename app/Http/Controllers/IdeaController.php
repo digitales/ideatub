@@ -30,6 +30,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use League\CommonMark\CommonMarkConverter;
@@ -1353,7 +1354,12 @@ class IdeaController extends Controller
         if (app(DemoMode::class)->enabled()) {
             try {
                 $displayMarkdown = app(DemoObfuscator::class)->obfuscate($displayMarkdown, $context) ?? 'Demo content hidden';
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                Log::warning('Demo obfuscation failed before markdown render.', [
+                    'boundary' => 'idea_controller.render_demo_safe_markdown',
+                    'context' => $context,
+                    'exception' => $e::class,
+                ]);
                 $displayMarkdown = 'Demo content hidden';
             }
         }
