@@ -754,6 +754,55 @@ class ResearchShowTest extends TestCase
         $response->assertSee('QUALITY_NOTES_UNIQUE_SUBDUED_8844', false);
     }
 
+    public function test_research_show_renders_why_it_matters_inline_without_template_whitespace(): void
+    {
+        $owner = User::factory()->create();
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'Newsletter for why it matters formatting',
+        ]);
+
+        $root = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => '# Research why it matters formatting',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+            'source_metadata' => [
+                'email_thought_id' => $emailThought->id,
+            ],
+        ]);
+
+        $this->createThoughtLinkSummaryRow($owner->id, $emailThought->id, $root->id, [
+            'original_url' => 'https://example.com/why-inline',
+            'normalized_url' => 'https://example.com/why-inline',
+            'normalized_url_hash' => sha1('https://example.com/why-inline'),
+            'newsletter_section_label' => 'Why inline section',
+            'newsletter_section_order' => 1,
+            'classification' => 'editorial',
+            'processing_status' => 'summarized',
+            'resolved_title' => 'Why inline title unique wiw-1122',
+            'summary_text' => 'Summary body unique wiw-1122',
+            'why_it_matters' => 'WHY_IT_MATTERS_INLINE_UNIQUE_1122',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('idea.research.show', $root));
+
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertNotFalse($content);
+        $this->assertStringContainsString(
+            'Why it matters:</span> WHY_IT_MATTERS_INLINE_UNIQUE_1122',
+            $content
+        );
+    }
+
     public function test_research_show_shows_failed_count_for_failed_editorial_links(): void
     {
         $owner = User::factory()->create();

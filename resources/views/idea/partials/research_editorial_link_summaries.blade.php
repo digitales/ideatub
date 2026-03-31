@@ -32,10 +32,7 @@
                                     </p>
                                 @endif
                                 @if (! empty($item['why_it_matters']))
-                                    <p class="mt-2 text-[12px] text-deep-indigo/90 leading-relaxed whitespace-pre-wrap">
-                                        <span class="font-medium text-deep-indigo">Why it matters:</span>
-                                        {{ $item['why_it_matters'] }}
-                                    </p>
+                                    <p class="mt-2 text-[12px] text-deep-indigo/90 leading-relaxed whitespace-pre-wrap"><span class="font-medium text-deep-indigo">Why it matters:</span> {{ $item['why_it_matters'] }}</p>
                                 @endif
                                 @if (! empty($item['quality_notes']))
                                     <p class="mt-2 text-[11px] text-slate-brand/60 leading-relaxed whitespace-pre-wrap">{{ $item['quality_notes'] }}</p>
