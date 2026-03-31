@@ -21,6 +21,9 @@ class PresenterGuardTest extends TestCase
         $thought = Thought::factory()->make();
 
         $this->expectException(MissingPresenterData::class);
+        $this->expectExceptionMessage(
+            'Presenter requires relation [comments] to be loaded on '.Thought::class.'.'
+        );
 
         $presenter->requireRelationLoaded($thought, 'comments');
     }
@@ -34,7 +37,39 @@ class PresenterGuardTest extends TestCase
         };
 
         $this->expectException(MissingPresenterData::class);
+        $this->expectExceptionMessage(
+            'Presenter requires lookup key [newsletterStatusByThoughtId] to be present in the preloaded payload.'
+        );
 
         $presenter->requireLookupKey([], 'newsletterStatusByThoughtId');
+    }
+
+    #[Test]
+    public function require_relation_loaded_does_not_throw_when_relation_is_loaded(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $presenter = new class
+        {
+            use EnsuresPresenterDataIsLoaded;
+        };
+
+        $thought = Thought::factory()->make();
+        $thought->setRelation('comments', collect());
+
+        $presenter->requireRelationLoaded($thought, 'comments');
+    }
+
+    #[Test]
+    public function require_lookup_key_does_not_throw_when_key_exists_even_if_value_is_null(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $presenter = new class
+        {
+            use EnsuresPresenterDataIsLoaded;
+        };
+
+        $presenter->requireLookupKey(['newsletterStatusByThoughtId' => null], 'newsletterStatusByThoughtId');
     }
 }
