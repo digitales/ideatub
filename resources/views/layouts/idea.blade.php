@@ -170,6 +170,9 @@
                             <a href="{{route('settings.ideas-revisit.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                                 Ideas to revisit settings
                             </a>
+                            <a href="{{route('settings.research-skills.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                Research skills
+                            </a>
                             <form method="POST" action="{{route('logout')}}">
                                 @csrf
                                 <button type="submit" class="w-full text-left px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">

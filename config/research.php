@@ -18,4 +18,9 @@ return [
      * Override via RESEARCH_MAX_TOKENS.
      */
     'max_tokens' => env('RESEARCH_MAX_TOKENS', 2048),
+
+    /*
+     * Hard cap for queued/running research runs per user. Set to 0 to disable.
+     */
+    'max_active_runs_per_user' => env('RESEARCH_MAX_ACTIVE_RUNS_PER_USER', 25),
 ];

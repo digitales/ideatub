@@ -245,6 +245,27 @@ class OpenRouterServiceTest extends TestCase
     }
 
     #[Test]
+    public function research_from_prompt_prefers_dedicated_research_model_when_configured(): void
+    {
+        Config::set('services.openrouter.research_model', 'openai/gpt-4.1-mini');
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => 'OK']]],
+            ], 200),
+        ]);
+
+        $result = $this->service->researchFromPrompt('Prompt body');
+
+        $this->assertSame('OK', $result);
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://openrouter.ai/api/v1/chat/completions'
+                && $request['model'] === 'openai/gpt-4.1-mini'
+                && $this->getUserMessageContent($request) === 'Prompt body';
+        });
+    }
+
+    #[Test]
     public function summarize_link_truncates_multibyte_text_without_breaking_utf8(): void
     {
         $json = json_encode([

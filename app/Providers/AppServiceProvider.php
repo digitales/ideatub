@@ -3,8 +3,6 @@
 namespace App\Providers;
 
 use App\Contracts\EvernoteApiGateway;
-use App\Events\IdeaResearchRequested;
-use App\Listeners\RunResearchForIdeaListener;
 use App\Models\InboxItem;
 use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
@@ -12,7 +10,6 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Broadcast;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use MrMySQL\YoutubeTranscript\TranscriptListFetcher;
@@ -53,8 +50,6 @@ class AppServiceProvider extends ServiceProvider
         if (file_exists($channelsPath)) {
             require $channelsPath;
         }
-
-        Event::listen(IdeaResearchRequested::class, RunResearchForIdeaListener::class);
 
         View::composer('layouts.idea', function ($view): void {
             $count = 0;

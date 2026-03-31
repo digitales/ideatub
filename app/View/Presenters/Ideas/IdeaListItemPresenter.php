@@ -24,17 +24,18 @@ final class IdeaListItemPresenter
         private readonly Thought $thought,
         private readonly Collection $researchList,
         private readonly bool $ownerMayInlineEdit,
+        private readonly IdeaResearchStatusPresenter $researchStatus,
     ) {}
 
     /**
      * @param  Collection<int, Thought>  $researchList  Pre-grouped research thoughts for this idea (newest first).
      */
-    public static function from(Thought $thought, Collection $researchList): self
+    public static function from(Thought $thought, Collection $researchList, IdeaResearchStatusPresenter $researchStatus): self
     {
         $userId = Auth::id();
         $ownerMayInlineEdit = Auth::check() && $userId !== null && (int) $userId === (int) $thought->user_id;
 
-        return new self($thought, $researchList, $ownerMayInlineEdit);
+        return new self($thought, $researchList, $ownerMayInlineEdit, $researchStatus);
     }
 
     public function thought(): Thought
@@ -49,7 +50,12 @@ final class IdeaListItemPresenter
 
     public function isResearchPending(): bool
     {
-        return $this->thought->isResearchPending();
+        return $this->researchStatus->showsInProgress();
+    }
+
+    public function researchStatus(): IdeaResearchStatusPresenter
+    {
+        return $this->researchStatus;
     }
 
     /**

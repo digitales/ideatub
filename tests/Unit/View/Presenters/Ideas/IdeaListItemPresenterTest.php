@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\DemoMode;
 use App\Services\DemoObfuscator;
 use App\View\Presenters\Ideas\IdeaListItemPresenter;
+use App\View\Presenters\Ideas\IdeaResearchStatusPresenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
@@ -26,7 +27,7 @@ class IdeaListItemPresenterTest extends TestCase
             'embedding' => null,
         ]);
 
-        $row = IdeaListItemPresenter::from($thought, collect());
+        $row = IdeaListItemPresenter::from($thought, collect(), IdeaResearchStatusPresenter::from($thought, null, null));
 
         $this->assertSame($thought->getLoggedDate(), $row->loggedDateYmd());
         $this->assertSame('2025-06-15', $row->loggedDateYmd());
@@ -47,8 +48,8 @@ class IdeaListItemPresenterTest extends TestCase
             'embedding' => null,
         ]);
 
-        $this->assertTrue(IdeaListItemPresenter::from($pending, collect())->isResearchPending());
-        $this->assertFalse(IdeaListItemPresenter::from($idle, collect())->isResearchPending());
+        $this->assertTrue(IdeaListItemPresenter::from($pending, collect(), IdeaResearchStatusPresenter::from($pending, null, null))->isResearchPending());
+        $this->assertFalse(IdeaListItemPresenter::from($idle, collect(), IdeaResearchStatusPresenter::from($idle, null, null))->isResearchPending());
     }
 
     #[Test]
@@ -68,7 +69,7 @@ class IdeaListItemPresenterTest extends TestCase
         ]);
         $research = collect([$r1]);
 
-        $row = IdeaListItemPresenter::from($idea, $research);
+        $row = IdeaListItemPresenter::from($idea, $research, IdeaResearchStatusPresenter::from($idea, null, null));
 
         $this->assertCount(1, $row->researchList());
         $this->assertTrue($row->researchList()->isNotEmpty());
@@ -85,7 +86,7 @@ class IdeaListItemPresenterTest extends TestCase
             'embedding' => null,
         ]);
 
-        $row = IdeaListItemPresenter::from($thought, collect());
+        $row = IdeaListItemPresenter::from($thought, collect(), IdeaResearchStatusPresenter::from($thought, null, null));
 
         $this->assertSame($thought->id, $row->thought()->id);
     }
@@ -105,7 +106,7 @@ class IdeaListItemPresenterTest extends TestCase
         session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
 
         $this->actingAs($user);
-        $row = IdeaListItemPresenter::from($thought, collect());
+        $row = IdeaListItemPresenter::from($thought, collect(), IdeaResearchStatusPresenter::from($thought, null, null));
 
         $this->assertSame('UNIT_IDEAS_LIST_BODY_MARKER', $row->displayContent());
         $this->assertTrue($row->contentEditable());
@@ -135,7 +136,7 @@ class IdeaListItemPresenterTest extends TestCase
         ]);
 
         $this->actingAs($user);
-        $row = IdeaListItemPresenter::from($idea, collect([$research]));
+        $row = IdeaListItemPresenter::from($idea, collect([$research]), IdeaResearchStatusPresenter::from($idea, null, null));
 
         try {
             $this->assertNotSame('UNIT_IDEAS_LIST_BODY_MARKER', $row->displayContent());
@@ -182,7 +183,7 @@ class IdeaListItemPresenterTest extends TestCase
         session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
         $this->actingAs($user);
 
-        $row = IdeaListItemPresenter::from($idea, collect([$research]));
+        $row = IdeaListItemPresenter::from($idea, collect([$research]), IdeaResearchStatusPresenter::from($idea, null, null));
         $preview = $row->researchPreviewRows()[0]['preview'];
 
         $this->assertSame(Str::limit($long, 120), $preview);

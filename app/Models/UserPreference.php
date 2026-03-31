@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserPreference extends Model
 {
+    /** Global toggle: allow research to auto-run when eligible skills exist. Stored as JSON boolean. */
+    public const KEY_RESEARCH_AUTO_RUN_ENABLED = 'research_auto_run_enabled';
+
     /**
      * The attributes that are mass assignable.
      *
@@ -30,7 +33,6 @@ class UserPreference extends Model
      * Get a preference value for a user.
      *
      * @param  mixed  $default  Value to return if the preference does not exist.
-     * @return mixed
      */
     public static function get(User $user, string $key, mixed $default = null): mixed
     {
@@ -60,7 +62,6 @@ class UserPreference extends Model
      * Set a preference value for a user (create or update).
      *
      * @param  mixed  $value  String stored as-is; other types JSON-encoded.
-     * @return \App\Models\UserPreference
      */
     public static function set(User $user, string $key, mixed $value): self
     {

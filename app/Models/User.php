@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -129,6 +130,26 @@ class User extends Authenticatable
     public function preferences()
     {
         return $this->hasMany(UserPreference::class);
+    }
+
+    /**
+     * Persisted research skills owned by this user.
+     *
+     * @return HasMany<ResearchSkill, $this>
+     */
+    public function researchSkills(): HasMany
+    {
+        return $this->hasMany(ResearchSkill::class);
+    }
+
+    /**
+     * Research workflow runs initiated by this user.
+     *
+     * @return HasMany<ResearchRun, $this>
+     */
+    public function researchRuns(): HasMany
+    {
+        return $this->hasMany(ResearchRun::class);
     }
 
     /**

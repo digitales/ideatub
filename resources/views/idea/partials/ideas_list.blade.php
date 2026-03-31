@@ -13,6 +13,13 @@
         @foreach ($ideaRows as $row)
             @php
                 $thought = $row->thought();
+                $researchList = $row->researchList();
+                $researchStatus = $row->researchStatus();
+                $hasResearch = $researchList->isNotEmpty();
+                $actionLabel = $hasResearch ? 'Regenerate' : 'Research this idea';
+                $contentEditable = $row->contentEditable();
+                $displayContent = $row->displayContent();
+                $rawEditorContent = $contentEditable ? $thought->content : $displayContent;
             @endphp
             <li data-thought-id="{{ $thought->id }}" class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3 flex items-start gap-3">
                 <form method="POST" action="{{ route('ideas.toggle-completed', $thought) }}" class="flex-shrink-0 mt-0.5">
@@ -29,47 +36,48 @@
                 </form>
                 <div class="min-w-0 flex-1 relative">
                     <div class="absolute top-0 right-0 z-10">
-                        @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => $row->contentEditable()])
+                        @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => $contentEditable])
                     </div>
                     <div class="pr-8">
                         @include('idea.partials.editable_thought_content', [
                             'thought' => $thought,
-                            'editable' => $row->contentEditable(),
-                            'displayContent' => $row->displayContent(),
-                            'rawEditorContent' => $row->displayContent(),
+                            'editable' => $contentEditable,
+                            'displayContent' => $displayContent,
+                            'rawEditorContent' => $rawEditorContent,
                             'displayClass' => 'text-sm text-deep-indigo whitespace-pre-line mb-0 ',
                             'previewMaxLength' => 200,
                         ])
                     <p class="text-[11px] text-slate-brand/50 mt-1">{{ $row->loggedDateYmd() }}</p>
-                    @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => $row->contentEditable()])
+                    @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => $contentEditable])
                     {{-- Research block --}}
                     <div class="mt-2 pt-2 border-t border-memory-violet/10">
-                        @if ($row->isResearchPending())
+                        @if ($researchStatus->showsInProgress())
                             <p class="text-xs text-slate-brand/70 flex items-center gap-1.5">
                                 <span class="inline-block size-3.5 rounded-full border-2 border-neural-teal/50 border-t-neural-teal animate-spin" aria-hidden="true"></span>
-                                Researching…
+                                <span>{{ $researchStatus->statusLine() }}</span>
                             </p>
-                            @if ($row->researchList()->isNotEmpty())
-                                <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-2">Research</p>
-                                @foreach ($row->researchPreviewRows() as $researchRow)
-                                    <div class="text-sm text-slate-brand/80 mb-2">
-                                        <p>{{ $researchRow['preview'] }}</p>
-                                        <a href="{{ route('idea.research.show', $researchRow['research']) . '?from=ideas' }}" class="text-xs font-medium text-neural-teal hover:underline">View formatted</a>
-                                    </div>
-                                @endforeach
-                            @endif
-                        @elseif ($row->researchList()->isEmpty())
+                        @elseif ($researchStatus->showsFailed())
+                            <p class="text-xs text-red-600/90 mb-2">
+                                Research failed
+                                @if ($researchStatus->failedSkillName())
+                                    <span class="text-slate-brand/80">({{ $researchStatus->failedSkillName() }})</span>
+                                @endif
+                                @if ($researchStatus->failedSummary())
+                                    <span class="text-slate-brand/70">— {{ Str::limit($researchStatus->failedSummary(), 80) }}</span>
+                                @endif
+                            </p>
+                        @endif
+
+                        @if (! $researchStatus->showsInProgress())
                             <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
                                 @csrf
                                 <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">
-                                    Research this idea
+                                    {{ $actionLabel }}
                                 </button>
                             </form>
-                        @else
-                            <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
-                                @csrf
-                                <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">Regenerate</button>
-                            </form>
+                        @endif
+
+                        @if ($hasResearch)
                             <p class="text-[11px] font-semibold text-slate-brand/60 uppercase tracking-wide mb-1 mt-1">Research</p>
                             @foreach ($row->researchPreviewRows() as $researchRow)
                                 <div class="text-sm text-slate-brand/80 mb-2">
