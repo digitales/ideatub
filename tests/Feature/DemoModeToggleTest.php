@@ -65,6 +65,38 @@ class DemoModeToggleTest extends TestCase
         $page->assertSee('Demo mode enabled. Sensitive text is obfuscated.', false);
     }
 
+    public function test_authenticated_user_can_disable_demo_mode_and_clear_session_state(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $user = User::factory()->create();
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-123',
+        ])->actingAs($user)->post(route('demo-mode.disable'));
+
+        $response->assertRedirect(route('idea.index'));
+        $response->assertSessionHas('success');
+        $response->assertSessionMissing(DemoMode::ENABLED_SESSION_KEY);
+        $response->assertSessionMissing(DemoMode::SEED_SESSION_KEY);
+    }
+
+    public function test_banner_does_not_render_when_feature_flag_is_disabled_even_with_stale_session_keys(): void
+    {
+        config(['services.demo_mode.enabled' => false]);
+        $user = User::factory()->create();
+
+        $page = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-123',
+        ])
+            ->actingAs($user)
+            ->get(route('idea.index'));
+
+        $page->assertOk();
+        $page->assertDontSee('Demo mode enabled. Sensitive text is obfuscated.', false);
+    }
+
     public function test_demo_mode_routes_return_not_found_when_feature_disabled(): void
     {
         config(['services.demo_mode.enabled' => false]);
