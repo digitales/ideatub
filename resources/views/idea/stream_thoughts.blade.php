@@ -5,7 +5,12 @@
         class="relative rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all @if ($card->isVideoThought()) border-l-[3px] border-l-rose-400/90 @endif"
     >
         <div class="absolute top-3 right-3">
-            @include('idea.partials.thought_card_actions', ['thought' => $card->thought(), 'editable' => $card->editable(), 'share' => $card->share()])
+            @include('idea.partials.thought_card_actions', [
+                'thought' => $card->thought(),
+                'editable' => $card->editable(),
+                'share' => $card->share(),
+                'documentShareEligible' => $card->documentShareEligible(),
+            ])
         </div>
         <div class="pr-8 min-w-0">
             @include('idea.partials.editable_thought_content', [

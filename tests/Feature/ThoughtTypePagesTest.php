@@ -526,6 +526,30 @@ class ThoughtTypePagesTest extends TestCase
         $this->assertStringNotContainsString("href=''", $response->getContent());
     }
 
+    public function test_main_stream_shows_document_share_menu_only_for_shareable_roots(): void
+    {
+        $user = User::factory()->create();
+        $eligible = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Eligible document root for share menu',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'research'],
+        ]);
+        $plain = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Plain root without doc type',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+        $response->assertOk();
+        $response->assertSee(route('shared-research.index', ['create' => $eligible->id], false), false);
+        $response->assertDontSee(route('shared-research.index', ['create' => $plain->id], false), false);
+    }
+
     private function assertThoughtBadgeLink(TestResponse $response, string $label, string $href): void
     {
         $xpath = $this->xpathFromResponse($response);

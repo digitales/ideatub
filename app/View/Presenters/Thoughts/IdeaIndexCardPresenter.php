@@ -64,6 +64,11 @@ final class IdeaIndexCardPresenter
         return $this->thought;
     }
 
+    public function documentShareEligible(): bool
+    {
+        return $this->thought->isShareableDocumentRoot();
+    }
+
     public function currentReplyableIndex(): int
     {
         return $this->currentReplyableIndex;

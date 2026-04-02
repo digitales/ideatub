@@ -36,7 +36,11 @@
                 </form>
                 <div class="min-w-0 flex-1 relative">
                     <div class="absolute top-0 right-0 z-10">
-                        @include('idea.partials.thought_card_actions', ['thought' => $thought, 'editable' => $contentEditable])
+                        @include('idea.partials.thought_card_actions', [
+                            'thought' => $thought,
+                            'editable' => $contentEditable,
+                            'documentShareEligible' => $thought->isShareableDocumentRoot(),
+                        ])
                     </div>
                     <div class="pr-8">
                         @include('idea.partials.editable_thought_content', [

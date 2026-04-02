@@ -1,6 +1,7 @@
 @php
     $editable = $editable ?? (auth()->check() && auth()->id() === $thought->user_id);
     $share = $share ?? null;
+    $documentShareEligible = $documentShareEligible ?? false;
     $isRootThought = $thought->parent_id === null;
 @endphp
 @if ($editable)
@@ -25,7 +26,7 @@
         x-transition
         class="absolute right-0 top-full mt-0.5 py-1 min-w-[8rem] rounded-lg border border-memory-violet/15 bg-white shadow-lg z-10"
     >
-        @if ($isRootThought)
+        @if ($isRootThought && $documentShareEligible)
             @if ($share)
                 <a
                     href="{{ url(route('shared-research.show', $share->token)) }}"

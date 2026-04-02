@@ -74,6 +74,11 @@ final class StreamThoughtCardPresenter
         return $this->share;
     }
 
+    public function documentShareEligible(): bool
+    {
+        return $this->thought->isShareableDocumentRoot();
+    }
+
     public function activityAtHuman(): string
     {
         return $this->activityAtHuman;
