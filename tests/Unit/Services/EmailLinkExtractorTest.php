@@ -59,6 +59,44 @@ TXT;
     }
 
     #[Test]
+    public function extracts_youtube_video_id_from_shorts_urls(): void
+    {
+        $extractor = new EmailLinkExtractor;
+
+        $this->assertSame(
+            'dQw4w9WgXcQ',
+            $extractor->extractYouTubeVideoId('https://www.youtube.com/shorts/dQw4w9WgXcQ')
+        );
+    }
+
+    #[Test]
+    public function extracts_youtube_video_id_from_youtu_be_links(): void
+    {
+        $extractor = new EmailLinkExtractor;
+
+        $this->assertSame(
+            'dQw4w9WgXcQ',
+            $extractor->extractYouTubeVideoId('https://youtu.be/dQw4w9WgXcQ?t=42')
+        );
+    }
+
+    #[Test]
+    public function does_not_extract_youtube_video_id_when_trailing_path_prose_follows_the_video_id(): void
+    {
+        $extractor = new EmailLinkExtractor;
+
+        $this->assertNull(
+            $extractor->extractYouTubeVideoId('https://youtu.be/dQw4w9WgXcQNotes')
+        );
+        $this->assertNull(
+            $extractor->extractYouTubeVideoId('https://www.youtube.com/shorts/dQw4w9WgXcQNotes')
+        );
+        $this->assertNull(
+            $extractor->extractYouTubeVideoId('https://www.youtube.com/live/dQw4w9WgXcQNotes')
+        );
+    }
+
+    #[Test]
     public function links_from_processing_metadata_returns_stored_extracted_links_for_review_items(): void
     {
         $extractor = new EmailLinkExtractor;

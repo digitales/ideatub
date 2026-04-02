@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\RunVideoResearch;
 use App\Jobs\SyncUserJiraActivity;
 use App\Models\Thought;
 use App\Models\User;
@@ -13,6 +14,7 @@ use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
+use App\Services\Video\VideoCaptureService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,6 +30,7 @@ class McpController extends Controller
         private IdeasToRevisitService $ideasToRevisit,
         private ResearchService $researchService,
         private ThoughtSearchService $searchService,
+        private VideoCaptureService $videoCaptureService,
         private ?OAuthMcpJwtService $oauthJwt = null
     ) {}
 
@@ -51,7 +54,7 @@ class McpController extends Controller
      */
     private function mcpMethodNames(): array
     {
-        $base = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'];
+        $base = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea', 'capture_video'];
         if (config('services.jira.enabled', true)) {
             $base[] = 'sync_jira';
         }
@@ -243,6 +246,20 @@ class McpController extends Controller
                     'required' => [],
                 ],
             ],
+            [
+                'name' => 'capture_video',
+                'description' => 'Save a YouTube video as a video thought. Same normalization as web capture. Optional pasted transcript skips automatic fetch. Duplicate URL returns the existing root thought id.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'url' => ['type' => 'string', 'description' => 'YouTube watch or youtu.be URL'],
+                        'transcript' => ['type' => 'string', 'description' => 'Optional full transcript text; when set, automatic YouTube fetch is not queued'],
+                        'research_now' => ['type' => 'boolean', 'description' => 'When true, queues video research using the built-in video workflow. If a transcript is missing, transcript fetch runs first and video research is queued after the transcript reaches a terminal state; if a transcript is already present, video research is queued immediately.'],
+                        'source_metadata' => ['type' => 'object', 'description' => 'Optional metadata merged onto the root video thought (e.g. project, client)'],
+                    ],
+                    'required' => ['url'],
+                ],
+            ],
         ];
         if (config('services.jira.enabled', true)) {
             $tools[] = [
@@ -395,6 +412,7 @@ class McpController extends Controller
             'capture_idea' => $this->captureIdea($params),
             'get_ideas' => $this->getIdeas($params),
             'research_idea' => $this->researchIdea($params),
+            'capture_video' => $this->captureVideo($params),
             'sync_jira' => $this->syncJira($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
@@ -532,6 +550,100 @@ class McpController extends Controller
         }, $thoughts);
 
         return ['ideas' => $ideas];
+    }
+
+    /**
+     * capture_video: Save or reuse a YouTube video thought via {@see VideoCaptureService}.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{id: string, video_id: string, transcript_status: mixed, research_pending: bool, warning?: string}
+     */
+    private function captureVideo(array $params): array
+    {
+        $v = Validator::make($params, [
+            'url' => 'required|string|max:2048',
+            'transcript' => 'sometimes|nullable|string|max:65535',
+            'research_now' => 'sometimes|boolean',
+            'source_metadata' => 'sometimes|nullable|array',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $url = trim((string) $params['url']);
+        $transcript = array_key_exists('transcript', $params) && $params['transcript'] !== null
+            ? (string) $params['transcript']
+            : null;
+        $transcriptProvided = $transcript !== null && trim($transcript) !== '';
+        $researchNow = ! empty($params['research_now']);
+        $sourceMetadata = isset($params['source_metadata']) && is_array($params['source_metadata'])
+            ? $params['source_metadata']
+            : null;
+
+        $user = Auth::user();
+        if ($user === null) {
+            throw new \InvalidArgumentException('Not authenticated.');
+        }
+
+        $root = $this->videoCaptureService->capture($user, $url, $transcriptProvided ? $transcript : null, $sourceMetadata);
+
+        $root->refresh();
+        $intentMerged = ! empty($root->metadata[VideoCaptureService::META_VIDEO_RESEARCH_INTENT_PENDING]);
+
+        if ($researchNow) {
+            $meta = is_array($root->metadata) ? $root->metadata : [];
+            $meta[VideoCaptureService::META_VIDEO_RESEARCH_INTENT_PENDING] = true;
+            $meta['research_pending'] = true;
+            $root->update([
+                'metadata' => Thought::normalizeMetadataTags($meta),
+            ]);
+            $root->refresh();
+        } elseif ($intentMerged) {
+            $meta = is_array($root->metadata) ? $root->metadata : [];
+            $meta['research_pending'] = true;
+            $root->update([
+                'metadata' => Thought::normalizeMetadataTags($meta),
+            ]);
+            $root->refresh();
+        }
+
+        $researchRequested = $researchNow || $intentMerged;
+
+        $warning = null;
+        if (! $transcriptProvided) {
+            $queued = $this->videoCaptureService->queueTranscriptFetchIfPending($root, $researchRequested);
+            $root->refresh();
+            $status = data_get($root->metadata, 'transcript_status');
+            if (! $queued && $status === VideoCaptureService::TRANSCRIPT_STATUS_PENDING) {
+                if ($researchRequested) {
+                    $this->videoCaptureService->clearStalledResearchRequestMarkers($root);
+                    $root->refresh();
+                }
+                $warning = 'Transcript fetch could not be queued; the video was saved. Retry transcript fetch later if needed.';
+            }
+        }
+
+        $root->refresh();
+        if ($researchRequested && $this->videoCaptureService->transcriptFetchShouldNoop($root)) {
+            RunVideoResearch::dispatch($root->id);
+        }
+
+        $root->refresh();
+        $metadata = is_array($root->metadata) ? $root->metadata : [];
+        $researchPending = ! empty($metadata[VideoCaptureService::META_VIDEO_RESEARCH_INTENT_PENDING])
+            || ! empty($metadata['research_pending']);
+
+        $out = [
+            'id' => $root->id,
+            'video_id' => (string) ($metadata['video_id'] ?? ''),
+            'transcript_status' => $metadata['transcript_status'] ?? null,
+            'research_pending' => $researchPending,
+        ];
+        if ($warning !== null) {
+            $out['warning'] = $warning;
+        }
+
+        return $out;
     }
 
     /**

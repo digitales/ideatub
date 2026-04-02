@@ -636,7 +636,10 @@ class IdeaController extends Controller
         bool $showFullSections,
         array $newsletterPresenters,
     ): Collection {
-        return $thoughts->getCollection()->map(function (Thought $thought) use ($shareByThoughtId, $showFullSections, $newsletterPresenters) {
+        $collection = $thoughts->getCollection();
+        $videoResearchUrlByThoughtId = $this->buildVideoResearchUrlByThoughtId($collection);
+
+        return $collection->map(function (Thought $thought) use ($shareByThoughtId, $showFullSections, $newsletterPresenters, $videoResearchUrlByThoughtId) {
             /** @var ResearchShare|null $share */
             $share = $shareByThoughtId->get($thought->id);
 
@@ -644,9 +647,49 @@ class IdeaController extends Controller
                 $thought,
                 $share,
                 $showFullSections,
-                $newsletterPresenters[$thought->id] ?? null
+                $newsletterPresenters[$thought->id] ?? null,
+                $videoResearchUrlByThoughtId[$thought->id] ?? null,
             );
         });
+    }
+
+    /**
+     * @param  Collection<int, Thought>  $thoughts
+     * @return array<string, string>
+     */
+    private function buildVideoResearchUrlByThoughtId(Collection $thoughts): array
+    {
+        $researchIdsByThoughtId = $thoughts
+            ->filter(fn (Thought $thought) => data_get($thought->metadata, 'type') === 'video')
+            ->mapWithKeys(function (Thought $thought): array {
+                $researchId = data_get($thought->metadata, 'research_thought_id');
+
+                return is_string($researchId) && $researchId !== ''
+                    ? [$thought->id => $researchId]
+                    : [];
+            });
+
+        if ($researchIdsByThoughtId->isEmpty()) {
+            return [];
+        }
+
+        $researchThoughts = Thought::query()
+            ->where('user_id', auth()->id())
+            ->whereIn('id', $researchIdsByThoughtId->values()->all())
+            ->where('metadata->type', 'research')
+            ->get(['id']);
+
+        $resolvedUrlsByResearchId = $researchThoughts
+            ->mapWithKeys(fn (Thought $thought): array => [$thought->id => route('idea.research.show', $thought)])
+            ->all();
+
+        return $researchIdsByThoughtId
+            ->mapWithKeys(function (string $researchId, string $thoughtId) use ($resolvedUrlsByResearchId): array {
+                $url = $resolvedUrlsByResearchId[$researchId] ?? null;
+
+                return is_string($url) ? [$thoughtId => $url] : [];
+            })
+            ->all();
     }
 
     private function firstPageCreatedAtCursor(LengthAwarePaginator $thoughts, bool $ascending): ?string

@@ -87,11 +87,11 @@ class EmailLinkExtractor
             return $m[1];
         }
 
-        if (preg_match('#(?:^|//)(?:www\.)?youtu\.be/([a-zA-Z0-9_-]{11})#i', $url, $m)) {
+        if (preg_match('#(?:^|//)(?:www\.)?youtu\.be/([a-zA-Z0-9_-]{11})(?:[^a-zA-Z0-9_-]|$)#i', $url, $m)) {
             return $m[1];
         }
 
-        if (preg_match('#youtube\.com/(?:embed|shorts|live)/([a-zA-Z0-9_-]{11})#i', $url, $m)) {
+        if (preg_match('#youtube\.com/(?:embed|shorts|live)/([a-zA-Z0-9_-]{11})(?:[^a-zA-Z0-9_-]|$)#i', $url, $m)) {
             return $m[1];
         }
 
