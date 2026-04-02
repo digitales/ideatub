@@ -135,6 +135,7 @@ git commit -m "feat(thought): shareable long-form document root eligibility"
 - Add `test_store_rejects_video_root`: `metadata => ['type' => 'video']` → expect redirect + errors.
 - Add `test_store_rejects_email_source`: `source => 'email', is_visible_in_stream => true` → rejected.
 - Add `test_store_rejects_jira_source` (or email only if jira factory is heavy).
+- Add at least one **successful** `POST` per `metadata.type` **`plan`** and **`meeting`** (in addition to `research`) so store logic is not covered by a single happy path only.
 - Update assertion for duplicate-share flash to new string.
 
 - [ ] **Step 4: Run tests**
@@ -182,7 +183,7 @@ Wrap the entire `@if ($isRootThought) … Share … @endif` block so it runs onl
 
 - [ ] **Step 4: Add/adjust feature test**
 
-If `tests/Feature/StreamPageTest.php` or research stream test asserts Share link, add case: root **without** eligible type should **not** see `shared-research.index` create link. Eligible root **should** see it.
+If no test currently asserts the Share menu, add a **minimal** feature test (typed research/meeting stream or main stream) so CI guards “Share link only when `documentShareEligible`”. Cover: root **without** eligible type must **not** include the create URL; eligible root **must** include it.
 
 - [ ] **Step 5: Run targeted tests**
 
@@ -209,9 +210,9 @@ git commit -m "feat(ui): gate stream/index share menu to shareable documents"
 - Create: `resources/views/idea/partials/thought_detail_document_share.blade.php` (optional; or embed in header)
 - Modify: `resources/views/idea/show.blade.php` or `thought_detail_header.blade.php`
 
-- [ ] **Step 1: In `IdeaController::show`**, after authorizing thought:
+- [ ] **Step 1: In `IdeaController::show`**, after authorizing thought (owner-only `view` policy — `auth()->id()` equals `thought->user_id`):
 
-  - `$documentShare = ResearchShare::where('thought_id', $thought->id)->where('user_id', $thought->user_id)->first();` (or `auth()->id()` if always owner view).
+  - `$documentShare = ResearchShare::where('thought_id', $thought->id)->where('user_id', auth()->id())->first();`
   - `$documentShareEligible = $thought->isShareableDocumentRoot();`
 
 - [ ] **Step 2: Extend `ThoughtDetailPresenter::forShow`** with named parameters at the end:
