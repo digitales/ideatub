@@ -12,6 +12,7 @@
 <div class="max-w-6xl mx-auto px-6 md:px-8 pt-16 pb-24 space-y-6">
     @include('idea.partials.thought_detail_header', [
         'thought' => $thought,
+        'thoughtDetail' => $thoughtDetail,
         'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
     ])
 
@@ -33,6 +34,15 @@
                 </div>
             @endif
         </article>
+
+        @if ($thoughtDetail->isVideoThought() && $thoughtDetail->videoTranscriptText())
+            <article class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 md:p-8 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
+                <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-4">Transcript</p>
+                <div class="text-[14px] md:text-[15px] text-deep-indigo leading-relaxed whitespace-pre-line">
+                    {{ $thoughtDetail->videoTranscriptText() }}
+                </div>
+            </article>
+        @endif
 
         @if ($isEmailThought && ! empty($thoughtDetail->emailResearchPreview()))
             @php

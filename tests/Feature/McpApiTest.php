@@ -51,7 +51,7 @@ class McpApiTest extends TestCase
             'name' => 'ideatub',
             'version' => '1.0',
             'protocol' => 'json-rpc',
-            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea'],
+            'methods' => ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea', 'capture_video'],
         ]);
     }
 
@@ -87,14 +87,26 @@ class McpApiTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $response->assertJsonPath('result.tools.0.name', 'search_thoughts');
-        $response->assertJsonPath('result.tools.1.name', 'browse_recent');
-        $response->assertJsonPath('result.tools.2.name', 'thought_stats');
-        $response->assertJsonPath('result.tools.3.name', 'capture_thought');
-        $response->assertJsonPath('result.tools.4.name', 'capture_plan');
-        $response->assertJsonPath('result.tools.5.name', 'capture_idea');
-        $response->assertJsonPath('result.tools.6.name', 'get_ideas');
-        $response->assertJsonPath('result.tools.7.name', 'research_idea');
+        $names = array_column($response->json('result.tools'), 'name');
+        $expectedPrefix = [
+            'search_thoughts',
+            'browse_recent',
+            'thought_stats',
+            'capture_thought',
+            'capture_plan',
+            'capture_idea',
+            'get_ideas',
+            'research_idea',
+            'capture_video',
+        ];
+        $this->assertSame($expectedPrefix, array_slice($names, 0, count($expectedPrefix)));
+        $this->assertContains('capture_video', $names);
+        $captureVideo = collect($response->json('result.tools'))->firstWhere('name', 'capture_video');
+        $this->assertIsArray($captureVideo);
+        $researchNow = data_get($captureVideo, 'inputSchema.properties.research_now.description');
+        $this->assertIsString($researchNow);
+        $this->assertStringContainsString('queues video research', $researchNow);
+        $this->assertStringContainsString('after the transcript reaches a terminal state', $researchNow);
     }
 
     public function test_post_without_key_returns_401(): void

@@ -29,6 +29,7 @@ use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\ToolController;
+use App\Http\Controllers\VideoController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -129,6 +130,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/ideas/revisit', [IdeaController::class, 'revisit'])->name('idea.revisit');
     Route::get('/ideas/completed', [IdeaController::class, 'completed'])->name('idea.completed');
     Route::post('/ideas', [IdeaController::class, 'storeIdea'])->name('ideas.store');
+    Route::post('/videos', [VideoController::class, 'store'])->name('videos.store');
     Route::patch('/ideas/{thought}/completed', [IdeaController::class, 'toggleCompleted'])->name('ideas.toggle-completed');
     Route::patch('/ideas/{thought}/tags', [IdeaController::class, 'updateTags'])->name('ideas.update-tags');
     Route::patch('/ideas/{thought}/content', [IdeaController::class, 'updateContent'])->name('ideas.update-content');

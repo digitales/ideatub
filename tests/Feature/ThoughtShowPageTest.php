@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\DemoMode;
 use App\Services\DemoObfuscator;
 use App\Services\ThoughtCaptureService;
+use App\Services\Video\VideoCaptureService;
 use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
@@ -1534,6 +1535,291 @@ class ThoughtShowPageTest extends TestCase
         $response->assertOk();
         $this->assertThoughtBadgeSpan($response, 'Thought');
         $this->assertNoThoughtBadgeLink($response, 'Thought');
+    }
+
+    public function test_video_thought_detail_shows_transcript_status_canonical_link_and_view_research(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=detailVidResearch01';
+
+        $research = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'research',
+            'content' => '# Linked from video',
+            'metadata' => ['type' => 'research', 'tags' => ['video']],
+        ]);
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'detailVidResearch01',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_MANUAL,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_PASTED,
+                'research_thought_id' => $research->id,
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $response->assertSee('data-thought-detail-kind="video"', false);
+        $response->assertSee('Transcript added manually', false);
+        $response->assertSee($canonical, false);
+        $response->assertSee('View research', false);
+        $response->assertSee('Rerun research', false);
+        $response->assertSee(route('videos.store'), false);
+        $response->assertSee('name="youtube_url"', false);
+        $response->assertSee('value="'.$canonical.'"', false);
+        $response->assertSee('name="research_now"', false);
+        $response->assertSee(route('idea.research.show', $research), false);
+    }
+
+    public function test_video_thought_detail_shows_transcript_content_in_a_dedicated_block(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=detailVidTranscript06';
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'detailVidTranscript06',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
+                'tags' => [],
+            ],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $video->id,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => "## Transcript\n\nUNIQUE_TRANSCRIPT_BODY_VISIBLE_123",
+            'metadata' => [
+                'video_section_type' => 'transcript',
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $response->assertSee('Transcript', false);
+        $response->assertSee('UNIQUE_TRANSCRIPT_BODY_VISIBLE_123', false);
+    }
+
+    public function test_video_thought_detail_does_not_list_transcript_child_as_a_reply(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=detailVidReply02';
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'detailVidReply02',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
+                'tags' => [],
+            ],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $video->id,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => "## Transcript\n\nUNIQUE_TRANSCRIPT_NOT_A_REPLY_77",
+            'metadata' => [
+                'video_section_type' => 'transcript',
+                'tags' => [],
+            ],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $video->id,
+            'embedding' => null,
+            'source' => 'web',
+            'content' => 'REAL_USER_REPLY_MARKER_88',
+            'metadata' => ['tags' => []],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $response->assertSee('UNIQUE_TRANSCRIPT_NOT_A_REPLY_77', false);
+        $response->assertSee('REAL_USER_REPLY_MARKER_88', false);
+
+        $xpath = $this->xpathFromResponse($response);
+        $replySections = $xpath->query("//section[.//p[normalize-space(.)='Replies']]");
+
+        $this->assertSame(1, $replySections->length);
+
+        $replyText = trim($replySections->item(0)?->textContent ?? '');
+        $this->assertStringNotContainsString('UNIQUE_TRANSCRIPT_NOT_A_REPLY_77', $replyText);
+        $this->assertStringContainsString('REAL_USER_REPLY_MARKER_88', $replyText);
+    }
+
+    public function test_video_thought_detail_shows_research_now_form_when_ready_without_linked_research(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=detailVidReady03';
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'detailVidReady03',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $response->assertSee('Research now', false);
+        $response->assertSee(route('videos.store'), false);
+        $response->assertSee('name="youtube_url"', false);
+        $response->assertSee('value="'.$canonical.'"', false);
+        $response->assertSee('name="research_now"', false);
+    }
+
+    public function test_video_thought_detail_shows_fetch_transcript_form_when_transcript_is_missing_and_not_pending(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=detailVidFetch05';
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'detailVidFetch05',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_UNAVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_NONE,
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $response->assertSee('Fetch transcript', false);
+        $response->assertSee(route('videos.store'), false);
+        $response->assertSee('name="youtube_url"', false);
+        $response->assertSee('value="'.$canonical.'"', false);
+        $response->assertDontSee('name="research_now"', false);
+    }
+
+    public function test_demo_mode_video_thought_detail_does_not_expose_raw_canonical_url(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=detailVidDemo04';
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'detailVidDemo04',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'video-detail-demo-url',
+        ])->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $response->assertDontSee($canonical, false);
+        $response->assertDontSee('Open video', false);
+        $response->assertDontSee('Research now', false);
+        $response->assertDontSee('Rerun research', false);
+    }
+
+    public function test_demo_mode_video_thought_detail_does_not_expose_raw_transcript_text(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=detailVidDemoTranscript07';
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'detailVidDemoTranscript07',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
+                'tags' => [],
+            ],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $video->id,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => "## Transcript\n\nUNIQUE_TRANSCRIPT_SECRET_456",
+            'metadata' => [
+                'video_section_type' => 'transcript',
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'video-detail-demo-transcript',
+        ])->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $response->assertDontSee('UNIQUE_TRANSCRIPT_SECRET_456', false);
     }
 
     public function test_jira_disabled_jira_thought_detail_header_does_not_link_to_jira_stream(): void
