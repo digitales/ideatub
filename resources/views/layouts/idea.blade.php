@@ -173,9 +173,21 @@
         </main>
 
         {{-- Shortcut palette (modal) --}}
-        <div x-show="shortcutsOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @keydown.escape.window="shortcutsOpen = false" @click.away="shortcutsOpen = false" class="fixed inset-0 z-40 flex items-center justify-center p-4">
-            style="background: rgba(30, 37, 71, 0.4); backdrop-filter: blur(6px);" role="dialog" aria-modal="true"
-            aria-labelledby="shortcuts-modal-title" x-ref="shortcutsModal"
+        <div x-show="shortcutsOpen"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            @keydown.escape.window="shortcutsOpen = false"
+            @click.away="shortcutsOpen = false"
+            class="fixed inset-0 z-40 flex items-center justify-center p-4"
+            style="background: rgba(30, 37, 71, 0.4); backdrop-filter: blur(6px);"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shortcuts-modal-title"
+            x-ref="shortcutsModal"
             x-effect="shortcutsOpen && $nextTick(() => { const el = $refs.shortcutsModal && $refs.shortcutsModal.querySelector('[autofocus]'); if (el) el.focus(); })">
             <div class="rounded-2xl border border-memory-violet/25 bg-white shadow-2xl max-w-md w-full p-6" @click.stop x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95">
                 <h2 id="shortcuts-modal-title" class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts

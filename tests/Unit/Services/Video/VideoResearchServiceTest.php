@@ -10,6 +10,7 @@ use App\Services\Video\VideoResearchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Mockery;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class VideoResearchServiceTest extends TestCase
@@ -56,6 +57,17 @@ class VideoResearchServiceTest extends TestCase
         ]);
     }
 
+    /**
+     * Post-research enrichment: same OpenRouter paths as normal thought capture (metadata + embedding).
+     *
+     * @param  array<string, mixed>  $extractReturn
+     */
+    private function mockOpenRouterEnrichment(MockInterface $mock, array $extractReturn = ['tags' => ['topic-one'], 'people' => [], 'action_items' => []]): void
+    {
+        $mock->shouldReceive('extractMetadata')->once()->andReturn($extractReturn);
+        $mock->shouldReceive('embed')->once()->andReturn(array_fill(0, 1536, 0.02));
+    }
+
     public function test_success_saves_research_with_fixed_headings_and_updates_latest_pointer(): void
     {
         $user = User::factory()->create();
@@ -66,9 +78,12 @@ class VideoResearchServiceTest extends TestCase
 
         $rawModel = "## Summary\n\nS.\n## Key Points\n\n- K\n## Positives\n\nP\n## Negatives\n\nN\n## Source Notes\n\nSrc";
         $this->mock(OpenRouterService::class, function ($mock) use ($rawModel): void {
-            $mock->shouldReceive('researchFromPrompt')
-                ->once()
-                ->andReturn($rawModel);
+            $mock->shouldReceive('researchFromPrompt')->once()->andReturn($rawModel);
+            $this->mockOpenRouterEnrichment($mock, [
+                'tags' => ['anthropic', 'security'],
+                'people' => ['Ada'],
+                'action_items' => ['Review policy'],
+            ]);
         });
 
         $service = app(VideoResearchService::class);
@@ -81,6 +96,14 @@ class VideoResearchServiceTest extends TestCase
         }
         $this->assertSame('research', $research->metadata['type'] ?? null);
         $this->assertSame($root->id, $research->metadata['video_thought_id'] ?? null);
+        $this->assertNotNull($research->embedding);
+        $tags = $research->metadata['tags'] ?? [];
+        $this->assertContains('research', $tags);
+        $this->assertContains('video', $tags);
+        $this->assertContains('anthropic', $tags);
+        $this->assertContains('security', $tags);
+        $this->assertSame(['Ada'], $research->metadata['people'] ?? []);
+        $this->assertSame(['Review policy'], $research->metadata['action_items'] ?? []);
         $sm = $research->source_metadata ?? [];
         $this->assertSame($root->id, $sm['video_thought_id'] ?? null);
         $this->assertSame('vid123', $sm['video_id'] ?? null);
@@ -123,9 +146,8 @@ class VideoResearchServiceTest extends TestCase
 
         $rawModel = "## Summary\n\nS2\n## Key Points\n\nK2\n## Positives\n\nP2\n## Negatives\n\nN2\n## Source Notes\n\nSN2";
         $this->mock(OpenRouterService::class, function ($mock) use ($rawModel): void {
-            $mock->shouldReceive('researchFromPrompt')
-                ->once()
-                ->andReturn($rawModel);
+            $mock->shouldReceive('researchFromPrompt')->once()->andReturn($rawModel);
+            $this->mockOpenRouterEnrichment($mock);
         });
 
         $service = app(VideoResearchService::class);
@@ -154,6 +176,7 @@ class VideoResearchServiceTest extends TestCase
                     return str_contains($p, 'transcript') && stripos($p, 'limited') !== false;
                 }))
                 ->andReturn($rawModel);
+            $this->mockOpenRouterEnrichment($mock);
         });
 
         $service = app(VideoResearchService::class);
@@ -202,6 +225,7 @@ class VideoResearchServiceTest extends TestCase
 
         $this->mock(OpenRouterService::class, function ($mock): void {
             $mock->shouldReceive('researchFromPrompt')->once()->andReturn('No structure here.');
+            $this->mockOpenRouterEnrichment($mock);
         });
 
         $service = app(VideoResearchService::class);
@@ -222,6 +246,7 @@ class VideoResearchServiceTest extends TestCase
             $mock->shouldReceive('researchFromPrompt')->once()->andReturn(
                 "## Negatives\n\nN\n## Summary\n\nS\n## Source Notes\n\nSN\n## Key Points\n\nK\n## Positives\n\nP"
             );
+            $this->mockOpenRouterEnrichment($mock);
         });
 
         $research = app(VideoResearchService::class)->runAndSaveForVideoRoot($root->fresh());
@@ -253,6 +278,7 @@ class VideoResearchServiceTest extends TestCase
             $mock->shouldReceive('researchFromPrompt')
                 ->once()
                 ->andReturn("## Summary\n\nS\n## Key Points\n\nK\n## Positives\n\nP\n## Negatives\n\nN\n## Source Notes\n\nOnly generic notes.");
+            $this->mockOpenRouterEnrichment($mock);
         });
 
         $research = app(VideoResearchService::class)->runAndSaveForVideoRoot($root->fresh());
@@ -299,6 +325,7 @@ class VideoResearchServiceTest extends TestCase
 
                     return "## Summary\n\nS\n## Key Points\n\nK\n## Positives\n\nP\n## Negatives\n\nN\n## Source Notes\n\nSN";
                 });
+            $this->mockOpenRouterEnrichment($mock);
         });
 
         $research = app(VideoResearchService::class)->runAndSaveForVideoRoot($root->fresh());
@@ -307,5 +334,48 @@ class VideoResearchServiceTest extends TestCase
         $this->assertSame($interleaved->id, $research->metadata['parent_research_thought_id'] ?? null);
         $this->assertSame('preserve-me', $root->metadata['concurrent_marker'] ?? null);
         $this->assertSame($research->id, $root->metadata['research_thought_id'] ?? null);
+    }
+
+    public function test_merges_tags_from_video_root_metadata(): void
+    {
+        $user = User::factory()->create();
+        $root = $this->videoRoot($user, [
+            'research_thought_id' => null,
+            'tags' => ['Youtube', 'mvp'],
+        ]);
+        $this->transcriptChild($root, $user, 'T');
+
+        $rawModel = "## Summary\n\nS\n## Key Points\n\nK\n## Positives\n\nP\n## Negatives\n\nN\n## Source Notes\n\nSN";
+        $this->mock(OpenRouterService::class, function ($mock) use ($rawModel): void {
+            $mock->shouldReceive('researchFromPrompt')->once()->andReturn($rawModel);
+            $this->mockOpenRouterEnrichment($mock, ['tags' => [], 'people' => [], 'action_items' => []]);
+        });
+
+        $research = app(VideoResearchService::class)->runAndSaveForVideoRoot($root->fresh());
+        $tags = $research->metadata['tags'] ?? [];
+        $this->assertContains('research', $tags);
+        $this->assertContains('video', $tags);
+        $this->assertContains('youtube', $tags);
+        $this->assertContains('mvp', $tags);
+    }
+
+    public function test_enrichment_openrouter_failures_still_save_research(): void
+    {
+        $user = User::factory()->create();
+        $root = $this->videoRoot($user, ['research_thought_id' => null]);
+        $this->transcriptChild($root, $user, 'T');
+
+        $rawModel = "## Summary\n\nS\n## Key Points\n\nK\n## Positives\n\nP\n## Negatives\n\nN\n## Source Notes\n\nSN";
+        $this->mock(OpenRouterService::class, function ($mock) use ($rawModel): void {
+            $mock->shouldReceive('researchFromPrompt')->once()->andReturn($rawModel);
+            $mock->shouldReceive('extractMetadata')->once()->andThrow(new \RuntimeException('metadata down'));
+            $mock->shouldReceive('embed')->once()->andThrow(new \RuntimeException('embed down'));
+        });
+
+        $research = app(VideoResearchService::class)->runAndSaveForVideoRoot($root->fresh());
+        $tags = $research->metadata['tags'] ?? [];
+        $this->assertContains('research', $tags);
+        $this->assertContains('video', $tags);
+        $this->assertNull($research->embedding);
     }
 }

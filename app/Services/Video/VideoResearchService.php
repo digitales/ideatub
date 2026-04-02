@@ -7,6 +7,7 @@ use App\Models\Thought;
 use App\Services\OpenRouterService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class VideoResearchService
 {
@@ -102,11 +103,20 @@ class VideoResearchService
 
                 $videoId = (string) (data_get($locked->metadata, 'video_id') ?? '');
 
+                $enrichment = $this->enrichVideoResearchArtifact($body, $locked);
+
                 $researchMetadata = Thought::normalizeMetadataTags([
                     'type' => 'research',
                     'video_thought_id' => $locked->id,
-                    'tags' => ['research', 'video'],
+                    'tags' => $enrichment['tags'],
                 ]);
+
+                if ($enrichment['people'] !== []) {
+                    $researchMetadata['people'] = $enrichment['people'];
+                }
+                if ($enrichment['action_items'] !== []) {
+                    $researchMetadata['action_items'] = $enrichment['action_items'];
+                }
 
                 if ($priorResearchId !== null) {
                     $researchMetadata['parent_research_thought_id'] = $priorResearchId;
@@ -120,7 +130,7 @@ class VideoResearchService
 
                 $research = Thought::create([
                     'content' => $body,
-                    'embedding' => null,
+                    'embedding' => $enrichment['embedding'],
                     'metadata' => $researchMetadata,
                     'user_id' => $locked->user_id,
                     'source' => 'research',
@@ -234,6 +244,77 @@ class VideoResearchService
             'transcript_child' => $transcriptChild,
             'transcript_context_available' => $this->transcriptContextAvailableAtRunStart($root, $transcriptChild),
             'transcript_state' => $transcriptState,
+        ];
+    }
+
+    /**
+     * After the research markdown is finalized, align with normal thought capture: topic tags from OpenRouter
+     * {@see OpenRouterService::extractMetadata}, optional people/action_items, and an embedding for semantic search.
+     * Failures are logged; we still persist research with at least `research` and `video` tags.
+     *
+     * @return array{tags: list<string>, people: list<string>, action_items: list<string>, embedding: array<int, float>|null}
+     */
+    private function enrichVideoResearchArtifact(string $body, Thought $videoRoot): array
+    {
+        $tags = ['research', 'video'];
+        $videoMetaTags = data_get($videoRoot->metadata, 'tags');
+        if (is_array($videoMetaTags)) {
+            foreach ($videoMetaTags as $t) {
+                $norm = mb_strtolower(trim((string) $t));
+                if ($norm !== '' && ! in_array($norm, $tags, true)) {
+                    $tags[] = $norm;
+                }
+            }
+        }
+
+        $people = [];
+        $actionItems = [];
+        try {
+            $extracted = $this->openRouter->extractMetadata($body);
+            foreach ($extracted['tags'] ?? [] as $t) {
+                $norm = mb_strtolower(trim((string) $t));
+                if ($norm !== '' && ! in_array($norm, $tags, true)) {
+                    $tags[] = $norm;
+                }
+            }
+            foreach ($extracted['people'] ?? [] as $p) {
+                $p = trim((string) $p);
+                if ($p !== '' && ! in_array($p, $people, true)) {
+                    $people[] = $p;
+                }
+            }
+            foreach ($extracted['action_items'] ?? [] as $a) {
+                $a = trim((string) $a);
+                if ($a !== '' && ! in_array($a, $actionItems, true)) {
+                    $actionItems[] = $a;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('VideoResearchService: extractMetadata failed after research generation.', [
+                'video_thought_id' => $videoRoot->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        $normalizedWrap = Thought::normalizeMetadataTags(['tags' => $tags]);
+        $tags = array_values(array_unique($normalizedWrap['tags'] ?? $tags));
+
+        $embedding = null;
+        try {
+            $forEmbed = Str::limit($body, 24000, '');
+            $embedding = $this->openRouter->embed($forEmbed);
+        } catch (\Throwable $e) {
+            Log::warning('VideoResearchService: embed failed for video research thought.', [
+                'video_thought_id' => $videoRoot->id,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        return [
+            'tags' => $tags,
+            'people' => array_values($people),
+            'action_items' => array_values($actionItems),
+            'embedding' => $embedding,
         ];
     }
 
