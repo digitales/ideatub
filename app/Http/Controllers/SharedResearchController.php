@@ -73,10 +73,19 @@ class SharedResearchController extends Controller
                 ->withInput();
         }
 
+        if (! $thought->isShareableDocumentRoot()) {
+            return redirect()
+                ->route('shared-research.index')
+                ->withErrors([
+                    'thought_id' => 'Only long-form capture documents (plans, specs, meetings, research, etc.) can be shared. Video, email, and Jira items cannot.',
+                ])
+                ->withInput();
+        }
+
         if (ResearchShare::where('thought_id', $thought->id)->exists()) {
             return redirect()
                 ->route('shared-research.index')
-                ->with('error', 'This research is already shared; manage it below.');
+                ->with('error', 'This document is already shared; manage it below.');
         }
 
         $share = ResearchShare::create([

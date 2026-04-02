@@ -9,6 +9,13 @@ use Tests\TestCase;
 
 class SharedResearchControllerTest extends TestCase
 {
+    /** @var array<string, mixed> */
+    private const SHAREABLE_ROOT = [
+        'parent_id' => null,
+        'source' => 'web',
+        'metadata' => ['type' => 'research'],
+    ];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -19,7 +26,7 @@ class SharedResearchControllerTest extends TestCase
     public function test_store_requires_authentication(): void
     {
         $user = User::factory()->create();
-        $thought = Thought::factory()->create(['user_id' => $user->id, 'parent_id' => null]);
+        $thought = Thought::factory()->create(['user_id' => $user->id] + self::SHAREABLE_ROOT);
 
         $response = $this->post(route('shared-research.store'), [
             'thought_id' => $thought->id,
@@ -47,9 +54,8 @@ class SharedResearchControllerTest extends TestCase
         $other = User::factory()->create();
         $thought = Thought::factory()->create([
             'user_id' => $owner->id,
-            'parent_id' => null,
             'content' => 'Owner only research',
-        ]);
+        ] + self::SHAREABLE_ROOT);
 
         $response = $this->actingAs($other)->post(route('shared-research.store'), [
             'thought_id' => $thought->id,
@@ -62,7 +68,7 @@ class SharedResearchControllerTest extends TestCase
     public function test_store_rejects_non_root_thought(): void
     {
         $user = User::factory()->create();
-        $root = Thought::factory()->create(['user_id' => $user->id, 'parent_id' => null]);
+        $root = Thought::factory()->create(['user_id' => $user->id] + self::SHAREABLE_ROOT);
         $child = Thought::factory()->create([
             'user_id' => $user->id,
             'parent_id' => $root->id,
@@ -82,9 +88,8 @@ class SharedResearchControllerTest extends TestCase
         $user = User::factory()->create();
         $thought = Thought::factory()->create([
             'user_id' => $user->id,
-            'parent_id' => null,
             'content' => 'My root research',
-        ]);
+        ] + self::SHAREABLE_ROOT);
 
         $response = $this->actingAs($user)->post(route('shared-research.store'), [
             'thought_id' => $thought->id,
@@ -101,13 +106,115 @@ class SharedResearchControllerTest extends TestCase
         ]);
     }
 
-    public function test_store_second_create_for_same_thought_redirects_with_already_shared(): void
+    public function test_store_creates_share_for_plan_root(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Plan doc',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'plan'],
+        ]);
+
+        $response = $this->actingAs($user)->post(route('shared-research.store'), [
+            'thought_id' => $thought->id,
+            '_token' => csrf_token(),
+        ]);
+
+        $share = ResearchShare::where('thought_id', $thought->id)->first();
+        $this->assertNotNull($share);
+        $response->assertRedirect(route('shared-research.index', ['share' => $share->id]));
+    }
+
+    public function test_store_creates_share_for_meeting_root(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Meeting notes',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'meeting'],
+        ]);
+
+        $response = $this->actingAs($user)->post(route('shared-research.store'), [
+            'thought_id' => $thought->id,
+            '_token' => csrf_token(),
+        ]);
+
+        $share = ResearchShare::where('thought_id', $thought->id)->first();
+        $this->assertNotNull($share);
+        $response->assertRedirect(route('shared-research.index', ['share' => $share->id]));
+    }
+
+    public function test_store_rejects_video_root(): void
     {
         $user = User::factory()->create();
         $thought = Thought::factory()->create([
             'user_id' => $user->id,
             'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'video'],
         ]);
+
+        $response = $this->actingAs($user)->post(route('shared-research.store'), [
+            'thought_id' => $thought->id,
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect(route('shared-research.index'));
+        $response->assertSessionHasErrors('thought_id');
+        $this->assertNull(ResearchShare::where('thought_id', $thought->id)->first());
+    }
+
+    public function test_store_rejects_email_source(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'source' => 'email',
+            'is_visible_in_stream' => true,
+            'metadata' => ['type' => 'research'],
+        ]);
+
+        $response = $this->actingAs($user)->post(route('shared-research.store'), [
+            'thought_id' => $thought->id,
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect(route('shared-research.index'));
+        $response->assertSessionHasErrors('thought_id');
+        $this->assertNull(ResearchShare::where('thought_id', $thought->id)->first());
+    }
+
+    public function test_store_rejects_jira_source(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'source' => 'jira',
+            'metadata' => ['type' => 'research'],
+        ]);
+
+        $response = $this->actingAs($user)->post(route('shared-research.store'), [
+            'thought_id' => $thought->id,
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect(route('shared-research.index'));
+        $response->assertSessionHasErrors('thought_id');
+        $this->assertNull(ResearchShare::where('thought_id', $thought->id)->first());
+    }
+
+    public function test_store_second_create_for_same_thought_redirects_with_already_shared(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+        ] + self::SHAREABLE_ROOT);
         ResearchShare::create([
             'user_id' => $user->id,
             'thought_id' => $thought->id,
@@ -122,7 +229,7 @@ class SharedResearchControllerTest extends TestCase
         ]);
 
         $response->assertRedirect(route('shared-research.index'));
-        $response->assertSessionHas('error', 'This research is already shared; manage it below.');
+        $response->assertSessionHas('error', 'This document is already shared; manage it below.');
     }
 
     public function test_index_requires_authentication(): void
@@ -139,14 +246,12 @@ class SharedResearchControllerTest extends TestCase
         $userB = User::factory()->create();
         $thoughtA = Thought::factory()->create([
             'user_id' => $userA->id,
-            'parent_id' => null,
             'content' => 'Only A sees this',
-        ]);
+        ] + self::SHAREABLE_ROOT);
         $thoughtB = Thought::factory()->create([
             'user_id' => $userB->id,
-            'parent_id' => null,
             'content' => 'Only B sees this',
-        ]);
+        ] + self::SHAREABLE_ROOT);
         $shareA = ResearchShare::create([
             'user_id' => $userA->id,
             'thought_id' => $thoughtA->id,
@@ -175,8 +280,7 @@ class SharedResearchControllerTest extends TestCase
         $user = User::factory()->create();
         $thought = Thought::factory()->create([
             'user_id' => $user->id,
-            'parent_id' => null,
-        ]);
+        ] + self::SHAREABLE_ROOT);
         $share = ResearchShare::create([
             'user_id' => $user->id,
             'thought_id' => $thought->id,
@@ -200,9 +304,8 @@ class SharedResearchControllerTest extends TestCase
         $user = User::factory()->create();
         $thought = Thought::factory()->create([
             'user_id' => $user->id,
-            'parent_id' => null,
             'content' => 'Secret content',
-        ]);
+        ] + self::SHAREABLE_ROOT);
         $share = ResearchShare::create([
             'user_id' => $user->id,
             'thought_id' => $thought->id,
