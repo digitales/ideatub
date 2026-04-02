@@ -203,6 +203,7 @@ Use this if you are scripting against IdeaTub or building a bridge.
 | `thought_stats` | — | — |
 | `capture_thought` | `content` (string) | `parent_id` or `in_reply_to` (UUID); `source` (string, e.g. chatgpt/claude/cursor); `source_metadata` (object) |
 | `capture_plan` | `content` (string) | `doc_type` (plan \| decision \| dev \| support \| spec \| research \| meeting); `file_path`, `plan_slug`, `parent_id` (UUID), `section_title`, `tags` (array) |
+| `capture_meeting`, `add_meeting`, `add_meeting_notes` | `content` (string) | Same optional params as `capture_plan` **except** `doc_type` is omitted and always `meeting`. These three names are **aliases** of one implementation (any `doc_type` in params is ignored). |
 
 Example calls:
 
@@ -213,6 +214,7 @@ Example calls:
 {"jsonrpc":"2.0","method":"capture_thought","params":{"content":"Decided to move the launch to March 15."},"id":4}
 {"jsonrpc":"2.0","method":"capture_thought","params":{"content":"Done.","parent_id":"uuid-of-parent-thought"},"id":5}
 {"jsonrpc":"2.0","method":"capture_plan","params":{"content":"## Chunk 1: Phase 0...","file_path":"docs/superpowers/plans/2026-03-12-tag-and-stream.md","plan_slug":"2026-03-12-tag-and-stream","section_title":"Chunk 1"},"id":6}
+{"jsonrpc":"2.0","method":"add_meeting_notes","params":{"content":"## Standup\n\n- Shipped search","plan_slug":"2026-04-02-standup"},"id":7}
 ```
 
 For more on `capture_thought` and comments, see [MCP capture_thought](mcp-capture-thought.md).
@@ -220,6 +222,8 @@ For more on `capture_thought` and comments, see [MCP capture_thought](mcp-captur
 ### Plans and documents as thoughts (`capture_plan`)
 
 Use **`capture_plan`** when syncing plans, decisions, dev notes, support docs, specs, research, or meeting notes into IdeaTub. Set **`doc_type`** to one of: `plan`, `decision`, `dev`, `support`, `spec`, `research`, `meeting` (default `plan`). The source and tag prefix match (e.g. `decision:project-spec`, `research:2026-03-13-vehicle-valuation`, `meeting:2026-04-01-standup`). Supported paths: `docs/superpowers/plans/*.md`, `decisions/*.md`, `dev/*.md`, `support/*.md`, `specs/*.md`; for research or meetings use any logical path or omit. Use **`project`** to record which code project or research topic the content belongs to. Meeting notes also appear under **Stream → Meetings** in the web app when captured with `doc_type: meeting`.
+
+**Meeting shortcuts:** JSON-RPC methods **`capture_meeting`**, **`add_meeting`**, and **`add_meeting_notes`** are aliases: same behavior as `capture_plan` with `doc_type` fixed to `meeting` (and the same optional fields as `capture_plan` except `doc_type` is not used). MCP **`tools/list`** exposes all three so clients can pick a natural name.
 
 - **One thought per section:** Send one `capture_plan` per section. Use the same **`plan_slug`** for all sections. IdeaTub adds a tag `<doc_type>:<slug>` (e.g. `decision:project-spec`). View in Stream via `/stream?tag=decision-project-spec` etc.
 - **Long-form view via Stream:** Open **Stream** and filter by the tag using the URL slug form (e.g. `/stream?tag=decision-project-spec`).

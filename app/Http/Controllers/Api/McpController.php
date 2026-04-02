@@ -54,7 +54,20 @@ class McpController extends Controller
      */
     private function mcpMethodNames(): array
     {
-        $base = ['search_thoughts', 'browse_recent', 'thought_stats', 'capture_thought', 'capture_plan', 'capture_idea', 'get_ideas', 'research_idea', 'capture_video'];
+        $base = [
+            'search_thoughts',
+            'browse_recent',
+            'thought_stats',
+            'capture_thought',
+            'capture_plan',
+            'capture_meeting',
+            'add_meeting',
+            'add_meeting_notes',
+            'capture_idea',
+            'get_ideas',
+            'research_idea',
+            'capture_video',
+        ];
         if (config('services.jira.enabled', true)) {
             $base[] = 'sync_jira';
         }
@@ -147,8 +160,43 @@ class McpController extends Controller
         ]);
     }
 
+    /**
+     * JSON Schema object for capture_plan and meeting-alias tools (same fields except doc_type when omitted).
+     *
+     * @return array<string, mixed>
+     */
+    private function buildCapturePlanLikeInputSchema(bool $includeDocTypeProperty): array
+    {
+        $properties = [
+            'content' => ['type' => 'string', 'description' => 'Document content (full doc or one section)'],
+            'file_path' => ['type' => 'string', 'description' => 'Optional path (e.g. decisions/project-spec.md, dev/notes.md, support/investigation.md, specs/example-feature-spec.md)'],
+            'plan_slug' => ['type' => 'string', 'description' => 'Optional slug (e.g. project-spec or 2026-04-01-standup). Adds tag <doc_type>:<slug> (capture_plan) or meeting:<slug> (meeting tools) so Stream can show all sections.'],
+            'parent_id' => ['type' => 'string', 'description' => 'Optional UUID of root thought to attach this section to (for hierarchy)'],
+            'section_title' => ['type' => 'string', 'description' => 'Optional title of this section (stored in source_metadata)'],
+            'project' => ['type' => 'string', 'description' => 'Optional code project name (e.g. workspace or repo name). Stored in source_metadata so you can filter by project.'],
+            'tags' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Optional extra tags to merge with extracted and doc tag'],
+            'no_chunking' => ['type' => 'boolean', 'description' => 'If true, do not auto-chunk long documents (default: documents over 500 words are split at markdown headings into linked sections).'],
+        ];
+        if ($includeDocTypeProperty) {
+            $properties = array_merge(
+                [
+                    'doc_type' => ['type' => 'string', 'description' => 'One of: plan, decision, dev, support, spec, research, meeting. Default plan. Sets source and tag prefix (e.g. decision:slug, research:slug, meeting:slug).'],
+                ],
+                $properties
+            );
+        }
+
+        return [
+            'type' => 'object',
+            'properties' => $properties,
+            'required' => ['content'],
+        ];
+    }
+
     private function respondToolsList(mixed $id): JsonResponse
     {
+        $meetingAliasesNote = 'Same as capture_plan with doc_type fixed to meeting (Stream → Meetings). Equivalent tool names: capture_meeting, add_meeting, add_meeting_notes.';
+
         $tools = [
             [
                 'name' => 'search_thoughts',
@@ -195,22 +243,23 @@ class McpController extends Controller
             ],
             [
                 'name' => 'capture_plan',
-                'description' => 'Save a plan, decision, dev note, support doc, spec, research, or meeting notes as a thought. Use doc_type to set source (plan, decision, dev, support, spec, research, meeting). Use plan_slug to tag all sections for long-form view (Stream filter by tag). Use project to record which code project or research topic this belongs to.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'content' => ['type' => 'string', 'description' => 'Document content (full doc or one section)'],
-                        'doc_type' => ['type' => 'string', 'description' => 'One of: plan, decision, dev, support, spec, research, meeting. Default plan. Sets source and tag prefix (e.g. decision:slug, research:slug, meeting:slug).'],
-                        'file_path' => ['type' => 'string', 'description' => 'Optional path (e.g. decisions/project-spec.md, dev/notes.md, support/investigation.md, specs/example-feature-spec.md)'],
-                        'plan_slug' => ['type' => 'string', 'description' => 'Optional slug for this document (e.g. project-spec). Adds tag <doc_type>:<slug> so Stream can show all sections.'],
-                        'parent_id' => ['type' => 'string', 'description' => 'Optional UUID of root thought to attach this section to (for hierarchy)'],
-                        'section_title' => ['type' => 'string', 'description' => 'Optional title of this section (stored in source_metadata)'],
-                        'project' => ['type' => 'string', 'description' => 'Optional code project name (e.g. workspace or repo name). Stored in source_metadata so you can filter by project.'],
-                        'tags' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Optional extra tags to merge with extracted and doc tag'],
-                        'no_chunking' => ['type' => 'boolean', 'description' => 'If true, do not auto-chunk long documents (default: documents over 500 words are split at markdown headings into linked sections).'],
-                    ],
-                    'required' => ['content'],
-                ],
+                'description' => 'Save a plan, decision, dev note, support doc, spec, research, or meeting notes as a thought. Use doc_type to set source (plan, decision, dev, support, spec, research, meeting). Use plan_slug to tag all sections for long-form view (Stream filter by tag). Use project to record which code project or research topic this belongs to. For meetings only, you can also call capture_meeting, add_meeting, or add_meeting_notes (same parameters except doc_type is implied).',
+                'inputSchema' => $this->buildCapturePlanLikeInputSchema(true),
+            ],
+            [
+                'name' => 'capture_meeting',
+                'description' => 'Save meeting notes. '.$meetingAliasesNote,
+                'inputSchema' => $this->buildCapturePlanLikeInputSchema(false),
+            ],
+            [
+                'name' => 'add_meeting',
+                'description' => 'Add meeting notes (alias of capture_meeting). '.$meetingAliasesNote,
+                'inputSchema' => $this->buildCapturePlanLikeInputSchema(false),
+            ],
+            [
+                'name' => 'add_meeting_notes',
+                'description' => 'Add meeting notes (alias of capture_meeting). '.$meetingAliasesNote,
+                'inputSchema' => $this->buildCapturePlanLikeInputSchema(false),
             ],
             [
                 'name' => 'capture_idea',
@@ -409,6 +458,9 @@ class McpController extends Controller
             'thought_stats' => $this->thoughtStats($params),
             'capture_thought' => $this->captureThought($params),
             'capture_plan' => $this->capturePlan($params),
+            'capture_meeting' => $this->captureMeeting($params),
+            'add_meeting' => $this->captureMeeting($params),
+            'add_meeting_notes' => $this->captureMeeting($params),
             'capture_idea' => $this->captureIdea($params),
             'get_ideas' => $this->getIdeas($params),
             'research_idea' => $this->researchIdea($params),
@@ -806,6 +858,19 @@ class McpController extends Controller
         }
 
         return ['id' => $result['thought']->id];
+    }
+
+    /**
+     * capture_meeting / add_meeting / add_meeting_notes: same as capture_plan with doc_type forced to meeting.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{id: string, plan_slug?: string, doc_type?: string}
+     */
+    private function captureMeeting(array $params): array
+    {
+        $params['doc_type'] = 'meeting';
+
+        return $this->capturePlan($params);
     }
 
     /**

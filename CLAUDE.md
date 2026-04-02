@@ -45,9 +45,10 @@ When the user or a research agent has research output to save to IdeaTub, use th
 
 ## IdeaTub: Save meeting notes via capture_plan
 
-When the user wants meeting notes in IdeaTub as a first-class type (Stream → **Meetings**), use **capture_plan** with:
+When the user wants meeting notes in IdeaTub as a first-class type (Stream → **Meetings**), use **`capture_plan`** with **`doc_type`:** `meeting`, **or** any of the equivalent MCP methods **`capture_meeting`**, **`add_meeting`**, **`add_meeting_notes`** (same parameters as `capture_plan` except `doc_type` is implied).
 
-- **doc_type**: `meeting`.
+Parameters (for `capture_plan` with `doc_type: meeting`, or for any meeting alias — omit `doc_type` there):
+
 - **plan_slug**: A short slug for this meeting or series (e.g. `2026-04-01-standup`, `weekly-design-sync`). Same slug for all sections of one meeting doc so Stream can show them together via tag `meeting:<slug>`.
 - **project**, **file_path**, **section_title**: Same conventions as other `capture_plan` docs.
 
