@@ -24,11 +24,15 @@
 
     {{-- Capture box (initial content in data attr to avoid @json breaking the x-data attribute) --}}
     @php
-        $initialContent = (old('content') === '[object HTMLTextAreaElement]' ? '' : old('content', ''));
+        $initialContent = old('youtube_url', old('content', ''));
+        $initialContent = ($initialContent === '[object HTMLTextAreaElement]' ? '' : $initialContent);
+        $forceHomeVideoMode = filled(old('youtube_url'));
     @endphp
     <div
         x-data="captureBox()"
         data-initial-content="{{ e($initialContent) }}"
+        data-force-video-mode="{{ $forceHomeVideoMode ? '1' : '0' }}"
+        data-videos-store-url="{{ route('videos.store') }}"
         data-focus-reply="{{ (isset($replyingTo) && $replyingTo) ? '1' : '0' }}"
         data-idea-index-url="{{ route('idea.index') }}"
         data-drafts-url="{{ route('ideas.drafts.index') }}"
@@ -111,23 +115,50 @@
             @endif
 
             <textarea
-                name="content"
+                x-bind:name="videoMode && !isReplyMode ? 'youtube_url' : 'content'"
                 id="content"
                 rows="3"
                 x-ref="captureTextarea"
                 x-model="content"
                 @keydown.meta.enter.prevent="submitCapture()"
                 @keydown.ctrl.enter.prevent="submitCapture()"
-                :aria-invalid="!!errorField || {{ $errors->has('content') ? 'true' : 'false' }}"
-                aria-describedby="content-error"
-                placeholder="What are you thinking?"
+                :aria-invalid="!!errorField || !!videoErrorField || {{ $errors->has('content') ? 'true' : 'false' }}"
+                aria-describedby="content-error youtube-url-error"
+                x-bind:placeholder="videoMode && !isReplyMode ? 'Paste a YouTube link…' : 'What are you thinking?'"
                 class="w-full border-none outline-none resize-none text-sm text-deep-indigo placeholder-slate-brand/40 leading-relaxed"
                 :class="focusOverlayOpen ? 'flex-1 min-h-0 bg-white border border-slate-200 rounded-lg p-3' : 'bg-transparent'"
             ></textarea>
 
             <p id="content-error" class="mt-1 text-xs text-red-500" x-show="errorField || {{ $errors->has('content') ? 'true' : 'false' }}" x-text="errorField">@if($errors->has('content')){{ $errors->first('content') }}@endif</p>
+            <p id="youtube-url-error" class="mt-1 text-xs text-red-500" x-show="videoErrorField" x-cloak x-text="videoErrorField"></p>
+            @error('youtube_url')
+                <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+            @enderror
 
-            <div class="mt-2 flex items-center gap-2">
+            <div x-show="videoMode && !isReplyMode" x-cloak class="mt-3 space-y-3 rounded-lg border border-memory-violet/15 bg-memory-violet/5 px-3 py-3">
+                <p class="text-xs text-deep-indigo leading-relaxed">
+                    This will be saved as a <span class="font-medium">video thought</span> (not a regular capture). Leave transcript empty to try fetching from YouTube.
+                </p>
+                <label class="block">
+                    <span class="text-[11px] font-medium text-memory-violet/90">Transcript (optional)</span>
+                    <textarea
+                        name="transcript"
+                        rows="4"
+                        x-model="videoTranscript"
+                        placeholder="Paste a transcript if you already have one…"
+                        class="mt-1 w-full rounded-lg border border-memory-violet/20 bg-white/90 px-3 py-2 text-sm text-deep-indigo placeholder-slate-brand/40 focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50 resize-none"
+                    ></textarea>
+                </label>
+                <label class="flex items-start gap-2 text-[11px] text-slate-brand/80">
+                    <input type="checkbox" name="research_now" value="1" x-model="videoResearchNow" class="mt-0.5 rounded border-slate-300 text-memory-violet" />
+                    <span>
+                        <span class="font-medium text-deep-indigo">Research now</span>
+                        <span class="block text-slate-brand/60">Video research runs after the transcript is ready.</span>
+                    </span>
+                </label>
+            </div>
+
+            <div class="mt-2 flex items-center gap-2" x-show="!videoMode || isReplyMode">
                 <input type="checkbox" name="no_chunking" id="no_chunking" value="1" class="rounded border-slate-300 text-memory-violet focus:ring-memory-violet/30"
                     x-model="noChunking"
                     {{ old('no_chunking') ? 'checked' : '' }}>
@@ -162,7 +193,8 @@
                         class="text-xs font-medium text-white px-4 py-1.5 rounded-lg transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                         style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
                     >
-                        <span x-show="!saving">Store thought</span>
+                        <span x-show="!saving && (!videoMode || isReplyMode)">Store thought</span>
+                        <span x-show="!saving && videoMode && !isReplyMode" x-cloak>Save video</span>
                         <span x-show="saving" x-cloak>Saving…</span>
                     </button>
                 </div>

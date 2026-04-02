@@ -34,12 +34,45 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 
+/** Same rules as `ideatubIdeasComposer` on the Ideas page (lone URL, no whitespace). */
+function extractYouTubeVideoIdFromComposerInput(url) {
+  const u = String(url).trim();
+  if (!u) {
+    return null;
+  }
+  let m = u.match(/[?&]v=([a-zA-Z0-9_-]{11})(?:[^a-zA-Z0-9_-]|$)/);
+  if (m) {
+    return m[1];
+  }
+  m = u.match(/(?:^|\/\/)(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})(?:[^a-zA-Z0-9_-]|$)/i);
+  if (m) {
+    return m[1];
+  }
+  m = u.match(/youtube\.com\/(?:embed|shorts|live)\/([a-zA-Z0-9_-]{11})(?:[^a-zA-Z0-9_-]|$)/i);
+  return m ? m[1] : null;
+}
+
+function isLoneYouTubeUrlComposer(raw) {
+  const t = String(raw).trim();
+  if (!t) {
+    return false;
+  }
+  if (/\n/.test(t) || /\r/.test(t)) {
+    return false;
+  }
+  if (/\s/.test(t)) {
+    return false;
+  }
+  return extractYouTubeVideoIdFromComposerInput(t) !== null;
+}
+
 Alpine.data('captureBox', () => ({
   content: '',
   saving: false,
   message: '',
   messageType: 'success',
   errorField: '',
+  videoErrorField: '',
   drafts: [],
   currentDraftId: null,
   draftsExpanded: false,
@@ -47,6 +80,11 @@ Alpine.data('captureBox', () => ({
   focusOverlayOpen: false,
   isReplyMode: false,
   noChunking: false,
+  videoMode: false,
+  videoTranscript: '',
+  videoResearchNow: false,
+  videoDetectTimer: null,
+  videoDetectDebounceMs: 380,
 
   init() {
     this._rootEl = this.$el;
@@ -55,9 +93,19 @@ Alpine.data('captureBox', () => ({
     this.isReplyMode = this._rootEl.dataset.focusReply === '1';
     const noChunkCb = this._rootEl.querySelector('input[name="no_chunking"]');
     if (noChunkCb && noChunkCb.checked) this.noChunking = true;
+    if (!this.isReplyMode) {
+      if (this._rootEl.dataset.forceVideoMode === '1') {
+        this.videoMode = true;
+      } else if (isLoneYouTubeUrlComposer(this.content)) {
+        this.videoMode = true;
+      }
+    }
     if (!this.isReplyMode) this.fetchDrafts();
     if (this.isReplyMode) this.$nextTick(() => this.focusCapture());
-    this.$watch('content', () => this.scheduleDraftSave());
+    this.$watch('content', () => {
+      this.scheduleDraftSave();
+      this.scheduleYouTubeDetect();
+    });
     this.$watch('noChunking', () => this.scheduleDraftSave());
     this._escapeHandler = (e) => {
       if (e.key === 'Escape' && this.focusOverlayOpen) this.focusOverlayOpen = false;
@@ -101,8 +149,29 @@ Alpine.data('captureBox', () => ({
 
   scheduleDraftSave() {
     if (this.draftSaveTimeout) clearTimeout(this.draftSaveTimeout);
-    if (this.isReplyMode) return;
+    if (this.isReplyMode || this.videoMode) return;
     this.draftSaveTimeout = setTimeout(() => this.saveDraft(), 1500);
+  },
+
+  scheduleYouTubeDetect() {
+    if (this.isReplyMode) return;
+    if (this.videoDetectTimer) clearTimeout(this.videoDetectTimer);
+    this.videoDetectTimer = setTimeout(() => this.runYouTubeDetect(), this.videoDetectDebounceMs);
+  },
+
+  runYouTubeDetect() {
+    if (this.isReplyMode) return;
+    const lone = isLoneYouTubeUrlComposer(this.content);
+    if (lone) {
+      this.videoMode = true;
+      return;
+    }
+    if (this.videoMode) {
+      const t = String(this.content || '').trim();
+      if (t === '' || !isLoneYouTubeUrlComposer(this.content)) {
+        this.videoMode = false;
+      }
+    }
   },
 
   async saveDraft() {
@@ -157,7 +226,10 @@ Alpine.data('captureBox', () => ({
       this.noChunking = !!data.no_chunking;
       this.currentDraftId = id;
       this.draftsExpanded = false;
-      this.$nextTick(() => this.focusCapture());
+      this.$nextTick(() => {
+        this.focusCapture();
+        this.scheduleYouTubeDetect();
+      });
     } catch {
       // no-op
     }
@@ -207,13 +279,19 @@ Alpine.data('captureBox', () => ({
       return;
     }
 
+    if (!this.isReplyMode && this.videoMode) {
+      await this.submitVideoCapture(content);
+      return;
+    }
+
     this.saving = true;
     this.message = '';
     this.messageType = 'success';
     this.errorField = '';
+    this.videoErrorField = '';
 
     // Ensure textarea value is in sync with Alpine model before building FormData
-    const textarea = form.querySelector('[name="content"]');
+    const textarea = form.querySelector('textarea[name="content"]');
     if (textarea) textarea.value = content;
 
     const body = new FormData(form);
@@ -273,6 +351,100 @@ Alpine.data('captureBox', () => ({
         // Server may have returned HTML (e.g. redirect); refresh so the list updates
         window.location = (this._rootEl && this._rootEl.dataset.ideaIndexUrl) || window.location.pathname;
       }
+
+      setTimeout(() => { this.message = ''; }, 4000);
+    } catch {
+      this.message = 'Unable to save. Please try again.';
+      this.messageType = 'error';
+    } finally {
+      this.saving = false;
+    }
+  },
+
+  async submitVideoCapture(youtubeUrl) {
+    const videoStoreUrl = this._rootEl?.dataset?.videosStoreUrl;
+    if (!videoStoreUrl) {
+      this.message = 'Video capture is unavailable on this page. Try the Ideas page.';
+      this.messageType = 'error';
+      setTimeout(() => { this.message = ''; }, 5000);
+      return;
+    }
+
+    this.saving = true;
+    this.message = '';
+    this.messageType = 'success';
+    this.errorField = '';
+    this.videoErrorField = '';
+
+    const csrf =
+      document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+      document.querySelector('input[name="_token"]')?.value ||
+      '';
+
+    const fd = new FormData();
+    fd.append('_token', csrf);
+    fd.append('youtube_url', youtubeUrl);
+    const transcript = (this.videoTranscript || '').trim();
+    if (transcript !== '') {
+      fd.append('transcript', this.videoTranscript);
+    }
+    if (this.videoResearchNow) {
+      fd.append('research_now', '1');
+    }
+
+    try {
+      const res = await fetch(videoStoreUrl, {
+        method: 'POST',
+        body: fd,
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (res.status === 419) {
+          this.message = 'Session expired. Please refresh the page and try again.';
+          this.messageType = 'error';
+        } else if (res.status === 422 && data.errors && data.errors.youtube_url) {
+          const msg = data.errors.youtube_url[0] || 'Invalid YouTube URL.';
+          this.videoErrorField = msg;
+        } else {
+          this.message = data.message || 'Something went wrong. Please try again.';
+          this.messageType = 'error';
+        }
+        return;
+      }
+
+      if (this.currentDraftId) {
+        try {
+          await fetch(`${this.draftsUrl}/${this.currentDraftId}`, {
+            method: 'DELETE',
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': this.csrfToken },
+          });
+        } catch {
+          // ignore
+        }
+        this.currentDraftId = null;
+      }
+
+      this.content = '';
+      this.videoTranscript = '';
+      this.videoResearchNow = false;
+      this.videoMode = false;
+      let msg = data.message || 'Video saved.';
+      if (data.warning) {
+        msg = `${msg} ${data.warning}`;
+      }
+      this.message = msg;
+      this.messageType = 'success';
+      this.fetchDrafts();
+
+      const target = data.redirect || (this._rootEl && this._rootEl.dataset.ideaIndexUrl) || window.location.pathname;
+      window.location = target;
 
       setTimeout(() => { this.message = ''; }, 4000);
     } catch {

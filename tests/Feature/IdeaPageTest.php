@@ -31,6 +31,7 @@ class IdeaPageTest extends TestCase
         $response->assertSee('IdeaTub');
         $response->assertSee('What are you thinking?');
         $response->assertSee('Store thought');
+        $response->assertSee('data-videos-store-url="'.route('videos.store').'"', false);
         $response->assertSee('Help');
         $response->assertSee('Find a memory');
     }

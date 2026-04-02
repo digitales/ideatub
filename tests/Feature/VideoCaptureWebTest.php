@@ -54,6 +54,31 @@ class VideoCaptureWebTest extends TestCase
         $this->assertStringContainsString($url, (string) $video->content);
     }
 
+    public function test_post_youtube_url_json_returns_message_and_home_redirect(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $embed = array_fill(0, 1536, 0.03);
+        $this->mock(OpenRouterService::class, function ($mock) use ($embed): void {
+            $mock->shouldReceive('embed')->once()->andReturn($embed);
+        });
+
+        $url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+        $response = $this->actingAs($user)->postJson(route('videos.store'), [
+            'youtube_url' => $url,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('message', 'Video saved.');
+        $response->assertJsonPath('redirect', route('idea.index'));
+
+        $this->assertNotNull(Thought::query()
+            ->where('user_id', $user->id)
+            ->whereNull('parent_id')
+            ->where('metadata->type', 'video')
+            ->first());
+    }
+
     public function test_post_without_transcript_queues_fetch_video_transcript(): void
     {
         Queue::fake();
