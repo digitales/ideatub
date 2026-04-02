@@ -568,6 +568,44 @@ class Thought extends Model
     }
 
     /**
+     * Whether this thought is the root of a long-form capture document that may be shared (MCP doc types).
+     */
+    public function isShareableDocumentRoot(): bool
+    {
+        if ($this->parent_id !== null) {
+            return false;
+        }
+
+        $sourceKey = ThoughtTypeNavigation::normalizeTypeKey($this->source);
+        if ($sourceKey === 'email' || $sourceKey === 'jira') {
+            return false;
+        }
+
+        $metadata = $this->metadata;
+        $typeRaw = is_array($metadata) ? ($metadata['type'] ?? null) : null;
+        if (! is_string($typeRaw)) {
+            return false;
+        }
+        $normalized = mb_strtolower(trim($typeRaw));
+        if ($normalized === '') {
+            return false;
+        }
+        if ($normalized === 'video') {
+            return false;
+        }
+
+        $extraTypes = ['decision', 'dev', 'support', 'spec'];
+        if (! in_array($normalized, $extraTypes, true)) {
+            $navKey = ThoughtTypeNavigation::normalizeTypeKey($typeRaw);
+            if (! in_array($navKey, ['research', 'plan', 'meeting'], true)) {
+                return false;
+            }
+        }
+
+        return self::query()->whereKey($this->id)->visibleInStream()->exists();
+    }
+
+    /**
      * Scope to thoughts that are replies to the given thought.
      */
     public function scopeRepliesTo(Builder $query, Thought $thought): Builder
