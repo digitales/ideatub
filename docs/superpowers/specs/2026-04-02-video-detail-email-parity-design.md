@@ -37,20 +37,26 @@
 
 ## 4. Backend and presenter
 
-- **`IdeaController::show`**: When the thought is a video root (`metadata.type === 'video'` or existing `ThoughtDetailPresenter::isVideoThought()` criteria), build an optional preview payload **reusing the same semantics** as `buildEmailResearchPreview`: resolve linked research thought (from `metadata.research_thought_id`), resolve document root for preview, render root + up to two section chunks with `CommonMarkConverter` and existing demo-safe markdown helpers, return `null` if not renderable. Prefer **extracting a small private helper** shared by email and video preview builders if it reduces duplication (e.g. `buildResearchPreviewForThought(Thought $researchRoot): ?array`), without changing email behavior.
+- **`IdeaController::show`**: When the thought is a **video thought** by the **same rule as** `ThoughtDetailPresenter::isVideoThought()` (single source of truth; do not duplicate ad-hoc `metadata.type` checks in the controller unless that method already relies on them), build an optional preview payload **reusing the same semantics** as `buildEmailResearchPreview`: resolve linked research thought (from `metadata.research_thought_id`), resolve document root for preview, render root + up to two section chunks with `CommonMarkConverter` and existing demo-safe markdown helpers, return `null` if not renderable. Prefer **extracting a small private helper** shared by email and video preview builders if it reduces duplication (e.g. `buildResearchPreviewForThought(Thought $researchRoot): ?array`), without changing email behavior.
 - **`ThoughtDetailPresenter`**: Add optional `videoResearchPreview` (same array shape as `emailResearchPreview`) and `videoResearchPreview(): ?array` accessor. Thread through `forShow` factory and tests.
 - Existing methods (`videoMetadataLabeledRows`, `videoLatestResearchUrl`, `showFetchTranscriptAction`, `showVideoResearchPending`, etc.) remain the **source of truth** for sidebar visibility; the Blade partial consumes them.
 
 ## 5. View changes
 
 - **`show.blade.php`**: Introduce a condition equivalent to “use two-column layout” for **email OR video** (e.g. `$isEmailThought || $thoughtDetail->isVideoThought()`). Wrap left column stack and sidebar include accordingly. For video: left stack order = content → research preview (if any) → transcript (if any). Include new `idea.partials.thought_detail_video_sidebar` with `$thought`, `$thoughtDetail`.
-- **`thought_detail_header.blade.php`**: Remove the `@if (isVideoThought())` block that renders metadata, actions, and related email (lines ~20–68 in current structure). Related email moves to video sidebar only.
+- **`thought_detail_header.blade.php`**: Remove the entire `@if (isset($thoughtDetail) && $thoughtDetail->isVideoThought())` region that renders video metadata rows, research/transcript actions (links and forms), and related email. Related email moves to the video sidebar only.
 - **New** `thought_detail_video_sidebar.blade.php`: Metadata labeled rows, link/form row, related email card, then Actions subsection — mirror spacing and heading styles from `thought_detail_email_sidebar.blade.php` for consistency.
 
 ## 6. Testing
 
-- Extend **feature** coverage for thought show (e.g. `ThoughtShowPageTest`): video thought renders **without** video metadata strings inside the header region (assert absence of duplicate content or use stable `data-` attributes if added for tests); when research preview is buildable, left column contains research preview before transcript when both exist; sidebar contains expected actions when fixtures allow.
-- **Unit** tests for `ThoughtDetailPresenter` if constructor/factory gains `videoResearchPreview` (update existing tests that construct the presenter).
+- Extend **feature** coverage for thought show (e.g. `ThoughtShowPageTest`) with **deterministic** scenarios. Use existing factories/helpers already used for video + research + transcript in that suite; do not leave assertions conditional on “when fixtures allow.”
+- **Explicit cases to cover:**
+  - **Video + research preview + transcript:** In the main content column, DOM order is **Content → Research preview → Transcript**. Full-width replies section remains below the grid.
+  - **Video + transcript, no preview:** Transcript card sits **directly under** the content card (no empty preview card).
+  - **Video, no preview and no transcript:** Neither optional card appears; page still succeeds.
+  - **Header vs sidebar:** The **header** card (the element with `data-thought-detail-kind="video"` on the root header when present, or the first “Thought detail” header container) **must not** contain the video metadata labeled-row content that belongs in the sidebar — assert within that scoped node so legitimate duplicates elsewhere do not false-fail. Sidebar must contain the metadata rows and action links/forms for the same thought when the presenter would show them today.
+- **Demo mode:** No new demo rules in this slice. Video sidebar and header behavior continue to follow existing `ThoughtDetailPresenter` / `DemoMode` gates (e.g. hidden actions where already implemented); if implementation discovers a gap, fix in scope only if required for parity or security.
+- **Unit** tests: update any `ThoughtDetailPresenter::forShow(...)` constructions to pass `videoResearchPreview` and add coverage if the accessor adds behavior worth locking.
 
 ## 7. Accessibility and responsive
 
@@ -59,10 +65,9 @@
 
 ## 8. Implementation sequencing (informal)
 
-1. Controller + presenter + tests for preview payload.  
-2. New sidebar partial + header cleanup.  
-3. `show.blade.php` grid and card ordering.  
-4. Full test run and manual spot-check on a video with research + transcript.
+1. Controller + presenter + tests for preview payload (can merge with step 2 in one PR).  
+2. **Land together in one change (avoid a broken intermediate UI):** new video sidebar partial, header cleanup (remove video block from header), and `show.blade.php` grid + left-column card ordering for video.  
+3. Full test run and manual spot-check on a video with research + transcript.
 
 ---
 
