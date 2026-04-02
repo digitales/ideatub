@@ -29,6 +29,8 @@ class SharedResearchViewTest extends TestCase
         $thought = Thought::factory()->create([
             'user_id' => $user->id,
             'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'research'],
             'content' => 'Root research content',
         ]);
         $share = ResearchShare::create([
@@ -43,7 +45,33 @@ class SharedResearchViewTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Root research content', false);
+        $response->assertSee('Research', false);
         $response->assertSee('Shared via IdeaTub', false);
+    }
+
+    public function test_readonly_meeting_root_shows_meeting_label(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'meeting'],
+            'content' => 'Standup notes body',
+        ]);
+        $share = ResearchShare::create([
+            'user_id' => $user->id,
+            'thought_id' => $thought->id,
+            'token' => ResearchShare::generateToken(),
+            'password_hash' => null,
+            'expires_at' => null,
+        ]);
+
+        $response = $this->get(route('shared-research.show', ['token' => $share->token]));
+
+        $response->assertOk();
+        $response->assertSee('Meeting', false);
+        $response->assertSee('Standup notes body', false);
     }
 
     public function test_password_protected_share_get_shows_password_form(): void

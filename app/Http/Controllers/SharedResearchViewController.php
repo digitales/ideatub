@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\ResearchShare;
+use App\Models\Thought;
+use App\Support\ThoughtTypeNavigation;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Http\Response;
 use Illuminate\View\View;
 use League\CommonMark\CommonMarkConverter;
 
@@ -16,7 +19,7 @@ class SharedResearchViewController extends Controller
      * Show shared research (readonly). GET: show content or password form.
      * POST: submit password to unlock; on success set cookie and redirect to GET.
      */
-    public function show(Request $request, string $token): View|\Illuminate\Http\RedirectResponse|Response
+    public function show(Request $request, string $token): View|RedirectResponse|Response
     {
         $share = ResearchShare::where('token', $token)->first();
 
@@ -38,7 +41,7 @@ class SharedResearchViewController extends Controller
     /**
      * Handle password-protected share: POST = verify password and set cookie; GET = check cookie or show form.
      */
-    private function handlePasswordProtectedShare(Request $request, ResearchShare $share): View|\Illuminate\Http\RedirectResponse|Response
+    private function handlePasswordProtectedShare(Request $request, ResearchShare $share): View|RedirectResponse|Response
     {
         $token = $share->token;
         $cookieName = 'research_share_'.$token;
@@ -94,6 +97,31 @@ class SharedResearchViewController extends Controller
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
             'sharedBy' => $share->user,
+            'documentTypeLabel' => $this->documentTypeLabelForSharedView($thought),
         ]);
+    }
+
+    private function documentTypeLabelForSharedView(Thought $root): string
+    {
+        $typeRaw = data_get($root->metadata, 'type');
+        if (! is_string($typeRaw)) {
+            return 'Shared document';
+        }
+        $normalized = mb_strtolower(trim($typeRaw));
+        if ($normalized === '') {
+            return 'Shared document';
+        }
+
+        $extra = ['decision', 'dev', 'support', 'spec'];
+        if (in_array($normalized, $extra, true)) {
+            return ucfirst($normalized);
+        }
+
+        $navKey = ThoughtTypeNavigation::normalizeTypeKey($typeRaw);
+        if (in_array($navKey, ['research', 'plan', 'meeting'], true)) {
+            return ThoughtTypeNavigation::thoughtDisplayLabel($navKey);
+        }
+
+        return 'Shared document';
     }
 }

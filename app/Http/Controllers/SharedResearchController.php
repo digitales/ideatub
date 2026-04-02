@@ -28,8 +28,11 @@ class SharedResearchController extends Controller
             ->whereNull('parent_id')
             ->visibleInStream()
             ->orderByDesc('created_at')
-            ->limit(50)
-            ->get();
+            ->limit(120)
+            ->get()
+            ->filter(fn (Thought $t) => $t->isShareableDocumentRoot())
+            ->take(50)
+            ->values();
 
         return view('shared_research.index', [
             'shares' => $shares,

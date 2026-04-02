@@ -1,11 +1,11 @@
 @extends('layouts.idea')
 
-@section('title', 'Shared research — IdeaTub')
+@section('title', 'Shared documents — IdeaTub')
 
 @section('content')
 <div class="max-w-[720px] mx-auto px-6 pt-16 pb-24">
-    <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug mb-2">Shared research</h1>
-    <p class="text-sm text-slate-brand mb-8">Share read-only research links from your Stream. Each link can be password-protected and given an expiry.</p>
+    <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug mb-2">Shared documents</h1>
+    <p class="text-sm text-slate-brand mb-8">Share read-only links to long-form documents from your Stream (plans, specs, meetings, research, and other capture types). Each link can be password-protected and given an expiry.</p>
 
     @if (session('success'))
         <div class="mb-6 rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal">
@@ -24,7 +24,7 @@
         <form method="POST" action="{{ route('shared-research.store') }}" class="space-y-4">
             @csrf
             <div>
-                <label for="thought_id" class="block text-sm font-medium text-deep-indigo mb-1">Research (top-level thought)</label>
+                <label for="thought_id" class="block text-sm font-medium text-deep-indigo mb-1">Document (top-level thought)</label>
                 <select name="thought_id" id="thought_id" required class="w-full rounded-lg border border-memory-violet/20 px-3 py-2 text-sm text-deep-indigo focus:border-neural-teal focus:ring-1 focus:ring-neural-teal">
                     <option value="">Choose a thought…</option>
                     @foreach ($topLevelThoughts as $t)
@@ -111,7 +111,7 @@
                 </form>
             </div>
         @empty
-            <p class="text-sm text-slate-brand">No share links yet. Use the form above to share a research thought.</p>
+            <p class="text-sm text-slate-brand">No share links yet. Use the form above to share a document.</p>
         @endforelse
     </div>
 </div>

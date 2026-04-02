@@ -54,7 +54,7 @@ class ProfileSettingsTest extends TestCase
         $response->assertSee('Profile');
     }
 
-    public function test_account_menu_keeps_only_profile_inbox_shared_research_and_logout_for_navigation(): void
+    public function test_account_menu_keeps_only_profile_inbox_shared_documents_and_logout_for_navigation(): void
     {
         $user = User::factory()->create();
 
@@ -64,6 +64,7 @@ class ProfileSettingsTest extends TestCase
         $response->assertSee(route('settings.profile.index'), false);
         $response->assertSee(route('inbox.index'), false);
         $response->assertSee(route('shared-research.index'), false);
+        $response->assertSee('Shared documents', false);
         $response->assertSee('Log out');
 
         $response->assertDontSee(route('settings.mcp-keys.index'), false);

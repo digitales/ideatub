@@ -37,6 +37,7 @@ class SharedResearchIndexTest extends TestCase
             'parent_id' => null,
             'source' => null,
             'content' => 'VISIBLE_MANUAL_SHARED_RESEARCH_SNIPPET_Y9',
+            'metadata' => ['type' => 'research'],
         ]);
 
         $response = $this->actingAs($user)->get(route('shared-research.index'));

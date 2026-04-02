@@ -1,5 +1,7 @@
 # Shareable readonly research — Implementation Plan
 
+> **Follow-up:** Eligibility, UI copy (“Shared documents”), detail-page share, and readonly type labels are specified in `docs/superpowers/plans/2026-04-02-shared-longform-documents.md` (implemented after this plan).
+
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let owners share a readonly link to an entire research note (root thought + sections) with optional per-share password and expiry; no WebSockets on the share view; minimal branding.

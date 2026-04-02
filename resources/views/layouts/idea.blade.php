@@ -147,7 +147,7 @@
                                 @endif
                             </a>
                             <a href="{{route('shared-research.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
-                                Shared research
+                                Shared documents
                             </a>
                             <form method="POST" action="{{route('logout')}}">
                                 @csrf
