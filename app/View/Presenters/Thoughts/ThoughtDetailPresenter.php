@@ -33,6 +33,7 @@ final class ThoughtDetailPresenter
     private function __construct(
         private readonly Thought $thought,
         private readonly ?string $contentHtml,
+        private readonly array $documentSectionHtmlChunks,
         private readonly ?string $linkedResearchUrl,
         private readonly ?array $emailResearchPreview,
         private readonly ?NewsletterResearchStatusPresenter $newsletterResearchStatus,
@@ -48,6 +49,7 @@ final class ThoughtDetailPresenter
     public static function forShow(
         Thought $thought,
         ?string $contentHtml,
+        array $documentSectionHtmlChunks,
         ?string $linkedResearchUrl,
         ?array $emailResearchPreview,
         ?NewsletterResearchStatusPresenter $newsletterResearchStatus,
@@ -58,6 +60,7 @@ final class ThoughtDetailPresenter
         return new self(
             $thought,
             $contentHtml,
+            $documentSectionHtmlChunks,
             $linkedResearchUrl,
             $emailResearchPreview,
             $newsletterResearchStatus,
@@ -80,6 +83,14 @@ final class ThoughtDetailPresenter
     public function contentHtml(): ?string
     {
         return $this->contentHtml;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function documentSectionHtmlChunks(): array
+    {
+        return $this->documentSectionHtmlChunks;
     }
 
     public function linkedResearchUrl(): ?string
@@ -119,6 +130,7 @@ final class ThoughtDetailPresenter
     public function replyRows(): array
     {
         return $this->thought->comments
+            ->reject(fn (Thought $comment): bool => $this->isStructuredDocumentSection($comment))
             ->map(function (Thought $comment): array {
                 try {
                     $content = $this->demoText($comment->content, 'thought_comment_preview');
@@ -176,5 +188,12 @@ final class ThoughtDetailPresenter
             'subject_thought_id' => $subjectThoughtId,
             'exception' => $exception::class,
         ]);
+    }
+
+    private function isStructuredDocumentSection(Thought $comment): bool
+    {
+        $sectionIndex = data_get($comment->source_metadata, 'section_index');
+
+        return $sectionIndex !== null && trim((string) $sectionIndex) !== '';
     }
 }

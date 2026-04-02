@@ -190,13 +190,25 @@ class IdeaController extends Controller
             ? $this->thoughtEmailSenderContextResolver->resolve($thought, $importedEmail, usePreloadedImportedEmail: true)
             : null;
         $contentHtml = null;
+        $documentSectionHtmlChunks = [];
 
         if ($thought->source !== 'email') {
+            $converter = new CommonMarkConverter;
             $contentHtml = $this->renderDemoSafeMarkdown(
-                new CommonMarkConverter,
+                $converter,
                 $thought->content,
                 'thought_content'
             );
+            $documentSectionHtmlChunks = $thought->comments
+                ->filter(fn (Thought $comment): bool => $this->isStructuredDocumentSection($comment))
+                ->sortBy(fn (Thought $comment): int => (int) data_get($comment->source_metadata, 'section_index', PHP_INT_MAX))
+                ->map(fn (Thought $section): string => $this->renderDemoSafeMarkdown(
+                    $converter,
+                    $section->content,
+                    'thought_content_section'
+                ))
+                ->values()
+                ->all();
         }
 
         $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl(
@@ -222,6 +234,7 @@ class IdeaController extends Controller
         $thoughtDetail = ThoughtDetailPresenter::forShow(
             thought: $thought,
             contentHtml: $contentHtml,
+            documentSectionHtmlChunks: $documentSectionHtmlChunks,
             linkedResearchUrl: $linkedResearchUrl,
             emailResearchPreview: $emailResearchPreview,
             newsletterResearchStatus: $newsletterResearchStatus,
@@ -1744,5 +1757,14 @@ class IdeaController extends Controller
         }
 
         return null;
+    }
+
+    private function isStructuredDocumentSection(Thought $thought): bool
+    {
+        $sectionIndex = data_get($thought->source_metadata, 'section_index');
+
+        return $thought->parent_id !== null
+            && $sectionIndex !== null
+            && trim((string) $sectionIndex) !== '';
     }
 }

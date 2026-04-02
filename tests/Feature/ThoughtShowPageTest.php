@@ -393,6 +393,65 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('<strong>bold</strong>', false);
     }
 
+    public function test_chunked_document_sections_render_inline_as_markdown_and_stay_out_of_replies(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'web',
+            'content' => "# Meeting notes\n\nRoot intro unique root-inline-901.",
+        ]);
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $thought->id,
+            'embedding' => null,
+            'source' => 'web',
+            'content' => "## Summary\n\nSection body with **bold marker** unique section-inline-902.",
+            'source_metadata' => [
+                'section_index' => 1,
+                'section_title' => 'Summary',
+            ],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $thought->id,
+            'embedding' => null,
+            'source' => 'web',
+            'content' => "## Decisions\n\n- First decision unique section-inline-903.",
+            'source_metadata' => [
+                'section_index' => 2,
+                'section_title' => 'Decisions',
+            ],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $thought->id,
+            'embedding' => null,
+            'source' => 'web',
+            'content' => 'Actual follow-up reply unique reply-inline-904.',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $response->assertSee('<h2>Summary</h2>', false);
+        $response->assertSee('<strong>bold marker</strong>', false);
+        $response->assertSee('First decision unique section-inline-903.', false);
+
+        $xpath = $this->xpathFromResponse($response);
+        $replySections = $xpath->query("//section[.//p[normalize-space(.)='Replies']]");
+
+        $this->assertSame(1, $replySections->length);
+
+        $replyText = trim($replySections->item(0)?->textContent ?? '');
+
+        $this->assertStringContainsString('Actual follow-up reply unique reply-inline-904.', $replyText);
+        $this->assertStringNotContainsString('Section body with bold marker unique section-inline-902.', $replyText);
+        $this->assertStringNotContainsString('First decision unique section-inline-903.', $replyText);
+    }
+
     public function test_other_user_cannot_view_thought_show_page(): void
     {
         $owner = User::factory()->create();
