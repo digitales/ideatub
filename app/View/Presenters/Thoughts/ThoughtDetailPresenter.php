@@ -44,6 +44,7 @@ final class ThoughtDetailPresenter
     /**
      * @param  array<string, mixed>|null  $senderRuleContext
      * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $emailResearchPreview
+     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $videoResearchPreview
      * @param  array{subject: string, sender: string, url: string}|null  $relatedEmailCard
      */
     private function __construct(
@@ -52,6 +53,7 @@ final class ThoughtDetailPresenter
         private readonly array $documentSectionHtmlChunks,
         private readonly ?string $linkedResearchUrl,
         private readonly ?array $emailResearchPreview,
+        private readonly ?array $videoResearchPreview,
         private readonly ?NewsletterResearchStatusPresenter $newsletterResearchStatus,
         private readonly ?array $senderRuleContext,
         private readonly ?EmailMetadataPresenter $emailMetadata,
@@ -62,6 +64,7 @@ final class ThoughtDetailPresenter
     /**
      * @param  array<string, mixed>|null  $senderRuleContext
      * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $emailResearchPreview
+     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $videoResearchPreview
      * @param  array{subject: string, sender: string, url: string}|null  $relatedEmailCard
      */
     public static function forShow(
@@ -74,7 +77,8 @@ final class ThoughtDetailPresenter
         ?array $senderRuleContext,
         ?EmailMetadataPresenter $emailMetadata,
         ?ImportedEmail $importedEmailForBody,
-        ?array $relatedEmailCard = null
+        ?array $relatedEmailCard = null,
+        ?array $videoResearchPreview = null,
     ): self {
         return new self(
             $thought,
@@ -82,6 +86,7 @@ final class ThoughtDetailPresenter
             $documentSectionHtmlChunks,
             $linkedResearchUrl,
             $emailResearchPreview,
+            $videoResearchPreview,
             $newsletterResearchStatus,
             $senderRuleContext,
             $emailMetadata,
@@ -422,6 +427,14 @@ final class ThoughtDetailPresenter
     public function emailResearchPreview(): ?array
     {
         return $this->emailResearchPreview;
+    }
+
+    /**
+     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
+     */
+    public function videoResearchPreview(): ?array
+    {
+        return $this->videoResearchPreview;
     }
 
     public function newsletterResearchStatus(): ?NewsletterResearchStatusPresenter

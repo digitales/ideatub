@@ -1617,6 +1617,54 @@ class ThoughtShowPageTest extends TestCase
         $this->assertNoThoughtBadgeLink($response, 'Thought');
     }
 
+    public function test_video_thought_detail_exposes_video_research_preview_on_presenter_when_linked(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=vidPreviewPayload01';
+
+        $research = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'research',
+            'content' => '# Video linked research preview body unique QP99',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'vidPreviewPayload01',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_MANUAL,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_PASTED,
+                'research_thought_id' => $research->id,
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $detail = $response->viewData('thoughtDetail');
+        $this->assertInstanceOf(ThoughtDetailPresenter::class, $detail);
+        $preview = $detail->videoResearchPreview();
+        $this->assertIsArray($preview);
+        $this->assertArrayHasKey('full_research_url', $preview);
+        $this->assertArrayHasKey('root_html', $preview);
+        $this->assertArrayHasKey('section_html_chunks', $preview);
+        $this->assertStringContainsString(route('idea.research.show', $research), $preview['full_research_url'] ?? '');
+        $this->assertStringContainsString(
+            'Video linked research preview body unique QP99',
+            strip_tags($preview['root_html'] ?? '')
+        );
+    }
+
     public function test_video_thought_detail_shows_transcript_status_canonical_link_and_view_research(): void
     {
         $owner = User::factory()->create();
@@ -1652,14 +1700,21 @@ class ThoughtShowPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('data-thought-detail-kind="video"', false);
-        $response->assertSee('Video metadata', false);
+        $xpath = $this->xpathFromResponse($response);
+        $header = $xpath->query('//*[@data-thought-detail-kind="video"]')->item(0);
+        $this->assertNotNull($header);
+        $this->assertStringNotContainsString('Video metadata', $header->textContent ?? '');
+        $sidebar = $xpath->query('//*[@data-thought-detail-sidebar="video"]')->item(0);
+        $this->assertNotNull($sidebar);
+        $this->assertStringContainsString('Video metadata', $sidebar->textContent ?? '');
         $response->assertSee('Video ID', false);
         $response->assertSee('detailVidResearch01', false);
         $response->assertSee('Transcript added manually', false);
         $response->assertSee($canonical, false);
         $response->assertSee('View research', false);
         $response->assertSee('Rerun research', false);
-        $response->assertSee(route('videos.store'), false);
+        $sidebarHtml = $sidebar->ownerDocument->saveHTML($sidebar);
+        $this->assertStringContainsString(route('videos.store'), $sidebarHtml);
         $response->assertSee('name="youtube_url"', false);
         $response->assertSee('value="'.$canonical.'"', false);
         $response->assertSee('name="research_now"', false);
@@ -1747,6 +1802,131 @@ class ThoughtShowPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Transcript', false);
         $response->assertSee('UNIQUE_TRANSCRIPT_BODY_VISIBLE_123', false);
+    }
+
+    public function test_video_thought_detail_left_column_heading_order_content_research_preview_transcript(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=vidOrderMainCol01';
+
+        $research = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'research',
+            'content' => '# Order test root ZZ1',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'vidOrderMainCol01',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
+                'research_thought_id' => $research->id,
+                'tags' => [],
+            ],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $video->id,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => "## Transcript\n\nUNIQUE_ORDER_TX_55",
+            'metadata' => [
+                'video_section_type' => 'transcript',
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $this->assertSame(
+            ['Content', 'Research preview', 'Transcript'],
+            $this->thoughtDetailMainColumnHeadingLabels($response)
+        );
+    }
+
+    public function test_video_thought_detail_transcript_heading_follows_content_when_no_research_preview(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=vidNoPreviewOrder02';
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'vidNoPreviewOrder02',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
+                'tags' => [],
+            ],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $video->id,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => "## Transcript\n\nUNIQUE_NO_PREVIEW_TX_66",
+            'metadata' => [
+                'video_section_type' => 'transcript',
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $this->assertSame(
+            ['Content', 'Transcript'],
+            $this->thoughtDetailMainColumnHeadingLabels($response)
+        );
+        $response->assertDontSee('Research preview', false);
+    }
+
+    public function test_video_thought_detail_minimal_video_main_column_only_content_heading(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=vidMinimalMain03';
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'vidMinimalMain03',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_UNAVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_NONE,
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $this->assertSame(
+            ['Content'],
+            $this->thoughtDetailMainColumnHeadingLabels($response)
+        );
     }
 
     public function test_video_thought_detail_does_not_list_transcript_child_as_a_reply(): void
@@ -2173,6 +2353,29 @@ class ThoughtShowPageTest extends TestCase
         $cardText = $this->senderRuleCardText($response);
 
         $this->assertStringNotContainsString($text, $cardText);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function thoughtDetailMainColumnHeadingLabels(TestResponse $response): array
+    {
+        $xpath = $this->xpathFromResponse($response);
+        $main = $xpath->query('//*[@data-thought-detail-main]')->item(0);
+        if ($main === null) {
+            return [];
+        }
+
+        $labels = [];
+        $nodes = $xpath->query(
+            './/article//p[contains(@class, "uppercase") and contains(@class, "text-memory-violet")]',
+            $main
+        );
+        foreach ($nodes as $node) {
+            $labels[] = trim($node->textContent ?? '');
+        }
+
+        return $labels;
     }
 
     private function xpathFromResponse(TestResponse $response): \DOMXPath

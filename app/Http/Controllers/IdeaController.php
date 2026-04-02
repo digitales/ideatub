@@ -236,12 +236,18 @@ class IdeaController extends Controller
             ? $this->resolveRelatedEmailCardForThought($thought)
             : null;
 
+        // Same predicate as ThoughtDetailPresenter::isVideoThought()
+        $videoResearchPreview = data_get($thought->metadata, 'type') === 'video'
+            ? $this->buildVideoResearchPreview($thought)
+            : null;
+
         $thoughtDetail = ThoughtDetailPresenter::forShow(
             thought: $thought,
             contentHtml: $contentHtml,
             documentSectionHtmlChunks: $documentSectionHtmlChunks,
             linkedResearchUrl: $linkedResearchUrl,
             emailResearchPreview: $emailResearchPreview,
+            videoResearchPreview: $videoResearchPreview,
             newsletterResearchStatus: $newsletterResearchStatus,
             senderRuleContext: $senderRuleContext,
             emailMetadata: $emailMetadata,
@@ -1595,11 +1601,34 @@ class IdeaController extends Controller
         bool $usePreloadedImportedEmail = false,
     ): ?array {
         $resolved = $this->resolveEmailLinkedResearchThought($emailThought, $preloadedImportedEmail, $usePreloadedImportedEmail);
-        if ($resolved === null) {
+
+        return $this->buildResearchPreviewPayloadFromLinkedResearchThought($resolved, 'email');
+    }
+
+    /**
+     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
+     */
+    private function buildVideoResearchPreview(Thought $thought): ?array
+    {
+        return $this->buildResearchPreviewPayloadFromLinkedResearchThought(
+            $this->resolveVideoLinkedResearchThought($thought),
+            'video'
+        );
+    }
+
+    /**
+     * Shared preview HTML for email and video detail pages.
+     *
+     * @param  'email'|'video'  $markdownContextPrefix
+     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
+     */
+    private function buildResearchPreviewPayloadFromLinkedResearchThought(?Thought $linkedResearch, string $markdownContextPrefix): ?array
+    {
+        if ($linkedResearch === null) {
             return null;
         }
 
-        $documentRoot = $this->resolveResearchDocumentRootForPreview($resolved);
+        $documentRoot = $this->resolveResearchDocumentRootForPreview($linkedResearch);
         if ($documentRoot === null) {
             return null;
         }
@@ -1614,22 +1643,29 @@ class IdeaController extends Controller
             return null;
         }
 
+        $rootContext = $markdownContextPrefix === 'video'
+            ? 'video_research_preview_root'
+            : 'email_research_preview_root';
+        $sectionContext = $markdownContextPrefix === 'video'
+            ? 'video_research_preview_section'
+            : 'email_research_preview_section';
+
         $converter = new CommonMarkConverter;
         $rootHtml = $this->renderDemoSafeMarkdown(
             $converter,
             $documentRoot->content,
-            'email_research_preview_root'
+            $rootContext
         );
         $sections = $documentRoot->comments()->orderBy('created_at')->get();
-        $sectionHtmlChunks = $sections->take(2)->map(function (Thought $section) use ($converter) {
+        $sectionHtmlChunks = $sections->take(2)->map(function (Thought $section) use ($converter, $sectionContext) {
             return $this->renderDemoSafeMarkdown(
                 $converter,
                 $section->content,
-                'email_research_preview_section'
+                $sectionContext
             );
         })->values()->all();
 
-        if (! $this->researchEmailPreviewHasRenderableBody($rootHtml, $sectionHtmlChunks)) {
+        if (! $this->researchPreviewHasRenderableBody($rootHtml, $sectionHtmlChunks)) {
             return null;
         }
 
@@ -1638,6 +1674,28 @@ class IdeaController extends Controller
             'root_html' => $rootHtml,
             'section_html_chunks' => $sectionHtmlChunks,
         ];
+    }
+
+    /**
+     * Linked research for a video root via {@see Thought::$metadata} `research_thought_id`.
+     * Predicate for “is video” must match {@see ThoughtDetailPresenter::isVideoThought()}.
+     */
+    private function resolveVideoLinkedResearchThought(Thought $thought): ?Thought
+    {
+        if (data_get($thought->metadata, 'type') !== 'video') {
+            return null;
+        }
+
+        $id = $this->normalizeResearchThoughtId(data_get($thought->metadata, 'research_thought_id'));
+        if ($id === null) {
+            return null;
+        }
+
+        return Thought::query()
+            ->whereKey($id)
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
+            ->first();
     }
 
     private function resolveResearchDocumentRootForPreview(Thought $resolvedResearch): ?Thought
@@ -1656,7 +1714,7 @@ class IdeaController extends Controller
     /**
      * @param  array<int, string>  $sectionHtmlChunks
      */
-    private function researchEmailPreviewHasRenderableBody(string $rootHtml, array $sectionHtmlChunks): bool
+    private function researchPreviewHasRenderableBody(string $rootHtml, array $sectionHtmlChunks): bool
     {
         $hasText = fn (string $html): bool => trim(strip_tags($html)) !== '';
 
