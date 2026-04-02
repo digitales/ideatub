@@ -143,6 +143,41 @@ class ThoughtTypePagesTest extends TestCase
         $response->assertSee('Mixed case research metadata');
     }
 
+    public function test_research_type_page_includes_video_linked_research_even_when_child_of_video_root(): void
+    {
+        $user = User::factory()->create();
+        $video = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'source' => 'video',
+            'content' => 'YouTube: https://www.youtube.com/watch?v=streamResearchChildVid',
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'streamResearchChildVid',
+                'video_url' => 'https://www.youtube.com/watch?v=streamResearchChildVid',
+                'transcript_status' => 'available',
+                'transcript_source' => 'youtube',
+            ],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $video->id,
+            'source' => 'research',
+            'content' => 'Video-linked research stream row unique rsrch-stream-child-99',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => ['research', 'video'],
+                'video_thought_id' => $video->id,
+                'video_section_type' => 'research',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.research'));
+
+        $response->assertOk();
+        $response->assertSee('Video-linked research stream row unique rsrch-stream-child-99');
+    }
+
     public function test_plans_type_page_shows_only_plan_thoughts(): void
     {
         $user = User::factory()->create();

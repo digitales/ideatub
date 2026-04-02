@@ -108,6 +108,7 @@ class VideoResearchService
                 $researchMetadata = Thought::normalizeMetadataTags([
                     'type' => 'research',
                     'video_thought_id' => $locked->id,
+                    'video_section_type' => 'research',
                     'tags' => $enrichment['tags'],
                 ]);
 
@@ -135,7 +136,7 @@ class VideoResearchService
                     'user_id' => $locked->user_id,
                     'source' => 'research',
                     'source_metadata' => $sourceMetadata,
-                    'parent_id' => null,
+                    'parent_id' => $locked->id,
                 ]);
 
                 $rootMeta = is_array($locked->metadata) ? $locked->metadata : [];

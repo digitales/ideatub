@@ -506,7 +506,12 @@ class IdeaController extends Controller
         $thoughts = Thought::query()
             ->where('user_id', auth()->id())
             ->visibleInStream()
-            ->topLevel()
+            ->where(function ($q): void {
+                $q->whereNull('parent_id')
+                    ->orWhereHas('parent', function ($pq): void {
+                        $pq->where('metadata->type', 'video');
+                    });
+            })
             ->matchingCanonicalMetadataType('research')
             ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
@@ -1215,7 +1220,11 @@ class IdeaController extends Controller
         $this->authorize('view', $thought);
 
         if ($thought->parent_id !== null) {
-            return redirect()->route('idea.research.show', ['thought' => $thought->parent_id]);
+            $parent = Thought::query()->whereKey($thought->parent_id)->first();
+            $parentIsVideo = $parent !== null && data_get($parent->metadata, 'type') === 'video';
+            if (! $parentIsVideo) {
+                return redirect()->route('idea.research.show', ['thought' => $thought->parent_id]);
+            }
         }
 
         $isResearchRoot = Thought::query()
@@ -1717,11 +1726,26 @@ class IdeaController extends Controller
             return $resolvedResearch;
         }
 
-        return Thought::query()
+        $parent = Thought::query()
             ->whereKey($resolvedResearch->parent_id)
             ->where('user_id', auth()->id())
-            ->matchingCanonicalMetadataType('research')
             ->first();
+
+        if ($parent === null) {
+            return null;
+        }
+
+        if (data_get($parent->metadata, 'type') === 'video') {
+            return $resolvedResearch;
+        }
+
+        $parentIsResearchRoot = Thought::query()
+            ->whereKey($parent->id)
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
+            ->exists();
+
+        return $parentIsResearchRoot ? $parent : null;
     }
 
     /**

@@ -67,15 +67,7 @@ class VideoStreamDisplayTest extends TestCase
         $user = User::factory()->create();
         $canonical = 'https://www.youtube.com/watch?v=streamVidResearch02';
 
-        $research = Thought::factory()->create([
-            'user_id' => $user->id,
-            'parent_id' => null,
-            'source' => 'research',
-            'content' => '# Video research',
-            'metadata' => ['type' => 'research', 'tags' => ['video']],
-        ]);
-
-        Thought::factory()->create([
+        $video = Thought::factory()->create([
             'user_id' => $user->id,
             'parent_id' => null,
             'source' => 'video',
@@ -86,14 +78,36 @@ class VideoStreamDisplayTest extends TestCase
                 'video_url' => $canonical,
                 'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
                 'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
-                'research_thought_id' => $research->id,
                 'tags' => [],
             ],
+        ]);
+
+        $research = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $video->id,
+            'source' => 'research',
+            'content' => '# Video research UNIQUE_STREAM_VID_RSRCH_CHILD_02',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => ['video'],
+                'video_thought_id' => $video->id,
+                'video_section_type' => 'research',
+            ],
+            'source_metadata' => [
+                'video_thought_id' => $video->id,
+                'video_id' => 'streamVidResearch02',
+                'transcript_context_available' => true,
+            ],
+        ]);
+
+        $video->update([
+            'metadata' => array_merge($video->metadata ?? [], ['research_thought_id' => $research->id]),
         ]);
 
         $response = $this->actingAs($user)->get(route('idea.stream'));
 
         $response->assertOk();
+        $response->assertDontSee('UNIQUE_STREAM_VID_RSRCH_CHILD_02', false);
         $response->assertSee('View research', false);
         $response->assertSee('Rerun research', false);
         $response->assertSee(route('videos.store'), false);

@@ -276,7 +276,11 @@ final class StreamThoughtCardPresenter
         $comments = $this->thought->comments;
         if ($this->isVideoThought()) {
             return $comments->filter(
-                fn (Thought $c) => data_get($c->metadata, 'video_section_type') !== 'transcript'
+                fn (Thought $c) => ! in_array(
+                    (string) data_get($c->metadata, 'video_section_type'),
+                    ['transcript', 'research'],
+                    true
+                )
             )->values();
         }
 

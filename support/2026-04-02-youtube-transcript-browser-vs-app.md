@@ -71,6 +71,23 @@ Suggested reply:
 - [ ] Optional: **Retry** `FetchVideoTranscript` once or twice on `youtube_rate_limited` / `youtube_fetch_failed` with backoff (careful with queue abuse).
 - [ ] Help: Short note that automatic fetch is best-effort and manual paste is supported (Help already mentions optional transcript; could add “browser may show captions we can’t auto-fetch”).
 
+## Stream observation (same case)
+
+On **Stream** (`/stream`), this workflow can surface as **two distinct entries**:
+
+1. **Original video thought** — the post that carries the YouTube embed / video metadata.
+2. **Separate research thought** — the saved “Research this idea” output (its own card in the feed).
+
+**Production examples (2026-04-02):**
+
+| Role | URL |
+|------|-----|
+| Video thought | [ideatub.com/thoughts/019d503c-e76f-7373-96d0-72c13c84b248](https://ideatub.com/thoughts/019d503c-e76f-7373-96d0-72c13c84b248) |
+| Research (thought page) | [ideatub.com/thoughts/019d503d-1e62-72d1-826a-abf087e74b62](https://ideatub.com/thoughts/019d503d-1e62-72d1-826a-abf087e74b62) |
+| Research (research route) | [ideatub.com/research/019d503d-1e62-72d1-826a-abf087e74b62](https://ideatub.com/research/019d503d-1e62-72d1-826a-abf087e74b62) |
+
+**Support note:** Seeing both the **video row** and a **research** card is consistent with research being stored as its **own thought** (often tagged `research:*`), not merged into the parent video card. If customers expect a single Stream row, clarify that research is a separate artifact or treat as product feedback (grouping / parent link in UI).
+
 ## Related issues
 
 - [Video thought title/channel (Content card)](./2026-04-02-video-thought-youtube-metadata-missing.md) — oEmbed metadata and root `content` rebuilds.

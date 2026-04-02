@@ -96,6 +96,8 @@ class VideoResearchServiceTest extends TestCase
         }
         $this->assertSame('research', $research->metadata['type'] ?? null);
         $this->assertSame($root->id, $research->metadata['video_thought_id'] ?? null);
+        $this->assertSame($root->id, $research->parent_id);
+        $this->assertSame('research', $research->metadata['video_section_type'] ?? null);
         $this->assertNotNull($research->embedding);
         $tags = $research->metadata['tags'] ?? [];
         $this->assertContains('research', $tags);
@@ -130,6 +132,7 @@ class VideoResearchServiceTest extends TestCase
             'metadata' => Thought::normalizeMetadataTags([
                 'type' => 'research',
                 'video_thought_id' => $root->id,
+                'video_section_type' => 'research',
                 'tags' => ['research', 'video'],
             ]),
             'user_id' => $user->id,
@@ -139,7 +142,7 @@ class VideoResearchServiceTest extends TestCase
                 'video_id' => 'vid123',
                 'transcript_context_available' => true,
             ],
-            'parent_id' => null,
+            'parent_id' => $root->id,
         ]);
 
         $root->update([
@@ -305,6 +308,7 @@ class VideoResearchServiceTest extends TestCase
             'metadata' => Thought::normalizeMetadataTags([
                 'type' => 'research',
                 'video_thought_id' => $root->id,
+                'video_section_type' => 'research',
                 'tags' => ['research', 'video'],
             ]),
             'user_id' => $user->id,
@@ -314,7 +318,7 @@ class VideoResearchServiceTest extends TestCase
                 'video_id' => 'vid123',
                 'transcript_context_available' => true,
             ],
-            'parent_id' => null,
+            'parent_id' => $root->id,
         ]);
 
         $this->mock(OpenRouterService::class, function ($mock) use ($root, $interleaved): void {

@@ -74,13 +74,14 @@ class ResearchShowTest extends TestCase
         ]);
         $research = Thought::factory()->create([
             'user_id' => $user->id,
-            'parent_id' => null,
+            'parent_id' => $video->id,
             'content' => "## Summary\n\nFrom video.",
             'source' => 'research',
             'metadata' => [
                 'type' => 'research',
                 'tags' => ['research', 'video'],
                 'video_thought_id' => $video->id,
+                'video_section_type' => 'research',
             ],
             'source_metadata' => [
                 'video_thought_id' => $video->id,
@@ -100,6 +101,45 @@ class ResearchShowTest extends TestCase
         $response->assertSee('Open video thought', false);
         $response->assertSee(route('thoughts.show', $video), false);
         $response->assertSee('https://www.youtube.com/watch?v=dQw4w9WgXcQ', false);
+    }
+
+    public function test_research_show_does_not_redirect_when_thought_is_child_of_video_root(): void
+    {
+        $user = User::factory()->create();
+        $video = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Video root',
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'vidChildResearch',
+                'video_url' => 'https://www.youtube.com/watch?v=vidChildResearch',
+                'transcript_status' => 'available',
+                'transcript_source' => 'youtube',
+            ],
+        ]);
+        $research = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $video->id,
+            'content' => "## Summary\n\nVideo child research unique body vchild-no-redirect-1.",
+            'source' => 'research',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => ['research', 'video'],
+                'video_thought_id' => $video->id,
+                'video_section_type' => 'research',
+            ],
+            'source_metadata' => [
+                'video_thought_id' => $video->id,
+                'video_id' => 'vidChildResearch',
+                'transcript_context_available' => true,
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.research.show', $research));
+
+        $response->assertOk();
+        $response->assertSee('Video child research unique body vchild-no-redirect-1', false);
     }
 
     public function test_research_show_still_renders_all_sections_after_shared_partial_refactor(): void
