@@ -165,6 +165,20 @@ final class ThoughtDetailPresenter
         return is_string($url) && trim($url) !== '' ? trim($url) : null;
     }
 
+    /**
+     * Same normalization as {@see IdeaController::normalizeResearchThoughtId} for linked research IDs.
+     */
+    private function normalizeLinkedResearchThoughtId(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $id = strtolower(trim((string) $value));
+
+        return $id === '' ? null : $id;
+    }
+
     public function transcriptStatusLabel(): ?string
     {
         if (! $this->isVideoThought()) {
@@ -290,23 +304,22 @@ final class ThoughtDetailPresenter
 
         $this->videoLatestResearchUrlResolved = true;
 
-        $id = data_get($this->thought->metadata, 'research_thought_id');
-        if (! is_string($id) || $id === '') {
+        $id = $this->normalizeLinkedResearchThoughtId(
+            data_get($this->thought->metadata, 'research_thought_id')
+        );
+        if ($id === null) {
             $this->resolvedVideoLatestResearchUrl = null;
 
             return null;
         }
 
-        $research = Thought::query()->find($id);
-        if (
-            $research === null ||
-            (int) $research->user_id !== (int) $this->thought->user_id
-        ) {
-            $this->resolvedVideoLatestResearchUrl = null;
+        $research = Thought::query()
+            ->whereKey($id)
+            ->where('user_id', $this->thought->user_id)
+            ->matchingCanonicalMetadataType('research')
+            ->first();
 
-            return null;
-        }
-        if (data_get($research->metadata, 'type') !== 'research') {
+        if ($research === null) {
             $this->resolvedVideoLatestResearchUrl = null;
 
             return null;
