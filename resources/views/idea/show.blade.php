@@ -14,6 +14,7 @@
         'thought' => $thought,
         'thoughtDetail' => $thoughtDetail,
         'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
+        'videoCaptureReturnThoughtId' => $thought->id,
     ])
 
     <div class="{{ $isEmailThought ? 'grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start' : '' }}">

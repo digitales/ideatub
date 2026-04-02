@@ -386,6 +386,18 @@ final class ThoughtDetailPresenter
         );
     }
 
+    /**
+     * Offer pasting a transcript on the thought detail page when none is stored yet.
+     */
+    public function showAddTranscriptForm(): bool
+    {
+        if (! $this->isVideoThought() || app(DemoMode::class)->enabled()) {
+            return false;
+        }
+
+        return ! $this->hasTranscriptTextPresent();
+    }
+
     public function contentHtml(): ?string
     {
         return $this->contentHtml;

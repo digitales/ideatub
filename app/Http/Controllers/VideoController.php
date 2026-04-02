@@ -22,6 +22,7 @@ class VideoController extends Controller
             'youtube_url' => 'required|string|max:2048',
             'transcript' => 'nullable|string|max:65535',
             'research_now' => 'sometimes|boolean',
+            'return_thought_id' => 'sometimes|nullable|uuid',
         ]);
 
         $user = $request->user();
@@ -30,6 +31,7 @@ class VideoController extends Controller
         }
 
         $transcript = $validated['transcript'] ?? null;
+        $returnThoughtId = $validated['return_thought_id'] ?? null;
 
         try {
             $thought = $videoCapture->capture($user, $validated['youtube_url'], $transcript);
@@ -99,10 +101,20 @@ class VideoController extends Controller
             RunVideoResearch::dispatch($thought->id);
         }
 
+        $returnToDetail =
+            $returnThoughtId !== null
+            && (string) $returnThoughtId === (string) $thought->id;
+
         if ($request->wantsJson()) {
+            $transcriptProvided =
+                $transcript !== null && trim($transcript) !== '';
             $payload = [
-                'message' => 'Video saved.',
-                'redirect' => route('idea.index'),
+                'message' => $transcriptProvided && $returnToDetail
+                    ? 'Transcript saved.'
+                    : 'Video saved.',
+                'redirect' => $returnToDetail
+                    ? route('thoughts.show', $thought)
+                    : route('idea.index'),
             ];
             if ($warning !== null) {
                 $payload['warning'] = $warning;
@@ -111,9 +123,20 @@ class VideoController extends Controller
             return response()->json($payload);
         }
 
-        $redirect = redirect()
-            ->route('idea.ideas')
-            ->with('success', 'Video saved.');
+        $successMessage =
+            $transcript !== null &&
+            trim($transcript) !== '' &&
+            $returnToDetail
+                ? 'Transcript saved.'
+                : 'Video saved.';
+
+        $redirect = $returnToDetail
+            ? redirect()
+                ->route('thoughts.show', $thought)
+                ->with('success', $successMessage)
+            : redirect()
+                ->route('idea.ideas')
+                ->with('success', $successMessage);
 
         if ($warning !== null) {
             $redirect->with('warning', $warning);

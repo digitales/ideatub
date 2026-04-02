@@ -31,6 +31,9 @@
                     <form method="POST" action="{{ route('videos.store') }}" class="inline">
                         @csrf
                         <input type="hidden" name="youtube_url" value="{{ $thoughtDetail->videoFetchTranscriptActionUrl() }}">
+                        @isset($videoCaptureReturnThoughtId)
+                            <input type="hidden" name="return_thought_id" value="{{ $videoCaptureReturnThoughtId }}">
+                        @endisset
                         <button type="submit" class="font-medium text-memory-violet hover:underline">Fetch transcript</button>
                     </form>
                 @endif
@@ -42,6 +45,9 @@
                         @csrf
                         <input type="hidden" name="youtube_url" value="{{ $thoughtDetail->videoResearchActionUrl() }}">
                         <input type="hidden" name="research_now" value="1">
+                        @isset($videoCaptureReturnThoughtId)
+                            <input type="hidden" name="return_thought_id" value="{{ $videoCaptureReturnThoughtId }}">
+                        @endisset
                         <button type="submit" class="font-medium text-memory-violet hover:underline">Research now</button>
                     </form>
                 @endif
@@ -50,10 +56,47 @@
                         @csrf
                         <input type="hidden" name="youtube_url" value="{{ $thoughtDetail->videoResearchActionUrl() }}">
                         <input type="hidden" name="research_now" value="1">
+                        @isset($videoCaptureReturnThoughtId)
+                            <input type="hidden" name="return_thought_id" value="{{ $videoCaptureReturnThoughtId }}">
+                        @endisset
                         <button type="submit" class="font-medium text-memory-violet hover:underline">Rerun research</button>
                     </form>
                 @endif
             </div>
+            @if ($thoughtDetail->showAddTranscriptForm() && ($editable ?? true))
+                <div class="mt-4 pt-4 border-t border-memory-violet/10">
+                    <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-2">Add transcript</p>
+                    <p class="text-xs text-deep-indigo leading-relaxed mb-3">
+                        Paste the transcript from YouTube (Show transcript) if automatic fetch is unavailable or you prefer your own copy.
+                    </p>
+                    <form method="POST" action="{{ route('videos.store') }}" class="space-y-3">
+                        @csrf
+                        <input type="hidden" name="youtube_url" value="{{ $thoughtDetail->videoFetchTranscriptActionUrl() }}">
+                        @isset($videoCaptureReturnThoughtId)
+                            <input type="hidden" name="return_thought_id" value="{{ $videoCaptureReturnThoughtId }}">
+                        @endisset
+                        <label class="block">
+                            <span class="text-[11px] font-medium text-memory-violet/90">Transcript</span>
+                            <textarea
+                                name="transcript"
+                                rows="6"
+                                required
+                                class="mt-1 w-full rounded-lg border border-memory-violet/20 bg-white/90 px-3 py-2 text-sm text-deep-indigo placeholder-slate-brand/40 focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50 resize-y min-h-[8rem]"
+                                placeholder="Paste the full transcript…"
+                            >{{ old('transcript') }}</textarea>
+                        </label>
+                        @error('transcript')
+                            <p class="text-xs text-red-500">{{ $message }}</p>
+                        @enderror
+                        <button
+                            type="submit"
+                            class="inline-flex items-center rounded-lg bg-memory-violet px-3 py-2 text-xs font-medium text-white shadow-sm hover:bg-memory-violet/90 focus:outline-none focus:ring-2 focus:ring-memory-violet/40"
+                        >
+                            Save transcript
+                        </button>
+                    </form>
+                </div>
+            @endif
             @if ($thoughtDetail->relatedEmailCard())
                 @php $relatedEmail = $thoughtDetail->relatedEmailCard(); @endphp
                 <div class="mt-4 pt-4 border-t border-memory-violet/10">

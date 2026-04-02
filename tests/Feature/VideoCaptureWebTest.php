@@ -121,6 +121,50 @@ class VideoCaptureWebTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_post_with_transcript_and_return_thought_id_redirects_to_thought_show(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $embed = array_fill(0, 1536, 0.03);
+        $this->mock(OpenRouterService::class, function ($mock) use ($embed): void {
+            $mock->shouldReceive('embed')->twice()->andReturn($embed);
+        });
+
+        $canonical = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+        $video = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'embedding' => $embed,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'dQw4w9WgXcQ',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_UNAVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_NONE,
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->post(route('videos.store'), [
+            'youtube_url' => $canonical,
+            'transcript' => "Line one.\nLine two.",
+            'return_thought_id' => $video->id,
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect(route('thoughts.show', $video));
+        $response->assertSessionHas('success', 'Transcript saved.');
+
+        $transcriptChild = Thought::query()
+            ->where('parent_id', $video->id)
+            ->where('metadata->video_section_type', 'transcript')
+            ->sole();
+        $this->assertStringContainsString('Line one.', (string) $transcriptChild->content);
+        Queue::assertNothingPushed();
+    }
+
     public function test_repeated_post_without_transcript_only_queues_one_fetch_job(): void
     {
         Queue::fake();

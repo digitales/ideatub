@@ -1867,6 +1867,51 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('name="youtube_url"', false);
         $response->assertSee('value="'.$canonical.'"', false);
         $response->assertDontSee('name="research_now"', false);
+        $response->assertSee('Add transcript', false);
+        $response->assertSee('Save transcript', false);
+        $response->assertSee('name="transcript"', false);
+        $response->assertSee('name="return_thought_id"', false);
+        $response->assertSee('value="'.$video->id.'"', false);
+    }
+
+    public function test_video_thought_detail_hides_add_transcript_form_when_transcript_text_exists(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=detailVidHasTranscript99';
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'detailVidHasTranscript99',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
+                'tags' => [],
+            ],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => $video->id,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => "## Transcript\n\nSome transcript body here.",
+            'metadata' => [
+                'video_section_type' => 'transcript',
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $response->assertDontSee('Add transcript', false);
+        $response->assertDontSee('Save transcript', false);
     }
 
     public function test_demo_mode_video_thought_detail_does_not_expose_raw_canonical_url(): void
@@ -1902,6 +1947,7 @@ class ThoughtShowPageTest extends TestCase
         $response->assertDontSee('Open video', false);
         $response->assertDontSee('Research now', false);
         $response->assertDontSee('Rerun research', false);
+        $response->assertDontSee('Add transcript', false);
     }
 
     public function test_demo_mode_video_thought_detail_does_not_expose_raw_transcript_text(): void
