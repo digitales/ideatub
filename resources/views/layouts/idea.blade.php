@@ -23,7 +23,7 @@
 
 <body class="font-sans antialiased min-h-screen" style="background: linear-gradient(135deg, #eef2ff 0%, #f3f0ff 50%, #f0f5ff 100%); padding-top: max(0.5rem, env(safe-area-inset-top, 0px));">
 
-    <div x-data="ideaShortcuts()" data-query="{{e(old('q', $query ?? ''))}}" data-idea-index-url="{{e(route('idea.index'))}}" @keydown.window="handleKey($event)" <blade ideatub|-open-shortcuts%3D%26%2334%3BshortcutsOpen%20%3D%20true%26%2334%3B%3E>
+    <div x-data="ideaShortcuts()" data-query="{{e(old('q', $query ?? ''))}}" data-idea-index-url="{{e(route('idea.index'))}}" @keydown.window="handleKey($event)" @ideatub-open-shortcuts.window="shortcutsOpen = true">
         @php
             $inboxCount = (int) ($inboxActionableCount ?? 0);
         @endphp
@@ -36,7 +36,7 @@
             </a>
 
             {{-- Search overlay (shown when searching) --}}
-            <form x-show="searching" x-transition method="GET" action="{{route('idea.index')}}" class="absolute inset-x-0 top-0 bottom-0 flex items-center px-6 md:px-8 z-10" style="background: rgba(238,242,255,0.95); backdrop-filter: blur(12px);" <blade click|.away%3D%26%2334%3Bsearching%20%3D%20false%26%2334%3B%3E>
+            <form x-show="searching" x-transition method="GET" action="{{route('idea.index')}}" class="absolute inset-x-0 top-0 bottom-0 flex items-center px-6 md:px-8 z-10" style="background: rgba(238,242,255,0.95); backdrop-filter: blur(12px);" @click.away="searching = false">
                 <div class="flex flex-col w-full max-w-lg mx-auto gap-4">
                     <div class="flex items-center gap-3">
                         <svg class="w-4 h-4 text-neural-teal flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -173,7 +173,7 @@
         </main>
 
         {{-- Shortcut palette (modal) --}}
-        <div x-show="shortcutsOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @keydown.escape.window="shortcutsOpen = false" <blade click|.away%3D%26%2334%3BshortcutsOpen%20%3D%20false%26%2334%3B%20class%3D%26%2334%3Bfixed%20inset-0%20z-40%20flex%20items-center%20justify-center%20p-4%26%2334%3B>
+        <div x-show="shortcutsOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @keydown.escape.window="shortcutsOpen = false" @click.away="shortcutsOpen = false" class="fixed inset-0 z-40 flex items-center justify-center p-4">
             style="background: rgba(30, 37, 71, 0.4); backdrop-filter: blur(6px);" role="dialog" aria-modal="true"
             aria-labelledby="shortcuts-modal-title" x-ref="shortcutsModal"
             x-effect="shortcutsOpen && $nextTick(() => { const el = $refs.shortcutsModal && $refs.shortcutsModal.querySelector('[autofocus]'); if (el) el.focus(); })">
