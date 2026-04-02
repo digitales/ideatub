@@ -24,7 +24,7 @@ A thought may be **shared as a document** when all hold:
 
    `plan`, `decision`, `dev`, `support`, `spec`, `research`, `meeting`
 
-   Accept stored aliases where the app already normalizes types (e.g. `plans`, `meetings`) if the canonical matcher used elsewhere can express them; otherwise document exact stored values in implementation to match stream/MCP behavior.
+   **Normalization:** Implementation MUST reuse the same rules the app already uses for stream/MCP type matching (e.g. `ThoughtTypeNavigation::storedValuesForCollection` / `normalizeTypeKey` where applicable) so `plans` / `meetings` aliases behave like `plan` / `meeting`. The implementation plan should name the exact helper(s) called from the eligibility method.
 
 5. **Excluded sources/types** — Do not offer share for `source` email or jira, or for `metadata.type` **video** (and other non-listed types).
 
@@ -68,7 +68,7 @@ Implement eligibility in one place (e.g. `Thought` method or small dedicated cla
 
 ### 4.3 Management index (`/shared-research`)
 
-- Rename user-facing strings from **“Shared research”** to a neutral label (**“Shared links”** or **“Shared documents”** — pick one consistently in implementation).
+- Rename user-facing strings from **“Shared research”** to a neutral label (**“Shared links”** or **“Shared documents”**). **Pick one string once** at implementation start and use it for index title, nav menu, help, and flash messages so copy does not drift mid-build.
 - List rows remain per share; preview text can remain first lines of root content.
 
 ### 4.4 Help and navigation
@@ -83,7 +83,8 @@ Implement eligibility in one place (e.g. `Thought` method or small dedicated cla
 ## 6. Testing
 
 - Feature tests:
-  - **Store:** eligible `meeting` / `plan` / `research` root succeeds; **video** or **email** or wrong parent fails or redirects with errors as specified.
+  - **Store:** eligible `meeting` / `plan` / `research` root succeeds; **video** or wrong parent fails or redirects with errors as specified.
+  - **Store / exclusions:** at least one case by **`source`** (e.g. email or jira top-level thought) is rejected even if metadata were ambiguous, matching §1.5.
   - **Detail page:** eligible root shows Share block; ineligible root does not.
   - **Stream:** Share action present only when eligible (if covered by existing presenter tests, extend).
 - Adjust any tests that assert literal **“Shared research”** strings if copy changes.
