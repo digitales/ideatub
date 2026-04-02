@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ThoughtDetailResearchPreviewSource;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\ResearchRun;
@@ -1602,7 +1603,10 @@ class IdeaController extends Controller
     ): ?array {
         $resolved = $this->resolveEmailLinkedResearchThought($emailThought, $preloadedImportedEmail, $usePreloadedImportedEmail);
 
-        return $this->buildResearchPreviewPayloadFromLinkedResearchThought($resolved, 'email');
+        return $this->buildResearchPreviewPayloadFromLinkedResearchThought(
+            $resolved,
+            ThoughtDetailResearchPreviewSource::Email
+        );
     }
 
     /**
@@ -1612,18 +1616,19 @@ class IdeaController extends Controller
     {
         return $this->buildResearchPreviewPayloadFromLinkedResearchThought(
             $this->resolveVideoLinkedResearchThought($thought),
-            'video'
+            ThoughtDetailResearchPreviewSource::Video
         );
     }
 
     /**
      * Shared preview HTML for email and video detail pages.
      *
-     * @param  'email'|'video'  $markdownContextPrefix
      * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
      */
-    private function buildResearchPreviewPayloadFromLinkedResearchThought(?Thought $linkedResearch, string $markdownContextPrefix): ?array
-    {
+    private function buildResearchPreviewPayloadFromLinkedResearchThought(
+        ?Thought $linkedResearch,
+        ThoughtDetailResearchPreviewSource $previewSource,
+    ): ?array {
         if ($linkedResearch === null) {
             return null;
         }
@@ -1643,12 +1648,8 @@ class IdeaController extends Controller
             return null;
         }
 
-        $rootContext = $markdownContextPrefix === 'video'
-            ? 'video_research_preview_root'
-            : 'email_research_preview_root';
-        $sectionContext = $markdownContextPrefix === 'video'
-            ? 'video_research_preview_section'
-            : 'email_research_preview_section';
+        $rootContext = $previewSource->demoSafeMarkdownRootContext();
+        $sectionContext = $previewSource->demoSafeMarkdownSectionContext();
 
         $converter = new CommonMarkConverter;
         $rootHtml = $this->renderDemoSafeMarkdown(
