@@ -111,6 +111,12 @@ class VideoResearchServiceTest extends TestCase
         $this->assertFalse($root->metadata['research_pending'] ?? false);
         $this->assertArrayNotHasKey(VideoCaptureService::META_VIDEO_RESEARCH_INTENT_PENDING, $root->metadata);
         $this->assertArrayNotHasKey(VideoCaptureService::META_VIDEO_TRANSCRIPT_READY_FOR_RESEARCH, $root->metadata);
+
+        $rootTags = $root->metadata['tags'] ?? [];
+        $this->assertContains('video', $rootTags);
+        $this->assertContains('anthropic', $rootTags);
+        $this->assertContains('security', $rootTags);
+        $this->assertNotContains('research', $rootTags);
     }
 
     public function test_second_run_chains_prior_research_via_parent_research_thought_id(): void

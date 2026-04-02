@@ -107,6 +107,7 @@ class VideoCaptureServiceTest extends TestCase
         $this->assertSame('pending', $root->metadata['transcript_status']);
         $this->assertSame('none', $root->metadata['transcript_source']);
         $this->assertSame('video', $root->metadata['type']);
+        $this->assertContains('video', $root->metadata['tags'] ?? []);
         $this->assertStringContainsString('Transcript status: pending', $root->content);
     }
 

@@ -1628,7 +1628,7 @@ class ThoughtShowPageTest extends TestCase
             'embedding' => null,
             'source' => 'research',
             'content' => '# Video linked research preview body unique QP99',
-            'metadata' => ['type' => 'research', 'tags' => []],
+            'metadata' => ['type' => 'research', 'tags' => ['research', 'video', 'preview-tag-qp99']],
         ]);
 
         $video = Thought::factory()->create([
@@ -1658,11 +1658,16 @@ class ThoughtShowPageTest extends TestCase
         $this->assertArrayHasKey('full_research_url', $preview);
         $this->assertArrayHasKey('root_html', $preview);
         $this->assertArrayHasKey('section_html_chunks', $preview);
+        $this->assertArrayHasKey('tags', $preview);
+        $this->assertContains('preview-tag-qp99', $preview['tags'] ?? []);
         $this->assertStringContainsString(route('idea.research.show', $research), $preview['full_research_url'] ?? '');
         $this->assertStringContainsString(
             'Video linked research preview body unique QP99',
             strip_tags($preview['root_html'] ?? '')
         );
+
+        $response->assertSee('Research tags', false);
+        $response->assertSee('#preview-tag-qp99', false);
     }
 
     public function test_video_thought_detail_shows_transcript_status_canonical_link_and_view_research(): void

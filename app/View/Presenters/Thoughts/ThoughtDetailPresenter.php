@@ -44,8 +44,8 @@ final class ThoughtDetailPresenter
 
     /**
      * @param  array<string, mixed>|null  $senderRuleContext
-     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $emailResearchPreview
-     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $videoResearchPreview
+     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>, tags?: list<string>}|null  $emailResearchPreview
+     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>, tags?: list<string>}|null  $videoResearchPreview
      * @param  array{subject: string, sender: string, url: string}|null  $relatedEmailCard
      */
     private function __construct(
@@ -64,8 +64,8 @@ final class ThoughtDetailPresenter
 
     /**
      * @param  array<string, mixed>|null  $senderRuleContext
-     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $emailResearchPreview
-     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $videoResearchPreview
+     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>, tags?: list<string>}|null  $emailResearchPreview
+     * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>, tags?: list<string>}|null  $videoResearchPreview
      * @param  array{subject: string, sender: string, url: string}|null  $relatedEmailCard
      *
      * Parameter order matches the constructor only for the first five arguments; {@see $videoResearchPreview}

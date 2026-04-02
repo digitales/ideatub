@@ -1594,7 +1594,7 @@ class IdeaController extends Controller
      * Preview payload for the email thought detail page: full research URL, rendered root HTML, and up to two section HTML chunks (child thoughts, same order as the full research page).
      *
      * @param  ?ImportedEmail  $preloadedImportedEmail  When $usePreloadedImportedEmail is true, use this row (or null) instead of calling {@see Thought::importedEmail()}.
-     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
+     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>, tags: list<string>}|null
      */
     private function buildEmailResearchPreview(
         Thought $emailThought,
@@ -1610,7 +1610,7 @@ class IdeaController extends Controller
     }
 
     /**
-     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
+     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>, tags: list<string>}|null
      */
     private function buildVideoResearchPreview(Thought $thought): ?array
     {
@@ -1623,7 +1623,7 @@ class IdeaController extends Controller
     /**
      * Shared preview HTML for email and video detail pages.
      *
-     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null
+     * @return array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>, tags: list<string>}|null
      */
     private function buildResearchPreviewPayloadFromLinkedResearchThought(
         ?Thought $linkedResearch,
@@ -1670,10 +1670,22 @@ class IdeaController extends Controller
             return null;
         }
 
+        $previewTags = [];
+        $rawTags = data_get($documentRoot->metadata, 'tags');
+        if (is_array($rawTags)) {
+            foreach ($rawTags as $t) {
+                $s = trim((string) $t);
+                if ($s !== '') {
+                    $previewTags[] = $s;
+                }
+            }
+        }
+
         return [
             'full_research_url' => route('idea.research.show', $documentRoot),
             'root_html' => $rootHtml,
             'section_html_chunks' => $sectionHtmlChunks,
+            'tags' => array_values(array_unique($previewTags)),
         ];
     }
 

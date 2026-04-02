@@ -75,6 +75,20 @@ final class VideoThoughtMetadataPresenter
             $rows[] = ['label' => 'Transcript text', 'value' => $presence, 'href' => null];
         }
 
+        $tags = data_get($meta, 'tags');
+        if (is_array($tags) && $tags !== []) {
+            $parts = [];
+            foreach ($tags as $t) {
+                $s = trim((string) $t);
+                if ($s !== '') {
+                    $parts[] = '#'.$s;
+                }
+            }
+            if ($parts !== []) {
+                $rows[] = ['label' => 'Tags', 'value' => implode(', ', $parts), 'href' => null];
+            }
+        }
+
         $src = $this->thought->source;
         $capturedAs = is_string($src) && trim($src) !== '' ? trim($src) : 'video';
         $rows[] = ['label' => 'Captured as', 'value' => $capturedAs, 'href' => null];

@@ -146,6 +146,8 @@ class VideoResearchService
                     $rootMeta[VideoCaptureService::META_VIDEO_TRANSCRIPT_READY_FOR_RESEARCH],
                 );
 
+                $rootMeta = $this->mergeLinkedResearchTagsIntoVideoRoot($rootMeta, $researchMetadata);
+
                 $locked->update([
                     'metadata' => Thought::normalizeMetadataTags($rootMeta),
                 ]);
@@ -193,6 +195,42 @@ class VideoResearchService
             VideoCaptureService::TRANSCRIPT_STATUS_FAILED,
             VideoCaptureService::TRANSCRIPT_STATUS_MANUAL,
         ], true);
+    }
+
+    /**
+     * Copy topic tags from the new research thought onto the video root (excluding `research`) so the detail header,
+     * Stream, and sidebar stay aligned with linked research without treating the root as a research card.
+     *
+     * @param  array<string, mixed>  $videoRootMeta
+     * @param  array<string, mixed>  $researchMeta
+     * @return array<string, mixed>
+     */
+    private function mergeLinkedResearchTagsIntoVideoRoot(array $videoRootMeta, array $researchMeta): array
+    {
+        $researchTags = $researchMeta['tags'] ?? [];
+        if (! is_array($researchTags) || $researchTags === []) {
+            return $videoRootMeta;
+        }
+
+        $rootTags = isset($videoRootMeta['tags']) && is_array($videoRootMeta['tags'])
+            ? $videoRootMeta['tags']
+            : [];
+        $rootLower = array_map(fn ($t) => mb_strtolower(trim((string) $t)), $rootTags);
+
+        foreach ($researchTags as $t) {
+            $norm = mb_strtolower(trim((string) $t));
+            if ($norm === '' || $norm === 'research') {
+                continue;
+            }
+            if (! in_array($norm, $rootLower, true)) {
+                $rootTags[] = $norm;
+                $rootLower[] = $norm;
+            }
+        }
+
+        $videoRootMeta['tags'] = $rootTags;
+
+        return $videoRootMeta;
     }
 
     private function transcriptContextAvailableAtRunStart(Thought $root, ?Thought $transcriptChild): bool

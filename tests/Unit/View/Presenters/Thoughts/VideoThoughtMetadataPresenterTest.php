@@ -26,6 +26,7 @@ class VideoThoughtMetadataPresenterTest extends TestCase
                 'video_url' => 'https://www.youtube.com/watch?v=abc123xyz',
                 'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE,
                 'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_YOUTUBE,
+                'tags' => ['video', 'mvp'],
             ],
         ]);
         $video->setRelation('comments', collect());
@@ -38,6 +39,7 @@ class VideoThoughtMetadataPresenterTest extends TestCase
         $this->assertSame('Transcript available', $byLabel->get('Transcript status')['value']);
         $this->assertSame('YouTube', $byLabel->get('Transcript source')['value']);
         $this->assertSame('Not stored yet', $byLabel->get('Transcript text')['value']);
+        $this->assertSame('#video, #mvp', $byLabel->get('Tags')['value']);
         $this->assertSame('video', $byLabel->get('Captured as')['value']);
     }
 

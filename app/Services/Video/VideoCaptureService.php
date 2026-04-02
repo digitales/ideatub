@@ -145,6 +145,7 @@ class VideoCaptureService
             }
 
             $rootMetadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($rootMetadata, $canonicalUrl);
+            $rootMetadata = $this->ensureVideoRootDefaultTag($rootMetadata);
 
             $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, $transcriptStatus, $rootMetadata);
             $rootEmbedding = $this->openRouter->embed($rootContent);
@@ -385,6 +386,7 @@ class VideoCaptureService
 
         $canonicalUrl = $this->canonicalVideoUrlForThought($root);
         $metadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($metadata, $canonicalUrl);
+        $metadata = $this->ensureVideoRootDefaultTag($metadata);
         $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, self::TRANSCRIPT_STATUS_AVAILABLE, $metadata);
         $rootEmbedding = $this->openRouter->embed($rootContent);
 
@@ -412,6 +414,7 @@ class VideoCaptureService
 
         $canonicalUrl = $this->canonicalVideoUrlForThought($root);
         $metadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($metadata, $canonicalUrl);
+        $metadata = $this->ensureVideoRootDefaultTag($metadata);
         $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, self::TRANSCRIPT_STATUS_UNAVAILABLE, $metadata);
         $rootEmbedding = $this->openRouter->embed($rootContent);
 
@@ -439,6 +442,7 @@ class VideoCaptureService
 
         $canonicalUrl = $this->canonicalVideoUrlForThought($root);
         $metadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($metadata, $canonicalUrl);
+        $metadata = $this->ensureVideoRootDefaultTag($metadata);
         $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, self::TRANSCRIPT_STATUS_FAILED, $metadata);
         $rootEmbedding = $this->openRouter->embed($rootContent);
 
@@ -520,6 +524,26 @@ class VideoCaptureService
         foreach ($transcriptChildren->slice(1) as $duplicateChild) {
             $duplicateChild->delete();
         }
+    }
+
+    /**
+     * Ensure every video root has at least the `video` tag so Stream and detail UIs stay consistent with research capture.
+     *
+     * @param  array<string, mixed>  $rootMetadata
+     * @return array<string, mixed>
+     */
+    private function ensureVideoRootDefaultTag(array $rootMetadata): array
+    {
+        $tags = isset($rootMetadata['tags']) && is_array($rootMetadata['tags'])
+            ? $rootMetadata['tags']
+            : [];
+        $lower = array_map(fn ($t) => mb_strtolower(trim((string) $t)), $tags);
+        if (! in_array('video', $lower, true)) {
+            $tags[] = 'video';
+        }
+        $rootMetadata['tags'] = $tags;
+
+        return $rootMetadata;
     }
 
     private function acquireVideoCaptureLock(?int $userId, string $videoId): void
