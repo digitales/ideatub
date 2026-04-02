@@ -113,4 +113,33 @@ class StreamThoughtCardPresenterTest extends TestCase
         $this->assertSame('IDEATUB_DEMO_STREAM_BODY_MARKER', $cardNormal->displayContent());
         $this->assertStringContainsString('IDEATUB_DEMO_STREAM_COMMENT_MARKER', $cardNormal->commentPreviewRows()[0]['content']);
     }
+
+    #[Test]
+    public function it_uses_preloaded_video_research_url_for_video_cards(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'video',
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'vid-preloaded',
+                'video_url' => 'https://www.youtube.com/watch?v=vid-preloaded',
+                'research_thought_id' => 'missing-research-id',
+            ],
+        ]);
+        $thought->setRelation('comments', collect());
+
+        $card = StreamThoughtCardPresenter::fromThought(
+            $thought,
+            null,
+            false,
+            null,
+            'http://localhost/research/preloaded'
+        );
+
+        $this->assertSame('http://localhost/research/preloaded', $card->videoLatestResearchUrl());
+    }
 }

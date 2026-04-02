@@ -8,8 +8,8 @@ use App\Models\ResearchSkill;
 use App\Models\ResearchSkillVersion;
 use App\Models\Thought;
 use App\Models\User;
-use App\Services\DemoMode;
 use App\Models\UserPreference;
+use App\Services\DemoMode;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -658,5 +658,63 @@ class IdeaIdeasTest extends TestCase
         $this->assertSame(0, Thought::where('user_id', $user->id)->where('metadata->type', 'idea')->count());
         $this->assertSame(0, ResearchRun::query()->count());
         Queue::assertNothingPushed();
+    }
+
+    public function test_ideas_page_includes_smart_composer_script_and_video_confirmation_copy(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.ideas'));
+
+        $response->assertOk();
+        $html = $response->getContent();
+        $this->assertStringContainsString('ideatubIdeasComposer', $html);
+        $this->assertStringContainsString('data-ideas-composer-debounce="380"', $html);
+        $this->assertStringContainsString(route('videos.store'), $html);
+        $this->assertStringContainsString('data-videos-store-url="'.route('videos.store').'"', $html);
+        $this->assertStringContainsString(
+            'youtu\.be\/([a-zA-Z0-9_-]{11})(?:[^a-zA-Z0-9_-]|$)',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'youtube\.com\/(?:embed|shorts|live)\/([a-zA-Z0-9_-]{11})(?:[^a-zA-Z0-9_-]|$)',
+            $html,
+        );
+        $response->assertSee('video thought', false);
+        $response->assertSee('Transcript (optional)', false);
+        $response->assertSee('Research now', false);
+        $this->assertMatchesRegularExpression('/<input[^>]*type="checkbox"[^>]*name="research_now"[^>]*>/', $html);
+        $this->assertDoesNotMatchRegularExpression(
+            '/<input[^>]*type="checkbox"[^>]*name="research_now"[^>]*disabled[^>]*>/',
+            $html,
+        );
+        $this->assertStringNotContainsString('coming in a later update', $html);
+        $this->assertStringContainsString('Video research runs after the transcript is ready.', $html);
+        $response->assertSee('Save idea', false);
+        $response->assertSee('Save video', false);
+    }
+
+    public function test_ideas_page_reopens_video_composer_after_failed_video_url_validation(): void
+    {
+        $user = User::factory()->create();
+        $badUrl = 'https://example.com/not-youtube';
+
+        $page = $this->actingAs($user)
+            ->from(route('idea.ideas'))
+            ->followingRedirects()
+            ->post(route('videos.store'), [
+                'youtube_url' => $badUrl,
+                '_token' => csrf_token(),
+            ]);
+
+        $page->assertOk();
+        $page->assertSee('Not a recognized YouTube URL', false);
+        $html = $page->getContent();
+        $this->assertTrue(
+            str_contains($html, $badUrl)
+            || str_contains($html, str_replace('/', '\/', $badUrl)),
+            'Expected old youtube_url to appear in composer config.',
+        );
+        $this->assertMatchesRegularExpression('/forceVideoMode:\s*true\b/', $html);
     }
 }
