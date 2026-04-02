@@ -1652,6 +1652,9 @@ class ThoughtShowPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('data-thought-detail-kind="video"', false);
+        $response->assertSee('Video metadata', false);
+        $response->assertSee('Video ID', false);
+        $response->assertSee('detailVidResearch01', false);
         $response->assertSee('Transcript added manually', false);
         $response->assertSee($canonical, false);
         $response->assertSee('View research', false);

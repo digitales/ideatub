@@ -93,6 +93,10 @@ class ResearchShowTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Related video', false);
+        $response->assertSee('Video metadata', false);
+        $response->assertSee('Video ID', false);
+        $response->assertSee('dQw4w9WgXcQ', false);
+        $response->assertSee('Transcript available', false);
         $response->assertSee('Open video thought', false);
         $response->assertSee(route('thoughts.show', $video), false);
         $response->assertSee('https://www.youtube.com/watch?v=dQw4w9WgXcQ', false);

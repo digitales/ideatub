@@ -29,6 +29,7 @@ use App\View\Presenters\Ideas\IdeaResearchStatusPresenter;
 use App\View\Presenters\Thoughts\IdeaIndexCardPresenter;
 use App\View\Presenters\Thoughts\StreamThoughtCardPresenter;
 use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
+use App\View\Presenters\Thoughts\VideoThoughtMetadataPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -1282,7 +1283,7 @@ class IdeaController extends Controller
         $label = data_get($video->metadata, 'video_url');
         $label = is_string($label) && trim($label) !== '' ? trim($label) : 'Video thought';
 
-        $metadataRows = \App\View\Presenters\Thoughts\VideoThoughtMetadataPresenter::forVideoRoot($video)->labeledRows();
+        $metadataRows = VideoThoughtMetadataPresenter::forVideoRoot($video)->labeledRows();
 
         return [
             'detail_url' => route('thoughts.show', $video),

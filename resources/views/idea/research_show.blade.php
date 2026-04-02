@@ -14,7 +14,8 @@
         @if (! empty($linkedVideo ?? null))
             <div class="mb-6 rounded-xl border border-rose-400/25 bg-rose-500/[0.06] p-4 md:p-5">
                 <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-rose-600/90 mb-3">Related video</p>
-                <p class="text-[13px] text-slate-brand break-all [overflow-wrap:anywhere]">{{ $linkedVideo['label'] }}</p>
+                <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-2">Video metadata</p>
+                @include('idea.partials.video_metadata_labeled_rows', ['rows' => $linkedVideo['metadata_rows'] ?? []])
                 <p class="mt-3">
                     <a href="{{ $linkedVideo['detail_url'] }}" class="text-[13px] font-medium text-memory-violet hover:underline">Open video thought</a>
                 </p>
