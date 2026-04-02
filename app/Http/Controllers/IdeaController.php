@@ -634,9 +634,11 @@ class IdeaController extends Controller
             ? $thoughts->getCollection()
             : collect($thoughts);
 
+        $videoResearchUrlByThoughtId = $this->buildVideoResearchUrlByThoughtId($collection);
+
         $replyableIndex = $replyableIndexStart;
 
-        return $collection->map(function (Thought $thought) use (&$replyableIndex, $newsletterPresenters) {
+        return $collection->map(function (Thought $thought) use (&$replyableIndex, $newsletterPresenters, $videoResearchUrlByThoughtId) {
             if (! $thought->parent_id) {
                 $currentReplyable = $replyableIndex;
                 $replyableIndex++;
@@ -647,7 +649,8 @@ class IdeaController extends Controller
             return IdeaIndexCardPresenter::fromThought(
                 $thought,
                 $currentReplyable,
-                $newsletterPresenters[$thought->id] ?? null
+                $newsletterPresenters[$thought->id] ?? null,
+                $videoResearchUrlByThoughtId[$thought->id] ?? null,
             );
         });
     }
@@ -1231,6 +1234,7 @@ class IdeaController extends Controller
         });
 
         $relatedEmail = $this->resolveResearchRelatedEmailCard($thought);
+        $linkedVideo = $this->resolveLinkedVideoForResearchThought($thought);
         $editorialLinkSummaries = $this->buildResearchEditorialLinkSummaryViewModel($thought);
         $pageTitle = Str::limit(
             preg_replace('/\s+/', ' ', trim(strip_tags($rootHtml))) ?: 'Research',
@@ -1243,8 +1247,39 @@ class IdeaController extends Controller
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
             'relatedEmail' => $relatedEmail,
+            'linkedVideo' => $linkedVideo,
             'editorialLinkSummaries' => $editorialLinkSummaries,
         ]);
+    }
+
+    /**
+     * When video research created the research thought, source/metadata holds the video root id.
+     *
+     * @return array{detail_url: string, label: string}|null
+     */
+    private function resolveLinkedVideoForResearchThought(Thought $researchRoot): ?array
+    {
+        $rawId = data_get($researchRoot->source_metadata, 'video_thought_id')
+            ?? data_get($researchRoot->metadata, 'video_thought_id');
+        if (! is_string($rawId) || trim($rawId) === '') {
+            return null;
+        }
+
+        $video = Thought::query()
+            ->whereKey($rawId)
+            ->where('user_id', $researchRoot->user_id)
+            ->first();
+        if ($video === null || data_get($video->metadata, 'type') !== 'video') {
+            return null;
+        }
+
+        $label = data_get($video->metadata, 'video_url');
+        $label = is_string($label) && trim($label) !== '' ? trim($label) : 'Video thought';
+
+        return [
+            'detail_url' => route('thoughts.show', $video),
+            'label' => $label,
+        ];
     }
 
     /**

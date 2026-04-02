@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Services\DemoMode;
 use App\Models\Thought;
 use App\Models\ThoughtLinkSummary;
 use App\Models\User;
+use App\Services\DemoMode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -55,6 +55,47 @@ class ResearchShowTest extends TestCase
         $response->assertSee('bold', false);
         $response->assertSee('Back to Stream', false);
         $response->assertSee('Research', false);
+    }
+
+    public function test_research_show_shows_related_video_when_linked_via_source_metadata(): void
+    {
+        $user = User::factory()->create();
+        $video = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Video root',
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'dQw4w9WgXcQ',
+                'video_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                'transcript_status' => 'available',
+                'transcript_source' => 'youtube',
+            ],
+        ]);
+        $research = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => "## Summary\n\nFrom video.",
+            'source' => 'research',
+            'metadata' => [
+                'type' => 'research',
+                'tags' => ['research', 'video'],
+                'video_thought_id' => $video->id,
+            ],
+            'source_metadata' => [
+                'video_thought_id' => $video->id,
+                'video_id' => 'dQw4w9WgXcQ',
+                'transcript_context_available' => true,
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.research.show', $research));
+
+        $response->assertOk();
+        $response->assertSee('Related video', false);
+        $response->assertSee('Open video thought', false);
+        $response->assertSee(route('thoughts.show', $video), false);
+        $response->assertSee('https://www.youtube.com/watch?v=dQw4w9WgXcQ', false);
     }
 
     public function test_research_show_still_renders_all_sections_after_shared_partial_refactor(): void

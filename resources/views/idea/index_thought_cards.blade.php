@@ -27,6 +27,30 @@
                 'previewMode' => $card->previewMode(),
             ])
 
+            @if ($card->isVideoThought())
+                <div class="mt-2 rounded-lg border border-rose-400/20 bg-rose-500/[0.06] px-3 py-2 space-y-1.5 text-[11px] leading-snug text-slate-brand">
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span class="font-semibold uppercase tracking-wide text-rose-600/90">Video</span>
+                        @if ($card->videoOpenHref())
+                            <a
+                                href="{{ $card->videoOpenHref() }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="font-medium text-memory-violet hover:underline"
+                            >Open video</a>
+                        @endif
+                    </div>
+                    @if ($card->transcriptStatusLabel())
+                        <p class="text-slate-brand/90">{{ $card->transcriptStatusLabel() }}</p>
+                    @endif
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        @if ($card->videoLatestResearchUrl())
+                            <a href="{{ $card->videoLatestResearchUrl() }}" class="font-medium text-memory-violet hover:underline">View research</a>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             @if ($card->thought()->relationLoaded('comments') && $card->thought()->comments->isNotEmpty())
                 <a
                     href="{{ route('thoughts.show', $card->thought()) }}"

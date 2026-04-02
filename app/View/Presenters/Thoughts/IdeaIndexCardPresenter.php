@@ -4,6 +4,7 @@ namespace App\View\Presenters\Thoughts;
 
 use App\Models\Thought;
 use App\Services\DemoMode;
+use App\Services\Video\VideoCaptureService;
 use App\View\Presenters\Concerns\EnsuresPresenterDataIsLoaded;
 use App\View\Presenters\Concerns\ObfuscatesDemoText;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
@@ -27,6 +28,7 @@ final class IdeaIndexCardPresenter
         private readonly bool $ownerMayInlineEdit,
         private readonly bool $previewMode,
         private readonly ?NewsletterResearchStatusPresenter $newsletterResearchStatus,
+        private readonly ?string $videoLatestResearchUrl,
     ) {
         $this->requireRelationLoaded($this->thought, 'comments');
         if ($this->thought->parent_id !== null) {
@@ -38,6 +40,7 @@ final class IdeaIndexCardPresenter
         Thought $thought,
         int $currentReplyableIndex,
         ?NewsletterResearchStatusPresenter $newsletterResearchStatus = null,
+        ?string $videoLatestResearchUrl = null,
     ): self {
         $replyHref = $thought->parent_id ? '' : route('idea.index', ['parent_id' => $thought->id]);
 
@@ -52,6 +55,7 @@ final class IdeaIndexCardPresenter
             $ownerMayInlineEdit,
             $thought->parent_id === null,
             $newsletterResearchStatus,
+            $videoLatestResearchUrl,
         );
     }
 
@@ -140,6 +144,46 @@ final class IdeaIndexCardPresenter
     public function showReplyLink(): bool
     {
         return ! $this->thought->parent_id;
+    }
+
+    public function isVideoThought(): bool
+    {
+        return data_get($this->thought->metadata, 'type') === 'video';
+    }
+
+    public function videoLatestResearchUrl(): ?string
+    {
+        return $this->videoLatestResearchUrl;
+    }
+
+    public function transcriptStatusLabel(): ?string
+    {
+        if (! $this->isVideoThought()) {
+            return null;
+        }
+        $status = data_get($this->thought->metadata, 'transcript_status');
+
+        return match ($status) {
+            VideoCaptureService::TRANSCRIPT_STATUS_PENDING => 'Fetching transcript',
+            VideoCaptureService::TRANSCRIPT_STATUS_MANUAL => 'Transcript added manually',
+            VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE => 'Transcript available',
+            VideoCaptureService::TRANSCRIPT_STATUS_UNAVAILABLE => 'Transcript unavailable',
+            VideoCaptureService::TRANSCRIPT_STATUS_FAILED => 'Transcript fetch failed',
+            default => null,
+        };
+    }
+
+    /**
+     * External YouTube (or canonical) URL for “Open video” on the home feed.
+     */
+    public function videoOpenHref(): ?string
+    {
+        if (! $this->isVideoThought() || app(DemoMode::class)->enabled()) {
+            return null;
+        }
+        $url = data_get($this->thought->metadata, 'video_url');
+
+        return is_string($url) && trim($url) !== '' ? trim($url) : null;
     }
 
     private function obfuscatedOrRaw(string $value, string $context, string $boundary): string

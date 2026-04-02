@@ -89,6 +89,31 @@ class IdeaIndexCardPresenterTest extends TestCase
     }
 
     #[Test]
+    public function it_exposes_video_latest_research_url_when_presenter_is_given_one(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'metadata' => [
+                'type' => 'video',
+                'video_url' => 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                'transcript_status' => 'available',
+                'transcript_source' => 'youtube',
+            ],
+        ]);
+        $thought->setRelation('comments', collect());
+
+        $card = IdeaIndexCardPresenter::fromThought($thought, 0, null, 'https://example.org/research-page');
+
+        $this->assertTrue($card->isVideoThought());
+        $this->assertSame('https://example.org/research-page', $card->videoLatestResearchUrl());
+        $this->assertSame('Transcript available', $card->transcriptStatusLabel());
+    }
+
+    #[Test]
     public function it_obfuscates_display_fields_in_demo_mode_and_disables_editing(): void
     {
         config(['services.demo_mode.enabled' => true]);
