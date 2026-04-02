@@ -337,6 +337,7 @@ class IdeaPageTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Help');
+        $response->assertSee('YouTube video thoughts');
         $response->assertSee('Example prompts');
         $response->assertSee('Memory Migration');
         $response->assertSee('Second Brain Migration');
@@ -344,6 +345,8 @@ class IdeaPageTest extends TestCase
         $response->assertSee('The Weekly Review');
         $response->assertSee('Decision: [what was decided]');
         $response->assertSee('promptkit.natebjones.com');
+        $response->assertSee('capture_meeting');
+        $response->assertSee('Meetings');
     }
 
     public function test_example_prompts_route_redirects_to_help(): void
