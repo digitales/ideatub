@@ -5,6 +5,7 @@ namespace App\View\Presenters\Thoughts;
 use App\Models\Thought;
 use App\Services\DemoMode;
 use App\Services\Video\VideoCaptureService;
+use App\Services\Video\YouTubeOEmbedService;
 use App\View\Presenters\Concerns\ObfuscatesDemoText;
 use Illuminate\Support\Facades\Log;
 
@@ -39,6 +40,16 @@ final class VideoThoughtMetadataPresenter
             $rows[] = ['label' => 'Video ID', 'value' => trim($videoId), 'href' => null];
         }
 
+        $title = data_get($meta, YouTubeOEmbedService::META_TITLE);
+        if (is_string($title) && trim($title) !== '') {
+            $rows[] = ['label' => 'Title', 'value' => $this->obfuscatedMetaLine($title, 'video_title'), 'href' => null];
+        }
+
+        $author = data_get($meta, YouTubeOEmbedService::META_AUTHOR_NAME);
+        if (is_string($author) && trim($author) !== '') {
+            $rows[] = ['label' => 'Channel', 'value' => $this->obfuscatedMetaLine($author, 'video_author_name'), 'href' => null];
+        }
+
         $rawUrl = data_get($meta, 'video_url');
         if (is_string($rawUrl) && trim($rawUrl) !== '') {
             $rawUrl = trim($rawUrl);
@@ -69,6 +80,22 @@ final class VideoThoughtMetadataPresenter
         $rows[] = ['label' => 'Captured as', 'value' => $capturedAs, 'href' => null];
 
         return $rows;
+    }
+
+    private function obfuscatedMetaLine(string $value, string $context): string
+    {
+        try {
+            return $this->demoText(trim($value), $context) ?? trim($value);
+        } catch (\Throwable $e) {
+            Log::warning('Demo obfuscation failed for video metadata line.', [
+                'boundary' => 'video_thought_metadata_presenter.obfuscated_meta_line',
+                'thought_id' => $this->thought->id,
+                'context' => $context,
+                'exception' => $e::class,
+            ]);
+
+            return 'Demo content hidden';
+        }
     }
 
     private function safeUrlDisplay(string $rawUrl): string

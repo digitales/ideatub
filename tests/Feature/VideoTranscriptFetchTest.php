@@ -10,6 +10,7 @@ use App\Services\OpenRouterService;
 use App\Services\Video\VideoCaptureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Tests\TestCase;
@@ -22,6 +23,12 @@ class VideoTranscriptFetchTest extends TestCase
     {
         parent::setUp();
         $this->withoutVite();
+        Http::fake([
+            'www.youtube.com/oembed*' => Http::response([
+                'title' => 'Stub video title',
+                'author_name' => 'Stub channel',
+            ], 200),
+        ]);
     }
 
     /**

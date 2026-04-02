@@ -8,7 +8,9 @@ use App\Services\Email\EmailLinkExtractor;
 use App\Services\OpenRouterService;
 use App\Services\Video\VideoCaptureService;
 use App\Services\Video\VideoThoughtContentBuilder;
+use App\Services\Video\YouTubeOEmbedService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -17,6 +19,14 @@ use Tests\TestCase;
 class VideoCaptureServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Http::fake([
+            'www.youtube.com/oembed*' => Http::response('', 404),
+        ]);
+    }
 
     private function fakeEmbedding(): array
     {
@@ -29,6 +39,7 @@ class VideoCaptureServiceTest extends TestCase
             new EmailLinkExtractor,
             $openRouter,
             new VideoThoughtContentBuilder,
+            new YouTubeOEmbedService,
         );
     }
 

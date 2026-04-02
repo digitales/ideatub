@@ -73,6 +73,7 @@ class VideoCaptureService
         private EmailLinkExtractor $linkExtractor,
         private OpenRouterService $openRouter,
         private VideoThoughtContentBuilder $contentBuilder,
+        private YouTubeOEmbedService $youTubeOEmbed,
     ) {}
 
     /**
@@ -143,7 +144,9 @@ class VideoCaptureService
                 unset($rootMetadata['transcript_error_reason']);
             }
 
-            $rootContent = $this->contentBuilder->rootContent($canonicalUrl, $transcriptStatus);
+            $rootMetadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($rootMetadata, $canonicalUrl);
+
+            $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, $transcriptStatus, $rootMetadata);
             $rootEmbedding = $this->openRouter->embed($rootContent);
 
             if ($root === null) {
@@ -381,7 +384,8 @@ class VideoCaptureService
         }
 
         $canonicalUrl = $this->canonicalVideoUrlForThought($root);
-        $rootContent = $this->contentBuilder->rootContent($canonicalUrl, self::TRANSCRIPT_STATUS_AVAILABLE);
+        $metadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($metadata, $canonicalUrl);
+        $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, self::TRANSCRIPT_STATUS_AVAILABLE, $metadata);
         $rootEmbedding = $this->openRouter->embed($rootContent);
 
         $root->update([
@@ -407,7 +411,8 @@ class VideoCaptureService
         }
 
         $canonicalUrl = $this->canonicalVideoUrlForThought($root);
-        $rootContent = $this->contentBuilder->rootContent($canonicalUrl, self::TRANSCRIPT_STATUS_UNAVAILABLE);
+        $metadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($metadata, $canonicalUrl);
+        $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, self::TRANSCRIPT_STATUS_UNAVAILABLE, $metadata);
         $rootEmbedding = $this->openRouter->embed($rootContent);
 
         $root->update([
@@ -433,7 +438,8 @@ class VideoCaptureService
         }
 
         $canonicalUrl = $this->canonicalVideoUrlForThought($root);
-        $rootContent = $this->contentBuilder->rootContent($canonicalUrl, self::TRANSCRIPT_STATUS_FAILED);
+        $metadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($metadata, $canonicalUrl);
+        $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, self::TRANSCRIPT_STATUS_FAILED, $metadata);
         $rootEmbedding = $this->openRouter->embed($rootContent);
 
         $root->update([

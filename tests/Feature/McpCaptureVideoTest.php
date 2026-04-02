@@ -11,13 +11,26 @@ use App\Services\Email\EmailLinkExtractor;
 use App\Services\OpenRouterService;
 use App\Services\Video\VideoCaptureService;
 use App\Services\Video\VideoThoughtContentBuilder;
+use App\Services\Video\YouTubeOEmbedService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class McpCaptureVideoTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Http::fake([
+            'www.youtube.com/oembed*' => Http::response([
+                'title' => 'Stub video title',
+                'author_name' => 'Stub channel',
+            ], 200),
+        ]);
+    }
 
     private function validKeyAndUser(): array
     {
@@ -73,7 +86,7 @@ class McpCaptureVideoTest extends TestCase
         $this->mock(OpenRouterService::class, function ($mock) use ($embed): void {
             $mock->shouldReceive('embed')->once()->andReturn($embed);
         });
-        $this->app->instance(VideoCaptureService::class, new class(app(EmailLinkExtractor::class), app(OpenRouterService::class), app(VideoThoughtContentBuilder::class)) extends VideoCaptureService
+        $this->app->instance(VideoCaptureService::class, new class(app(EmailLinkExtractor::class), app(OpenRouterService::class), app(VideoThoughtContentBuilder::class), app(YouTubeOEmbedService::class)) extends VideoCaptureService
         {
             public function queueTranscriptFetchIfPending(Thought $root, bool $researchNow = false): bool
             {
@@ -205,7 +218,7 @@ class McpCaptureVideoTest extends TestCase
         $this->mock(OpenRouterService::class, function ($mock) use ($embed): void {
             $mock->shouldReceive('embed')->once()->andReturn($embed);
         });
-        $this->app->instance(VideoCaptureService::class, new class(app(EmailLinkExtractor::class), app(OpenRouterService::class), app(VideoThoughtContentBuilder::class)) extends VideoCaptureService
+        $this->app->instance(VideoCaptureService::class, new class(app(EmailLinkExtractor::class), app(OpenRouterService::class), app(VideoThoughtContentBuilder::class), app(YouTubeOEmbedService::class)) extends VideoCaptureService
         {
             public function queueTranscriptFetchIfPending(Thought $root, bool $researchNow = false): bool
             {

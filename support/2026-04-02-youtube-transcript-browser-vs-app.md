@@ -71,6 +71,10 @@ Suggested reply:
 - [ ] Optional: **Retry** `FetchVideoTranscript` once or twice on `youtube_rate_limited` / `youtube_fetch_failed` with backoff (careful with queue abuse).
 - [ ] Help: Short note that automatic fetch is best-effort and manual paste is supported (Help already mentions optional transcript; could add “browser may show captions we can’t auto-fetch”).
 
+## Related issues
+
+- [Video thought title/channel (Content card)](./2026-04-02-video-thought-youtube-metadata-missing.md) — oEmbed metadata and root `content` rebuilds.
+
 ## References
 
 - `app/Services/Email/YouTubeTranscriptService.php`
