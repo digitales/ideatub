@@ -44,6 +44,7 @@ final class ThoughtDetailPresenter
     /**
      * @param  array<string, mixed>|null  $senderRuleContext
      * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $emailResearchPreview
+     * @param  array{subject: string, sender: string, url: string}|null  $relatedEmailCard
      */
     private function __construct(
         private readonly Thought $thought,
@@ -54,13 +55,14 @@ final class ThoughtDetailPresenter
         private readonly ?NewsletterResearchStatusPresenter $newsletterResearchStatus,
         private readonly ?array $senderRuleContext,
         private readonly ?EmailMetadataPresenter $emailMetadata,
-        private readonly ?ImportedEmail $importedEmailForBody
-    ) {
-    }
+        private readonly ?ImportedEmail $importedEmailForBody,
+        private readonly ?array $relatedEmailCard
+    ) {}
 
     /**
      * @param  array<string, mixed>|null  $senderRuleContext
      * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $emailResearchPreview
+     * @param  array{subject: string, sender: string, url: string}|null  $relatedEmailCard
      */
     public static function forShow(
         Thought $thought,
@@ -71,7 +73,8 @@ final class ThoughtDetailPresenter
         ?NewsletterResearchStatusPresenter $newsletterResearchStatus,
         ?array $senderRuleContext,
         ?EmailMetadataPresenter $emailMetadata,
-        ?ImportedEmail $importedEmailForBody
+        ?ImportedEmail $importedEmailForBody,
+        ?array $relatedEmailCard = null
     ): self {
         return new self(
             $thought,
@@ -82,7 +85,8 @@ final class ThoughtDetailPresenter
             $newsletterResearchStatus,
             $senderRuleContext,
             $emailMetadata,
-            $importedEmailForBody
+            $importedEmailForBody,
+            $relatedEmailCard
         );
     }
 
@@ -93,12 +97,12 @@ final class ThoughtDetailPresenter
 
     public function isEmailThought(): bool
     {
-        return $this->thought->source === "email";
+        return $this->thought->source === 'email';
     }
 
     public function isVideoThought(): bool
     {
-        return data_get($this->thought->metadata, "type") === "video";
+        return data_get($this->thought->metadata, 'type') === 'video';
     }
 
     public function videoCanonicalUrl(): ?string
@@ -109,15 +113,15 @@ final class ThoughtDetailPresenter
         }
 
         try {
-            return $this->demoText($url, "video_canonical_url");
+            return $this->demoText($url, 'video_canonical_url');
         } catch (\Throwable $e) {
             $this->logDemoObfuscationFailure(
-                boundary: "thought_detail_presenter.video_canonical_url",
-                context: "video_canonical_url",
+                boundary: 'thought_detail_presenter.video_canonical_url',
+                context: 'video_canonical_url',
                 exception: $e
             );
 
-            return "Demo content hidden";
+            return 'Demo content hidden';
         }
     }
 
@@ -142,53 +146,54 @@ final class ThoughtDetailPresenter
 
     private function rawVideoCanonicalUrl(): ?string
     {
-        if (!$this->isVideoThought()) {
+        if (! $this->isVideoThought()) {
             return null;
         }
-        $url = data_get($this->thought->metadata, "video_url");
+        $url = data_get($this->thought->metadata, 'video_url');
 
-        return is_string($url) && trim($url) !== "" ? trim($url) : null;
+        return is_string($url) && trim($url) !== '' ? trim($url) : null;
     }
 
     public function transcriptStatusLabel(): ?string
     {
-        if (!$this->isVideoThought()) {
+        if (! $this->isVideoThought()) {
             return null;
         }
-        $status = data_get($this->thought->metadata, "transcript_status");
 
-        return match ($status) {
-            VideoCaptureService::TRANSCRIPT_STATUS_PENDING
-                => "Fetching transcript",
-            VideoCaptureService::TRANSCRIPT_STATUS_MANUAL
-                => "Transcript added manually",
-            VideoCaptureService::TRANSCRIPT_STATUS_AVAILABLE
-                => "Transcript available",
-            VideoCaptureService::TRANSCRIPT_STATUS_UNAVAILABLE
-                => "Transcript unavailable",
-            VideoCaptureService::TRANSCRIPT_STATUS_FAILED
-                => "Transcript fetch failed",
-            default => null,
-        };
+        return VideoCaptureService::transcriptStatusHumanLabel(
+            data_get($this->thought->metadata, 'transcript_status')
+        );
+    }
+
+    /**
+     * @return list<array{label: string, value: string, href: ?string}>
+     */
+    public function videoMetadataLabeledRows(): array
+    {
+        if (! $this->isVideoThought()) {
+            return [];
+        }
+
+        return VideoThoughtMetadataPresenter::forVideoRoot($this->thought)->labeledRows();
     }
 
     public function hasTranscriptTextPresent(): bool
     {
-        if (!$this->isVideoThought()) {
+        if (! $this->isVideoThought()) {
             return false;
         }
 
         foreach ($this->thought->comments as $comment) {
             if (
-                data_get($comment->metadata, "video_section_type") !==
-                "transcript"
+                data_get($comment->metadata, 'video_section_type') !==
+                'transcript'
             ) {
                 continue;
             }
-            $raw = trim((string) ($comment->content ?? ""));
-            $raw = preg_replace("/^##\s+Transcript\s*/im", "", $raw) ?? $raw;
+            $raw = trim((string) ($comment->content ?? ''));
+            $raw = preg_replace("/^##\s+Transcript\s*/im", '', $raw) ?? $raw;
 
-            if (trim($raw) !== "") {
+            if (trim($raw) !== '') {
                 return true;
             }
         }
@@ -198,12 +203,12 @@ final class ThoughtDetailPresenter
 
     public function transcriptPresenceLabel(): ?string
     {
-        if (!$this->isVideoThought()) {
+        if (! $this->isVideoThought()) {
             return null;
         }
 
         if ($this->hasTranscriptTextPresent()) {
-            return "Transcript text present";
+            return 'Transcript text present';
         }
 
         return null;
@@ -211,7 +216,7 @@ final class ThoughtDetailPresenter
 
     public function videoTranscriptText(): ?string
     {
-        if (!$this->isVideoThought()) {
+        if (! $this->isVideoThought()) {
             return null;
         }
 
@@ -224,8 +229,8 @@ final class ThoughtDetailPresenter
         $transcriptChild = $this->thought->comments->first(
             fn (Thought $comment): bool => data_get(
                 $comment->metadata,
-                "video_section_type"
-            ) === "transcript"
+                'video_section_type'
+            ) === 'transcript'
         );
 
         if ($transcriptChild === null) {
@@ -234,11 +239,11 @@ final class ThoughtDetailPresenter
             return null;
         }
 
-        $raw = trim((string) ($transcriptChild->content ?? ""));
-        $raw = preg_replace("/^##\s+Transcript\s*/im", "", $raw) ?? $raw;
+        $raw = trim((string) ($transcriptChild->content ?? ''));
+        $raw = preg_replace("/^##\s+Transcript\s*/im", '', $raw) ?? $raw;
         $raw = trim($raw);
 
-        if ($raw === "") {
+        if ($raw === '') {
             $this->resolvedVideoTranscriptText = null;
 
             return null;
@@ -246,17 +251,17 @@ final class ThoughtDetailPresenter
 
         try {
             $this->resolvedVideoTranscriptText =
-                $this->demoText($raw, "video_transcript_text") ??
-                "Demo content hidden";
+                $this->demoText($raw, 'video_transcript_text') ??
+                'Demo content hidden';
         } catch (\Throwable $e) {
             $this->logDemoObfuscationFailure(
-                boundary: "thought_detail_presenter.video_transcript_text",
-                context: "video_transcript_text",
+                boundary: 'thought_detail_presenter.video_transcript_text',
+                context: 'video_transcript_text',
                 exception: $e,
                 subjectThoughtId: $transcriptChild->id
             );
 
-            $this->resolvedVideoTranscriptText = "Demo content hidden";
+            $this->resolvedVideoTranscriptText = 'Demo content hidden';
         }
 
         return $this->resolvedVideoTranscriptText;
@@ -264,7 +269,7 @@ final class ThoughtDetailPresenter
 
     public function videoLatestResearchUrl(): ?string
     {
-        if (!$this->isVideoThought()) {
+        if (! $this->isVideoThought()) {
             return null;
         }
 
@@ -274,8 +279,8 @@ final class ThoughtDetailPresenter
 
         $this->videoLatestResearchUrlResolved = true;
 
-        $id = data_get($this->thought->metadata, "research_thought_id");
-        if (!is_string($id) || $id === "") {
+        $id = data_get($this->thought->metadata, 'research_thought_id');
+        if (! is_string($id) || $id === '') {
             $this->resolvedVideoLatestResearchUrl = null;
 
             return null;
@@ -290,14 +295,14 @@ final class ThoughtDetailPresenter
 
             return null;
         }
-        if (data_get($research->metadata, "type") !== "research") {
+        if (data_get($research->metadata, 'type') !== 'research') {
             $this->resolvedVideoLatestResearchUrl = null;
 
             return null;
         }
 
         $this->resolvedVideoLatestResearchUrl = route(
-            "idea.research.show",
+            'idea.research.show',
             $research
         );
 
@@ -312,7 +317,7 @@ final class ThoughtDetailPresenter
     public function showVideoResearchNowHint(): bool
     {
         if (
-            !$this->isVideoThought() ||
+            ! $this->isVideoThought() ||
             $this->videoLatestResearchUrl() !== null
         ) {
             return false;
@@ -330,14 +335,14 @@ final class ThoughtDetailPresenter
             ? $this->thought->metadata
             : [];
         if (
-            !empty(
+            ! empty(
                 $meta[VideoCaptureService::META_VIDEO_RESEARCH_INTENT_PENDING]
             )
         ) {
             return false;
         }
 
-        $status = data_get($this->thought->metadata, "transcript_status");
+        $status = data_get($this->thought->metadata, 'transcript_status');
 
         return in_array(
             $status,
@@ -355,13 +360,13 @@ final class ThoughtDetailPresenter
     {
         return $this->isVideoThought() &&
             $this->videoLatestResearchUrl() !== null &&
-            !app(DemoMode::class)->enabled() &&
-            !$this->thought->isResearchPending();
+            ! app(DemoMode::class)->enabled() &&
+            ! $this->thought->isResearchPending();
     }
 
     public function showFetchTranscriptAction(): bool
     {
-        if (!$this->isVideoThought() || app(DemoMode::class)->enabled()) {
+        if (! $this->isVideoThought() || app(DemoMode::class)->enabled()) {
             return false;
         }
 
@@ -372,7 +377,7 @@ final class ThoughtDetailPresenter
             return false;
         }
 
-        $status = data_get($this->thought->metadata, "transcript_status");
+        $status = data_get($this->thought->metadata, 'transcript_status');
 
         return in_array(
             $status,
@@ -426,6 +431,16 @@ final class ThoughtDetailPresenter
     }
 
     /**
+     * Source email when this thought (e.g. video) carries merged email linkage in metadata/source_metadata.
+     *
+     * @return array{subject: string, sender: string, url: string}|null
+     */
+    public function relatedEmailCard(): ?array
+    {
+        return $this->relatedEmailCard;
+    }
+
+    /**
      * @return array<int, array{content: string, created_at_human: string}>
      */
     public function replyRows(): array
@@ -436,8 +451,8 @@ final class ThoughtDetailPresenter
                 ->filter(
                     fn (Thought $c) => data_get(
                         $c->metadata,
-                        "video_section_type"
-                    ) !== "transcript"
+                        'video_section_type'
+                    ) !== 'transcript'
                 )
                 ->values();
         }
@@ -451,22 +466,22 @@ final class ThoughtDetailPresenter
                 try {
                     $content = $this->demoText(
                         $comment->content,
-                        "thought_comment_preview"
+                        'thought_comment_preview'
                     );
                 } catch (\Throwable $e) {
                     $this->logDemoObfuscationFailure(
-                        boundary: "thought_detail_presenter.reply_rows",
-                        context: "thought_comment_preview",
+                        boundary: 'thought_detail_presenter.reply_rows',
+                        context: 'thought_comment_preview',
                         exception: $e,
                         subjectThoughtId: $comment->id
                     );
 
-                    $content = "Demo content hidden";
+                    $content = 'Demo content hidden';
                 }
 
                 return [
-                    "content" => $content ?? "Demo content hidden",
-                    "created_at_human" => $comment->created_at->diffForHumans(),
+                    'content' => $content ?? 'Demo content hidden',
+                    'created_at_human' => $comment->created_at->diffForHumans(),
                 ];
             })
             ->all();
@@ -474,31 +489,31 @@ final class ThoughtDetailPresenter
 
     public function emailBodyText(): string
     {
-        if ($this->thought->source !== "email") {
-            $raw = $this->thought->content ?? "";
+        if ($this->thought->source !== 'email') {
+            $raw = $this->thought->content ?? '';
 
             return $raw;
         }
 
         $body = $this->importedEmailForBody?->body_text;
         $raw =
-            is_string($body) && $body !== ""
+            is_string($body) && $body !== ''
                 ? $body
-                : $this->thought->content ?? "";
+                : $this->thought->content ?? '';
 
         try {
-            $obfuscated = $this->demoText($raw, "email_body_text");
+            $obfuscated = $this->demoText($raw, 'email_body_text');
         } catch (\Throwable $e) {
             $this->logDemoObfuscationFailure(
-                boundary: "thought_detail_presenter.email_body_text",
-                context: "email_body_text",
+                boundary: 'thought_detail_presenter.email_body_text',
+                context: 'email_body_text',
                 exception: $e
             );
 
-            return "Demo content hidden";
+            return 'Demo content hidden';
         }
 
-        return $obfuscated ?? "Demo content hidden";
+        return $obfuscated ?? 'Demo content hidden';
     }
 
     private function logDemoObfuscationFailure(
@@ -508,21 +523,21 @@ final class ThoughtDetailPresenter
         ?string $subjectThoughtId = null
     ): void {
         Log::warning(
-            "Demo obfuscation failed for thought detail presenter field.",
+            'Demo obfuscation failed for thought detail presenter field.',
             [
-                "boundary" => $boundary,
-                "context" => $context,
-                "thought_id" => $this->thought->id,
-                "subject_thought_id" => $subjectThoughtId,
-                "exception" => $exception::class,
+                'boundary' => $boundary,
+                'context' => $context,
+                'thought_id' => $this->thought->id,
+                'subject_thought_id' => $subjectThoughtId,
+                'exception' => $exception::class,
             ]
         );
     }
 
     private function isStructuredDocumentSection(Thought $comment): bool
     {
-        $sectionIndex = data_get($comment->source_metadata, "section_index");
+        $sectionIndex = data_get($comment->source_metadata, 'section_index');
 
-        return $sectionIndex !== null && trim((string) $sectionIndex) !== "";
+        return $sectionIndex !== null && trim((string) $sectionIndex) !== '';
     }
 }

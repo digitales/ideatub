@@ -39,6 +39,28 @@ class VideoCaptureService
 
     public const TRANSCRIPT_SOURCE_YOUTUBE = 'youtube';
 
+    public static function transcriptStatusHumanLabel(mixed $status): ?string
+    {
+        return match ($status) {
+            self::TRANSCRIPT_STATUS_PENDING => 'Fetching transcript',
+            self::TRANSCRIPT_STATUS_MANUAL => 'Transcript added manually',
+            self::TRANSCRIPT_STATUS_AVAILABLE => 'Transcript available',
+            self::TRANSCRIPT_STATUS_UNAVAILABLE => 'Transcript unavailable',
+            self::TRANSCRIPT_STATUS_FAILED => 'Transcript fetch failed',
+            default => null,
+        };
+    }
+
+    public static function transcriptSourceHumanLabel(mixed $source): ?string
+    {
+        return match ($source) {
+            self::TRANSCRIPT_SOURCE_PASTED => 'Pasted',
+            self::TRANSCRIPT_SOURCE_YOUTUBE => 'YouTube',
+            self::TRANSCRIPT_SOURCE_NONE, null => null,
+            default => is_string($source) && trim($source) !== '' ? trim($source) : null,
+        };
+    }
+
     /** Task 5: set when transcript fetch reaches a terminal state and research was requested; consumer clears after handoff. */
     public const META_VIDEO_TRANSCRIPT_READY_FOR_RESEARCH = 'video_transcript_ready_for_research';
 

@@ -231,6 +231,10 @@ class IdeaController extends Controller
             ? EmailMetadataPresenter::from($thought, $importedEmail)
             : null;
 
+        $relatedEmailCard = data_get($thought->metadata, 'type') === 'video'
+            ? $this->resolveRelatedEmailCardForThought($thought)
+            : null;
+
         $thoughtDetail = ThoughtDetailPresenter::forShow(
             thought: $thought,
             contentHtml: $contentHtml,
@@ -241,6 +245,7 @@ class IdeaController extends Controller
             senderRuleContext: $senderRuleContext,
             emailMetadata: $emailMetadata,
             importedEmailForBody: $importedEmail,
+            relatedEmailCard: $relatedEmailCard,
         );
 
         return view('idea.show', [
@@ -1255,7 +1260,7 @@ class IdeaController extends Controller
     /**
      * When video research created the research thought, source/metadata holds the video root id.
      *
-     * @return array{detail_url: string, label: string}|null
+     * @return array{detail_url: string, label: string, metadata_rows: list<array{label: string, value: string, href: ?string}>}|null
      */
     private function resolveLinkedVideoForResearchThought(Thought $researchRoot): ?array
     {
@@ -1268,6 +1273,7 @@ class IdeaController extends Controller
         $video = Thought::query()
             ->whereKey($rawId)
             ->where('user_id', $researchRoot->user_id)
+            ->with('comments')
             ->first();
         if ($video === null || data_get($video->metadata, 'type') !== 'video') {
             return null;
@@ -1276,9 +1282,12 @@ class IdeaController extends Controller
         $label = data_get($video->metadata, 'video_url');
         $label = is_string($label) && trim($label) !== '' ? trim($label) : 'Video thought';
 
+        $metadataRows = \App\View\Presenters\Thoughts\VideoThoughtMetadataPresenter::forVideoRoot($video)->labeledRows();
+
         return [
             'detail_url' => route('thoughts.show', $video),
             'label' => $label,
+            'metadata_rows' => $metadataRows,
         ];
     }
 
@@ -1728,9 +1737,19 @@ class IdeaController extends Controller
      */
     private function resolveResearchRelatedEmailCard(Thought $researchRoot): ?array
     {
+        return $this->resolveRelatedEmailCardForThought($researchRoot);
+    }
+
+    /**
+     * Related email card when {@see mergeResearchRootEmailLinkageFields} fields are present on metadata/source_metadata (e.g. research roots, video thoughts captured with email context).
+     *
+     * @return array{subject: string, sender: string, url: string}|null
+     */
+    private function resolveRelatedEmailCardForThought(Thought $thought): ?array
+    {
         $merged = $this->mergeResearchRootEmailLinkageFields(
-            $researchRoot->metadata ?? [],
-            $researchRoot->source_metadata ?? []
+            $thought->metadata ?? [],
+            $thought->source_metadata ?? []
         );
 
         if ($merged === null) {

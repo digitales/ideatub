@@ -47,18 +47,26 @@
     </div>
     <div class="mt-5 pt-4 border-t border-memory-violet/10 space-y-2">
         <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-3">Actions</p>
-        <form method="POST" action="{{ route('emails.idea-research', $thought) }}" x-data="{ submitting: false }" @submit="submitting = true">
-            @csrf
-            <button type="submit" :disabled="submitting" class="w-full text-left px-3 py-2 text-[12px] font-medium text-memory-violet border border-memory-violet/30 rounded-lg hover:bg-memory-violet/5 transition-colors disabled:opacity-50">
-                Run idea research
-            </button>
-        </form>
         <form method="POST" action="{{ route('emails.newsletter-research', $thought) }}" x-data="{ submitting: false }" @submit="submitting = true">
             @csrf
             <button type="submit" :disabled="submitting" class="w-full text-left px-3 py-2 text-[12px] font-medium text-memory-violet border border-memory-violet/30 rounded-lg hover:bg-memory-violet/5 transition-colors disabled:opacity-50">
                 Run newsletter research
             </button>
         </form>
+        <details class="group rounded-lg border border-memory-violet/15 bg-memory-violet/[0.03] open:bg-memory-violet/[0.06] open:border-memory-violet/25">
+            <summary class="cursor-pointer select-none list-none px-3 py-2 text-[12px] font-medium text-slate-brand/80 hover:text-slate-brand [&::-webkit-details-marker]:hidden flex items-center gap-2">
+                <span class="inline-block text-[10px] text-slate-brand/50 transition-transform duration-150 group-open:rotate-90" aria-hidden="true">▶</span>
+                More research options
+            </summary>
+            <div class="px-3 pb-3 pt-0 border-t border-memory-violet/10">
+                <form method="POST" action="{{ route('emails.idea-research', $thought) }}" class="mt-2" x-data="{ submitting: false }" @submit="submitting = true">
+                    @csrf
+                    <button type="submit" :disabled="submitting" class="w-full text-left px-3 py-2 text-[12px] font-medium text-slate-brand border border-slate-brand/20 rounded-lg hover:bg-slate-brand/5 transition-colors disabled:opacity-50">
+                        Run idea research
+                    </button>
+                </form>
+            </div>
+        </details>
     </div>
 
     @include('idea.partials.thought_detail_sender_rule_card', ['senderRuleContext' => $senderRuleContext])

@@ -1663,6 +1663,49 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee(route('idea.research.show', $research), false);
     }
 
+    public function test_video_thought_detail_shows_related_email_when_metadata_links_email(): void
+    {
+        $owner = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=detailVidRelatedEmail01';
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'email',
+            'content' => 'Email body for related video test',
+            'metadata' => ['type' => 'email'],
+        ]);
+
+        $video = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'detailVidRelatedEmail01',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_MANUAL,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_PASTED,
+                'email_thought_id' => $emailThought->id,
+                'email_subject' => 'Newsletter with video link',
+                'email_sender' => 'newsletter@example.com',
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $video));
+
+        $response->assertOk();
+        $response->assertSee('Related email', false);
+        $response->assertSee('Newsletter with video link', false);
+        $response->assertSee('newsletter@example.com', false);
+        $response->assertSee('View email', false);
+        $response->assertSee(route('thoughts.show', $emailThought), false);
+    }
+
     public function test_video_thought_detail_shows_transcript_content_in_a_dedicated_block(): void
     {
         $owner = User::factory()->create();

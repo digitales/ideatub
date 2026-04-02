@@ -18,28 +18,12 @@
     </div>
 
     @if (isset($thoughtDetail) && $thoughtDetail->isVideoThought())
-        <div class="mt-4 pt-4 border-t border-memory-violet/10 space-y-2 text-[12px] text-slate-brand">
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span class="font-semibold uppercase tracking-wide text-rose-600/90 text-[11px]">Video</span>
-                @if ($thoughtDetail->videoCanonicalUrl())
-                    <span class="break-all text-slate-brand/80">{{ $thoughtDetail->videoCanonicalUrl() }}</span>
-                @endif
-                @if ($thoughtDetail->videoCanonicalHref())
-                    <a
-                        href="{{ $thoughtDetail->videoCanonicalHref() }}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="font-medium text-memory-violet hover:underline"
-                    >Open video</a>
-                @endif
+        <div class="mt-4 pt-4 border-t border-memory-violet/10 space-y-3 text-[12px] text-slate-brand">
+            <div>
+                <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-rose-600/90 mb-2">Video metadata</p>
+                @include('idea.partials.video_metadata_labeled_rows', ['rows' => $thoughtDetail->videoMetadataLabeledRows()])
             </div>
-            @if ($thoughtDetail->transcriptStatusLabel())
-                <p>{{ $thoughtDetail->transcriptStatusLabel() }}</p>
-            @endif
-            @if ($thoughtDetail->transcriptPresenceLabel())
-                <p class="text-slate-brand/75">{{ $thoughtDetail->transcriptPresenceLabel() }}</p>
-            @endif
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1">
                 @if ($thoughtDetail->videoLatestResearchUrl())
                     <a href="{{ $thoughtDetail->videoLatestResearchUrl() }}" class="font-medium text-memory-violet hover:underline">View research</a>
                 @endif
@@ -70,6 +54,17 @@
                     </form>
                 @endif
             </div>
+            @if ($thoughtDetail->relatedEmailCard())
+                @php $relatedEmail = $thoughtDetail->relatedEmailCard(); @endphp
+                <div class="mt-4 pt-4 border-t border-memory-violet/10">
+                    <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-2">Related email</p>
+                    <p class="text-[13px] font-semibold text-deep-indigo">{{ $relatedEmail['subject'] }}</p>
+                    <p class="text-[12px] text-slate-brand mt-0.5">{{ $relatedEmail['sender'] }}</p>
+                    <p class="mt-2">
+                        <a href="{{ $relatedEmail['url'] }}" class="text-[12px] font-medium text-memory-violet hover:underline">View email</a>
+                    </p>
+                </div>
+            @endif
         </div>
     @endif
 

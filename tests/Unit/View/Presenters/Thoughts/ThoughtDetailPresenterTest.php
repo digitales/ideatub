@@ -38,12 +38,14 @@ class ThoughtDetailPresenterTest extends TestCase
         $presenter = ThoughtDetailPresenter::forShow(
             thought: $video,
             contentHtml: null,
+            documentSectionHtmlChunks: [],
             linkedResearchUrl: null,
             emailResearchPreview: null,
             newsletterResearchStatus: null,
             senderRuleContext: null,
             emailMetadata: null,
             importedEmailForBody: null,
+            relatedEmailCard: null,
         );
 
         DB::flushQueryLog();
