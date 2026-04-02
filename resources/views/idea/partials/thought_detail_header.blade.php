@@ -17,6 +17,10 @@
         @include('idea.partials.thought_tag_row', ['thought' => $thought, 'editable' => $editable ?? true])
     </div>
 
+    @if (isset($thoughtDetail) && $thoughtDetail->showDocumentShareBlock())
+        @include('idea.partials.thought_detail_document_share', ['thoughtDetail' => $thoughtDetail])
+    @endif
+
     @if (($thought->metadata['type'] ?? null) === 'idea' && $thought->isIdeaCompleted())
         <div class="mt-4 pt-4 border-t border-memory-violet/10">
             <form method="POST" action="{{ route('ideas.toggle-completed', $thought) }}" class="inline">

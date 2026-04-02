@@ -4,6 +4,7 @@ namespace App\View\Presenters\Thoughts;
 
 use App\Http\Controllers\IdeaController;
 use App\Models\ImportedEmail;
+use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Services\DemoMode;
 use App\Services\Video\VideoCaptureService;
@@ -59,7 +60,9 @@ final class ThoughtDetailPresenter
         private readonly ?array $senderRuleContext,
         private readonly ?EmailMetadataPresenter $emailMetadata,
         private readonly ?ImportedEmail $importedEmailForBody,
-        private readonly ?array $relatedEmailCard
+        private readonly ?array $relatedEmailCard,
+        private readonly ?ResearchShare $documentShare,
+        private readonly bool $documentShareEligible,
     ) {}
 
     /**
@@ -85,6 +88,8 @@ final class ThoughtDetailPresenter
         ?ImportedEmail $importedEmailForBody,
         ?array $relatedEmailCard = null,
         ?array $videoResearchPreview = null,
+        ?ResearchShare $documentShare = null,
+        bool $documentShareEligible = false,
     ): self {
         return new self(
             $thought,
@@ -97,7 +102,9 @@ final class ThoughtDetailPresenter
             $senderRuleContext,
             $emailMetadata,
             $importedEmailForBody,
-            $relatedEmailCard
+            $relatedEmailCard,
+            $documentShare,
+            $documentShareEligible,
         );
     }
 
@@ -114,6 +121,16 @@ final class ThoughtDetailPresenter
     public function isVideoThought(): bool
     {
         return data_get($this->thought->metadata, 'type') === 'video';
+    }
+
+    public function documentShare(): ?ResearchShare
+    {
+        return $this->documentShare;
+    }
+
+    public function showDocumentShareBlock(): bool
+    {
+        return $this->documentShareEligible && ! app(DemoMode::class)->enabled();
     }
 
     public function videoCanonicalUrl(): ?string

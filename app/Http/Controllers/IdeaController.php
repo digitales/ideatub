@@ -242,6 +242,14 @@ class IdeaController extends Controller
             ? $this->buildVideoResearchPreview($thought)
             : null;
 
+        $documentShareEligible = $thought->isShareableDocumentRoot();
+        $documentShare = $documentShareEligible
+            ? ResearchShare::query()
+                ->where('thought_id', $thought->id)
+                ->where('user_id', auth()->id())
+                ->first()
+            : null;
+
         $thoughtDetail = ThoughtDetailPresenter::forShow(
             thought: $thought,
             contentHtml: $contentHtml,
@@ -254,6 +262,8 @@ class IdeaController extends Controller
             emailMetadata: $emailMetadata,
             importedEmailForBody: $importedEmail,
             relatedEmailCard: $relatedEmailCard,
+            documentShare: $documentShare,
+            documentShareEligible: $documentShareEligible,
         );
 
         return view('idea.show', [

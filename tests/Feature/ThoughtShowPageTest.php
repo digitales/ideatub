@@ -189,6 +189,58 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('Root thought body for detail view', false);
     }
 
+    public function test_shareable_document_detail_shows_create_share_link(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'research'],
+            'content' => 'Research root for share block',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $response->assertOk();
+        $response->assertSee(route('shared-research.index', ['create' => $thought->id], false), false);
+        $response->assertSee('Create share link', false);
+    }
+
+    public function test_non_shareable_detail_hides_document_share_block(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'content' => 'Plain root for detail',
+            'metadata' => null,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $response->assertOk();
+        $response->assertDontSee(route('shared-research.index', ['create' => $thought->id], false), false);
+        $response->assertDontSee('Create share link', false);
+    }
+
+    public function test_video_detail_hides_document_share_block(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'source' => 'web',
+            'content' => 'Video root for share block test',
+            'metadata' => [
+                'type' => 'video',
+                'video_url' => 'https://www.youtube.com/watch?v=detailShareBlockVid',
+            ],
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $response->assertOk();
+        $response->assertDontSee(route('shared-research.index', ['create' => $thought->id], false), false);
+    }
+
     public function test_completed_idea_detail_shows_reopen_control_posting_to_toggle_completed(): void
     {
         $owner = User::factory()->create();
