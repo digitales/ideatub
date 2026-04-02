@@ -46,6 +46,7 @@ class ThoughtDetailPresenterTest extends TestCase
             emailMetadata: null,
             importedEmailForBody: null,
             relatedEmailCard: null,
+            videoResearchPreview: null,
         );
 
         DB::flushQueryLog();

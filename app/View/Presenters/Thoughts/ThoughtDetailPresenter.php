@@ -2,6 +2,7 @@
 
 namespace App\View\Presenters\Thoughts;
 
+use App\Http\Controllers\IdeaController;
 use App\Models\ImportedEmail;
 use App\Models\Thought;
 use App\Services\DemoMode;
@@ -66,6 +67,11 @@ final class ThoughtDetailPresenter
      * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $emailResearchPreview
      * @param  array{full_research_url: string, root_html: string, section_html_chunks: array<int, string>}|null  $videoResearchPreview
      * @param  array{subject: string, sender: string, url: string}|null  $relatedEmailCard
+     *
+     * Parameter order matches the constructor only for the first five arguments; {@see $videoResearchPreview}
+     * is last with a default so PHP does not require optional parameters before required ones. Call sites should
+     * use named arguments (as {@see IdeaController::show} does) so omitting
+     * {@see $videoResearchPreview} cannot bind the wrong value positionally.
      */
     public static function forShow(
         Thought $thought,
