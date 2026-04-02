@@ -8,7 +8,7 @@ When the user wants to sync this document (or other plan/decision/dev/support/sp
 
 - **content** (required): The file content. Read the file and send its text. The server cannot read local paths.
 - **file_path**: The repo-relative path (e.g. `decisions/project-spec.md`, `docs/superpowers/plans/2026-03-12-tag-and-stream.md`).
-- **doc_type**: From the path — `plan` (docs/superpowers/plans), `decision` (decisions/), `dev` (dev/), `support` (support/), `spec` (specs/ or docs/superpowers/specs/).
+- **doc_type**: From the path — `plan` (docs/superpowers/plans), `decision` (decisions/), `dev` (dev/), `support` (support/), `spec` (specs/ or docs/superpowers/specs/). For meeting notes not tied to those paths, use **`meeting`** (see below).
 - **plan_slug**: A short slug for this doc (e.g. filename without .md: `project-spec`, `2026-03-12-tag-and-stream`). Same slug for all sections of one doc so Stream can show them together via tag `<doc_type>:<slug>`.
 - **project**: The **code project** name (e.g. workspace folder name, or repo name). Inject this for every capture_plan call during sync so thoughts are tagged with which project they came from. Use a consistent value for the whole sync (e.g. `ideatub`, `my-app`). Stored in source_metadata.
 
@@ -40,5 +40,17 @@ When the user or a research agent has research output to save to IdeaTub, use th
 **Alternative: one call per section.** If you split at section titles yourself, call capture_plan once per section **without** `parent_id`, in order, with the same `doc_type`, `plan_slug`, and `project`.
 
 **Stream:** In IdeaTub, filter by tag, e.g. `/stream?tag=research-2026-03-13-vehicle-valuation`.
+
+---
+
+## IdeaTub: Save meeting notes via capture_plan
+
+When the user wants meeting notes in IdeaTub as a first-class type (Stream → **Meetings**), use **capture_plan** with:
+
+- **doc_type**: `meeting`.
+- **plan_slug**: A short slug for this meeting or series (e.g. `2026-04-01-standup`, `weekly-design-sync`). Same slug for all sections of one meeting doc so Stream can show them together via tag `meeting:<slug>`.
+- **project**, **file_path**, **section_title**: Same conventions as other `capture_plan` docs.
+
+**Stream:** Filter by tag, e.g. `/stream?tag=meeting-2026-04-01-standup`, or open **Stream → Meetings**.
 
 **Research agent prompt (ideas):** The in-app “Research this idea” prompt is loaded from `resources/prompts/research.md` (placeholders: `{{idea}}`, `{{existing_research}}`). Override path via `RESEARCH_PROMPT_PATH`. See `docs/superpowers/specs/2026-03-15-research-prompt-from-file-design.md`.

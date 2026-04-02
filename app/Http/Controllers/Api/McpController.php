@@ -195,12 +195,12 @@ class McpController extends Controller
             ],
             [
                 'name' => 'capture_plan',
-                'description' => 'Save a plan, decision, dev note, support doc, spec, or research as a thought. Use doc_type to set source (plan, decision, dev, support, spec, research). Use plan_slug to tag all sections for long-form view (Stream filter by tag). Use project to record which code project or research topic this belongs to.',
+                'description' => 'Save a plan, decision, dev note, support doc, spec, research, or meeting notes as a thought. Use doc_type to set source (plan, decision, dev, support, spec, research, meeting). Use plan_slug to tag all sections for long-form view (Stream filter by tag). Use project to record which code project or research topic this belongs to.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
                         'content' => ['type' => 'string', 'description' => 'Document content (full doc or one section)'],
-                        'doc_type' => ['type' => 'string', 'description' => 'One of: plan, decision, dev, support, spec, research. Default plan. Sets source and tag prefix (e.g. decision:slug, research:slug).'],
+                        'doc_type' => ['type' => 'string', 'description' => 'One of: plan, decision, dev, support, spec, research, meeting. Default plan. Sets source and tag prefix (e.g. decision:slug, research:slug, meeting:slug).'],
                         'file_path' => ['type' => 'string', 'description' => 'Optional path (e.g. decisions/project-spec.md, dev/notes.md, support/investigation.md, specs/example-feature-spec.md)'],
                         'plan_slug' => ['type' => 'string', 'description' => 'Optional slug for this document (e.g. project-spec). Adds tag <doc_type>:<slug> so Stream can show all sections.'],
                         'parent_id' => ['type' => 'string', 'description' => 'Optional UUID of root thought to attach this section to (for hierarchy)'],
@@ -809,8 +809,8 @@ class McpController extends Controller
     }
 
     /**
-     * capture_plan: Save a document (plan, decision, dev, support, spec, research) or section as a thought.
-     * doc_type sets source and tag prefix (e.g. decision:slug, spec:slug). When plan_slug is provided,
+     * capture_plan: Save a document (plan, decision, dev, support, spec, research, meeting) or section as a thought.
+     * doc_type sets source and tag prefix (e.g. decision:slug, spec:slug, meeting:slug). When plan_slug is provided,
      * adds tag <doc_type>:<slug> so all sections can be viewed via Stream ?tag=... (slug form e.g. decision-project-spec).
      * Optional parent_id links this thought to a root for hierarchy.
      *
@@ -819,7 +819,7 @@ class McpController extends Controller
      */
     private function capturePlan(array $params): array
     {
-        $allowedDocTypes = ['plan', 'decision', 'dev', 'support', 'spec', 'research'];
+        $allowedDocTypes = ['plan', 'decision', 'dev', 'support', 'spec', 'research', 'meeting'];
         $v = Validator::make($params, [
             'content' => 'required|string',
             'doc_type' => 'sometimes|nullable|string|in:'.implode(',', $allowedDocTypes),

@@ -39,6 +39,12 @@ final class ThoughtTypeNavigation
             'route_name' => 'idea.stream.plans',
             'stored_values' => ['plan', 'plans'],
         ],
+        'meeting' => [
+            'collection_label' => 'Meetings',
+            'thought_label' => 'Meeting',
+            'route_name' => 'idea.stream.meetings',
+            'stored_values' => ['meeting', 'meetings'],
+        ],
     ];
 
     /**
@@ -145,6 +151,9 @@ final class ThoughtTypeNavigation
         }
         if ($metaType === 'plan') {
             return 'plan';
+        }
+        if ($metaType === 'meeting') {
+            return 'meeting';
         }
 
         return null;

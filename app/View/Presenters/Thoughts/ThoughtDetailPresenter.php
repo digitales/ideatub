@@ -442,6 +442,10 @@ final class ThoughtDetailPresenter
                 ->values();
         }
 
+        $comments = $comments
+            ->filter(fn (Thought $c) => ! $this->isStructuredDocumentSection($c))
+            ->values();
+
         return $comments
             ->map(function (Thought $comment): array {
                 try {

@@ -53,6 +53,16 @@ class StreamPageTest extends TestCase
         $this->assertStreamTypeNav($response, route('idea.stream.jira'));
     }
 
+    public function test_meetings_stream_page_marks_active_type_navigation_option(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.stream.meetings'));
+
+        $response->assertOk();
+        $this->assertStreamTypeNav($response, route('idea.stream.meetings'));
+    }
+
     public function test_stream_page_renders_edit_affordance_and_content_update_route(): void
     {
         $user = User::factory()->create();
@@ -535,6 +545,7 @@ class StreamPageTest extends TestCase
             'Emails' => route('idea.stream.emails'),
             'Research' => route('idea.stream.research'),
             'Plans' => route('idea.stream.plans'),
+            'Meetings' => route('idea.stream.meetings'),
         ];
 
         foreach ($expectedLinks as $label => $href) {

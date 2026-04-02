@@ -131,6 +131,7 @@ class ThoughtCaptureService
         if ($ideaMetadata !== null && $ideaMetadata !== []) {
             $metadata = array_merge($metadata, $ideaMetadata);
         }
+        $metadata = $this->applyDocTypeToMetadata($metadata, $docType);
 
         $payload = [
             'content' => $content,
@@ -181,6 +182,7 @@ class ThoughtCaptureService
         if ($ideaMetadata !== null && $ideaMetadata !== []) {
             $metadata = array_merge($metadata, $ideaMetadata);
         }
+        $metadata = $this->applyDocTypeToMetadata($metadata, $docType);
 
         $base = array_filter([
             'doc_type' => $docType,
@@ -255,5 +257,20 @@ class ThoughtCaptureService
         }
 
         return $out;
+    }
+
+    /**
+     * Set metadata.type for doc types that use a Stream collection filtered on metadata (not source).
+     *
+     * @param  array<string, mixed>  $metadata
+     * @return array<string, mixed>
+     */
+    private function applyDocTypeToMetadata(array $metadata, ?string $docType): array
+    {
+        if ($docType === 'meeting') {
+            $metadata['type'] = 'meeting';
+        }
+
+        return $metadata;
     }
 }

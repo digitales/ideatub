@@ -117,6 +117,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/stream/emails', [IdeaController::class, 'streamEmails'])->name('idea.stream.emails');
     Route::get('/stream/research', [IdeaController::class, 'streamResearch'])->name('idea.stream.research');
     Route::get('/stream/plans', [IdeaController::class, 'streamPlans'])->name('idea.stream.plans');
+    Route::get('/stream/meetings', [IdeaController::class, 'streamMeetings'])->name('idea.stream.meetings');
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
 
     Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');

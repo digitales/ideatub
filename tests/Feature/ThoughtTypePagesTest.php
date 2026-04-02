@@ -186,6 +186,49 @@ class ThoughtTypePagesTest extends TestCase
         $response->assertSee('Plural plans metadata');
     }
 
+    public function test_meetings_type_page_lists_only_meeting_metadata_thoughts(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Standup notes',
+            'parent_id' => null,
+            'source' => 'meeting',
+            'metadata' => ['type' => 'meeting'],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Not a meeting',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'idea'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.meetings'));
+
+        $response->assertOk();
+        $response->assertSee('Meetings', false);
+        $response->assertSee('Standup notes');
+        $response->assertDontSee('Not a meeting');
+    }
+
+    public function test_meetings_type_page_includes_meetings_alias_metadata_values(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Plural meetings metadata',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'MEETINGS'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.meetings'));
+
+        $response->assertOk();
+        $response->assertSee('Plural meetings metadata');
+    }
+
     public function test_type_page_shows_empty_state_when_no_matching_thoughts_exist(): void
     {
         $user = User::factory()->create();
@@ -199,6 +242,21 @@ class ThoughtTypePagesTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('No plans yet.', false);
+    }
+
+    public function test_meetings_stream_shows_empty_state_when_no_matching_thoughts_exist(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Other',
+            'parent_id' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.meetings'));
+
+        $response->assertOk();
+        $response->assertSee('No meetings yet.', false);
     }
 
     public function test_disabled_jira_type_is_not_available_in_navigation_mapping(): void
@@ -316,6 +374,25 @@ class ThoughtTypePagesTest extends TestCase
         $this->actingAs($user)->get($href)->assertOk();
     }
 
+    public function test_meetings_stream_thought_type_label_links_to_meetings_stream_and_destination_ok(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Meeting card type label',
+            'parent_id' => null,
+            'source' => 'meeting',
+            'metadata' => ['type' => 'meeting'],
+        ]);
+
+        $href = route('idea.stream.meetings');
+        $response = $this->actingAs($user)->get($href);
+        $response->assertOk();
+        $this->assertThoughtBadgeLink($response, 'Meeting', $href);
+
+        $this->actingAs($user)->get($href)->assertOk();
+    }
+
     public function test_idea_index_plan_thought_type_label_links_to_plans_stream_and_destination_ok(): void
     {
         $user = User::factory()->create();
@@ -331,6 +408,25 @@ class ThoughtTypePagesTest extends TestCase
         $response = $this->actingAs($user)->get(route('idea.index'));
         $response->assertOk();
         $this->assertThoughtBadgeLink($response, 'Plan', $href);
+
+        $this->actingAs($user)->get($href)->assertOk();
+    }
+
+    public function test_idea_index_meeting_thought_type_label_links_to_meetings_stream_and_destination_ok(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Meeting card on index',
+            'parent_id' => null,
+            'source' => 'meeting',
+            'metadata' => ['type' => 'meeting'],
+        ]);
+
+        $href = route('idea.stream.meetings');
+        $response = $this->actingAs($user)->get(route('idea.index'));
+        $response->assertOk();
+        $this->assertThoughtBadgeLink($response, 'Meeting', $href);
 
         $this->actingAs($user)->get($href)->assertOk();
     }

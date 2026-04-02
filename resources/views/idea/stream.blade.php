@@ -42,6 +42,8 @@
                         No research yet.
                     @elseif($__collectionKey === 'plan')
                         No plans yet.
+                    @elseif($__collectionKey === 'meeting')
+                        No meetings yet.
                     @elseif($tag)
                         No thoughts with tag ‘{{e($tag)}}’. <a href="{{route('idea.stream')}}" class="text-memory-violet hover:underline">All thoughts</a>
                     @else

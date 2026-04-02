@@ -343,6 +343,39 @@ class McpApiTest extends TestCase
         $this->assertSame('my-app', $thought->source_metadata['project'] ?? null);
     }
 
+    public function test_capture_plan_with_doc_type_meeting_sets_source_metadata_type_and_tag(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->postJson('/api/mcp?key='.$key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => '## Standup — Decisions',
+                'doc_type' => 'meeting',
+                'plan_slug' => '2026-04-01-standup',
+                'section_title' => 'Standup — Decisions',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.doc_type', 'meeting');
+
+        $thought = Thought::where('user_id', $user->id)->latest()->first();
+        $this->assertNotNull($thought);
+        $this->assertSame('meeting', $thought->source);
+        $this->assertSame('meeting', $thought->metadata['type'] ?? null);
+        $this->assertSame('meeting', $thought->source_metadata['doc_type'] ?? null);
+        $tags = $thought->metadata['tags'] ?? [];
+        $this->assertContains('meeting:2026-04-01-standup', $tags);
+    }
+
     public function test_capture_plan_rejects_invalid_doc_type(): void
     {
         [$key] = $this->validKeyAndUser();

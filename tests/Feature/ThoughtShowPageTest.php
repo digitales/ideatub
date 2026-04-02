@@ -1558,6 +1558,27 @@ class ThoughtShowPageTest extends TestCase
         $this->actingAs($owner)->get($href)->assertOk();
     }
 
+    public function test_meeting_thought_detail_header_includes_meetings_stream_link_and_destination_ok(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'embedding' => null,
+            'content' => 'Detail body meeting type',
+            'source' => 'meeting',
+            'metadata' => ['type' => 'meeting', 'tags' => []],
+        ]);
+
+        $href = route('idea.stream.meetings');
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertThoughtBadgeLink($response, 'Meeting', $href);
+
+        $this->actingAs($owner)->get($href)->assertOk();
+    }
+
     public function test_non_canonical_source_detail_header_renders_human_readable_non_link_label(): void
     {
         $owner = User::factory()->create();

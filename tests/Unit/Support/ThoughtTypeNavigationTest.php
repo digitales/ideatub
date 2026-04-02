@@ -10,7 +10,7 @@ class ThoughtTypeNavigationTest extends TestCase
 {
     public function test_ordered_nav_types_match_spec(): void
     {
-        $this->assertSame(['jira', 'email', 'research', 'plan'], ThoughtTypeNavigation::orderedNavTypes());
+        $this->assertSame(['jira', 'email', 'research', 'plan', 'meeting'], ThoughtTypeNavigation::orderedNavTypes());
     }
 
     public function test_collection_labels(): void
@@ -19,6 +19,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('Emails', ThoughtTypeNavigation::collectionLabel('email'));
         $this->assertSame('Research', ThoughtTypeNavigation::collectionLabel('research'));
         $this->assertSame('Plans', ThoughtTypeNavigation::collectionLabel('plan'));
+        $this->assertSame('Meetings', ThoughtTypeNavigation::collectionLabel('meeting'));
     }
 
     public function test_thought_display_labels(): void
@@ -27,6 +28,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('Email', ThoughtTypeNavigation::thoughtDisplayLabel('email'));
         $this->assertSame('Research', ThoughtTypeNavigation::thoughtDisplayLabel('research'));
         $this->assertSame('Plan', ThoughtTypeNavigation::thoughtDisplayLabel('plan'));
+        $this->assertSame('Meeting', ThoughtTypeNavigation::thoughtDisplayLabel('meeting'));
     }
 
     public function test_aliases_normalize(): void
@@ -35,12 +37,15 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('plan', ThoughtTypeNavigation::normalizeTypeKey('plans'));
         $this->assertSame('email', ThoughtTypeNavigation::normalizeTypeKey('EMAIL'));
         $this->assertSame('plan', ThoughtTypeNavigation::normalizeTypeKey(' PlanS '));
+        $this->assertSame('meeting', ThoughtTypeNavigation::normalizeTypeKey('meetings'));
+        $this->assertSame('meeting', ThoughtTypeNavigation::normalizeTypeKey('MEETING'));
     }
 
     public function test_stored_values_for_collection_are_shared_with_normalization(): void
     {
         $this->assertSame(['email', 'emails'], ThoughtTypeNavigation::storedValuesForCollection('EMAIL'));
         $this->assertSame(['plan', 'plans'], ThoughtTypeNavigation::storedValuesForCollection('plans'));
+        $this->assertSame(['meeting', 'meetings'], ThoughtTypeNavigation::storedValuesForCollection('meetings'));
     }
 
     public function test_jira_availability_follows_config(): void
@@ -58,6 +63,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertTrue(ThoughtTypeNavigation::isAvailable('email'));
         $this->assertTrue(ThoughtTypeNavigation::isAvailable('research'));
         $this->assertTrue(ThoughtTypeNavigation::isAvailable('plan'));
+        $this->assertTrue(ThoughtTypeNavigation::isAvailable('meeting'));
     }
 
     public function test_route_names_per_type(): void
@@ -66,6 +72,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('idea.stream.emails', ThoughtTypeNavigation::routeName('email'));
         $this->assertSame('idea.stream.research', ThoughtTypeNavigation::routeName('research'));
         $this->assertSame('idea.stream.plans', ThoughtTypeNavigation::routeName('plan'));
+        $this->assertSame('idea.stream.meetings', ThoughtTypeNavigation::routeName('meeting'));
     }
 
     public function test_resolve_thought_to_type_key_from_source_and_metadata(): void
@@ -81,12 +88,18 @@ class ThoughtTypeNavigationTest extends TestCase
 
         $plan = new Thought(['source' => 'web', 'metadata' => ['type' => 'plan']]);
         $this->assertSame('plan', ThoughtTypeNavigation::resolveThoughtToTypeKey($plan));
+
+        $meeting = new Thought(['source' => 'meeting', 'metadata' => ['type' => 'meeting']]);
+        $this->assertSame('meeting', ThoughtTypeNavigation::resolveThoughtToTypeKey($meeting));
     }
 
     public function test_resolve_normalizes_metadata_type_aliases(): void
     {
         $t = new Thought(['source' => 'web', 'metadata' => ['type' => 'plans']]);
         $this->assertSame('plan', ThoughtTypeNavigation::resolveThoughtToTypeKey($t));
+
+        $m = new Thought(['source' => 'web', 'metadata' => ['type' => 'meetings']]);
+        $this->assertSame('meeting', ThoughtTypeNavigation::resolveThoughtToTypeKey($m));
     }
 
     public function test_resolve_thought_handles_null_metadata_without_throwing(): void
