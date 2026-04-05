@@ -54,6 +54,11 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('shared-research-password', function (Request $request) {
+            $token = $request->route('token') ?? 'unknown';
+            return Limit::perMinutes(15, 10)->by($token . ':' . $request->ip());
+        });
+
         Broadcast::routes(['middleware' => ['web', 'auth']]);
 
         $channelsPath = base_path('routes/channels.php');
