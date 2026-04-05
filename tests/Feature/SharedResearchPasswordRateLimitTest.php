@@ -22,10 +22,15 @@ class SharedResearchPasswordRateLimitTest extends TestCase
             'password_hash' => bcrypt('correct'),
         ]);
 
-        for ($i = 0; $i < 10; $i++) {
+        for ($i = 0; $i < 9; $i++) {
             $this->post('/r/' . $share->token, ['password' => 'wrong']);
         }
 
+        // 10th attempt — still within limit
+        $under = $this->post('/r/' . $share->token, ['password' => 'wrong']);
+        $under->assertStatus(401);
+
+        // 11th attempt — now throttled
         $response = $this->post('/r/' . $share->token, ['password' => 'wrong']);
         $response->assertStatus(429);
     }
