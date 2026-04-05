@@ -4,18 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 class LoginRateLimitTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        RateLimiter::clear('login:' . request()->ip());
-    }
 
     public function test_too_many_login_attempts_returns_429(): void
     {
