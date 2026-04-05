@@ -48,6 +48,7 @@ class SharedResearchXssTest extends TestCase
         $response = $this->get('/r/' . $share->token);
 
         $response->assertStatus(200);
-        $response->assertDontSee('javascript:alert', false);
+        $response->assertDontSee('javascript:', false);
+        $response->assertSee('click me', false);  // link text still rendered
     }
 }
