@@ -195,7 +195,7 @@ class IdeaController extends Controller
         $documentSectionHtmlChunks = [];
 
         if ($thought->source !== 'email') {
-            $converter = new CommonMarkConverter;
+            $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
             $contentHtml = $this->renderDemoSafeMarkdown(
                 $converter,
                 $thought->content,
@@ -1248,7 +1248,7 @@ class IdeaController extends Controller
         }
 
         $sections = $thought->comments()->orderBy('created_at')->get();
-        $converter = new CommonMarkConverter;
+        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
 
         $rootHtml = $this->renderDemoSafeMarkdown(
             $converter,
@@ -1670,7 +1670,7 @@ class IdeaController extends Controller
         $rootContext = $previewSource->demoSafeMarkdownRootContext();
         $sectionContext = $previewSource->demoSafeMarkdownSectionContext();
 
-        $converter = new CommonMarkConverter;
+        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
         $rootHtml = $this->renderDemoSafeMarkdown(
             $converter,
             $documentRoot->content,

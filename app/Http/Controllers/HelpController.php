@@ -37,7 +37,7 @@ class HelpController extends Controller
      */
     private function loadExamplePrompts(): array
     {
-        $converter = new CommonMarkConverter;
+        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
         $promptsDir = resource_path('content/example-prompts');
         $slugs = ['01-memory-migration', '02-second-brain-migration', '03-open-brain-spark', '04-quick-capture-templates', '05-weekly-review'];
         $prompts = [];
