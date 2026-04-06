@@ -110,7 +110,7 @@ class ThoughtsApiController extends Controller
     public function store(Request $request): JsonResponse
     {
         $v = Validator::make($request->all(), [
-            'content' => 'required|string',
+            'content' => 'required|string|max:65535',
             'parent_id' => 'sometimes|nullable|uuid',
             'in_reply_to' => 'sometimes|nullable|uuid',
             'source' => 'sometimes|nullable|string|max:64',

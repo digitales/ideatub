@@ -771,6 +771,9 @@ class McpController extends Controller
      */
     private function captureThought(array $params): array
     {
+        if (isset($params['content']) && mb_strlen((string) $params['content']) > 65535) {
+            throw new \InvalidArgumentException('Content must be 65535 characters or fewer.');
+        }
         $v = Validator::make($params, [
             'content' => 'required|string',
             'parent_id' => 'sometimes|nullable|uuid',
@@ -825,6 +828,9 @@ class McpController extends Controller
      */
     private function captureIdea(array $params): array
     {
+        if (isset($params['content']) && mb_strlen((string) $params['content']) > 65535) {
+            throw new \InvalidArgumentException('Content must be 65535 characters or fewer.');
+        }
         $v = Validator::make($params, [
             'content' => 'required|string',
             'logged_date' => 'sometimes|nullable|string|date_format:Y-m-d',
@@ -868,6 +874,9 @@ class McpController extends Controller
      */
     private function captureMeeting(array $params): array
     {
+        if (isset($params['content']) && mb_strlen((string) $params['content']) > 65535) {
+            throw new \InvalidArgumentException('Content must be 65535 characters or fewer.');
+        }
         $params['doc_type'] = 'meeting';
 
         return $this->capturePlan($params);
@@ -884,6 +893,9 @@ class McpController extends Controller
      */
     private function capturePlan(array $params): array
     {
+        if (isset($params['content']) && mb_strlen((string) $params['content']) > 65535) {
+            throw new \InvalidArgumentException('Content must be 65535 characters or fewer.');
+        }
         $allowedDocTypes = ['plan', 'decision', 'dev', 'support', 'spec', 'research', 'meeting'];
         $v = Validator::make($params, [
             'content' => 'required|string',

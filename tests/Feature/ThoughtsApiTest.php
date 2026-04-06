@@ -161,6 +161,29 @@ class ThoughtsApiTest extends TestCase
         $this->assertSame([], $response->json('thoughts'));
     }
 
+    public function test_store_thought_with_content_over_limit_returns_422(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/thoughts', [
+                'content' => str_repeat('a', 65536),
+            ]);
+
+        $response->assertStatus(422);
+    }
+
     public function test_stats_excludes_hidden_email_from_count(): void
     {
         $user = User::factory()->create();
