@@ -26,6 +26,7 @@ class SocialAuthTest extends TestCase
 
         $response->assertRedirect(route('login'));
         $this->assertGuest();
+        $response->assertSessionHas('error');
     }
 
     public function test_github_callback_with_null_email_does_not_create_user(): void

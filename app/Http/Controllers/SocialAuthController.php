@@ -73,11 +73,9 @@ class SocialAuthController extends Controller
                     ->with('error', 'Your GitHub account must have a public email address. Please add one in GitHub Settings → Profile.');
             }
 
-            $query = User::where('github_id', $githubUser->id);
-            if ($githubUser->email !== null) {
-                $query->orWhere('email', $githubUser->email);
-            }
-            $user = $query->first();
+            $user = User::where('github_id', $githubUser->id)
+                ->orWhere('email', $githubUser->email)
+                ->first();
 
             if ($user) {
                 // Update GitHub ID if not set
