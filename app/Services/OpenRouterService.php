@@ -295,4 +295,109 @@ PROMPT;
             'usefulness_score' => $score,
         ];
     }
+
+    /**
+     * Analyse a newsletter email body and return a structured summary.
+     *
+     * @return array{
+     *     summary: string,
+     *     key_points: list<string>,
+     *     positives_mentioned: list<string>,
+     *     negatives_mentioned: list<string>,
+     *     highlights: list<string>,
+     *     quality_notes: ?string
+     * }
+     *
+     * @throws RequestException On HTTP errors
+     * @throws \RuntimeException If OPENROUTER_API_KEY is not set or JSON is invalid
+     */
+    public function analyzeNewsletter(string $subject, string $body): array
+    {
+        $apiKey = config('services.openrouter.api_key');
+        if (empty($apiKey)) {
+            throw new \RuntimeException('OPENROUTER_API_KEY is not set.');
+        }
+
+        $model = config('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
+
+        $maxChars = 8_000;
+        $truncated = mb_strlen($body) > $maxChars;
+        if ($truncated) {
+            $truncatedBody = mb_substr($body, 0, $maxChars);
+            $lastParagraph = mb_strrpos($truncatedBody, "\n\n");
+            if ($lastParagraph !== false && $lastParagraph > (int) ($maxChars * 0.8)) {
+                $truncatedBody = mb_substr($truncatedBody, 0, $lastParagraph);
+            }
+        } else {
+            $truncatedBody = $body;
+        }
+
+        $systemPrompt = <<<'PROMPT'
+You analyse newsletter emails for an editor. Reply with only a single JSON object (no markdown fences, no explanation) with these keys:
+- "summary" (string): a 2–4 sentence neutral overview of what this newsletter covers, its topics, framing, and scope
+- "key_points" (array of strings): the main claims, findings, or stories the author highlights — one string per point
+- "positives_mentioned" (array of strings): capture both (a) things the newsletter author is positive about, bullish on, or praising (e.g. "Bullish on X", "Praises Y approach") AND (b) quality strengths of the newsletter itself (e.g. "Well-sourced claims", "Clear structure") — one string per item
+- "negatives_mentioned" (array of strings): capture both (a) things the author is critical or sceptical about (e.g. "Critical of Z policy", "Sceptical of Y trend") AND (b) quality weaknesses of the newsletter itself (e.g. "Surface-level on X", "Lacks evidence for claim Y") — one string per item
+- "highlights" (array of strings): anything else pertinent — notable data points, surprising assertions, calls to action, recurring themes — that does not fit the above fields; use an empty array if nothing stands out
+- "quality_notes" (string or null): caveats only — thin content, truncated body, unclear authorship, marketing-heavy; null if none
+
+Write in British English. Factual, neutral, analytical tone. No padding.
+PROMPT;
+
+        $userContent = 'Subject: '.trim($subject)."\n\nNewsletter body:\n".trim($truncatedBody);
+
+        $response = Http::withToken($apiKey)
+            ->timeout(60)
+            ->post(self::CHAT_URL, [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userContent],
+                ],
+                'max_tokens' => 1024,
+            ]);
+
+        $response->throw();
+
+        $content = $response->json('choices.0.message.content');
+        if ($content === null || $content === '') {
+            throw new \RuntimeException('OpenRouter newsletter analysis response missing choices[0].message.content.');
+        }
+
+        $content = trim((string) $content);
+        if (str_starts_with($content, '```')) {
+            $content = preg_replace('/^```(?:json)?\s*|\s*```$/s', '', $content) ?? $content;
+            $content = trim($content);
+        }
+
+        $decoded = json_decode($content, true);
+        if (! is_array($decoded)) {
+            throw new \RuntimeException('OpenRouter newsletter analysis response was not valid JSON.');
+        }
+
+        $quality = $decoded['quality_notes'] ?? null;
+        $quality = ($quality !== null && $quality !== '') ? (is_string($quality) ? trim($quality) : null) : null;
+
+        if ($truncated) {
+            $truncationNote = 'Newsletter body was truncated before analysis; some content may be missing.';
+            $quality = $quality !== null ? $truncationNote.' '.$quality : $truncationNote;
+        }
+
+        $toStringArray = static function (mixed $value): array {
+            if (! is_array($value)) {
+                return [];
+            }
+
+            return array_values(array_filter(array_map('strval', $value)));
+        };
+
+        return [
+            'summary' => is_string($decoded['summary'] ?? null) ? trim($decoded['summary']) : '',
+            'key_points' => $toStringArray($decoded['key_points'] ?? null),
+            'positives_mentioned' => $toStringArray($decoded['positives_mentioned'] ?? null),
+            'negatives_mentioned' => $toStringArray($decoded['negatives_mentioned'] ?? null),
+            'highlights' => $toStringArray($decoded['highlights'] ?? null),
+            'quality_notes' => $quality,
+        ];
+    }
 }
