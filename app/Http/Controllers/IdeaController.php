@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\ThoughtDetailResearchPreviewSource;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
+use App\Models\NewsletterAnalysis;
 use App\Models\ResearchRun;
 use App\Models\ResearchShare;
 use App\Models\ResearchSkill;
@@ -1268,6 +1269,7 @@ class IdeaController extends Controller
         $relatedEmail = $this->resolveResearchRelatedEmailCard($thought);
         $linkedVideo = $this->resolveLinkedVideoForResearchThought($thought);
         $editorialLinkSummaries = $this->buildResearchEditorialLinkSummaryViewModel($thought);
+        $newsletterAnalysis = $this->buildNewsletterAnalysisViewModel($thought);
         $pageTitle = Str::limit(
             preg_replace('/\s+/', ' ', trim(strip_tags($rootHtml))) ?: 'Research',
             50
@@ -1281,6 +1283,7 @@ class IdeaController extends Controller
             'relatedEmail' => $relatedEmail,
             'linkedVideo' => $linkedVideo,
             'editorialLinkSummaries' => $editorialLinkSummaries,
+            'newsletterAnalysis' => $newsletterAnalysis,
         ]);
     }
 
@@ -1387,6 +1390,27 @@ class IdeaController extends Controller
             'sections' => $sections,
             'pending_count' => $pendingCount,
             'failed_count' => $failedCount,
+        ];
+    }
+
+    private function buildNewsletterAnalysisViewModel(Thought $researchThought): ?array
+    {
+        $analysis = NewsletterAnalysis::query()
+            ->where('research_thought_id', $researchThought->id)
+            ->first();
+
+        if ($analysis === null) {
+            return null;
+        }
+
+        return [
+            'status' => (string) $analysis->status,
+            'summary' => $analysis->summary,
+            'key_points' => $analysis->key_points ?? [],
+            'positives_mentioned' => $analysis->positives_mentioned ?? [],
+            'negatives_mentioned' => $analysis->negatives_mentioned ?? [],
+            'highlights' => $analysis->highlights ?? [],
+            'quality_notes' => $analysis->quality_notes,
         ];
     }
 
