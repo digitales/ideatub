@@ -38,12 +38,16 @@ class McpKeyController extends Controller
     {
         $this->authorize('create', UserMcpKey::class);
 
+        $validated = $request->validate([
+            'label' => 'nullable|string|max:64',
+        ]);
+
         $plainKey = 'ideatub_'.Str::random(32);
         $keyHash = UserMcpKey::hashKey($plainKey);
 
         $request->user()->userMcpKeys()->create([
             'key_hash' => $keyHash,
-            'label' => 'Created in IdeaTub',
+            'label' => $validated['label'] ?? 'Created in IdeaTub',
         ]);
 
         return redirect()
