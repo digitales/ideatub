@@ -44,6 +44,11 @@ class McpCaptureVideoTest extends TestCase
         return [$plain, $user];
     }
 
+    private function mcpPost(string $key, array $data): \Illuminate\Testing\TestResponse
+    {
+        return $this->postJson('/api/mcp', $data, ['x-ideatub-key' => $key]);
+    }
+
     public function test_capture_video_happy_path_queues_transcript_fetch(): void
     {
         Queue::fake();
@@ -54,7 +59,7 @@ class McpCaptureVideoTest extends TestCase
         });
 
         $url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_video',
@@ -94,7 +99,7 @@ class McpCaptureVideoTest extends TestCase
             }
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_video',
@@ -123,13 +128,13 @@ class McpCaptureVideoTest extends TestCase
         });
 
         $params = ['url' => 'https://youtu.be/dQw4w9WgXcQ'];
-        $first = $this->postJson('/api/mcp?key='.$key, [
+        $first = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_video',
             'params' => $params,
         ]);
-        $second = $this->postJson('/api/mcp?key='.$key, [
+        $second = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 2,
             'method' => 'capture_video',
@@ -152,7 +157,7 @@ class McpCaptureVideoTest extends TestCase
             $mock->shouldReceive('embed')->twice()->andReturn($embed);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_video',
@@ -181,7 +186,7 @@ class McpCaptureVideoTest extends TestCase
             $mock->shouldReceive('embed')->once()->andReturn($embed);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_video',
@@ -226,7 +231,7 @@ class McpCaptureVideoTest extends TestCase
             }
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_video',
@@ -257,7 +262,7 @@ class McpCaptureVideoTest extends TestCase
             $mock->shouldReceive('embed')->once()->andReturn($embed);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'tools/call',
@@ -287,7 +292,7 @@ class McpCaptureVideoTest extends TestCase
         Queue::fake();
         [$key] = $this->validKeyAndUser();
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_video',

@@ -42,6 +42,11 @@ class McpApiTest extends TestCase
         return [$plain, $user];
     }
 
+    private function mcpPost(string $key, array $data): \Illuminate\Testing\TestResponse
+    {
+        return $this->postJson('/api/mcp', $data, ['x-ideatub-key' => $key]);
+    }
+
     public function test_get_mcp_returns_server_info(): void
     {
         $response = $this->getJson('/api/mcp');
@@ -72,7 +77,7 @@ class McpApiTest extends TestCase
     {
         $key = $this->validKey();
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'initialize',
@@ -92,7 +97,7 @@ class McpApiTest extends TestCase
     {
         $key = $this->validKey();
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'tools/list',
@@ -146,7 +151,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_thought',
@@ -169,7 +174,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_thought',
@@ -195,7 +200,7 @@ class McpApiTest extends TestCase
             'source_metadata' => ['client_version' => '1.0'],
         ]);
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'browse_recent',
@@ -216,7 +221,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => ['implementation']]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_plan',
@@ -258,7 +263,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_plan',
@@ -284,7 +289,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('embed')->never();
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_plan',
@@ -308,7 +313,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_plan',
@@ -341,7 +346,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_plan',
@@ -368,7 +373,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_plan',
@@ -401,7 +406,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'add_meeting_notes',
@@ -431,7 +436,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_meeting',
@@ -455,7 +460,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('embed')->never();
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_plan',
@@ -483,7 +488,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_plan',
@@ -529,7 +534,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_plan',
@@ -556,7 +561,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_idea',
@@ -584,7 +589,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'capture_idea',
@@ -607,7 +612,7 @@ class McpApiTest extends TestCase
     {
         $key = $this->validKey();
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'get_ideas',
@@ -626,7 +631,7 @@ class McpApiTest extends TestCase
             'metadata' => ['type' => 'idea', 'completed' => true],
         ]);
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'get_ideas',
@@ -646,7 +651,7 @@ class McpApiTest extends TestCase
             'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-03-01'],
         ]);
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'get_ideas',
@@ -677,7 +682,7 @@ class McpApiTest extends TestCase
             $mock->shouldNotReceive('researchNote');
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -720,7 +725,7 @@ class McpApiTest extends TestCase
             $mock->shouldNotReceive('researchNote');
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -745,7 +750,7 @@ class McpApiTest extends TestCase
     {
         $key = $this->validKey();
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -763,7 +768,7 @@ class McpApiTest extends TestCase
         Bus::fake();
         [$key, $user] = $this->validKeyAndUser();
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'tools/call',
@@ -794,7 +799,7 @@ class McpApiTest extends TestCase
             $mock->shouldReceive('embed')->once()->with('decision:project-spec')->andReturn($embedding);
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'search_thoughts',
@@ -822,7 +827,7 @@ class McpApiTest extends TestCase
             'visibility_reason' => Thought::VISIBILITY_REASON_IGNORED_SENDER,
         ]);
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'browse_recent',
@@ -851,7 +856,7 @@ class McpApiTest extends TestCase
             'visibility_reason' => Thought::VISIBILITY_REASON_IGNORED_SENDER,
         ]);
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'thought_stats',

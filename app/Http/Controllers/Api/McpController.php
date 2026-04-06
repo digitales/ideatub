@@ -44,7 +44,7 @@ class McpController extends Controller
             'name' => 'ideatub',
             'version' => '1.0',
             'protocol' => 'json-rpc',
-            'auth' => 'Send key via ?key=... or x-ideatub-key header',
+            'auth' => 'Send key via x-ideatub-key header or OAuth Bearer token',
             'methods' => $this->mcpMethodNames(),
         ]);
     }
@@ -401,7 +401,7 @@ class McpController extends Controller
             }
         }
 
-        $key = $request->query('key') ?? $request->header('x-ideatub-key');
+        $key = $request->header('x-ideatub-key');
         $key = is_string($key) ? trim($key) : '';
         if ($key === '') {
             return null;

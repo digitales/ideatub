@@ -31,6 +31,11 @@ class McpResearchIdeaTest extends TestCase
         return [$plain, $user];
     }
 
+    private function mcpPost(string $key, array $data): \Illuminate\Testing\TestResponse
+    {
+        return $this->postJson('/api/mcp', $data, ['x-ideatub-key' => $key]);
+    }
+
     public function test_research_idea_with_content_queues_run_returns_idea_and_run_ids_without_research_thought(): void
     {
         Bus::fake();
@@ -42,7 +47,7 @@ class McpResearchIdeaTest extends TestCase
             $mock->shouldNotReceive('researchNote');
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -90,7 +95,7 @@ class McpResearchIdeaTest extends TestCase
             $mock->shouldNotReceive('extractMetadata');
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -126,7 +131,7 @@ class McpResearchIdeaTest extends TestCase
             $mock->shouldNotReceive('researchNote');
         });
 
-        $first = $this->postJson('/api/mcp?key='.$key, [
+        $first = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -135,7 +140,7 @@ class McpResearchIdeaTest extends TestCase
         $first->assertStatus(200);
         $runId = $first->json('result.research_run_id');
 
-        $second = $this->postJson('/api/mcp?key='.$key, [
+        $second = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 2,
             'method' => 'research_idea',
@@ -163,7 +168,7 @@ class McpResearchIdeaTest extends TestCase
             $mock->shouldNotReceive('extractMetadata');
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -185,7 +190,7 @@ class McpResearchIdeaTest extends TestCase
         Bus::fake();
         [$key] = $this->validKeyAndUser();
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -204,7 +209,7 @@ class McpResearchIdeaTest extends TestCase
         Bus::fake();
         [$key] = $this->validKeyAndUser();
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -228,7 +233,7 @@ class McpResearchIdeaTest extends TestCase
             'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => now()->toDateString()],
         ]);
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -251,7 +256,7 @@ class McpResearchIdeaTest extends TestCase
             'metadata' => ['type' => 'note'],
         ]);
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'research_idea',
@@ -280,7 +285,7 @@ class McpResearchIdeaTest extends TestCase
             $mock->shouldNotReceive('researchNote');
         });
 
-        $response = $this->postJson('/api/mcp?key='.$key, [
+        $response = $this->mcpPost($key, [
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'tools/call',

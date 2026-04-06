@@ -77,4 +77,22 @@ class McpKeySettingsTest extends TestCase
         $response->assertForbidden();
         $this->assertDatabaseHas('user_mcp_keys', ['id' => $key->id]);
     }
+
+    public function test_mcp_key_in_query_string_is_rejected(): void
+    {
+        $user = User::factory()->create();
+        $plainKey = 'ideatub_' . str_repeat('a', 32);
+        $user->userMcpKeys()->create([
+            'key_hash' => \App\Models\UserMcpKey::hashKey($plainKey),
+            'label' => 'Test key',
+        ]);
+
+        $response = $this->postJson('/api/mcp?key=' . $plainKey, [
+            'jsonrpc' => '2.0',
+            'method' => 'thought_stats',
+            'id' => 1,
+        ]);
+
+        $response->assertStatus(401);
+    }
 }
