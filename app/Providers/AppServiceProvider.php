@@ -8,8 +8,11 @@ use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use MrMySQL\YoutubeTranscript\TranscriptListFetcher;
@@ -44,6 +47,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('login', function (Request $request) {
+            return [
+                Limit::perMinute(5)->by($request->ip()),
+                Limit::perMinute(10)->by($request->input('email')),
+            ];
+        });
+
+        RateLimiter::for('shared-research-password', function (Request $request) {
+            $token = $request->route('token') ?? 'unknown';
+            return Limit::perMinutes(15, 10)->by($token . ':' . $request->ip());
+        });
+
         Broadcast::routes(['middleware' => ['web', 'auth']]);
 
         $channelsPath = base_path('routes/channels.php');

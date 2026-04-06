@@ -307,6 +307,89 @@ class OpenRouterServiceTest extends TestCase
         });
     }
 
+    #[Test]
+    public function analyze_newsletter_returns_structured_analysis(): void
+    {
+        Config::set('services.openrouter.api_key', 'test-api-key');
+        Config::set('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
+
+        $json = json_encode([
+            'summary' => 'A weekly roundup covering AI tooling and developer productivity.',
+            'key_points' => ['OpenAI released GPT-5', 'Cursor raised Series B'],
+            'positives_mentioned' => ['Bullish on AI coding assistants', 'Well-structured overview'],
+            'negatives_mentioned' => ['Sceptical of AGI timelines', 'Lacks citations for key claims'],
+            'highlights' => ['Subscriber count now 50k'],
+            'quality_notes' => null,
+        ], JSON_THROW_ON_ERROR);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => $json]]],
+            ], 200),
+        ]);
+
+        $result = $this->service->analyzeNewsletter(
+            subject: 'AI Weekly #42',
+            body: str_repeat('Substantive newsletter body paragraph. ', 30),
+        );
+
+        $this->assertSame('A weekly roundup covering AI tooling and developer productivity.', $result['summary']);
+        $this->assertSame(['OpenAI released GPT-5', 'Cursor raised Series B'], $result['key_points']);
+        $this->assertSame(['Bullish on AI coding assistants', 'Well-structured overview'], $result['positives_mentioned']);
+        $this->assertSame(['Sceptical of AGI timelines', 'Lacks citations for key claims'], $result['negatives_mentioned']);
+        $this->assertSame(['Subscriber count now 50k'], $result['highlights']);
+        $this->assertNull($result['quality_notes']);
+
+        Http::assertSent(function ($request) {
+            $messages = $request->data()['messages'] ?? [];
+            $user = collect($messages)->firstWhere('role', 'user');
+            $system = collect($messages)->firstWhere('role', 'system');
+
+            return $request->url() === 'https://openrouter.ai/api/v1/chat/completions'
+                && str_contains((string) ($user['content'] ?? ''), 'AI Weekly #42')
+                && str_contains((string) ($system['content'] ?? ''), 'positives_mentioned');
+        });
+    }
+
+    #[Test]
+    public function analyze_newsletter_appends_truncation_note_to_quality_notes_when_body_exceeds_limit(): void
+    {
+        Config::set('services.openrouter.api_key', 'test-api-key');
+        Config::set('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
+
+        $json = json_encode([
+            'summary' => 'Summary of truncated body.',
+            'key_points' => [],
+            'positives_mentioned' => [],
+            'negatives_mentioned' => [],
+            'highlights' => [],
+            'quality_notes' => null,
+        ], JSON_THROW_ON_ERROR);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => $json]]],
+            ], 200),
+        ]);
+
+        // Body that exceeds the 8,000-character truncation limit
+        $longBody = str_repeat('x', 9_000);
+
+        $result = $this->service->analyzeNewsletter(subject: 'Long newsletter', body: $longBody);
+
+        $this->assertNotNull($result['quality_notes']);
+        $this->assertStringContainsString('truncated', $result['quality_notes']);
+
+        Http::assertSent(function ($request) {
+            $messages = $request->data()['messages'] ?? [];
+            $user = collect($messages)->firstWhere('role', 'user');
+            $body = (string) ($user['content'] ?? '');
+
+            // Truncated body should be shorter than the original 9,000 chars
+            return mb_strlen($body) < 9_200;
+        });
+    }
+
     private function getUserMessageContent($request): ?string
     {
         if ($request->url() !== 'https://openrouter.ai/api/v1/chat/completions') {

@@ -80,7 +80,7 @@ class SharedResearchViewController extends Controller
         }
 
         $sections = $thought->comments()->orderBy('created_at')->get();
-        $converter = new CommonMarkConverter;
+        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
 
         $rootHtml = $converter->convert($thought->content)->getContent();
         $sectionsWithHtml = $sections->map(function ($section) use ($converter) {

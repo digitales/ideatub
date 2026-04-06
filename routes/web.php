@@ -38,7 +38,8 @@ if (config('oauth-mcp.enabled', true)) {
     Route::get('.well-known/oauth-protected-resource', [OAuthWellKnownController::class, 'protectedResource']);
     Route::get('.well-known/oauth-authorization-server', [OAuthWellKnownController::class, 'authorizationServer']);
     Route::get('.well-known/jwks.json', [OAuthWellKnownController::class, 'jwks']);
-    Route::post('oauth/register', [OAuthServerController::class, 'register']);
+    Route::post('oauth/register', [OAuthServerController::class, 'register'])
+        ->middleware('throttle:10,1');
     Route::get('oauth/authorize', [OAuthServerController::class, 'showConsent'])->name('oauth.authorize');
     Route::post('oauth/token', [OAuthServerController::class, 'token']);
 }
@@ -49,7 +50,8 @@ Route::get('/welcome', [HomeController::class, 'index'])->name('home');
 // Public shared research view (no auth; password gate per share)
 Route::get('/r/{token}', [SharedResearchViewController::class, 'show'])
     ->name('shared-research.show');
-Route::post('/r/{token}', [SharedResearchViewController::class, 'show']);
+Route::post('/r/{token}', [SharedResearchViewController::class, 'show'])
+    ->middleware('throttle:shared-research-password');
 
 // Tool pages
 Route::get('/tools/{tool}', [ToolController::class, 'show'])
@@ -91,7 +93,8 @@ Route::middleware('guest')->group(function () {
     Route::post('/register', [RegisteredUserController::class, 'store']);
 
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
-    Route::post('/login', [AuthenticatedSessionController::class, 'store']);
+    Route::post('/login', [AuthenticatedSessionController::class, 'store'])
+        ->middleware('throttle:login');
 
     Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])->name('password.request');
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
