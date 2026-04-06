@@ -54,11 +54,12 @@ class UserMcpKey extends Model
 
     /**
      * Hash a plain MCP key for storage or lookup.
-     * Uses SHA-256 so the same key always produces the same hash (deterministic).
+     * Uses HMAC-SHA256 keyed on app.key so hashes are secret-dependent and
+     * cannot be brute-forced from the hash alone.
      */
     public static function hashKey(string $plainKey): string
     {
-        return hash(self::KEY_HASH_ALGO, $plainKey);
+        return hash_hmac('sha256', $plainKey, config('app.key'));
     }
 
     /**
