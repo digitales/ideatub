@@ -68,9 +68,16 @@ class SocialAuthController extends Controller
         try {
             $githubUser = Socialite::driver('github')->user();
 
-            $user = User::where('github_id', $githubUser->id)
-                ->orWhere('email', $githubUser->email)
-                ->first();
+            if (empty($githubUser->email)) {
+                return redirect()->route('login')
+                    ->with('error', 'Your GitHub account must have a public email address. Please add one in GitHub Settings → Profile.');
+            }
+
+            $query = User::where('github_id', $githubUser->id);
+            if ($githubUser->email !== null) {
+                $query->orWhere('email', $githubUser->email);
+            }
+            $user = $query->first();
 
             if ($user) {
                 // Update GitHub ID if not set
