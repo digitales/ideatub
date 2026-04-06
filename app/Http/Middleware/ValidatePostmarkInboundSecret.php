@@ -13,7 +13,7 @@ class ValidatePostmarkInboundSecret
         $token = $request->route('token');
         $secret = config('services.postmark_inbound.webhook_secret');
 
-        if (! is_string($token) || $token === '' || $secret === null || $secret === '' || $token !== $secret) {
+        if (! is_string($token) || $token === '' || $secret === null || $secret === '' || ! hash_equals($secret, $token)) {
             return response('', 404);
         }
 
