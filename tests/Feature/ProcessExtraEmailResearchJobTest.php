@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\ProcessExtraEmailResearch;
+use App\Jobs\ProcessNewsletterBodyAnalysis;
 use App\Jobs\ProcessThoughtLinkSummary;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
@@ -39,6 +40,14 @@ class ProcessExtraEmailResearchJobTest extends TestCase
         $openRouter = Mockery::mock(OpenRouterService::class);
         $openRouter->shouldReceive('embed')->byDefault()->andReturn($fakeEmbedding);
         $openRouter->shouldReceive('extractMetadata')->byDefault()->andReturn(['tags' => []]);
+        $openRouter->shouldReceive('analyzeNewsletter')->byDefault()->andReturn([
+            'summary' => 'Test summary.',
+            'key_points' => [],
+            'positives_mentioned' => [],
+            'negatives_mentioned' => [],
+            'highlights' => [],
+            'quality_notes' => null,
+        ]);
         $this->app->instance(OpenRouterService::class, $openRouter);
         $this->app->instance(
             ThoughtCaptureService::class,
@@ -680,5 +689,53 @@ TXT;
         $this->assertNotNull($sponsor);
         $this->assertSame('sponsor', $sponsor->classification);
         $this->assertSame('excluded', $sponsor->processing_status);
+    }
+
+    #[Test]
+    public function job_dispatches_newsletter_body_analysis_after_creating_research(): void
+    {
+        config(['app.name' => 'JobTestApp']);
+        $this->bindOpenRouterMocks();
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $account = MailAccount::factory()->create(['user_id' => $user->id]);
+        $imported = ImportedEmail::query()->create([
+            'user_id' => $user->id,
+            'mail_account_id' => $account->id,
+            'provider' => 'fastmail',
+            'provider_message_id' => 'analysis-dispatch-test',
+            'direction' => 'received',
+            'subject' => 'Analysis dispatch test',
+            'body_text' => str_repeat('Substantive newsletter body paragraph. ', 30),
+            'from_json' => [['email' => 'news@example.com', 'name' => 'News']],
+            'processing_status' => 'research_queued',
+            'rule_action' => 'extra_process',
+        ]);
+
+        $emailThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'email',
+            'source_metadata' => [
+                'imported_email_id' => $imported->id,
+                'sender_rule_action' => 'extra_process',
+            ],
+        ]);
+        $imported->thought_id = $emailThought->id;
+        $imported->save();
+
+        $yt = Mockery::mock(\App\Services\Email\YouTubeTranscriptService::class);
+        $yt->shouldReceive('fetchForUrl')->never();
+        $this->app->instance(\App\Services\Email\YouTubeTranscriptService::class, $yt);
+
+        $job = new ProcessExtraEmailResearch(importedEmailId: $imported->id);
+        $job->handle(
+            app(\App\Services\Email\EmailNewsletterResearchService::class),
+            app(\App\Services\Email\EmailLinkExtractor::class),
+        );
+
+        Queue::assertPushed(ProcessNewsletterBodyAnalysis::class, function ($job) use ($imported) {
+            return $job->importedEmailId === $imported->id;
+        });
     }
 }
