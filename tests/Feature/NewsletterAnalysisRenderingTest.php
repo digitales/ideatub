@@ -46,7 +46,7 @@ class NewsletterAnalysisRenderingTest extends TestCase
             'positives_mentioned' => ['Positive thing'],
             'negatives_mentioned' => ['Negative thing'],
             'highlights' => ['Notable highlight'],
-            'quality_notes' => null,
+            'quality_notes' => 'Watch for paywall issues.',
             'completed_at' => now(),
         ]);
 
@@ -60,6 +60,7 @@ class NewsletterAnalysisRenderingTest extends TestCase
         $response->assertSee('Positive thing');
         $response->assertSee('Negative thing');
         $response->assertSee('Notable highlight');
+        $response->assertSee('Watch for paywall issues.');
     }
 
     #[Test]
@@ -75,6 +76,28 @@ class NewsletterAnalysisRenderingTest extends TestCase
             'stored_email_type' => 'imported_email',
             'stored_email_id' => 1,
             'status' => 'processing',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('idea.research.show', $researchThought));
+
+        $response->assertOk();
+        $response->assertSee('Newsletter analysis processing');
+    }
+
+    #[Test]
+    public function research_show_renders_pending_note_when_analysis_is_queued(): void
+    {
+        $user = User::factory()->create();
+        $researchThought = $this->makeResearchThought($user);
+        $emailThought = Thought::factory()->create(['user_id' => $user->id]);
+
+        NewsletterAnalysis::query()->create([
+            'research_thought_id' => $researchThought->id,
+            'source_thought_id' => $emailThought->id,
+            'stored_email_type' => 'imported_email',
+            'stored_email_id' => 1,
+            'status' => 'queued',
         ]);
 
         $response = $this->actingAs($user)
