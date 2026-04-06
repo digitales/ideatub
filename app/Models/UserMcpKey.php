@@ -8,12 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class UserMcpKey extends Model
 {
     /**
-     * Algorithm used to hash MCP keys for storage and lookup.
-     * Must be deterministic so the same plain key hashes to the same value.
-     */
-    public const KEY_HASH_ALGO = 'sha256';
-
-    /**
      * The table associated with the model.
      *
      * @var string

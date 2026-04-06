@@ -14,6 +14,10 @@ class UserMcpKeyTest extends TestCase
 
         $plainSha256 = hash('sha256', $plain);
         $this->assertNotEquals($plainSha256, $hash, 'hashKey must not produce plain SHA-256');
+
+        // Also assert it matches the expected HMAC value directly
+        $expectedHmac = hash_hmac('sha256', $plain, config('app.key'));
+        $this->assertEquals($expectedHmac, $hash, 'hashKey must produce HMAC-SHA256 keyed on app.key');
     }
 
     public function test_same_key_produces_same_hash(): void
