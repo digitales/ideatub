@@ -14,6 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->validateCsrfTokens(except: [
             'webhooks/postmark/inbound/*',
+            // OAuth 2.1 / DCR: called by remote MCP clients (no browser session)
+            'oauth/register',
+            'oauth/token',
         ]);
 
         $middleware->web(append: [
