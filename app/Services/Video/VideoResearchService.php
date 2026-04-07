@@ -5,6 +5,7 @@ namespace App\Services\Video;
 use App\Jobs\RunVideoResearch;
 use App\Models\Thought;
 use App\Services\OpenRouterService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -78,7 +79,7 @@ class VideoResearchService
             $prompt = $this->promptBuilder->build(
                 $snapshot['root'],
                 $snapshot['transcript_context_available'],
-                $snapshot['transcript_child'],
+                $snapshot['transcript_section_markdown'],
                 $snapshot['transcript_state'],
             );
             $raw = $this->openRouter->researchFromPrompt($prompt);
@@ -234,23 +235,22 @@ class VideoResearchService
         return $videoRootMeta;
     }
 
-    private function transcriptContextAvailableAtRunStart(Thought $root, ?Thought $transcriptChild): bool
+    /**
+     * @param  Collection<int, Thought>  $transcriptChildren
+     */
+    private function transcriptContextAvailableAtRunStart(Collection $transcriptChildren): bool
     {
-        if ($transcriptChild === null) {
+        if ($transcriptChildren->isEmpty()) {
             return false;
         }
 
-        $raw = trim($transcriptChild->getDecodedContent());
-        $raw = preg_replace('/^##\s+Transcript\s*/im', '', $raw) ?? $raw;
-        $raw = trim($raw);
-
-        return $raw !== '';
+        return trim(VideoTranscriptAggregator::concatenatedPlainBody($transcriptChildren)) !== '';
     }
 
     /**
      * @return array{
      *     root: Thought,
-     *     transcript_child: ?Thought,
+     *     transcript_section_markdown: string,
      *     transcript_context_available: bool,
      *     transcript_state: array{status: string, source: string}
      * }
@@ -266,12 +266,14 @@ class VideoResearchService
             throw new \RuntimeException('Thought is not a video root.');
         }
 
-        $transcriptChild = Thought::query()
+        $transcriptChildren = Thought::query()
             ->where('parent_id', $root->id)
             ->where('metadata->video_section_type', 'transcript')
             ->orderBy('created_at')
             ->orderBy('id')
-            ->first();
+            ->get();
+
+        $transcriptSectionMarkdown = VideoTranscriptAggregator::markdownSectionForResearchPrompt($transcriptChildren);
 
         $transcriptState = [
             'status' => (string) (data_get($root->metadata, 'transcript_status') ?? ''),
@@ -280,8 +282,8 @@ class VideoResearchService
 
         return [
             'root' => $root,
-            'transcript_child' => $transcriptChild,
-            'transcript_context_available' => $this->transcriptContextAvailableAtRunStart($root, $transcriptChild),
+            'transcript_section_markdown' => $transcriptSectionMarkdown,
+            'transcript_context_available' => $this->transcriptContextAvailableAtRunStart($transcriptChildren),
             'transcript_state' => $transcriptState,
         ];
     }

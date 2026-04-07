@@ -20,7 +20,7 @@ class VideoController extends Controller
     {
         $validated = $request->validate([
             'youtube_url' => 'required|string|max:2048',
-            'transcript' => 'nullable|string|max:65535',
+            'transcript' => 'nullable|string|max:524288',
             'research_now' => 'sometimes|boolean',
             'return_thought_id' => 'sometimes|nullable|uuid',
         ]);

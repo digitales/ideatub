@@ -614,7 +614,7 @@ class McpController extends Controller
     {
         $v = Validator::make($params, [
             'url' => 'required|string|max:2048',
-            'transcript' => 'sometimes|nullable|string|max:65535',
+            'transcript' => 'sometimes|nullable|string|max:524288',
             'research_now' => 'sometimes|boolean',
             'source_metadata' => 'sometimes|nullable|array',
         ]);
