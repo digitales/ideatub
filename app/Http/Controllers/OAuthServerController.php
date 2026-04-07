@@ -7,9 +7,9 @@ use App\Models\OauthMcpClient;
 use App\Services\OAuthMcpJwtService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class OAuthServerController extends Controller
 {
