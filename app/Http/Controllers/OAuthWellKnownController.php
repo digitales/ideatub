@@ -2,19 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\OAuthMcpJwtService;
+use App\Support\OAuthMcpPemLoader;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\File;
 
 class OAuthWellKnownController extends Controller
 {
     public function protectedResource(): JsonResponse
     {
-        $resource = config('oauth-mcp.resource');
-        $issuer = config('oauth-mcp.issuer');
+        $resource = OAuthMcpJwtService::normalizeResourceUrl((string) config('oauth-mcp.resource'));
+        $issuer = OAuthMcpJwtService::normalizeResourceUrl(rtrim((string) config('oauth-mcp.issuer'), '/'));
 
         return response()->json([
             'resource' => $resource,
-            'authorization_servers' => [rtrim($issuer, '/')],
+            'authorization_servers' => [$issuer],
             'scopes_supported' => [config('oauth-mcp.scope')],
             'resource_documentation' => rtrim(config('app.url'), '/').'/help#mcp',
         ]);
@@ -22,7 +23,7 @@ class OAuthWellKnownController extends Controller
 
     public function authorizationServer(): JsonResponse
     {
-        $issuer = rtrim(config('oauth-mcp.issuer'), '/');
+        $issuer = OAuthMcpJwtService::normalizeResourceUrl(rtrim((string) config('oauth-mcp.issuer'), '/'));
 
         return response()->json([
             'issuer' => $issuer,
@@ -38,12 +39,13 @@ class OAuthWellKnownController extends Controller
 
     public function jwks(): JsonResponse
     {
-        $path = config('oauth-mcp.public_key_path');
-        if (! File::exists($path)) {
-            abort(404, 'JWKS not configured. Run: php artisan ideatub:oauth-mcp-keys');
+        try {
+            $publicPem = OAuthMcpPemLoader::publicKey();
+        } catch (\RuntimeException) {
+            abort(404, 'JWKS not configured. Set OAUTH_MCP_PUBLIC_KEY_B64 or run: php artisan ideatub:oauth-mcp-keys');
         }
 
-        $publicKey = openssl_pkey_get_public(File::get($path));
+        $publicKey = openssl_pkey_get_public($publicPem);
         $details = openssl_pkey_get_details($publicKey);
         if (! $details || ! isset($details['key'])) {
             abort(500, 'Invalid public key');

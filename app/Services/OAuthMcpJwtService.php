@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\OAuthMcpPemLoader;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
-use Illuminate\Support\Facades\File;
 
 class OAuthMcpJwtService
 {
@@ -13,9 +13,35 @@ class OAuthMcpJwtService
 
     private const KID = 'ideatub-mcp-1';
 
+    /**
+     * Normalize OAuth resource / issuer URLs so comparisons tolerate trailing slashes
+     * and scheme/host case differences (common client vs .env mismatches).
+     */
+    public static function normalizeResourceUrl(string $url): string
+    {
+        $trimmed = trim($url);
+        $parts = parse_url($trimmed);
+        if ($parts === false || ! isset($parts['scheme'], $parts['host'])) {
+            return rtrim($trimmed, '/');
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        $host = strtolower($parts['host']);
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+        $path = $parts['path'] ?? '';
+        if ($path === '' || $path === '/') {
+            $path = '';
+        } else {
+            $path = rtrim($path, '/');
+        }
+
+        return $scheme.'://'.$host.$port.($path !== '' ? $path : '');
+    }
+
     public function issueAccessToken(User $user, string $audience): string
     {
-        $issuer = rtrim(config('oauth-mcp.issuer'), '/');
+        $issuer = self::normalizeResourceUrl(rtrim(config('oauth-mcp.issuer'), '/'));
+        $audience = self::normalizeResourceUrl($audience);
         $ttl = config('oauth-mcp.access_token_ttl_seconds', 3600);
         $now = time();
 
@@ -28,12 +54,7 @@ class OAuthMcpJwtService
             'scope' => config('oauth-mcp.scope'),
         ];
 
-        $keyPath = config('oauth-mcp.private_key_path');
-        if (! File::exists($keyPath)) {
-            throw new \RuntimeException('OAuth MCP private key not found. Run: php artisan ideatub:oauth-mcp-keys');
-        }
-
-        $privateKey = File::get($keyPath);
+        $privateKey = OAuthMcpPemLoader::privateKey();
 
         return JWT::encode($payload, $privateKey, self::ALG, self::KID);
     }
@@ -45,23 +66,40 @@ class OAuthMcpJwtService
      */
     public function verifyAccessToken(string $token): array
     {
-        $keyPath = config('oauth-mcp.public_key_path');
-        if (! File::exists($keyPath)) {
-            throw new \RuntimeException('OAuth MCP public key not found.');
-        }
-
-        $publicKey = new Key(File::get($keyPath), self::ALG);
+        $publicKey = new Key(OAuthMcpPemLoader::publicKey(), self::ALG);
         $decoded = JWT::decode($token, $publicKey);
 
-        $resource = config('oauth-mcp.resource');
-        $resourceApi = config('oauth-mcp.resource_api');
-        $allowedAudiences = array_filter([$resource, $resourceApi]);
-        if (! in_array($decoded->aud, $allowedAudiences, true)) {
+        $resource = self::normalizeResourceUrl((string) config('oauth-mcp.resource'));
+        $resourceApi = self::normalizeResourceUrl((string) config('oauth-mcp.resource_api'));
+        $allowedAudiences = array_values(array_unique(array_filter([$resource, $resourceApi])));
+
+        $tokenAudiences = [];
+        if (isset($decoded->aud)) {
+            if (is_string($decoded->aud)) {
+                $tokenAudiences[] = $decoded->aud;
+            } elseif (is_array($decoded->aud)) {
+                $tokenAudiences = $decoded->aud;
+            }
+        }
+
+        $audienceOk = false;
+        foreach ($tokenAudiences as $aud) {
+            if (! is_string($aud)) {
+                continue;
+            }
+            if (in_array(self::normalizeResourceUrl($aud), $allowedAudiences, true)) {
+                $audienceOk = true;
+                break;
+            }
+        }
+
+        if (! $audienceOk) {
             throw new \Exception('Invalid audience');
         }
 
-        $issuer = rtrim(config('oauth-mcp.issuer'), '/');
-        if ($decoded->iss !== $issuer) {
+        $issuer = self::normalizeResourceUrl(rtrim(config('oauth-mcp.issuer'), '/'));
+        $tokenIssuer = self::normalizeResourceUrl(rtrim((string) $decoded->iss, '/'));
+        if ($tokenIssuer !== $issuer) {
             throw new \Exception('Invalid issuer');
         }
 

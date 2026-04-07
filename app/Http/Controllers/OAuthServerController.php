@@ -113,7 +113,8 @@ class OAuthServerController extends Controller
             return response()->json(['error' => 'invalid_grant'], 400);
         }
 
-        if ($code->resource !== $request->resource) {
+        if (OAuthMcpJwtService::normalizeResourceUrl((string) $code->resource)
+            !== OAuthMcpJwtService::normalizeResourceUrl((string) $request->resource)) {
             return response()->json(['error' => 'invalid_grant', 'error_description' => 'Resource mismatch'], 400);
         }
 
@@ -162,7 +163,7 @@ class OAuthServerController extends Controller
             'redirect_uri' => $request->redirect_uri,
             'code_challenge' => $request->code_challenge,
             'code_challenge_method' => $request->code_challenge_method,
-            'resource' => $request->resource,
+            'resource' => OAuthMcpJwtService::normalizeResourceUrl((string) $request->resource),
             'scope' => $request->scope ?? config('oauth-mcp.scope'),
             'state' => $request->state,
             'expires_at' => now()->addSeconds($ttl),

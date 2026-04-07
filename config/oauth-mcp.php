@@ -31,9 +31,20 @@ return [
 
     'access_token_ttl_seconds' => 3600, // 1 hour
 
-    'private_key_path' => storage_path('app/oauth-mcp-private.pem'),
+    /*
+    | Keys: use PEM files locally, or B64/inline PEM env vars on ephemeral hosts (Laravel Cloud, etc.).
+    */
+    'private_key_path' => env('OAUTH_MCP_PRIVATE_KEY_PATH', storage_path('app/oauth-mcp-private.pem')),
 
-    'public_key_path' => storage_path('app/oauth-mcp-public.pem'),
+    'public_key_path' => env('OAUTH_MCP_PUBLIC_KEY_PATH', storage_path('app/oauth-mcp-public.pem')),
+
+    'private_key_b64' => env('OAUTH_MCP_PRIVATE_KEY_B64'),
+
+    'public_key_b64' => env('OAUTH_MCP_PUBLIC_KEY_B64'),
+
+    'private_key_pem' => env('OAUTH_MCP_PRIVATE_KEY'),
+
+    'public_key_pem' => env('OAUTH_MCP_PUBLIC_KEY'),
 
     'allowed_redirect_hosts' => [
         'chatgpt.com',
