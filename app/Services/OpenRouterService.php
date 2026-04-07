@@ -41,6 +41,11 @@ class OpenRouterService
 
         $embedding = $response->json('data.0.embedding');
         if (! is_array($embedding)) {
+            Log::error('OpenRouter embeddings response missing data[0].embedding.', [
+                'status' => $response->status(),
+                'model' => $model,
+                'body_preview' => Str::limit($response->body(), 800),
+            ]);
             throw new \RuntimeException('OpenRouter embeddings response missing data[0].embedding.');
         }
 
