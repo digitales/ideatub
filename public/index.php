@@ -19,8 +19,11 @@ $app = require_once __DIR__.'/../bootstrap/app.php';
 
 // nginx / PHP-FPM often omit Authorization from $_SERVER; OAuth Bearer + MCP need it.
 if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
-    if (! empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-        $_SERVER['HTTP_AUTHORIZATION'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    foreach (['REDIRECT_HTTP_AUTHORIZATION', 'REDIRECT_REDIRECT_HTTP_AUTHORIZATION'] as $redirectKey) {
+        if (! empty($_SERVER[$redirectKey])) {
+            $_SERVER['HTTP_AUTHORIZATION'] = $_SERVER[$redirectKey];
+            break;
+        }
     }
 }
 
@@ -34,6 +37,14 @@ if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
                     $auth = $value;
                     break;
                 }
+            }
+        }
+    }
+    if ((! is_string($auth) || $auth === '') && function_exists('apache_request_headers')) {
+        foreach (apache_request_headers() as $name => $value) {
+            if (strtolower((string) $name) === 'authorization' && is_string($value) && $value !== '') {
+                $auth = $value;
+                break;
             }
         }
     }

@@ -16,6 +16,7 @@ use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Services\Video\VideoCaptureService;
+use App\Support\BearerTokenExtractor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,7 +35,7 @@ class McpController extends Controller
         private ThoughtSearchService $searchService,
         private VideoCaptureService $videoCaptureService,
         private McpSessionService $mcpSessions,
-        private ?OAuthMcpJwtService $oauthJwt = null
+        private OAuthMcpJwtService $oauthJwt
     ) {}
 
     /**
@@ -608,17 +609,26 @@ class McpController extends Controller
 
     private function resolveUser(Request $request): ?User
     {
-        $auth = $request->header('Authorization');
-        if (is_string($auth) && str_starts_with(strtolower($auth), 'bearer ')) {
-            $token = trim(substr($auth, 7));
-            if ($token !== '' && $this->oauthJwt && config('oauth-mcp.enabled', true)) {
-                try {
-                    $payload = $this->oauthJwt->verifyAccessToken($token);
+        if (config('mcp.debug_auth', false)) {
+            Log::info('MCP auth debug', $this->mcpAuthDebugContext($request));
+        }
 
-                    return User::find($payload['user_id']);
-                } catch (\Throwable) {
-                    return null;
+        $token = BearerTokenExtractor::fromRequest($request);
+        if ($token !== null && config('oauth-mcp.enabled', true)) {
+            try {
+                $payload = $this->oauthJwt->verifyAccessToken($token);
+                $user = User::find($payload['user_id']);
+
+                return $user;
+            } catch (\Throwable $e) {
+                if (config('mcp.log_oauth_failures', false)) {
+                    Log::warning('MCP OAuth JWT rejected', [
+                        'exception' => $e::class,
+                        'message' => $e->getMessage(),
+                    ]);
                 }
+
+                return null;
             }
         }
 
@@ -641,10 +651,53 @@ class McpController extends Controller
         return $user;
     }
 
+    /**
+     * Safe diagnostics for Laravel Cloud / log aggregation (never log tokens or API keys).
+     *
+     * @return array<string, mixed>
+     */
+    private function mcpAuthDebugContext(Request $request): array
+    {
+        $authHeader = $request->header('Authorization');
+        $rawAuth = is_string($authHeader) && $authHeader !== '';
+        $serverAuth = is_string($request->server('HTTP_AUTHORIZATION')) && $request->server('HTTP_AUTHORIZATION') !== '';
+        $bearerToken = BearerTokenExtractor::fromRequest($request);
+
+        $keyHeader = $request->header('x-ideatub-key');
+        $hasKeyHeader = is_string($keyHeader) && trim($keyHeader) !== '';
+
+        $origin = $request->headers->get('Origin');
+        $originHost = is_string($origin) && $origin !== '' ? parse_url($origin, PHP_URL_HOST) : null;
+
+        $body = $request->all();
+        $method = $body['method'] ?? null;
+
+        $serverKeys = array_keys($request->server->all());
+        $authishServerKeys = array_values(array_filter($serverKeys, static function (string $k): bool {
+            return stripos($k, 'AUTH') !== false || stripos($k, 'TOKEN') !== false;
+        }));
+
+        return [
+            'streamable_accept' => $this->wantsStreamableHttpPost($request),
+            'jsonrpc_method' => is_string($method) ? $method : null,
+            'header_authorization_set' => $rawAuth,
+            'server_http_authorization_set' => $serverAuth,
+            'bearer_extracted' => $bearerToken !== null,
+            'bearer_length' => $bearerToken !== null ? strlen($bearerToken) : 0,
+            'x_ideatub_key_header_set' => $hasKeyHeader,
+            'x_access_token_header_set' => is_string($request->header('X-Access-Token')) && trim($request->header('X-Access-Token')) !== '',
+            'mcp_session_id_set' => is_string($request->header('Mcp-Session-Id')) && $request->header('Mcp-Session-Id') !== '',
+            'oauth_mcp_enabled' => (bool) config('oauth-mcp.enabled', true),
+            'origin_host' => is_string($originHost) ? $originHost : null,
+            'user_agent' => substr((string) $request->userAgent(), 0, 120),
+            'server_keys_matching_auth_or_token' => array_slice($authishServerKeys, 0, 25),
+        ];
+    }
+
     private function unauthorizedResponse(): JsonResponse
     {
         $resourceMetadata = config('oauth-mcp.enabled', true)
-            ? rtrim(config('app.url'), '/').'/.well-known/oauth-protected-resource'
+            ? rtrim((string) config('oauth-mcp.issuer', config('app.url')), '/').'/.well-known/oauth-protected-resource'
             : null;
 
         $response = response()->json([

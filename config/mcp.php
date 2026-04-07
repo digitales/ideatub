@@ -15,6 +15,17 @@ return [
     'session_ttl_seconds' => (int) env('MCP_SESSION_TTL_SECONDS', 86400),
 
     /*
+    | When true, JWT verification failures on /api/mcp are logged (message only, never the token).
+    */
+    'log_oauth_failures' => filter_var(env('MCP_LOG_OAUTH_FAILURES', false), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    | When true, each /api/mcp auth resolution logs a single info line (no secrets):
+    | whether Authorization / Bearer / API key headers were seen, token length only, streamable flag, JSON-RPC method.
+    */
+    'debug_auth' => filter_var(env('MCP_DEBUG_AUTH', false), FILTER_VALIDATE_BOOLEAN),
+
+    /*
     | Optional comma-separated extra hostnames allowed in Origin (in addition to
     | APP_URL host and the built-in defaults in McpController).
     */

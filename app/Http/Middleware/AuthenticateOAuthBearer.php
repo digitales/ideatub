@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\User;
 use App\Services\OAuthMcpJwtService;
+use App\Support\BearerTokenExtractor;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,13 +24,8 @@ class AuthenticateOAuthBearer
             return response()->json(['error' => 'OAuth not enabled'], 503);
         }
 
-        $auth = $request->header('Authorization');
-        if (! is_string($auth) || ! str_starts_with(strtolower($auth), 'bearer ')) {
-            return $this->unauthorized();
-        }
-
-        $token = trim(substr($auth, 7));
-        if ($token === '') {
+        $token = BearerTokenExtractor::fromRequest($request);
+        if ($token === null) {
             return $this->unauthorized();
         }
 

@@ -67,7 +67,15 @@ class OAuthMcpJwtService
     public function verifyAccessToken(string $token): array
     {
         $publicKey = new Key(OAuthMcpPemLoader::publicKey(), self::ALG);
-        $decoded = JWT::decode($token, $publicKey);
+
+        $previousLeeway = JWT::$leeway;
+        JWT::$leeway = max(JWT::$leeway, 120);
+
+        try {
+            $decoded = JWT::decode($token, $publicKey);
+        } finally {
+            JWT::$leeway = $previousLeeway;
+        }
 
         $resource = self::normalizeResourceUrl((string) config('oauth-mcp.resource'));
         $resourceApi = self::normalizeResourceUrl((string) config('oauth-mcp.resource_api'));
