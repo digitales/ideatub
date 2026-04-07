@@ -9,6 +9,7 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
 use App\Services\IdeasToRevisitService;
+use App\Services\McpSessionService;
 use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
 use App\Services\ResearchService;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response;
 
 class McpController extends Controller
 {
@@ -31,15 +33,28 @@ class McpController extends Controller
         private ResearchService $researchService,
         private ThoughtSearchService $searchService,
         private VideoCaptureService $videoCaptureService,
+        private McpSessionService $mcpSessions,
         private ?OAuthMcpJwtService $oauthJwt = null
     ) {}
 
     /**
      * GET /api/mcp — Server info for connector discovery/validation (e.g. ChatGPT "Add connector").
      * No auth required so the connector URL can be validated before the user supplies a key.
+     *
+     * Streamable HTTP clients (Accept: text/event-stream) receive 405; the MCP endpoint may offer GET SSE later.
      */
-    public function show(Request $request): JsonResponse
+    public function show(Request $request): JsonResponse|Response
     {
+        $accept = strtolower((string) $request->headers->get('Accept', ''));
+        if (str_contains($accept, 'text/event-stream')) {
+            if ($deny = $this->rejectInvalidStreamableOrigin($request)) {
+                return $deny;
+            }
+
+            return response('', Response::HTTP_METHOD_NOT_ALLOWED)
+                ->header('Allow', 'DELETE, GET, POST');
+        }
+
         return response()->json([
             'name' => 'ideatub',
             'version' => '1.0',
@@ -47,6 +62,31 @@ class McpController extends Controller
             'auth' => 'Send key via x-ideatub-key header or OAuth Bearer token',
             'methods' => $this->mcpMethodNames(),
         ]);
+    }
+
+    /**
+     * DELETE /api/mcp — Terminate Streamable HTTP session (Mcp-Session-Id).
+     */
+    public function destroy(Request $request): JsonResponse|Response
+    {
+        $user = $this->resolveUser($request);
+        if ($user === null) {
+            return $this->unauthorizedResponse();
+        }
+
+        $sessionId = $request->header('Mcp-Session-Id');
+        if (! is_string($sessionId) || $sessionId === '') {
+            return response('', Response::HTTP_METHOD_NOT_ALLOWED);
+        }
+
+        $uid = $this->mcpSessions->userId($sessionId);
+        if ($uid !== $user->id) {
+            return response()->json(['message' => 'Invalid or expired session'], Response::HTTP_NOT_FOUND);
+        }
+
+        $this->mcpSessions->destroy($sessionId);
+
+        return response('', Response::HTTP_NO_CONTENT);
     }
 
     /**
@@ -76,19 +116,191 @@ class McpController extends Controller
     }
 
     /**
-     * Handle MCP JSON-RPC request: authenticate by per-user key, dispatch by method, return JSON-RPC response.
+     * Handle MCP JSON-RPC: legacy clients (typical Accept: application/json) use JSON-RPC 2.0 only.
+     * Streamable HTTP (MCP 2025-03-26): Accept includes application/json and text/event-stream.
      */
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request): JsonResponse|Response
+    {
+        if ($this->wantsStreamableHttpPost($request)) {
+            return $this->handleStreamablePost($request);
+        }
+
+        return $this->handleLegacyPost($request);
+    }
+
+    private function wantsStreamableHttpPost(Request $request): bool
+    {
+        $accept = strtolower((string) $request->headers->get('Accept', ''));
+
+        return str_contains($accept, 'application/json')
+            && str_contains($accept, 'text/event-stream');
+    }
+
+    private function handleLegacyPost(Request $request): JsonResponse
     {
         $user = $this->resolveUser($request);
         if ($user === null) {
             return $this->unauthorizedResponse();
         }
 
-        $request->setUserResolver(fn () => $user);
-        Auth::setUser($user);
+        return $this->processSingleJsonRpcRequest($request, $user, $request->all(), legacyTransport: true);
+    }
 
-        $body = $request->all();
+    private function handleStreamablePost(Request $request): JsonResponse|Response
+    {
+        if ($deny = $this->rejectInvalidStreamableOrigin($request)) {
+            return $deny;
+        }
+
+        $messages = $this->normalizeMcpMessages($request->all());
+        if ($messages === null) {
+            return response()->json(['message' => 'Invalid JSON-RPC body'], Response::HTTP_BAD_REQUEST);
+        }
+
+        if ($messages === []) {
+            return response()->json(['message' => 'Empty body'], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (count($messages) > 1) {
+            return response()->json(['message' => 'Batched requests are not supported'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $msg = $messages[0];
+        if (! array_key_exists('id', $msg)) {
+            return $this->handleStreamableNotification($request, $msg);
+        }
+
+        $user = $this->resolveUser($request);
+        if ($user === null) {
+            return $this->unauthorizedResponse();
+        }
+
+        $method = $msg['method'] ?? null;
+        if ($method !== 'initialize') {
+            $sessionId = $request->header('Mcp-Session-Id');
+            if (! is_string($sessionId) || $sessionId === '') {
+                return response()->json(['message' => 'Mcp-Session-Id required'], Response::HTTP_BAD_REQUEST);
+            }
+            $uid = $this->mcpSessions->userId($sessionId);
+            if ($uid !== $user->id) {
+                return response()->json(['message' => 'Invalid or expired session'], Response::HTTP_NOT_FOUND);
+            }
+        }
+
+        return $this->processSingleJsonRpcRequest($request, $user, $msg, legacyTransport: false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $msg
+     */
+    private function handleStreamableNotification(Request $request, array $msg): JsonResponse|Response
+    {
+        $user = $this->resolveUser($request);
+        if ($user === null) {
+            return $this->unauthorizedResponse();
+        }
+
+        $sessionId = $request->header('Mcp-Session-Id');
+        if (! is_string($sessionId) || $sessionId === '') {
+            return response()->json(['message' => 'Mcp-Session-Id required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $uid = $this->mcpSessions->userId($sessionId);
+        if ($uid !== $user->id) {
+            return response()->json(['message' => 'Invalid or expired session'], Response::HTTP_NOT_FOUND);
+        }
+
+        return response('', Response::HTTP_ACCEPTED);
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return ?array<int, array<string, mixed>>
+     */
+    private function normalizeMcpMessages(array $body): ?array
+    {
+        if ($body === []) {
+            return null;
+        }
+
+        if (isset($body['method'])) {
+            return [$body];
+        }
+
+        if (! array_is_list($body)) {
+            return null;
+        }
+
+        foreach ($body as $item) {
+            if (! is_array($item) || ! isset($item['method'])) {
+                return null;
+            }
+        }
+
+        return $body;
+    }
+
+    /**
+     * @return ?JsonResponse Non-null means reject request (403 JSON).
+     */
+    private function rejectInvalidStreamableOrigin(Request $request): ?JsonResponse
+    {
+        $origin = $request->headers->get('Origin');
+        if ($origin === null || $origin === '') {
+            return null;
+        }
+
+        $host = parse_url($origin, PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            return response()->json(['message' => 'Invalid Origin'], Response::HTTP_FORBIDDEN);
+        }
+
+        foreach ($this->streamableAllowedHosts() as $allowed) {
+            if ($host === $allowed || str_ends_with($host, '.'.$allowed)) {
+                return null;
+            }
+        }
+
+        return response()->json(['message' => 'Origin not allowed'], Response::HTTP_FORBIDDEN);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function streamableAllowedHosts(): array
+    {
+        $hosts = [
+            'claude.ai',
+            'claude.com',
+            'chatgpt.com',
+            'chat.openai.com',
+            'platform.openai.com',
+            'cursor.sh',
+            'cursor.com',
+        ];
+
+        $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+        if (is_string($appHost) && $appHost !== '') {
+            $hosts[] = $appHost;
+        }
+
+        $extra = config('mcp.streamable_allowed_hosts_extra', '');
+        if (is_string($extra) && $extra !== '') {
+            foreach (array_map('trim', explode(',', $extra)) as $h) {
+                if ($h !== '') {
+                    $hosts[] = $h;
+                }
+            }
+        }
+
+        return array_values(array_unique($hosts));
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    private function processSingleJsonRpcRequest(Request $request, User $user, array $body, bool $legacyTransport): JsonResponse|Response
+    {
         $method = $body['method'] ?? null;
         $params = is_array($body['params'] ?? null) ? $body['params'] : [];
         $id = $body['id'] ?? null;
@@ -97,12 +309,16 @@ class McpController extends Controller
             return $this->jsonRpcError(-32600, 'Invalid request: method required', $id);
         }
 
-        // Standard MCP protocol methods (e.g. ChatGPT connector)
+        $request->setUserResolver(fn () => $user);
+        Auth::setUser($user);
+
         if ($method === 'initialize') {
-            return $this->respondInitialize($params, $id);
+            return $this->respondInitialize($params, $id, $legacyTransport, $user);
         }
         if ($method === 'notifications/initialized') {
-            return response()->json(['jsonrpc' => '2.0']);
+            return $legacyTransport
+                ? response()->json(['jsonrpc' => '2.0'])
+                : response('', Response::HTTP_ACCEPTED);
         }
         if ($method === 'tools/list') {
             return $this->respondToolsList($id);
@@ -111,7 +327,6 @@ class McpController extends Controller
             return $this->respondToolsCall($params, $id);
         }
 
-        // Legacy direct method names (search_thoughts, browse_recent, etc.)
         if (! in_array($method, $this->mcpMethodNames(), true)) {
             return $this->jsonRpcError(-32601, 'Method not found', $id);
         }
@@ -138,13 +353,13 @@ class McpController extends Controller
         ]);
     }
 
-    private function respondInitialize(array $params, mixed $id): JsonResponse
+    private function respondInitialize(array $params, mixed $id, bool $legacyTransport = true, ?User $user = null): JsonResponse
     {
         $requestedVersion = $params['protocolVersion'] ?? '2024-11-05';
         $supported = ['2024-11-05', '2025-03-26'];
         $protocolVersion = in_array($requestedVersion, $supported, true) ? $requestedVersion : '2024-11-05';
 
-        return response()->json([
+        $response = response()->json([
             'jsonrpc' => '2.0',
             'id' => $id,
             'result' => [
@@ -158,6 +373,12 @@ class McpController extends Controller
                 ],
             ],
         ]);
+
+        if (! $legacyTransport && $user !== null) {
+            $response->headers->set('Mcp-Session-Id', $this->mcpSessions->create($user->id));
+        }
+
+        return $response;
     }
 
     /**

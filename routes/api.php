@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/mcp', [McpController::class, 'show']);
 Route::post('/mcp', McpController::class);
+Route::delete('/mcp', [McpController::class, 'destroy']);
 
 // REST API for Custom GPT Actions (OAuth Bearer only)
 Route::middleware('auth.oauth.bearer')->prefix('thoughts')->group(function (): void {
