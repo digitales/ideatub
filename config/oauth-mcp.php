@@ -39,6 +39,10 @@ return [
         'chatgpt.com',
         'chat.openai.com',
         'platform.openai.com',
+        // Claude custom remote MCP connectors (DCR + OAuth callback)
+        // https://support.claude.com/en/articles/11503834-building-custom-connectors-via-remote-mcp-servers
+        'claude.ai',
+        'claude.com',
     ],
 
 ];
