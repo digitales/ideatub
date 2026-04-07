@@ -74,6 +74,7 @@ class VideoCaptureService
         private OpenRouterService $openRouter,
         private VideoThoughtContentBuilder $contentBuilder,
         private YouTubeOEmbedService $youTubeOEmbed,
+        private VideoTranscriptChunker $transcriptChunker,
     ) {}
 
     /**
@@ -171,9 +172,9 @@ class VideoCaptureService
             }
 
             if ($transcriptProvided) {
-                $this->upsertTranscriptChild($user, $root, (string) $transcript, $transcriptChildren);
-            } elseif ($hadTranscriptChild) {
-                $this->consolidateTranscriptChildren($root, $transcriptChildren);
+                $this->replaceTranscriptChunks($user, $root, (string) $transcript, $transcriptChildren);
+            } elseif ($hadTranscriptChild && $duplicateRoots->isNotEmpty()) {
+                $this->consolidateTranscriptChildrenAfterDuplicateMerge($root, $transcriptChildren);
             }
 
             $this->reparentChildrenToRoot($root, $duplicateRoots);
@@ -318,40 +319,53 @@ class VideoCaptureService
     /**
      * @param  Collection<int, Thought>  $existingTranscriptChildren
      */
-    private function upsertTranscriptChild(User $user, Thought $root, string $transcriptText, Collection $existingTranscriptChildren, string $thoughtSource = 'video'): void
+    private function replaceTranscriptChunks(User $user, Thought $root, string $transcriptText, Collection $existingTranscriptChildren, string $thoughtSource = 'video'): void
     {
-        $childMetadata = [
-            'video_section_type' => 'transcript',
-        ];
+        $bodies = $this->transcriptChunker->splitPlainText($transcriptText);
+        if ($bodies === []) {
+            foreach ($existingTranscriptChildren as $row) {
+                $row->delete();
+            }
 
-        $content = $this->contentBuilder->transcriptContent($transcriptText);
-        $embedding = $this->openRouter->embed($content);
-
-        $keep = $existingTranscriptChildren->first();
-        if ($keep !== null) {
-            $keep->update([
-                'content' => $content,
-                'embedding' => $embedding,
-                'metadata' => Thought::normalizeMetadataTags($childMetadata),
-                'parent_id' => $root->id,
-                'source' => $thoughtSource,
-            ]);
-            $toDelete = $existingTranscriptChildren->skip(1);
-        } else {
-            $keep = Thought::create([
-                'content' => $content,
-                'embedding' => $embedding,
-                'metadata' => Thought::normalizeMetadataTags($childMetadata),
-                'user_id' => $user->id,
-                'source' => $thoughtSource,
-                'source_metadata' => null,
-                'parent_id' => $root->id,
-            ]);
-            $toDelete = collect();
+            return;
         }
 
-        foreach ($toDelete as $row) {
-            $row->delete();
+        $chunkCount = count($bodies);
+        $existingOrdered = VideoTranscriptAggregator::orderedTranscriptChildren($existingTranscriptChildren);
+
+        foreach ($bodies as $i => $body) {
+            $childMetadata = [
+                'video_section_type' => 'transcript',
+                'transcript_chunk_index' => $i,
+                'transcript_chunk_count' => $chunkCount,
+            ];
+            $content = $this->contentBuilder->transcriptContent($body);
+            $embedding = $this->openRouter->embed($content);
+
+            $existing = $existingOrdered->get($i);
+            if ($existing !== null) {
+                $existing->update([
+                    'content' => $content,
+                    'embedding' => $embedding,
+                    'metadata' => Thought::normalizeMetadataTags($childMetadata),
+                    'parent_id' => $root->id,
+                    'source' => $thoughtSource,
+                ]);
+            } else {
+                Thought::create([
+                    'content' => $content,
+                    'embedding' => $embedding,
+                    'metadata' => Thought::normalizeMetadataTags($childMetadata),
+                    'user_id' => $user->id,
+                    'source' => $thoughtSource,
+                    'source_metadata' => null,
+                    'parent_id' => $root->id,
+                ]);
+            }
+        }
+
+        foreach ($existingOrdered->slice($chunkCount) as $extra) {
+            $extra->delete();
         }
     }
 
@@ -369,7 +383,7 @@ class VideoCaptureService
     private function applyTranscriptFetchSuccess(Thought $root, User $user, string $transcriptText, bool $researchNow): void
     {
         $children = $this->transcriptChildrenForRootLocked($root);
-        $this->upsertTranscriptChild($user, $root, $transcriptText, $children, self::TRANSCRIPT_SOURCE_YOUTUBE);
+        $this->replaceTranscriptChunks($user, $root, $transcriptText, $children, self::TRANSCRIPT_SOURCE_YOUTUBE);
 
         $metadata = $this->mergeRootMetadataForTranscriptState($root, [
             'transcript_status' => self::TRANSCRIPT_STATUS_AVAILABLE,
@@ -508,21 +522,66 @@ class VideoCaptureService
     }
 
     /**
+     * After duplicate video roots merge, reparent every transcript child onto the surviving root and drop
+     * duplicate rows that share the same chunk index (keeps the newest by {@see Thought::$updated_at}).
+     *
      * @param  Collection<int, Thought>  $transcriptChildren
      */
-    private function consolidateTranscriptChildren(Thought $root, Collection $transcriptChildren): void
+    private function consolidateTranscriptChildrenAfterDuplicateMerge(Thought $root, Collection $transcriptChildren): void
     {
-        $keep = $transcriptChildren->first();
-        if ($keep === null) {
+        if ($transcriptChildren->isEmpty()) {
             return;
         }
 
-        if ($keep->parent_id !== $root->id) {
-            $keep->update(['parent_id' => $root->id]);
+        foreach ($transcriptChildren as $child) {
+            if ($child->parent_id !== $root->id) {
+                $child->update(['parent_id' => $root->id]);
+            }
         }
 
-        foreach ($transcriptChildren->slice(1) as $duplicateChild) {
-            $duplicateChild->delete();
+        $byIndex = [];
+        foreach (VideoTranscriptAggregator::orderedTranscriptChildren($transcriptChildren) as $child) {
+            $idx = (int) data_get($child->metadata, 'transcript_chunk_index', 0);
+            $byIndex[$idx][] = $child;
+        }
+        ksort($byIndex);
+
+        $toDelete = [];
+        $keepers = [];
+        foreach ($byIndex as $group) {
+            if (count($group) === 1) {
+                $keepers[] = $group[0];
+
+                continue;
+            }
+            usort($group, fn (Thought $a, Thought $b): int => $b->updated_at <=> $a->updated_at);
+            $keepers[] = $group[0];
+            foreach (array_slice($group, 1) as $dup) {
+                $toDelete[] = $dup;
+            }
+        }
+
+        foreach ($toDelete as $dup) {
+            $dup->delete();
+        }
+
+        $orderedKeepers = collect($keepers)->sortBy(function (Thought $t): array {
+            return [
+                (int) data_get($t->metadata, 'transcript_chunk_index', 0),
+                $t->created_at?->timestamp ?? 0,
+                (string) $t->id,
+            ];
+        })->values();
+
+        $count = $orderedKeepers->count();
+        foreach ($orderedKeepers as $i => $thought) {
+            $meta = is_array($thought->metadata) ? $thought->metadata : [];
+            $meta['video_section_type'] = 'transcript';
+            $meta['transcript_chunk_index'] = $i;
+            $meta['transcript_chunk_count'] = $count;
+            $thought->update([
+                'metadata' => Thought::normalizeMetadataTags($meta),
+            ]);
         }
     }
 

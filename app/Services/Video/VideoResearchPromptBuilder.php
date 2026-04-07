@@ -9,13 +9,13 @@ class VideoResearchPromptBuilder
     /**
      * @param  array{status: string, source: string}  $transcriptState
      */
-    public function build(Thought $videoRoot, bool $transcriptContextAvailable, ?Thought $transcriptChild, array $transcriptState): string
+    public function build(Thought $videoRoot, bool $transcriptContextAvailable, string $transcriptSectionMarkdown, array $transcriptState): string
     {
         $videoId = (string) (data_get($videoRoot->metadata, 'video_id') ?? '');
         $videoUrl = (string) (data_get($videoRoot->metadata, 'video_url') ?? '');
         $rootContent = trim($videoRoot->getDecodedContent());
 
-        $transcriptSection = $this->formatTranscriptSection($transcriptContextAvailable, $transcriptChild, $transcriptState);
+        $transcriptSection = $this->formatTranscriptSection($transcriptContextAvailable, $transcriptSectionMarkdown, $transcriptState);
 
         $contract = <<<'MD'
 Your response MUST be Markdown and MUST include these level-2 headings in this exact order (each at the start of a line):
@@ -56,14 +56,12 @@ MD;
     /**
      * @param  array{status: string, source: string}  $transcriptState
      */
-    private function formatTranscriptSection(bool $transcriptContextAvailable, ?Thought $transcriptChild, array $transcriptState): string
+    private function formatTranscriptSection(bool $transcriptContextAvailable, string $transcriptSectionMarkdown, array $transcriptState): string
     {
-        if (! $transcriptContextAvailable || $transcriptChild === null) {
+        if (! $transcriptContextAvailable || trim($transcriptSectionMarkdown) === '') {
             return "## Transcript context\n\n_No usable transcript text was available at research time (status: {$transcriptState['status']}, source: {$transcriptState['source']}). Proceed with limited source context._";
         }
 
-        $text = trim($transcriptChild->getDecodedContent());
-
-        return "## Transcript (full text)\n\n".$text;
+        return trim($transcriptSectionMarkdown);
     }
 }

@@ -8,6 +8,7 @@ use App\Services\Email\EmailLinkExtractor;
 use App\Services\OpenRouterService;
 use App\Services\Video\VideoCaptureService;
 use App\Services\Video\VideoThoughtContentBuilder;
+use App\Services\Video\VideoTranscriptChunker;
 use App\Services\Video\YouTubeOEmbedService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -40,6 +41,7 @@ class VideoCaptureServiceTest extends TestCase
             $openRouter,
             new VideoThoughtContentBuilder,
             new YouTubeOEmbedService,
+            new VideoTranscriptChunker,
         );
     }
 
@@ -151,6 +153,8 @@ class VideoCaptureServiceTest extends TestCase
             ->sole();
 
         $this->assertSame('transcript', $child->metadata['video_section_type']);
+        $this->assertSame(0, $child->metadata['transcript_chunk_index']);
+        $this->assertSame(1, $child->metadata['transcript_chunk_count']);
         $this->assertSame("## Transcript\n\nsegment one", $child->content);
     }
 
@@ -616,5 +620,38 @@ class VideoCaptureServiceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $service->capture($user, 'https://example.com/page');
+    }
+
+    #[Test]
+    public function very_long_transcript_splits_into_multiple_ordered_children(): void
+    {
+        $user = User::factory()->create();
+        $embed = $this->fakeEmbedding();
+
+        $longBody = str_repeat('x', 130_000);
+        $prefixLen = strlen("## Transcript\n\n");
+        $expectedChunks = (int) ceil(130_000 / (VideoTranscriptChunker::MAX_STORED_CONTENT_BYTES - $prefixLen));
+
+        $openRouter = Mockery::mock(OpenRouterService::class);
+        $openRouter->shouldReceive('embed')->times(1 + $expectedChunks)->andReturn($embed);
+
+        $service = $this->serviceWithOpenRouter($openRouter);
+        $root = $service->capture($user, 'https://www.youtube.com/watch?v=abc12345678', $longBody);
+
+        $children = Thought::query()
+            ->where('parent_id', $root->id)
+            ->where('metadata->video_section_type', 'transcript')
+            ->get();
+
+        $this->assertCount($expectedChunks, $children);
+        foreach ($children as $i => $child) {
+            $this->assertSame($i, $child->metadata['transcript_chunk_index']);
+            $this->assertSame($expectedChunks, $child->metadata['transcript_chunk_count']);
+            $this->assertLessThanOrEqual(
+                VideoTranscriptChunker::MAX_STORED_CONTENT_BYTES,
+                strlen((string) $child->content),
+                'Stored chunk markdown must stay within TEXT-safe size.'
+            );
+        }
     }
 }

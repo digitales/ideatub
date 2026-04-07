@@ -8,6 +8,7 @@ use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Services\DemoMode;
 use App\Services\Video\VideoCaptureService;
+use App\Services\Video\VideoTranscriptAggregator;
 use App\View\Presenters\Concerns\ObfuscatesDemoText;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
@@ -268,28 +269,28 @@ final class ThoughtDetailPresenter
 
         $this->videoTranscriptTextResolved = true;
 
-        $transcriptChild = $this->thought->comments->first(
+        $transcriptComments = $this->thought->comments->filter(
             fn (Thought $comment): bool => data_get(
                 $comment->metadata,
                 'video_section_type'
             ) === 'transcript'
         );
 
-        if ($transcriptChild === null) {
+        if ($transcriptComments->isEmpty()) {
             $this->resolvedVideoTranscriptText = null;
 
             return null;
         }
 
-        $raw = trim((string) ($transcriptChild->content ?? ''));
-        $raw = preg_replace("/^##\s+Transcript\s*/im", '', $raw) ?? $raw;
-        $raw = trim($raw);
+        $raw = VideoTranscriptAggregator::concatenatedPlainBody($transcriptComments);
 
         if ($raw === '') {
             $this->resolvedVideoTranscriptText = null;
 
             return null;
         }
+
+        $subjectTranscriptThoughtId = (string) VideoTranscriptAggregator::orderedTranscriptChildren($transcriptComments)->first()->id;
 
         try {
             $this->resolvedVideoTranscriptText =
@@ -300,7 +301,7 @@ final class ThoughtDetailPresenter
                 boundary: 'thought_detail_presenter.video_transcript_text',
                 context: 'video_transcript_text',
                 exception: $e,
-                subjectThoughtId: $transcriptChild->id
+                subjectThoughtId: $subjectTranscriptThoughtId
             );
 
             $this->resolvedVideoTranscriptText = 'Demo content hidden';
