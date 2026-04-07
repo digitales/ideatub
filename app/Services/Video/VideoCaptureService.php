@@ -78,6 +78,26 @@ class VideoCaptureService
     ) {}
 
     /**
+     * Embed for search; on OpenRouter failure persist without blocking capture (embedding column is nullable).
+     *
+     * @return array<int, float>|null
+     */
+    private function embedOrNull(string $text, string $context, array $logContext = []): ?array
+    {
+        try {
+            return $this->openRouter->embed($text);
+        } catch (\Throwable $e) {
+            Log::warning('VideoCaptureService: OpenRouter embed failed; continuing without embedding.', array_merge([
+                'context' => $context,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ], $logContext));
+
+            return null;
+        }
+    }
+
+    /**
      * Create or update a top-level video thought for this user and YouTube video id.
      *
      * @param  non-empty-string  $youtubeUrl  Any URL shape accepted by {@see EmailLinkExtractor::extractYouTubeVideoId}.
@@ -149,7 +169,10 @@ class VideoCaptureService
             $rootMetadata = $this->ensureVideoRootDefaultTag($rootMetadata);
 
             $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, $transcriptStatus, $rootMetadata);
-            $rootEmbedding = $this->openRouter->embed($rootContent);
+            $rootEmbedding = $this->embedOrNull($rootContent, 'video_root', [
+                'user_id' => $user->id,
+                'video_id' => $videoId,
+            ]);
 
             if ($root === null) {
                 $root = Thought::create([
@@ -340,7 +363,11 @@ class VideoCaptureService
                 'transcript_chunk_count' => $chunkCount,
             ];
             $content = $this->contentBuilder->transcriptContent($body);
-            $embedding = $this->openRouter->embed($content);
+            $embedding = $this->embedOrNull($content, 'transcript_chunk', [
+                'user_id' => $user->id,
+                'root_thought_id' => (string) $root->id,
+                'transcript_chunk_index' => $i,
+            ]);
 
             $existing = $existingOrdered->get($i);
             if ($existing !== null) {
@@ -402,7 +429,9 @@ class VideoCaptureService
         $metadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($metadata, $canonicalUrl);
         $metadata = $this->ensureVideoRootDefaultTag($metadata);
         $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, self::TRANSCRIPT_STATUS_AVAILABLE, $metadata);
-        $rootEmbedding = $this->openRouter->embed($rootContent);
+        $rootEmbedding = $this->embedOrNull($rootContent, 'video_root_after_transcript', [
+            'root_thought_id' => (string) $root->id,
+        ]);
 
         $root->update([
             'content' => $rootContent,
@@ -430,7 +459,9 @@ class VideoCaptureService
         $metadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($metadata, $canonicalUrl);
         $metadata = $this->ensureVideoRootDefaultTag($metadata);
         $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, self::TRANSCRIPT_STATUS_UNAVAILABLE, $metadata);
-        $rootEmbedding = $this->openRouter->embed($rootContent);
+        $rootEmbedding = $this->embedOrNull($rootContent, 'video_root_transcript_unavailable', [
+            'root_thought_id' => (string) $root->id,
+        ]);
 
         $root->update([
             'content' => $rootContent,
@@ -458,7 +489,9 @@ class VideoCaptureService
         $metadata = $this->youTubeOEmbed->enrichVideoMetadataIfMissing($metadata, $canonicalUrl);
         $metadata = $this->ensureVideoRootDefaultTag($metadata);
         $rootContent = $this->contentBuilder->rootContentFromMetadata($canonicalUrl, self::TRANSCRIPT_STATUS_FAILED, $metadata);
-        $rootEmbedding = $this->openRouter->embed($rootContent);
+        $rootEmbedding = $this->embedOrNull($rootContent, 'video_root_transcript_failed', [
+            'root_thought_id' => (string) $root->id,
+        ]);
 
         $root->update([
             'content' => $rootContent,

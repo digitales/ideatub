@@ -623,6 +623,50 @@ class VideoCaptureServiceTest extends TestCase
     }
 
     #[Test]
+    public function capture_succeeds_with_null_root_embedding_when_openrouter_embed_fails(): void
+    {
+        $user = User::factory()->create();
+
+        $openRouter = Mockery::mock(OpenRouterService::class);
+        $openRouter->shouldReceive('embed')->once()->andThrow(
+            new \RuntimeException('OpenRouter embeddings response missing data[0].embedding.')
+        );
+
+        $service = $this->serviceWithOpenRouter($openRouter);
+        $root = $service->capture($user, 'https://www.youtube.com/watch?v=abc12345678');
+
+        $this->assertNull($root->fresh()->embedding);
+    }
+
+    #[Test]
+    public function capture_succeeds_with_null_transcript_embedding_when_chunk_embed_fails(): void
+    {
+        $user = User::factory()->create();
+        $embed = $this->fakeEmbedding();
+
+        $openRouter = Mockery::mock(OpenRouterService::class);
+        $call = 0;
+        $openRouter->shouldReceive('embed')->twice()->andReturnUsing(function () use (&$call, $embed) {
+            $call++;
+            if ($call === 1) {
+                return $embed;
+            }
+
+            throw new \RuntimeException('OpenRouter embeddings response missing data[0].embedding.');
+        });
+
+        $service = $this->serviceWithOpenRouter($openRouter);
+        $root = $service->capture($user, 'https://www.youtube.com/watch?v=abc12345678', 'segment one');
+
+        $this->assertNotNull($root->fresh()->embedding);
+        $child = Thought::query()
+            ->where('parent_id', $root->id)
+            ->where('metadata->video_section_type', 'transcript')
+            ->sole();
+        $this->assertNull($child->fresh()->embedding);
+    }
+
+    #[Test]
     public function very_long_transcript_splits_into_multiple_ordered_children(): void
     {
         $user = User::factory()->create();

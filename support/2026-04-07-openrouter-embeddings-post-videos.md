@@ -1,7 +1,7 @@
 # OpenRouter embeddings failure on POST /videos — Customer Support Investigation
 
 **Date**: 2026-04-07  
-**Status**: Investigating  
+**Status**: Resolved (mitigation shipped)  
 **Customer**: Unknown (production logs)  
 **Priority**: Medium  
 **Reported By**: Monitoring / logs  
@@ -55,7 +55,8 @@ The embedding error text matches a `RuntimeException` thrown in application code
 ## Resolution
 
 - **Immediate:** Re-try the operation; if it persists, check OpenRouter status, account quota, and that `OPENROUTER_EMBEDDING_MODEL` is a supported embeddings model on OpenRouter.
-- **Operational:** Capture a **redacted sample of the raw JSON body** from the embeddings response on failure (see Prevention) to distinguish empty `data`, provider `error` object, etc.
+- **Operational:** `OpenRouterService::embed()` logs `body_preview` on malformed success responses.
+- **Mitigation (code):** `VideoCaptureService` now uses `embedOrNull()` for the video root and transcript chunks (and transcript-fetch root updates). If OpenRouter fails, the thought is still saved with `embedding` null so `POST /videos` no longer hard-fails; semantic search will omit those rows until embeddings exist (e.g. future backfill).
 
 ## Customer Communication
 
@@ -64,7 +65,7 @@ The embedding error text matches a `RuntimeException` thrown in application code
 ## Prevention & Follow-up
 
 - [x] On missing `data[0].embedding`, log **HTTP status**, **model**, and a **truncated** response body before throwing — implemented in `OpenRouterService::embed()` (2026-04-07).
-- [ ] Consider **degrading gracefully** for video capture (save thought with `embedding` null and backfill later) vs hard-failing the whole `POST /videos` — product decision; today the code requires embed for capture.
+- [x] **Degrade gracefully** on embed failure during video capture — implemented via `VideoCaptureService::embedOrNull()` (2026-04-07). Optional later: backfill job for null embeddings.
 
 ## Related Issues
 
