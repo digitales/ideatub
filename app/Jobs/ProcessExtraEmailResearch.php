@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\ProcessNewsletterBodyAnalysis;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\Thought;
@@ -119,6 +120,13 @@ class ProcessExtraEmailResearch implements ShouldQueue
                 $links
             );
 
+            ProcessNewsletterBodyAnalysis::dispatch(
+                researchThoughtId: (string) $existingResearchThought->id,
+                sourceThoughtId: (string) $thought->id,
+                importedEmailId: $this->importedEmailId,
+                capturedInboundEmailId: $this->capturedInboundEmailId,
+            );
+
             return;
         }
 
@@ -165,6 +173,13 @@ class ProcessExtraEmailResearch implements ShouldQueue
                 $stored,
                 trim((string) ($stored->body_text ?? '')),
                 $links
+            );
+
+            ProcessNewsletterBodyAnalysis::dispatch(
+                researchThoughtId: (string) $researchThought->id,
+                sourceThoughtId: (string) $thought->id,
+                importedEmailId: $this->importedEmailId,
+                capturedInboundEmailId: $this->capturedInboundEmailId,
             );
         }
     }
