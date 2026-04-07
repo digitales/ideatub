@@ -17,4 +17,29 @@ require __DIR__.'/../vendor/autoload.php';
 /** @var Application $app */
 $app = require_once __DIR__.'/../bootstrap/app.php';
 
+// nginx / PHP-FPM often omit Authorization from $_SERVER; OAuth Bearer + MCP need it.
+if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
+    if (! empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $_SERVER['HTTP_AUTHORIZATION'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+}
+
+if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
+    $auth = $_SERVER['HTTP_X_AUTHORIZATION'] ?? null;
+    if (! is_string($auth) || $auth === '') {
+        $headers = function_exists('getallheaders') ? getallheaders() : [];
+        if (is_array($headers)) {
+            foreach ($headers as $name => $value) {
+                if (strtolower((string) $name) === 'authorization' && is_string($value) && $value !== '') {
+                    $auth = $value;
+                    break;
+                }
+            }
+        }
+    }
+    if (is_string($auth) && $auth !== '') {
+        $_SERVER['HTTP_AUTHORIZATION'] = $auth;
+    }
+}
+
 $app->handleRequest(Request::capture());
