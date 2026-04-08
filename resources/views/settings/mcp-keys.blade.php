@@ -44,17 +44,47 @@
         @else
             <ul class="space-y-4 mb-4">
                 @foreach ($keys as $key)
-                    <li class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-memory-violet/10 bg-white/60 px-4 py-3">
-                        <div>
-                            <code class="text-sm font-mono text-deep-indigo">ideatub_••••••••••••••••••••••••••••••••</code>
-                            @if ($key->label)
-                                <span class="ml-2 text-xs text-slate-brand">{{ $key->label }}</span>
-                            @endif
+                    @php
+                        $labelField = 'label_'.$key->id;
+                        $labelDefault = $key->label ?? 'Created in IdeaTub';
+                    @endphp
+                    <li class="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-memory-violet/10 bg-white/60 px-4 py-3">
+                        <div class="min-w-0 flex-1 space-y-2">
+                            <form method="POST" action="{{ route('settings.mcp-keys.update', $key) }}" class="flex flex-wrap items-end gap-2">
+                                @csrf
+                                @method('PATCH')
+                                <div class="min-w-[12rem] flex-1">
+                                    <label for="{{ $labelField }}" class="block text-[11px] font-medium text-slate-brand mb-1">Label</label>
+                                    <input
+                                        type="text"
+                                        id="{{ $labelField }}"
+                                        name="{{ $labelField }}"
+                                        value="{{ old($labelField, $labelDefault) }}"
+                                        maxlength="64"
+                                        placeholder="e.g. Cursor — work laptop"
+                                        class="w-full text-sm text-deep-indigo bg-white border border-memory-violet/20 rounded-lg px-3 py-2 placeholder:text-slate-brand/50 focus:outline-none focus:ring-2 focus:ring-memory-violet/25 focus:border-memory-violet/40"
+                                    />
+                                    @error($labelField)
+                                        <p class="text-[11px] text-red-600 mt-1">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <button
+                                    type="submit"
+                                    class="shrink-0 text-xs font-medium text-white px-3 py-2 rounded-lg transition-opacity hover:opacity-90"
+                                    style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
+                                >
+                                    Update label
+                                </button>
+                            </form>
+                            <div>
+                                <p class="text-[11px] font-medium text-slate-brand mb-0.5">Key</p>
+                                <code class="text-sm font-mono text-deep-indigo select-none">ideatub_••••••••••••••••••••••••••••••••</code>
+                            </div>
                             @if ($key->last_used_at)
-                                <p class="text-[11px] text-slate-brand/70 mt-1">Last used {{ $key->last_used_at->diffForHumans() }}</p>
+                                <p class="text-[11px] text-slate-brand/70">Last used {{ $key->last_used_at->diffForHumans() }}</p>
                             @endif
                         </div>
-                        <form method="POST" action="{{ route('settings.mcp-keys.destroy', $key) }}" class="inline" onsubmit="return confirm('Revoke this key? Clients using it will stop working until you add a new key.');">
+                        <form method="POST" action="{{ route('settings.mcp-keys.destroy', $key) }}" class="shrink-0 inline" onsubmit="return confirm('Revoke this key? Clients using it will stop working until you add a new key.');">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="text-xs font-medium text-red-600 hover:text-red-700 hover:underline">Revoke</button>
@@ -63,8 +93,23 @@
                 @endforeach
             </ul>
         @endif
-        <form method="POST" action="{{ route('settings.mcp-keys.store') }}">
+        <form method="POST" action="{{ route('settings.mcp-keys.store') }}" class="space-y-3 mt-4 pt-4 border-t border-memory-violet/10">
             @csrf
+            <div>
+                <label for="new-mcp-key-label" class="block text-[11px] font-medium text-slate-brand mb-1">Label <span class="font-normal text-slate-brand/70">(optional)</span></label>
+                <input
+                    type="text"
+                    id="new-mcp-key-label"
+                    name="label"
+                    value="{{ old('label') }}"
+                    maxlength="64"
+                    placeholder="e.g. Cursor — work laptop"
+                    class="w-full max-w-md text-sm text-deep-indigo bg-white border border-memory-violet/20 rounded-lg px-3 py-2 placeholder:text-slate-brand/50 focus:outline-none focus:ring-2 focus:ring-memory-violet/25 focus:border-memory-violet/40"
+                />
+                @error('label')
+                    <p class="text-[11px] text-red-600 mt-1">{{ $message }}</p>
+                @enderror
+            </div>
             <button
                 type="submit"
                 class="text-xs font-medium text-white px-4 py-2 rounded-lg transition-opacity hover:opacity-90"

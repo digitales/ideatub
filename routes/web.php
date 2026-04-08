@@ -160,6 +160,7 @@ Route::middleware('auth')->group(function () {
     // MCP key management (obtain / revoke auth key for AI clients)
     Route::get('/settings/mcp-keys', [McpKeyController::class, 'index'])->name('settings.mcp-keys.index');
     Route::post('/settings/mcp-keys', [McpKeyController::class, 'store'])->name('settings.mcp-keys.store');
+    Route::patch('/settings/mcp-keys/{mcpKey}', [McpKeyController::class, 'update'])->name('settings.mcp-keys.update');
     Route::delete('/settings/mcp-keys/{mcpKey}', [McpKeyController::class, 'destroy'])->name('settings.mcp-keys.destroy');
 
     Route::get('/settings/profile', [ProfileSettingsController::class, 'index'])->name('settings.profile.index');

@@ -32,6 +32,14 @@ class UserMcpKeyPolicy
     }
 
     /**
+     * Whether the user can update this key's label. Only the owner can.
+     */
+    public function update(User $user, UserMcpKey $userMcpKey): bool
+    {
+        return $userMcpKey->user_id === $user->id;
+    }
+
+    /**
      * Whether the user can delete (revoke) this key. Only the owner can.
      */
     public function delete(User $user, UserMcpKey $userMcpKey): bool

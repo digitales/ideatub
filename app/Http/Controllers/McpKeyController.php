@@ -47,12 +47,33 @@ class McpKeyController extends Controller
 
         $request->user()->userMcpKeys()->create([
             'key_hash' => $keyHash,
-            'label' => $validated['label'] ?? 'Created in IdeaTub',
+            'label' => $this->resolvedMcpKeyLabel($validated['label'] ?? null),
         ]);
 
         return redirect()
             ->route('settings.mcp-keys.index')
             ->with('new_mcp_key', $plainKey);
+    }
+
+    /**
+     * Update the human-readable label for an MCP key. Secret is never changed here.
+     */
+    public function update(Request $request, UserMcpKey $mcpKey): RedirectResponse
+    {
+        $this->authorize('update', $mcpKey);
+
+        $field = 'label_'.$mcpKey->id;
+        $validated = $request->validate([
+            $field => 'nullable|string|max:64',
+        ]);
+
+        $mcpKey->update([
+            'label' => $this->resolvedMcpKeyLabel($validated[$field] ?? null),
+        ]);
+
+        return redirect()
+            ->route('settings.mcp-keys.index')
+            ->with('success', 'Label updated.');
     }
 
     /**
@@ -67,5 +88,15 @@ class McpKeyController extends Controller
         return redirect()
             ->route('settings.mcp-keys.index')
             ->with('success', 'MCP key revoked. Any clients using it will need a new key.');
+    }
+
+    /**
+     * Trim; empty becomes the default label used when the user does not name a key.
+     */
+    private function resolvedMcpKeyLabel(?string $label): string
+    {
+        $trimmed = trim((string) ($label ?? ''));
+
+        return $trimmed === '' ? 'Created in IdeaTub' : $trimmed;
     }
 }
