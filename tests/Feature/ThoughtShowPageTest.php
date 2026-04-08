@@ -90,6 +90,46 @@ class ThoughtShowPageTest extends TestCase
         $normal->assertSee('Edit tags', false);
     }
 
+    public function test_thought_detail_shows_content_edit_for_owner(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Unique detail edit body zed-4421',
+            'source' => 'web',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertStringContainsString('aria-label="Edit content"', $response->getContent());
+    }
+
+    public function test_demo_mode_thought_detail_does_not_expose_content_edit_affordance(): void
+    {
+        config(['services.demo_mode.enabled' => true]);
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Demo detail body zed-1199',
+            'source' => 'web',
+            'metadata' => ['tags' => ['alphademo']],
+        ]);
+
+        $response = $this->withSession([
+            DemoMode::ENABLED_SESSION_KEY => true,
+            DemoMode::SEED_SESSION_KEY => 'seed-detail-content-edit-demo',
+        ])->actingAs($owner)->get(route('thoughts.show', $thought));
+
+        $response->assertOk();
+        $this->assertStringNotContainsString('aria-label="Edit content"', $response->getContent());
+
+        session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
+        $normal = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $normal->assertOk();
+        $this->assertStringContainsString('aria-label="Edit content"', $normal->getContent());
+    }
+
     public function test_demo_mode_obfuscates_email_thought_subject_and_body_without_mutating_imported_rows(): void
     {
         config(['services.demo_mode.enabled' => true]);

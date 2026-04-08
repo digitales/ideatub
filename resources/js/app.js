@@ -631,7 +631,16 @@ Alpine.data('thoughtTagRow', (initialTags, updateUrl, editable = false) => ({
   },
 }));
 
-Alpine.data('thoughtContentEditor', ({ content, displayContent, rawEditorContent, updateUrl, editable = false, previewMaxLength = null, previewMode = false }) => ({
+Alpine.data('thoughtContentEditor', ({
+  content,
+  displayContent,
+  rawEditorContent,
+  updateUrl,
+  editable = false,
+  previewMaxLength = null,
+  previewMode = false,
+  detailMarkdownRead = false,
+}) => ({
   content: displayContent ?? content ?? '',
   originalContent: rawEditorContent ?? content ?? displayContent ?? '',
   draftContent: rawEditorContent ?? content ?? displayContent ?? '',
@@ -639,6 +648,7 @@ Alpine.data('thoughtContentEditor', ({ content, displayContent, rawEditorContent
   editable: !!editable,
   previewMaxLength: previewMaxLength == null || previewMaxLength === '' ? null : Number(previewMaxLength),
   previewMode: !!previewMode,
+  detailMarkdownRead: !!detailMarkdownRead,
   previewExpanded: false,
   previewHasOverflow: false,
   editing: false,
@@ -769,6 +779,12 @@ Alpine.data('thoughtContentEditor', ({ content, displayContent, rawEditorContent
       this.content = data.content ?? trimmed;
       this.originalContent = this.content;
       this.draftContent = this.content;
+      if (this.detailMarkdownRead && typeof data.content_html === 'string') {
+        const el = this.$refs.markdownReadBody;
+        if (el) {
+          el.innerHTML = data.content_html;
+        }
+      }
       this.editing = false;
     } catch {
       this.error = 'Unable to update thought.';

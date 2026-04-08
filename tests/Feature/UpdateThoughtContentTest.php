@@ -97,4 +97,25 @@ class UpdateThoughtContentTest extends TestCase
         $this->assertSame('Owner content', $thought->content);
         $this->assertSame(['original'], $thought->metadata['tags'] ?? null);
     }
+
+    public function test_json_response_includes_content_html_after_update(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'content' => 'Before',
+            'embedding' => null,
+        ]);
+
+        $response = $this->actingAs($owner)->patchJson(route('ideas.update-content', $thought), [
+            'content' => 'Hello **world**',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('content', 'Hello **world**');
+        $html = $response->json('content_html');
+        $this->assertIsString($html);
+        $this->assertStringContainsString('<p', $html);
+        $this->assertStringContainsString('world', $html);
+    }
 }

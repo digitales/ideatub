@@ -194,24 +194,37 @@ class IdeaController extends Controller
             : null;
         $contentHtml = null;
         $documentSectionHtmlChunks = [];
+        $thoughtDetailContentBlocks = [];
 
         if ($thought->source !== 'email') {
-            $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
-            $contentHtml = $this->renderDemoSafeMarkdown(
-                $converter,
-                $thought->content,
-                'thought_content'
-            );
-            $documentSectionHtmlChunks = $thought->comments
+            $contentHtml = $this->renderedThoughtBodyHtml($thought);
+            $sectionThoughts = $thought->comments
                 ->filter(fn (Thought $comment): bool => $this->isStructuredDocumentSection($comment))
                 ->sortBy(fn (Thought $comment): int => (int) data_get($comment->source_metadata, 'section_index', PHP_INT_MAX))
-                ->map(fn (Thought $section): string => $this->renderDemoSafeMarkdown(
-                    $converter,
-                    $section->content,
-                    'thought_content_section'
-                ))
-                ->values()
+                ->values();
+
+            $documentSectionHtmlChunks = $sectionThoughts
+                ->map(fn (Thought $section): string => $this->renderedThoughtBodyHtml($section))
                 ->all();
+
+            $detailContentEditable = auth()->check()
+                && (int) auth()->id() === (int) $thought->user_id
+                && ! app(DemoMode::class)->enabled();
+
+            $thoughtDetailContentBlocks = [
+                [
+                    'thought' => $thought,
+                    'content_html' => $contentHtml,
+                    'editable' => $detailContentEditable,
+                ],
+            ];
+            foreach ($sectionThoughts as $sectionThought) {
+                $thoughtDetailContentBlocks[] = [
+                    'thought' => $sectionThought,
+                    'content_html' => $this->renderedThoughtBodyHtml($sectionThought),
+                    'editable' => $detailContentEditable,
+                ];
+            }
         }
 
         $linkedResearchUrl = $this->resolveEmailLinkedResearchUrl(
@@ -269,6 +282,7 @@ class IdeaController extends Controller
 
         return view('idea.show', [
             'thoughtDetail' => $thoughtDetail,
+            'thoughtDetailContentBlocks' => $thoughtDetailContentBlocks,
         ]);
     }
 
@@ -1079,9 +1093,13 @@ class IdeaController extends Controller
         }
 
         $thought->update(['content' => $content]);
+        $thought->refresh();
 
         if ($request->expectsJson() || $request->ajax()) {
-            return response()->json(['content' => $thought->content]);
+            return response()->json([
+                'content' => $thought->content,
+                'content_html' => $this->renderedThoughtBodyHtml($thought),
+            ]);
         }
 
         return redirect()->back()->with('success', 'Thought updated.');
@@ -2011,6 +2029,19 @@ class IdeaController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * HTML body for a thought's markdown, matching {@see show()} rendering and demo obfuscation.
+     */
+    private function renderedThoughtBodyHtml(Thought $thought): string
+    {
+        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
+        $context = $this->isStructuredDocumentSection($thought)
+            ? 'thought_content_section'
+            : 'thought_content';
+
+        return $this->renderDemoSafeMarkdown($converter, (string) $thought->content, $context);
     }
 
     private function isStructuredDocumentSection(Thought $thought): bool
