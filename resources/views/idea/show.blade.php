@@ -22,6 +22,7 @@
         'thought' => $thought,
         'thoughtDetail' => $thoughtDetail,
         'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
+        'projectsToAttachToThought' => $projectsToAttachToThought,
     ])
 
     @include('idea.partials.thought_detail_projects_and_links', [
@@ -31,6 +32,7 @@
         'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
         'thoughtIncomingLinks' => $thoughtIncomingLinks,
         'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
+        'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
     ])
 
     <div class="{{ $useThoughtDetailTwoColumn ? 'grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start' : '' }}">

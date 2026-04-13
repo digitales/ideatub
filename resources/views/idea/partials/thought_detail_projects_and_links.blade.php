@@ -12,30 +12,16 @@
                 @foreach ($thoughtProjectsForDetail as $p)
                     <li class="inline-flex items-center gap-1 rounded-full border border-memory-violet/20 bg-memory-violet/5 pl-3 pr-1 py-1 text-xs text-deep-indigo">
                         <a href="{{ route('projects.show', $p) }}" class="hover:text-memory-violet hover:underline">{{ $p->title }}</a>
-                        <form method="POST" action="{{ route('thoughts.projects.destroy', [$thought, $p]) }}" class="inline">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="rounded-full p-1 text-slate-brand/50 hover:text-red-600 hover:bg-red-50" title="Remove from project">×</button>
-                        </form>
+                        @if ($editable ?? true)
+                            <form method="POST" action="{{ route('thoughts.projects.destroy', [$thought, $p]) }}" class="inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="rounded-full p-1 text-slate-brand/50 hover:text-red-600 hover:bg-red-50" title="Remove from project">×</button>
+                            </form>
+                        @endif
                     </li>
                 @endforeach
             </ul>
-        @endif
-
-        @if ($projectsToAttachToThought->isNotEmpty())
-            <form method="POST" action="{{ route('thoughts.projects.store', $thought) }}" class="flex flex-col sm:flex-row gap-2 items-start sm:items-end">
-                @csrf
-                <div class="flex-1 w-full sm:w-auto min-w-[12rem]">
-                    <label for="attach-project-id" class="sr-only">Add to project</label>
-                    <select id="attach-project-id" name="project_id" required class="w-full rounded-lg border border-memory-violet/20 bg-white px-3 py-2 text-sm text-deep-indigo">
-                        <option value="">Add to project…</option>
-                        @foreach ($projectsToAttachToThought as $p)
-                            <option value="{{ $p->id }}">{{ $p->title }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <button type="submit" class="rounded-lg bg-memory-violet text-white text-sm font-medium px-4 py-2 hover:opacity-90">Add</button>
-            </form>
         @endif
     </section>
 

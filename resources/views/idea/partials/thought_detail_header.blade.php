@@ -4,6 +4,13 @@
 >
     <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-3">Thought detail</p>
 
+    @if ($editable ?? true)
+        @include('idea.partials.thought_detail_add_to_project', [
+            'thought' => $thought,
+            'projectsToAttachToThought' => $projectsToAttachToThought ?? collect(),
+        ])
+    @endif
+
     <div class="flex items-center gap-2 flex-wrap">
         @include('idea.partials.thought_type_badge', [
             'thought' => $thought,
