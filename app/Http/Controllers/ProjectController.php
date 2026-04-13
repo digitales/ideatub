@@ -17,6 +17,11 @@ class ProjectController extends Controller
 
         $projects = Project::query()
             ->where('user_id', auth()->id())
+            ->withCount([
+                'thoughts as top_level_ideas_count' => function ($query) {
+                    $query->whereNull('thoughts.parent_id');
+                },
+            ])
             ->orderByDesc('updated_at')
             ->get();
 

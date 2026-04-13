@@ -26,7 +26,7 @@
                         @if ($project->description)
                             <p class="text-xs text-slate-brand/60 mt-1 line-clamp-2">{{ \Illuminate\Support\Str::limit(strip_tags($project->description), 120) }}</p>
                         @endif
-                        <p class="text-[11px] text-slate-brand/45 mt-2">Updated {{ $project->updated_at->diffForHumans() }}</p>
+                        <p class="text-[11px] text-slate-brand/45 mt-2">{{ $project->top_level_ideas_count === 1 ? '1 idea' : $project->top_level_ideas_count.' ideas' }} · Updated {{ $project->updated_at->diffForHumans() }}</p>
                     </a>
                 </li>
             @endforeach
