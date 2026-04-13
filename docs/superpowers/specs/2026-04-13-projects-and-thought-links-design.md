@@ -1,7 +1,7 @@
 # IdeaTub — Projects, typed thought links, and shared project views
 
 **Date:** 2026-04-13  
-**Status:** Approved for spec review (brainstorming)  
+**Status:** Implemented  
 **Scope:** Named projects (many-to-many with thoughts), directed typed links between thoughts, project hub + graph (members-only in v1), and public sharing (token + optional password + optional expiry) aligned with existing research shares.
 
 ## Overview
