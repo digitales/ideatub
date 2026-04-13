@@ -24,6 +24,8 @@ use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\ProfileSettingsController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectThoughtController;
 use App\Http\Controllers\ResearchSkillSettingsController;
 use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
@@ -153,6 +155,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/ideas/drafts/{draft}', [DraftController::class, 'show'])->name('ideas.drafts.show');
     Route::patch('/ideas/drafts/{draft}', [DraftController::class, 'update'])->name('ideas.drafts.update');
     Route::delete('/ideas/drafts/{draft}', [DraftController::class, 'destroy'])->name('ideas.drafts.destroy');
+
+    Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
+    Route::get('/projects/create', [ProjectController::class, 'create'])->name('projects.create');
+    Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
+    Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+    Route::get('/projects/{project}/edit', [ProjectController::class, 'edit'])->name('projects.edit');
+    Route::put('/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
+    Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
+    Route::post('/projects/{project}/thoughts', [ProjectThoughtController::class, 'store'])->name('projects.thoughts.store');
+    Route::delete('/projects/{project}/thoughts/{thought}', [ProjectThoughtController::class, 'destroy'])->name('projects.thoughts.destroy');
 
     Route::redirect('/example-prompts', '/help#example-prompts')->name('example-prompts');
     Route::get('/help', [HelpController::class, 'index'])->name('help');

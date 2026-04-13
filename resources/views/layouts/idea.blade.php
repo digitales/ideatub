@@ -76,6 +76,9 @@
                 <a href="{{route('idea.stream')}}" class="{{$navLinkClass}}">
                     Stream
                 </a>
+                <a href="{{route('projects.index')}}" class="{{$navLinkClass}}">
+                    Projects
+                </a>
                 <a href="{{route('help')}}" class="{{$navLinkClass}}">
                     Help
                 </a>
@@ -100,6 +103,9 @@
                         </a>
                         <a href="{{route('idea.stream')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
                             Stream
+                        </a>
+                        <a href="{{route('projects.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                            Projects
                         </a>
                         <div class="border-t border-memory-violet/10 my-1"></div>
                         <a href="{{route('help')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
