@@ -19,14 +19,14 @@
                 </div>
             @endif
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <a href="{{ route('projects.graph', $project) }}" class="text-sm font-medium text-memory-violet hover:underline">Graph</a>
             <a href="{{ route('projects.shares.index', $project) }}" class="text-sm font-medium text-memory-violet hover:underline">Share</a>
             <a href="{{ route('projects.edit', $project) }}" class="text-sm font-medium text-memory-violet hover:underline">Edit</a>
-            <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirm('Archive this project? Thoughts stay in your library.');">
+            <form method="POST" action="{{ route('projects.destroy', $project) }}" class="m-0 inline-flex items-center p-0" onsubmit="return confirm('Archive this project? Thoughts stay in your library.');">
                 @csrf
                 @method('DELETE')
-                <button type="submit" class="text-sm text-red-600 hover:underline">Archive</button>
+                <button type="submit" class="m-0 cursor-pointer border-0 bg-transparent p-0 text-sm font-medium text-red-600 hover:underline">Archive</button>
             </form>
         </div>
     </div>
