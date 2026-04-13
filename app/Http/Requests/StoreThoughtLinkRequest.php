@@ -27,6 +27,16 @@ class StoreThoughtLinkRequest extends FormRequest
         /** @var Thought $from */
         $from = $this->route('thought');
 
+        $linkTypeRules = [
+            'required',
+            Rule::enum(ThoughtLinkType::class),
+        ];
+        if ($this->filled('to_thought_id')) {
+            $linkTypeRules[] = Rule::unique('thought_links', 'link_type')
+                ->where('from_thought_id', $from->id)
+                ->where('to_thought_id', (string) $this->input('to_thought_id'));
+        }
+
         return [
             'to_thought_id' => [
                 'required',
@@ -34,13 +44,7 @@ class StoreThoughtLinkRequest extends FormRequest
                 Rule::exists('thoughts', 'id')->where('user_id', $this->user()->id),
                 Rule::notIn([$from->id]),
             ],
-            'link_type' => [
-                'required',
-                Rule::enum(ThoughtLinkType::class),
-                Rule::unique('thought_links', 'link_type')
-                    ->where('from_thought_id', $from->id)
-                    ->where('to_thought_id', (string) $this->input('to_thought_id')),
-            ],
+            'link_type' => $linkTypeRules,
             'note' => ['nullable', 'string', 'max:2000'],
         ];
     }

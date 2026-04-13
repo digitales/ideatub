@@ -1,16 +1,20 @@
 @php
     /** @var \App\Models\Thought $thought */
     /** @var \Illuminate\Support\Collection<int, \App\Models\Project> $projectsToAttachToThought */
+    $inActionsRow = $inActionsRow ?? false;
+    $addToProjectDetailsClass = $inActionsRow
+        ? 'min-w-0 shrink-0'
+        : 'mt-4 rounded-xl border border-memory-violet/15 bg-memory-violet/[0.04] px-3 py-2';
 @endphp
 
-<details class="mt-4 rounded-xl border border-memory-violet/15 bg-memory-violet/[0.04] px-3 py-2">
+<details class="{{ $addToProjectDetailsClass }}">
     <summary class="cursor-pointer text-sm font-medium text-memory-violet select-none">
         Add to project
     </summary>
     <form
         method="POST"
         action="{{ route('thoughts.projects.store', $thought) }}"
-        class="mt-3 space-y-3"
+        class="mt-3 w-full max-w-full space-y-3"
         x-data="{ pick: @js(old('project_id', '')) }"
     >
         @csrf

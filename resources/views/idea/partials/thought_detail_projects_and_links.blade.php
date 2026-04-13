@@ -25,9 +25,17 @@
         @endif
     </section>
 
+    @php
+        $linkSectionOpen = $errors->has('to_thought_id') || $errors->has('link_type') || $errors->has('note');
+    @endphp
     <section>
-        <h2 class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-3">Linked thoughts</h2>
-
+        <details class="group" @if ($linkSectionOpen) open @endif>
+            <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                <span class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80">
+                    Linked thoughts
+                </span>
+            </summary>
+            <div class="mt-4 space-y-4">
         @if ($thoughtOutgoingLinks->isNotEmpty())
             <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-brand/50 mb-2">From this thought</p>
             <ul class="space-y-2 mb-4">
@@ -77,6 +85,9 @@
         @if ($linkTargetThoughtOptions->isNotEmpty())
             <form method="POST" action="{{ route('thoughts.links.store', $thought) }}" class="space-y-3 rounded-xl border border-dashed border-memory-violet/25 p-4">
                 @csrf
+                @if ($linkTargetThoughtOptionsUsedGlobalFallback ?? false)
+                    <p class="text-xs text-slate-brand/70 mb-1">No other thoughts in your project(s) yet — showing all thoughts.</p>
+                @endif
                 <p class="text-xs font-medium text-slate-brand">New link <span class="text-slate-brand/60 font-normal">(from this thought)</span></p>
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div>
@@ -115,5 +126,7 @@
         @else
             <p class="text-sm text-slate-brand/70">No other thoughts to link yet.</p>
         @endif
+            </div>
+        </details>
     </section>
 </div>

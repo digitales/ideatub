@@ -32,6 +32,7 @@
         'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
         'thoughtIncomingLinks' => $thoughtIncomingLinks,
         'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
+        'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
         'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
     ])
 

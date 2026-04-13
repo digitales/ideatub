@@ -308,13 +308,37 @@ class IdeaController extends Controller
             ->orderBy('link_type')
             ->get();
 
-        $linkTargetThoughtOptions = Thought::query()
-            ->where('user_id', auth()->id())
-            ->whereNull('parent_id')
-            ->whereKeyNot($thought->id)
-            ->orderByDesc('updated_at')
-            ->limit(100)
-            ->get(['id', 'content']);
+        $globalLinkTargets = static function () use ($thought) {
+            return Thought::query()
+                ->where('user_id', auth()->id())
+                ->whereNull('parent_id')
+                ->whereKeyNot($thought->id)
+                ->orderByDesc('updated_at')
+                ->limit(100)
+                ->get(['id', 'content']);
+        };
+
+        if ($memberProjectIds->isEmpty()) {
+            $linkTargetThoughtOptions = $globalLinkTargets();
+            $linkTargetThoughtOptionsUsedGlobalFallback = false;
+        } else {
+            $scopedLinkTargets = Thought::query()
+                ->where('user_id', auth()->id())
+                ->whereNull('parent_id')
+                ->whereKeyNot($thought->id)
+                ->whereHas('projects', fn (Builder $q) => $q->whereIn('projects.id', $memberProjectIds))
+                ->orderByDesc('updated_at')
+                ->limit(100)
+                ->get(['id', 'content']);
+
+            if ($scopedLinkTargets->isNotEmpty()) {
+                $linkTargetThoughtOptions = $scopedLinkTargets;
+                $linkTargetThoughtOptionsUsedGlobalFallback = false;
+            } else {
+                $linkTargetThoughtOptions = $globalLinkTargets();
+                $linkTargetThoughtOptionsUsedGlobalFallback = true;
+            }
+        }
 
         if (app(DemoMode::class)->enabled()) {
             $obfuscator = app(DemoObfuscator::class);
@@ -352,6 +376,7 @@ class IdeaController extends Controller
             'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
             'thoughtIncomingLinks' => $thoughtIncomingLinks,
             'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
+            'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
         ]);
     }
 
