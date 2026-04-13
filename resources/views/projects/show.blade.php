@@ -33,15 +33,15 @@
 
     <section class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-5 mb-8">
         <h2 class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-4">Add thought</h2>
-        <form method="POST" action="{{ route('projects.thoughts.store', $project) }}" class="flex flex-col sm:flex-row gap-3">
+        <form method="POST" action="{{ route('projects.thoughts.store', $project) }}" class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-stretch">
             @csrf
-            <select name="thought_id" required class="flex-1 rounded-lg border border-memory-violet/20 bg-white px-3 py-2 text-sm text-deep-indigo">
+            <select name="thought_id" required class="min-w-0 w-full flex-1 rounded-lg border border-memory-violet/20 bg-white px-3 py-2 text-sm text-deep-indigo">
                 <option value="">Choose a thought…</option>
                 @foreach ($thoughtOptions as $t)
                     <option value="{{ $t->id }}">{{ \Illuminate\Support\Str::limit($t->content, 80) }}</option>
                 @endforeach
             </select>
-            <button type="submit" class="rounded-lg bg-memory-violet text-white text-sm font-medium px-4 py-2 hover:opacity-90 whitespace-nowrap">Add</button>
+            <button type="submit" class="shrink-0 rounded-lg bg-memory-violet px-4 py-2 text-sm font-medium whitespace-nowrap text-white hover:opacity-90">Add</button>
         </form>
         @error('thought_id')
             <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
