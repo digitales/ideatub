@@ -25,8 +25,11 @@ use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\ProfileSettingsController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectGraphController;
+use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\ProjectThoughtController;
 use App\Http\Controllers\ResearchSkillSettingsController;
+use App\Http\Controllers\SharedProjectViewController;
 use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
 use App\Http\Controllers\SocialAuthController;
@@ -56,6 +59,19 @@ Route::get('/r/{token}', [SharedResearchViewController::class, 'show'])
     ->name('shared-research.show');
 Route::post('/r/{token}', [SharedResearchViewController::class, 'show'])
     ->middleware('throttle:shared-research-password');
+
+Route::get('/shared/projects/{token}', [SharedProjectViewController::class, 'hub'])->name('shared-projects.hub');
+Route::post('/shared/projects/{token}', [SharedProjectViewController::class, 'hub'])
+    ->middleware('throttle:project-share-password');
+Route::get('/shared/projects/{token}/read', [SharedProjectViewController::class, 'readAll'])->name('shared-projects.read');
+Route::post('/shared/projects/{token}/read', [SharedProjectViewController::class, 'readAll'])
+    ->middleware('throttle:project-share-password');
+Route::get('/shared/projects/{token}/thoughts/{thoughtId}', [SharedProjectViewController::class, 'thought'])
+    ->whereUuid('thoughtId')
+    ->name('shared-projects.thought');
+Route::post('/shared/projects/{token}/thoughts/{thoughtId}', [SharedProjectViewController::class, 'thought'])
+    ->whereUuid('thoughtId')
+    ->middleware('throttle:project-share-password');
 
 // Tool pages
 Route::get('/tools/{tool}', [ToolController::class, 'show'])
@@ -171,6 +187,12 @@ Route::middleware('auth')->group(function () {
     Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
     Route::post('/projects/{project}/thoughts', [ProjectThoughtController::class, 'store'])->name('projects.thoughts.store');
     Route::delete('/projects/{project}/thoughts/{thought}', [ProjectThoughtController::class, 'destroy'])->name('projects.thoughts.destroy');
+    Route::get('/projects/{project}/graph', [ProjectGraphController::class, 'show'])->name('projects.graph');
+    Route::get('/projects/{project}/graph/data', [ProjectGraphController::class, 'data'])->name('projects.graph.data');
+    Route::get('/projects/{project}/shares', [ProjectShareController::class, 'index'])->name('projects.shares.index');
+    Route::post('/projects/{project}/shares', [ProjectShareController::class, 'store'])->name('projects.shares.store');
+    Route::patch('/project-shares/{projectShare}', [ProjectShareController::class, 'update'])->name('project-shares.update');
+    Route::delete('/project-shares/{projectShare}', [ProjectShareController::class, 'destroy'])->name('project-shares.destroy');
 
     Route::redirect('/example-prompts', '/help#example-prompts')->name('example-prompts');
     Route::get('/help', [HelpController::class, 'index'])->name('help');

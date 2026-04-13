@@ -8,9 +8,9 @@ use App\Models\User;
 
 class ProjectSharePolicy
 {
-    public function viewAny(User $user, Project $project): bool
+    public function view(User $user, ProjectShare $projectShare): bool
     {
-        return $project->user_id === $user->id;
+        return $projectShare->user_id === $user->id;
     }
 
     public function create(User $user, Project $project): bool
@@ -20,11 +20,11 @@ class ProjectSharePolicy
 
     public function update(User $user, ProjectShare $projectShare): bool
     {
-        return $projectShare->project->user_id === $user->id;
+        return $projectShare->user_id === $user->id;
     }
 
     public function delete(User $user, ProjectShare $projectShare): bool
     {
-        return $projectShare->project->user_id === $user->id;
+        return $projectShare->user_id === $user->id;
     }
 }

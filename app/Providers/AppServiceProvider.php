@@ -56,7 +56,14 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('shared-research-password', function (Request $request) {
             $token = $request->route('token') ?? 'unknown';
-            return Limit::perMinutes(15, 10)->by($token . ':' . $request->ip());
+
+            return Limit::perMinutes(15, 10)->by($token.':'.$request->ip());
+        });
+
+        RateLimiter::for('project-share-password', function (Request $request) {
+            $token = $request->route('token') ?? 'unknown';
+
+            return Limit::perMinutes(15, 10)->by($token.':'.$request->ip());
         });
 
         Broadcast::routes(['middleware' => ['web', 'auth']]);

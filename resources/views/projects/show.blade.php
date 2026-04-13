@@ -20,6 +20,8 @@
             @endif
         </div>
         <div class="flex flex-wrap gap-2">
+            <a href="{{ route('projects.graph', $project) }}" class="text-sm font-medium text-memory-violet hover:underline">Graph</a>
+            <a href="{{ route('projects.shares.index', $project) }}" class="text-sm font-medium text-memory-violet hover:underline">Share</a>
             <a href="{{ route('projects.edit', $project) }}" class="text-sm font-medium text-memory-violet hover:underline">Edit</a>
             <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirm('Archive this project? Thoughts stay in your library.');">
                 @csrf
