@@ -24,7 +24,7 @@
     const emptyMsg = document.getElementById('project-graph-empty');
     if (!container || typeof vis === 'undefined') return;
 
-    fetch(@json(route('projects.graph.data', $project))), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+    fetch(@json(route('projects.graph.data', $project)), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
         .then(function (r) { return r.json(); })
         .then(function (data) {
             const nodes = new vis.DataSet((data.nodes || []).map(function (n) {
