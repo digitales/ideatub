@@ -153,6 +153,22 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<Project, $this>
+     */
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
+    }
+
+    /**
+     * @return HasMany<ThoughtLink, $this>
+     */
+    public function thoughtLinks(): HasMany
+    {
+        return $this->hasMany(ThoughtLink::class);
+    }
+
+    /**
      * Check if user has unlimited access (Pro or Lifetime).
      */
     public function hasUnlimitedAccess(): bool

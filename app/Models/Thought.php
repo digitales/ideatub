@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -205,6 +206,33 @@ class Thought extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(Thought::class, 'parent_id');
+    }
+
+    /**
+     * @return BelongsToMany<Project, $this>
+     */
+    public function projects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class, 'project_thought')
+            ->withPivot('sort_order')
+            ->withTimestamps()
+            ->orderByPivot('sort_order');
+    }
+
+    /**
+     * @return HasMany<ThoughtLink, $this>
+     */
+    public function linksFrom(): HasMany
+    {
+        return $this->hasMany(ThoughtLink::class, 'from_thought_id');
+    }
+
+    /**
+     * @return HasMany<ThoughtLink, $this>
+     */
+    public function linksTo(): HasMany
+    {
+        return $this->hasMany(ThoughtLink::class, 'to_thought_id');
     }
 
     /**
