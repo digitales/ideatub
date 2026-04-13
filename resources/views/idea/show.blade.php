@@ -23,16 +23,15 @@
         'thoughtDetail' => $thoughtDetail,
         'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
         'projectsToAttachToThought' => $projectsToAttachToThought,
+        'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
+        'thoughtIncomingLinks' => $thoughtIncomingLinks,
+        'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
+        'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
     ])
 
     @include('idea.partials.thought_detail_projects_and_links', [
         'thought' => $thought,
         'thoughtProjectsForDetail' => $thoughtProjectsForDetail,
-        'projectsToAttachToThought' => $projectsToAttachToThought,
-        'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
-        'thoughtIncomingLinks' => $thoughtIncomingLinks,
-        'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
-        'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
         'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
     ])
 

@@ -76,7 +76,8 @@ test('thought detail page shows projects and link form', function () {
     $user = User::factory()->create();
     $thought = Thought::factory()->create(['user_id' => $user->id]);
     Thought::factory()->create(['user_id' => $user->id, 'content' => 'Other for picker']);
-    Project::factory()->create(['user_id' => $user->id, 'title' => 'My Project']);
+    $project = Project::factory()->create(['user_id' => $user->id, 'title' => 'My Project']);
+    $project->thoughts()->attach($thought->id, ['sort_order' => 0]);
 
     $this->actingAs($user)
         ->get(route('thoughts.show', $thought))

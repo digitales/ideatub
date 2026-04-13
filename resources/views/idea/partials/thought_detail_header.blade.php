@@ -22,6 +22,10 @@
         'thoughtDetail' => $thoughtDetail ?? null,
         'editable' => $editable ?? true,
         'projectsToAttachToThought' => $projectsToAttachToThought ?? collect(),
+        'thoughtOutgoingLinks' => $thoughtOutgoingLinks ?? collect(),
+        'thoughtIncomingLinks' => $thoughtIncomingLinks ?? collect(),
+        'linkTargetThoughtOptions' => $linkTargetThoughtOptions ?? collect(),
+        'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback ?? false,
     ])
 
     @if (($thought->metadata['type'] ?? null) === 'idea' && $thought->isIdeaCompleted())
