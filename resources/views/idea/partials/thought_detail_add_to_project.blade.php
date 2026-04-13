@@ -3,18 +3,24 @@
     /** @var \Illuminate\Support\Collection<int, \App\Models\Project> $projectsToAttachToThought */
     $inActionsRow = $inActionsRow ?? false;
     $addToProjectDetailsClass = $inActionsRow
-        ? 'min-w-0 shrink-0'
+        ? 'group w-full min-w-0'
         : 'mt-4 rounded-xl border border-memory-violet/15 bg-memory-violet/[0.04] px-3 py-2';
+    $addProjectOpen = $errors->has('project_id')
+        || $errors->has('new_project_title')
+        || $errors->has('new_project_description')
+        || (old('project_id') !== null && old('project_id') !== '');
 @endphp
 
-<details class="{{ $addToProjectDetailsClass }}">
-    <summary class="cursor-pointer text-sm font-medium text-memory-violet select-none">
+<details class="{{ $addToProjectDetailsClass }}" @if ($addProjectOpen) open @endif>
+    <summary
+        class="@if ($inActionsRow) cursor-pointer list-none font-medium text-memory-violet hover:underline [&::-webkit-details-marker]:hidden @else cursor-pointer text-sm font-medium text-memory-violet select-none @endif"
+    >
         Add to project
     </summary>
     <form
         method="POST"
         action="{{ route('thoughts.projects.store', $thought) }}"
-        class="mt-3 w-full max-w-full space-y-3"
+        class="mt-3 w-full max-w-full space-y-3 @if ($inActionsRow) border-l border-memory-violet/15 pl-4 @endif"
         x-data="{ pick: @js(old('project_id', '')) }"
     >
         @csrf

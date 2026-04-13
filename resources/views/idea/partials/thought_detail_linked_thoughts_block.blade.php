@@ -3,17 +3,19 @@
 
     $linkSectionOpen = $errors->has('to_thought_id') || $errors->has('link_type') || $errors->has('note');
     $inActionsRow = $inActionsRow ?? false;
-    $linkedDetailsClass = $inActionsRow ? 'min-w-0 shrink-0' : '';
+    $linkedDetailsClass = $inActionsRow ? 'group w-full min-w-0' : 'group';
 @endphp
-<details class="group {{ $linkedDetailsClass }}" @if ($linkSectionOpen) open @endif>
-    <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+<details class="{{ $linkedDetailsClass }}" @if ($linkSectionOpen) open @endif>
+    <summary
+        class="@if ($inActionsRow) cursor-pointer list-none font-medium text-memory-violet hover:underline select-none [&::-webkit-details-marker]:hidden @else cursor-pointer list-none [&::-webkit-details-marker]:hidden @endif"
+    >
         @if ($inActionsRow)
-            <span class="text-sm font-medium text-memory-violet select-none">Linked thoughts</span>
+            Linked thoughts
         @else
             <span class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80">Linked thoughts</span>
         @endif
     </summary>
-    <div class="mt-3 space-y-4 @if ($inActionsRow) w-full min-w-[min(100%,24rem)] @endif">
+    <div class="mt-3 w-full space-y-4 @if ($inActionsRow) min-w-[min(100%,24rem)] border-l border-memory-violet/15 pl-4 @endif">
         @if ($thoughtOutgoingLinks->isNotEmpty())
             <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-brand/50 mb-2">From this thought</p>
             <ul class="space-y-2 mb-4">
