@@ -72,6 +72,23 @@ test('user can attach and detach project from thought detail', function () {
     expect($project->thoughts()->whereKey($thought->id)->exists())->toBeFalse();
 });
 
+test('attaching to existing project accepts empty new project fields from browser form', function () {
+    $user = User::factory()->create();
+    $thought = Thought::factory()->create(['user_id' => $user->id]);
+    $project = Project::factory()->create(['user_id' => $user->id]);
+
+    $this->actingAs($user)
+        ->post(route('thoughts.projects.store', $thought), [
+            'project_id' => $project->id,
+            'new_project_title' => '',
+            'new_project_description' => '',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($project->thoughts()->whereKey($thought->id)->exists())->toBeTrue();
+});
+
 test('thought detail page shows projects and link form', function () {
     $user = User::factory()->create();
     $thought = Thought::factory()->create(['user_id' => $user->id]);

@@ -24,7 +24,7 @@ class ThoughtProjectController extends Controller
 
         $validated = $request->validate([
             'project_id' => ['required', 'string'],
-            'new_project_title' => ['prohibited_unless:project_id,__new__', 'required_if:project_id,__new__', 'string', 'max:255'],
+            'new_project_title' => ['prohibited_unless:project_id,__new__', 'required_if:project_id,__new__', 'nullable', 'string', 'max:255'],
             'new_project_description' => ['prohibited_unless:project_id,__new__', 'nullable', 'string', 'max:65535'],
         ]);
 
