@@ -30,6 +30,8 @@ use App\Http\Controllers\ResearchSkillSettingsController;
 use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
 use App\Http\Controllers\SocialAuthController;
+use App\Http\Controllers\ThoughtLinkController;
+use App\Http\Controllers\ThoughtProjectController;
 use App\Http\Controllers\ToolController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\WebhookController;
@@ -113,6 +115,10 @@ Route::middleware('auth')->group(function () {
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::get('/thoughts/{thought}', [IdeaController::class, 'show'])->name('thoughts.show');
+    Route::post('/thoughts/{thought}/links', [ThoughtLinkController::class, 'store'])->name('thoughts.links.store');
+    Route::delete('/thoughts/{thought}/links/{thoughtLink}', [ThoughtLinkController::class, 'destroy'])->name('thoughts.links.destroy');
+    Route::post('/thoughts/{thought}/projects', [ThoughtProjectController::class, 'store'])->name('thoughts.projects.store');
+    Route::delete('/thoughts/{thought}/projects/{project}', [ThoughtProjectController::class, 'destroy'])->name('thoughts.projects.destroy');
     Route::post('/thoughts/{thought}/sender-rules', [EmailThoughtSenderRuleController::class, 'store'])
         ->name('thoughts.sender-rules.store');
     Route::delete('/thoughts/{thought}/sender-rules', [EmailThoughtSenderRuleController::class, 'destroy'])

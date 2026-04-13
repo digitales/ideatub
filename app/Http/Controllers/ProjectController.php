@@ -55,6 +55,7 @@ class ProjectController extends Controller
 
         $thoughtOptions = Thought::query()
             ->where('user_id', auth()->id())
+            ->whereNull('parent_id')
             ->when($memberIds !== [], fn ($q) => $q->whereNotIn('id', $memberIds))
             ->orderByDesc('updated_at')
             ->limit(100)

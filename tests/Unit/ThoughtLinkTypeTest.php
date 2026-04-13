@@ -9,3 +9,8 @@ test('all spec link types exist', function () {
         ->and(ThoughtLinkType::Contradicts->value)->toBe('contradicts')
         ->and(ThoughtLinkType::Supersedes->value)->toBe('supersedes');
 });
+
+test('link type labels are human readable', function () {
+    expect(ThoughtLinkType::Supports->label())->toBe('Supports')
+        ->and(ThoughtLinkType::RelatesTo->label())->toBe('Relates to');
+});

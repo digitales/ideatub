@@ -12,10 +12,25 @@
 @endphp
 
 <div class="max-w-6xl mx-auto px-6 md:px-8 pt-16 pb-24 space-y-6">
+    @if (session('success'))
+        <div class="rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal">
+            {{ session('success') }}
+        </div>
+    @endif
+
     @include('idea.partials.thought_detail_header', [
         'thought' => $thought,
         'thoughtDetail' => $thoughtDetail,
         'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
+    ])
+
+    @include('idea.partials.thought_detail_projects_and_links', [
+        'thought' => $thought,
+        'thoughtProjectsForDetail' => $thoughtProjectsForDetail,
+        'projectsToAttachToThought' => $projectsToAttachToThought,
+        'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
+        'thoughtIncomingLinks' => $thoughtIncomingLinks,
+        'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
     ])
 
     <div class="{{ $useThoughtDetailTwoColumn ? 'grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start' : '' }}">

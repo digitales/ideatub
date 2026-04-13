@@ -6,10 +6,12 @@ use App\Enums\ThoughtDetailResearchPreviewSource;
 use App\Models\CapturedInboundEmail;
 use App\Models\ImportedEmail;
 use App\Models\NewsletterAnalysis;
+use App\Models\Project;
 use App\Models\ResearchRun;
 use App\Models\ResearchShare;
 use App\Models\ResearchSkill;
 use App\Models\Thought;
+use App\Models\ThoughtLink;
 use App\Models\ThoughtLinkSummary;
 use App\Models\User;
 use App\Models\UserPreference;
@@ -280,9 +282,76 @@ class IdeaController extends Controller
             documentShareEligible: $documentShareEligible,
         );
 
+        $thoughtProjectsForDetail = $thought->projects()
+            ->where('projects.user_id', auth()->id())
+            ->orderBy('title')
+            ->get();
+
+        $memberProjectIds = $thoughtProjectsForDetail->pluck('id');
+        $projectsToAttachToThought = Project::query()
+            ->where('user_id', auth()->id())
+            ->when($memberProjectIds->isNotEmpty(), fn (Builder $q) => $q->whereNotIn('id', $memberProjectIds))
+            ->orderBy('title')
+            ->get(['id', 'title']);
+
+        $thoughtOutgoingLinks = ThoughtLink::query()
+            ->where('user_id', auth()->id())
+            ->where('from_thought_id', $thought->id)
+            ->with('toThought')
+            ->orderBy('link_type')
+            ->get();
+
+        $thoughtIncomingLinks = ThoughtLink::query()
+            ->where('user_id', auth()->id())
+            ->where('to_thought_id', $thought->id)
+            ->with('fromThought')
+            ->orderBy('link_type')
+            ->get();
+
+        $linkTargetThoughtOptions = Thought::query()
+            ->where('user_id', auth()->id())
+            ->whereNull('parent_id')
+            ->whereKeyNot($thought->id)
+            ->orderByDesc('updated_at')
+            ->limit(100)
+            ->get(['id', 'content']);
+
+        if (app(DemoMode::class)->enabled()) {
+            $obfuscator = app(DemoObfuscator::class);
+            $linkTargetThoughtOptions = $linkTargetThoughtOptions->map(function (Thought $t) use ($obfuscator): Thought {
+                $t->setAttribute(
+                    'content',
+                    $obfuscator->obfuscate($t->content, 'thought_detail_link_picker') ?? 'Demo content hidden'
+                );
+
+                return $t;
+            });
+            $thoughtOutgoingLinks = $thoughtOutgoingLinks->map(function (ThoughtLink $link) use ($obfuscator): ThoughtLink {
+                $link->toThought->setAttribute(
+                    'content',
+                    $obfuscator->obfuscate($link->toThought->content, 'thought_detail_link_outgoing') ?? 'Demo content hidden'
+                );
+
+                return $link;
+            });
+            $thoughtIncomingLinks = $thoughtIncomingLinks->map(function (ThoughtLink $link) use ($obfuscator): ThoughtLink {
+                $link->fromThought->setAttribute(
+                    'content',
+                    $obfuscator->obfuscate($link->fromThought->content, 'thought_detail_link_incoming') ?? 'Demo content hidden'
+                );
+
+                return $link;
+            });
+        }
+
         return view('idea.show', [
             'thoughtDetail' => $thoughtDetail,
             'thoughtDetailContentBlocks' => $thoughtDetailContentBlocks,
+            'thoughtProjectsForDetail' => $thoughtProjectsForDetail,
+            'projectsToAttachToThought' => $projectsToAttachToThought,
+            'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
+            'thoughtIncomingLinks' => $thoughtIncomingLinks,
+            'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
         ]);
     }
 
