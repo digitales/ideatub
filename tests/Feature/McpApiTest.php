@@ -2,16 +2,21 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ProcessMeetingRun;
 use App\Jobs\RunResearchRun;
 use App\Jobs\SyncUserJiraActivity;
+use App\Models\MeetingRun;
 use App\Models\ResearchRun;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
+use App\Services\Meetings\MeetingSkillManager;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class McpApiTest extends TestCase
@@ -42,7 +47,7 @@ class McpApiTest extends TestCase
         return [$plain, $user];
     }
 
-    private function mcpPost(string $key, array $data): \Illuminate\Testing\TestResponse
+    private function mcpPost(string $key, array $data): TestResponse
     {
         return $this->postJson('/api/mcp', $data, ['x-ideatub-key' => $key]);
     }
@@ -68,6 +73,7 @@ class McpApiTest extends TestCase
                 'capture_idea',
                 'get_ideas',
                 'research_idea',
+                'process_meeting',
                 'capture_video',
             ],
         ]);
@@ -118,6 +124,7 @@ class McpApiTest extends TestCase
             'capture_idea',
             'get_ideas',
             'research_idea',
+            'process_meeting',
             'capture_video',
         ];
         $this->assertSame($expectedPrefix, array_slice($names, 0, count($expectedPrefix)));
@@ -760,6 +767,106 @@ class McpApiTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('error.code', -32602);
         $response->assertJsonPath('error.message', 'At least one of idea_id or content is required.');
+    }
+
+    public function test_process_meeting_with_content_creates_meeting_and_queues_run(): void
+    {
+        Queue::fake();
+        [$key, $user] = $this->validKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'process_meeting',
+            'params' => [
+                'content' => "Team sync transcript\nDecision: ship v1",
+                'plan_slug' => 'weekly-sync-apr-15',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.meeting_id', fn ($id) => is_string($id) && strlen($id) > 0);
+        $response->assertJsonPath('result.meeting_run_id', fn ($id) => is_int($id) && $id > 0);
+        $response->assertJsonPath('result.analysis_id', null);
+
+        $meetingId = $response->json('result.meeting_id');
+        $runId = $response->json('result.meeting_run_id');
+
+        $meeting = Thought::find($meetingId);
+        $this->assertNotNull($meeting);
+        $this->assertSame($user->id, $meeting->user_id);
+        $this->assertSame('meeting', $meeting->metadata['type'] ?? null);
+
+        $run = MeetingRun::find($runId);
+        $this->assertNotNull($run);
+        $this->assertSame($meetingId, $run->meeting_thought_id);
+        $this->assertSame('queued', $run->status);
+
+        Queue::assertPushed(ProcessMeetingRun::class, fn (ProcessMeetingRun $job) => $job->meetingRunId === $runId);
+    }
+
+    public function test_process_meeting_with_thought_id_reuses_existing_meeting(): void
+    {
+        Queue::fake();
+        [$key, $user] = $this->validKeyAndUser();
+        $meeting = Thought::factory()->create([
+            'user_id' => $user->id,
+            'source' => 'meeting',
+            'metadata' => ['type' => 'meeting'],
+        ]);
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'process_meeting',
+            'params' => ['thought_id' => $meeting->id],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.meeting_id', $meeting->id);
+        $response->assertJsonPath('result.meeting_run_id', fn ($id) => is_int($id) && $id > 0);
+        Queue::assertPushed(ProcessMeetingRun::class);
+    }
+
+    public function test_capture_plan_meeting_auto_queues_meeting_run(): void
+    {
+        Queue::fake();
+        [$key, $user] = $this->validKeyAndUser();
+        app(MeetingSkillManager::class)->create($user, [
+            'name' => 'Auto meeting',
+            'is_default' => true,
+            'allow_auto_run' => true,
+        ]);
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'capture_plan',
+            'params' => [
+                'content' => '## Notes from standup',
+                'doc_type' => 'meeting',
+                'plan_slug' => 'standup-apr-15',
+            ],
+        ]);
+
+        $response->assertStatus(200);
+        $meetingId = $response->json('result.id');
+        $meeting = Thought::query()->find($meetingId);
+        $this->assertNotNull($meeting);
+        $this->assertSame($user->id, $meeting->user_id);
+
+        Queue::assertPushed(ProcessMeetingRun::class);
     }
 
     public function test_sync_jira_dispatches_job_and_returns_message(): void

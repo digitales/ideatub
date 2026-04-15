@@ -153,6 +153,26 @@ class User extends Authenticatable
     }
 
     /**
+     * Persisted meeting skills owned by this user.
+     *
+     * @return HasMany<MeetingSkill, $this>
+     */
+    public function meetingSkills(): HasMany
+    {
+        return $this->hasMany(MeetingSkill::class);
+    }
+
+    /**
+     * Meeting workflow runs initiated by this user.
+     *
+     * @return HasMany<MeetingRun, $this>
+     */
+    public function meetingRuns(): HasMany
+    {
+        return $this->hasMany(MeetingRun::class);
+    }
+
+    /**
      * @return HasMany<Project, $this>
      */
     public function projects(): HasMany

@@ -19,7 +19,7 @@ How to connect Cursor to IdeaTub so you can **capture thoughts** (and search/bro
    - Save and restart Cursor if needed.
 
 3. **Verify tools**  
-   In a new chat, check that IdeaTub tools are available (e.g. `capture_thought`, `capture_plan`, `search_thoughts`, `browse_recent`, `thought_stats`). If they don’t appear, Cursor may expect the standard MCP transport; see [Protocol note](#protocol-note) in the main [MCP integration guide](mcp-integration-guide.md).
+   In a new chat, check that IdeaTub tools are available (e.g. `capture_thought`, `capture_plan`, `capture_meeting`, `process_meeting`, `search_thoughts`, `browse_recent`, `thought_stats`). If they don’t appear, Cursor may expect the standard MCP transport; see [Protocol note](#protocol-note) in the main [MCP integration guide](mcp-integration-guide.md).
 
 ## Using capture_thought from Cursor
 
@@ -47,7 +47,7 @@ The **capture_thought** tool saves a new thought to your IdeaTub brain. Cursor c
 
 ## Using capture_plan from Cursor (plans and docs as thoughts)
 
-The **capture_plan** tool saves a plan, decision, dev note, support doc, or spec as a thought. Set **`doc_type`** to one of: `plan` (default), `decision`, `dev`, `support`, `spec`. Use it to sync files from docs/superpowers/plans/, decisions/, dev/, support/, and specs/ so they are searchable and viewable as a long-form stream.
+The **capture_plan** tool saves a plan, decision, dev note, support doc, spec, research doc, or meeting notes as a thought. Set **`doc_type`** to one of: `plan` (default), `decision`, `dev`, `support`, `spec`, `research`, `meeting`. Use it to sync files from docs/superpowers/plans/, decisions/, dev/, support/, specs/, and meeting/research notes so they are searchable and viewable as a long-form stream.
 
 - **One thought per section:** Call `capture_plan` once per section. Use the same **`plan_slug`** for all sections. IdeaTub adds tag `<doc_type>:<slug>` (e.g. `decision:project-spec`) so you can view all sections in **Stream** (e.g. `/stream?tag=decision-project-spec`).
 - **Linking via tags and parent:** Use **`plan_slug`** for tag-based grouping. Optionally create a root thought first, then pass its UUID as **`parent_id`** for section thoughts.
@@ -58,12 +58,20 @@ The **capture_plan** tool saves a plan, decision, dev note, support doc, or spec
 | Parameter        | Required | Description |
 |------------------|----------|-------------|
 | `content`        | Yes      | Document content (full doc or one section). |
-| `doc_type`       | No       | One of: plan, decision, dev, support, spec, research. Default plan. Sets source and tag prefix. |
+| `doc_type`       | No       | One of: plan, decision, dev, support, spec, research, meeting. Default plan. Sets source and tag prefix. |
 | `file_path`      | No       | Path (e.g. decisions/project-spec.md, support/investigation.md). |
 | `plan_slug`      | No       | Slug for this document; adds tag `<doc_type>:<slug>` for Stream filtering. |
 | `parent_id`      | No       | UUID of root thought to attach this section to. |
 | `section_title` | No       | Title of this section (stored in source_metadata). |
 | `tags`           | No       | Extra tags to merge with extracted and doc tag. |
+
+### Meeting aliases and processing workflow
+
+- Use **`capture_meeting`**, **`add_meeting`**, or **`add_meeting_notes`** when you want meeting semantics without passing `doc_type`; they are aliases for `capture_plan` with meeting doc type forced.
+- Use **`process_meeting`** to summarize and categorize a meeting:
+  - pass `thought_id` for an existing meeting, or
+  - pass `content` for a new plain-text transcript (optionally `plan_slug`).
+- `process_meeting` returns `meeting_id`, `meeting_run_id`, and `analysis_id` (null until background processing completes).
 
 ## Protocol note
 

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\UserMcpKey;
 use App\Services\IdeasToRevisitService;
 use App\Services\McpSessionService;
+use App\Services\Meetings\MeetingService;
 use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
 use App\Services\ResearchService;
@@ -32,6 +33,7 @@ class McpController extends Controller
         private ThoughtCaptureService $captureService,
         private IdeasToRevisitService $ideasToRevisit,
         private ResearchService $researchService,
+        private MeetingService $meetingService,
         private ThoughtSearchService $searchService,
         private VideoCaptureService $videoCaptureService,
         private McpSessionService $mcpSessions,
@@ -107,6 +109,7 @@ class McpController extends Controller
             'capture_idea',
             'get_ideas',
             'research_idea',
+            'process_meeting',
             'capture_video',
         ];
         if (config('services.jira.enabled', true)) {
@@ -518,6 +521,21 @@ class McpController extends Controller
                 ],
             ],
             [
+                'name' => 'process_meeting',
+                'description' => 'Queue AI meeting processing (summary + categorization). Provide thought_id for an existing meeting thought, or content for a new meeting transcript. Supports optional meeting_skill_id and force_rerun.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'thought_id' => ['type' => 'string', 'description' => 'UUID of an existing meeting thought to process'],
+                        'content' => ['type' => 'string', 'description' => 'Meeting transcript/plain text to save as a meeting and process'],
+                        'plan_slug' => ['type' => 'string', 'description' => 'Optional slug used when content creates a new meeting thought'],
+                        'meeting_skill_id' => ['type' => 'integer', 'description' => 'Optional meeting skill id for manual runs'],
+                        'force_rerun' => ['type' => 'boolean', 'description' => 'When true, create a new run even if another active run exists for the same meeting+skill'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+            [
                 'name' => 'capture_video',
                 'description' => 'Save a YouTube video as a video thought. Same normalization as web capture. Optional pasted transcript skips automatic fetch. Duplicate URL returns the existing root thought id.',
                 'inputSchema' => [
@@ -738,6 +756,7 @@ class McpController extends Controller
             'capture_idea' => $this->captureIdea($params),
             'get_ideas' => $this->getIdeas($params),
             'research_idea' => $this->researchIdea($params),
+            'process_meeting' => $this->processMeeting($params),
             'capture_video' => $this->captureVideo($params),
             'sync_jira' => $this->syncJira($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
@@ -1157,6 +1176,86 @@ class McpController extends Controller
     }
 
     /**
+     * process_meeting: Queue AI meeting processing for an existing meeting thought or from raw content.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{meeting_id: string, meeting_run_id: int, analysis_id: null}
+     */
+    private function processMeeting(array $params): array
+    {
+        if (isset($params['content']) && mb_strlen((string) $params['content']) > 65535) {
+            throw new \InvalidArgumentException('Content must be 65535 characters or fewer.');
+        }
+
+        $thoughtId = isset($params['thought_id']) && trim((string) $params['thought_id']) !== ''
+            ? trim((string) $params['thought_id'])
+            : null;
+        $content = isset($params['content']) && trim((string) $params['content']) !== ''
+            ? trim((string) $params['content'])
+            : null;
+
+        if ($thoughtId === null && $content === null) {
+            throw new \InvalidArgumentException('At least one of thought_id or content is required.');
+        }
+
+        if ($thoughtId !== null && $content !== null) {
+            throw new \InvalidArgumentException('Provide only one of thought_id or content.');
+        }
+
+        $meetingSkillId = isset($params['meeting_skill_id'])
+            ? (int) $params['meeting_skill_id']
+            : null;
+        $forceRerun = ! empty($params['force_rerun']);
+        $planSlug = isset($params['plan_slug']) && trim((string) $params['plan_slug']) !== ''
+            ? trim((string) $params['plan_slug'])
+            : null;
+
+        if ($thoughtId !== null) {
+            $uuidValidator = Validator::make(['thought_id' => $thoughtId], ['thought_id' => 'uuid']);
+            if ($uuidValidator->fails()) {
+                throw new \InvalidArgumentException('thought_id must be a valid UUID.');
+            }
+
+            $meeting = Thought::query()->find($thoughtId);
+            if ($meeting === null || $meeting->user_id !== auth()->id()) {
+                throw new \InvalidArgumentException('Meeting thought not found.');
+            }
+
+            if (($meeting->metadata['type'] ?? null) !== 'meeting') {
+                throw new \InvalidArgumentException('Thought is not a meeting.');
+            }
+
+            $run = $this->meetingService->queueMeetingRunForThought($meeting, 'mcp', $meetingSkillId, $forceRerun);
+
+            return [
+                'meeting_id' => $meeting->id,
+                'meeting_run_id' => $run->id,
+                'analysis_id' => null,
+            ];
+        }
+
+        $user = Auth::user();
+        if (! $user instanceof User) {
+            throw new \InvalidArgumentException('Not authenticated.');
+        }
+
+        $run = $this->meetingService->createMeetingAndQueueRun(
+            user: $user,
+            content: (string) $content,
+            source: 'mcp',
+            meetingSkillId: $meetingSkillId,
+            forceRerun: $forceRerun,
+            planSlug: $planSlug,
+        );
+
+        return [
+            'meeting_id' => $run->meeting_thought_id,
+            'meeting_run_id' => $run->id,
+            'analysis_id' => null,
+        ];
+    }
+
+    /**
      * capture_plan: Save a document (plan, decision, dev, support, spec, research, meeting) or section as a thought.
      * doc_type sets source and tag prefix (e.g. decision:slug, spec:slug, meeting:slug). When plan_slug is provided,
      * adds tag <doc_type>:<slug> so all sections can be viewed via Stream ?tag=... (slug form e.g. decision-project-spec).
@@ -1251,6 +1350,16 @@ class McpController extends Controller
         }
         if ($docType !== 'plan') {
             $out['doc_type'] = $docType;
+        }
+
+        if ($docType === 'meeting') {
+            $meetingThoughtId = $out['id'] ?? null;
+            if (is_string($meetingThoughtId) && $meetingThoughtId !== '') {
+                $meetingThought = Thought::query()->find($meetingThoughtId);
+                if ($meetingThought instanceof Thought && $meetingThought->user_id === auth()->id()) {
+                    $this->meetingService->queueAutoRunForMeetingThought($meetingThought, 'mcp');
+                }
+            }
         }
 
         return $out;

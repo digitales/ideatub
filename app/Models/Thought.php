@@ -275,6 +275,16 @@ class Thought extends Model
         return $this->researchRuns();
     }
 
+    /**
+     * Meeting runs where this thought is the source meeting thought.
+     *
+     * @return HasMany<MeetingRun, $this>
+     */
+    public function meetingRuns(): HasMany
+    {
+        return $this->hasMany(MeetingRun::class, 'meeting_thought_id');
+    }
+
     public function importedEmail(): ?ImportedEmail
     {
         $importedEmailId = data_get($this->source_metadata, 'imported_email_id');

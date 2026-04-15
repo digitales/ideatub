@@ -4,7 +4,7 @@ This guide explains how to connect your AI assistant (Cursor, Claude Desktop, Ch
 
 ## Overview
 
-IdeaTub exposes an **MCP-style API** at `POST /api/mcp`. It uses **JSON-RPC 2.0** with five tools:
+IdeaTub exposes an **MCP-style API** at `POST /api/mcp`. It uses **JSON-RPC 2.0** with thought capture/search tools, meeting/research tools, and helper aliases:
 
 | Tool | Description |
 |------|-------------|
@@ -13,6 +13,8 @@ IdeaTub exposes an **MCP-style API** at `POST /api/mcp`. It uses **JSON-RPC 2.0*
 | `thought_stats` | Count of your thoughts |
 | `capture_thought` | Save a new thought (and optionally a comment on an existing one) |
 | `capture_plan` | Save a plan or plan section with source=plan; use tags and optional parent_id for long-form linking |
+| `capture_meeting` / `add_meeting` / `add_meeting_notes` | Meeting aliases for `capture_plan` with `doc_type=meeting` |
+| `process_meeting` | Queue meeting summarization + categorization (from existing meeting thought or raw transcript content) |
 
 Authentication is by **per-user MCP key**: you send your key via query parameter or header. The same key works in every client; it identifies **you**, not the app.
 
@@ -202,8 +204,9 @@ Use this if you are scripting against IdeaTub or building a bridge.
 | `browse_recent` | — | `limit` (int, default 10, max 100) |
 | `thought_stats` | — | — |
 | `capture_thought` | `content` (string) | `parent_id` or `in_reply_to` (UUID); `source` (string, e.g. chatgpt/claude/cursor); `source_metadata` (object) |
-| `capture_plan` | `content` (string) | `doc_type` (plan \| decision \| dev \| support \| spec \| research \| meeting); `file_path`, `plan_slug`, `parent_id` (UUID), `section_title`, `tags` (array) |
+| `capture_plan` | `content` (string) | `doc_type` (plan \| decision \| dev \| support \| spec \| research \| meeting); `file_path`, `plan_slug`, `parent_id` (UUID), `section_title`, `project`, `tags` (array) |
 | `capture_meeting`, `add_meeting`, `add_meeting_notes` | `content` (string) | Same optional params as `capture_plan` **except** `doc_type` is omitted and always `meeting`. These three names are **aliases** of one implementation (any `doc_type` in params is ignored). |
+| `process_meeting` | One of `thought_id` (UUID) or `content` (string) | `plan_slug` (when `content` is provided), `meeting_skill_id` (int), `force_rerun` (bool) |
 
 Example calls:
 
@@ -215,6 +218,8 @@ Example calls:
 {"jsonrpc":"2.0","method":"capture_thought","params":{"content":"Done.","parent_id":"uuid-of-parent-thought"},"id":5}
 {"jsonrpc":"2.0","method":"capture_plan","params":{"content":"## Chunk 1: Phase 0...","file_path":"docs/superpowers/plans/2026-03-12-tag-and-stream.md","plan_slug":"2026-03-12-tag-and-stream","section_title":"Chunk 1"},"id":6}
 {"jsonrpc":"2.0","method":"add_meeting_notes","params":{"content":"## Standup\n\n- Shipped search","plan_slug":"2026-04-02-standup"},"id":7}
+{"jsonrpc":"2.0","method":"process_meeting","params":{"thought_id":"uuid-of-existing-meeting"},"id":8}
+{"jsonrpc":"2.0","method":"process_meeting","params":{"content":"Speaker A: ...","plan_slug":"2026-04-15-weekly-sync"},"id":9}
 ```
 
 For more on `capture_thought` and comments, see [MCP capture_thought](mcp-capture-thought.md).
