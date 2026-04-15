@@ -30,6 +30,12 @@ This implementation is intentionally separate from the research skill domain.
 - Meeting analysis persistence:
   - child thought linked to the root meeting thought
   - tags include `meeting_analysis` and `meeting_analysis:<slug>` when a `meeting:<slug>` tag exists.
+- Default requested output sections:
+  - `summary`
+  - `positives`
+  - `things_to_watch`
+  - `actions`
+  - `conclusion`
 
 ### Excluded (v1)
 

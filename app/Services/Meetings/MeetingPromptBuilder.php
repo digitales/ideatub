@@ -85,7 +85,9 @@ class MeetingPromptBuilder
             'Always include every core category key even when empty.',
             'Use these core categories: '.implode(', ', $core).'.',
             'Use these optional custom categories: '.($custom === [] ? '(none)' : implode(', ', $custom)).'.',
-            'requested_sections keys should include: '.implode(', ', $sections).'.',
+            'requested_sections keys must include (in this order): '.implode(', ', $sections).'.',
+            'You may add other meeting-relevant sections based on content (e.g. dependencies, risks_overview, decisions_rationale), but keep actions and conclusion as the final two keys in requested_sections.',
+            'actions should capture practical next steps; conclusion should close with overall takeaway and confidence.',
         ]);
 
         $parts[] = '## Task';
@@ -101,10 +103,10 @@ class MeetingPromptBuilder
     private function normalizeOutputSections(array $outputShape): array
     {
         if (isset($outputShape['sections']) && is_array($outputShape['sections'])) {
-            return $this->normalizeStringList($outputShape['sections'], ['summary']);
+            return $this->normalizeStringList($outputShape['sections'], MeetingSkillManager::DEFAULT_OUTPUT_SECTIONS);
         }
 
-        return $this->normalizeStringList($outputShape, ['summary']);
+        return $this->normalizeStringList($outputShape, MeetingSkillManager::DEFAULT_OUTPUT_SECTIONS);
     }
 
     /**

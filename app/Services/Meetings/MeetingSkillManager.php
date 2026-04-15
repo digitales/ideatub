@@ -17,6 +17,11 @@ class MeetingSkillManager
      */
     public const DEFAULT_CORE_CATEGORIES = ['decisions', 'action_items', 'risks', 'blockers', 'follow_ups'];
 
+    /**
+     * @var array<int, string>
+     */
+    public const DEFAULT_OUTPUT_SECTIONS = ['summary', 'positives', 'things_to_watch', 'actions', 'conclusion'];
+
     public function create(User $user, array $attributes): MeetingSkill
     {
         return DB::transaction(function () use ($user, $attributes): MeetingSkill {
@@ -104,7 +109,7 @@ class MeetingSkillManager
             'workflow_type' => (string) ($attributes['workflow_type'] ?? self::WORKFLOW_MEETING_BRIEF),
             'instructions' => (string) ($attributes['instructions'] ?? ''),
             'context_options' => $attributes['context_options'] ?? null,
-            'output_shape' => $attributes['output_shape'] ?? null,
+            'output_shape' => $this->normalizeOutputShape($attributes['output_shape'] ?? null),
             'core_categories' => $this->normalizeStringList($attributes['core_categories'] ?? self::DEFAULT_CORE_CATEGORIES, self::DEFAULT_CORE_CATEGORIES),
             'custom_categories' => $this->normalizeStringList($attributes['custom_categories'] ?? [], []),
             'intensity' => (string) ($attributes['intensity'] ?? 'standard'),
@@ -131,7 +136,9 @@ class MeetingSkillManager
             'workflow_type' => array_key_exists('workflow_type', $attributes) ? (string) $attributes['workflow_type'] : $latest->workflow_type,
             'instructions' => array_key_exists('instructions', $attributes) ? (string) $attributes['instructions'] : $latest->instructions,
             'context_options' => array_key_exists('context_options', $attributes) ? $attributes['context_options'] : $latest->context_options,
-            'output_shape' => array_key_exists('output_shape', $attributes) ? $attributes['output_shape'] : $latest->output_shape,
+            'output_shape' => array_key_exists('output_shape', $attributes)
+                ? $this->normalizeOutputShape($attributes['output_shape'])
+                : $this->normalizeOutputShape($latest->output_shape),
             'core_categories' => array_key_exists('core_categories', $attributes)
                 ? $this->normalizeStringList($attributes['core_categories'], self::DEFAULT_CORE_CATEGORIES)
                 : $this->normalizeStringList($latest->core_categories, self::DEFAULT_CORE_CATEGORIES),
@@ -292,5 +299,25 @@ class MeetingSkillManager
         $normalized = array_values($out);
 
         return $normalized !== [] ? $normalized : $fallback;
+    }
+
+    /**
+     * @return array{sections: array<int, string>}
+     */
+    private function normalizeOutputShape(mixed $value): array
+    {
+        if (is_array($value) && isset($value['sections']) && is_array($value['sections'])) {
+            return [
+                'sections' => $this->normalizeStringList($value['sections'], self::DEFAULT_OUTPUT_SECTIONS),
+            ];
+        }
+
+        if (is_array($value)) {
+            return [
+                'sections' => $this->normalizeStringList($value, self::DEFAULT_OUTPUT_SECTIONS),
+            ];
+        }
+
+        return ['sections' => self::DEFAULT_OUTPUT_SECTIONS];
     }
 }

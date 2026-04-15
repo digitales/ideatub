@@ -60,4 +60,27 @@ class MeetingPromptBuilderTest extends TestCase
         $this->assertStringContainsString('## Transcript', $payload);
         $this->assertStringContainsString('…', $payload);
     }
+
+    #[Test]
+    public function prompt_builder_falls_back_to_default_requested_sections(): void
+    {
+        $meeting = Thought::factory()->make([
+            'content' => 'Weekly sync',
+            'metadata' => ['type' => 'meeting'],
+        ]);
+
+        $payload = app(MeetingPromptBuilder::class)->buildMeetingBriefPrompt(
+            meeting: $meeting,
+            instructions: '',
+            transcriptText: 'Transcript text.',
+            intensity: 'standard',
+            coreCategories: ['decisions', 'action_items'],
+            customCategories: [],
+            outputShape: [],
+            relatedThoughts: [],
+        );
+
+        $this->assertStringContainsString('summary, positives, things_to_watch, actions, conclusion', $payload);
+        $this->assertStringContainsString('keep actions and conclusion as the final two keys', $payload);
+    }
 }
