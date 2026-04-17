@@ -110,7 +110,7 @@ class JiraSyncService
             $createdEventId = "{$key}:created:" . ($created ?? $key);
             $events[] = $this->event(
                 $createdEventId,
-                "Created {$key}: {$summary}",
+                $this->formatEventContent($key, $summary, 'Created'),
                 $projectTags,
                 $key,
                 $summary,
@@ -135,12 +135,19 @@ class JiraSyncService
                 $items = $history['items'] ?? [];
                 $descriptions = [];
                 foreach ($items as $item) {
-                    $field = $item['field'] ?? '';
-                    $from = $item['fromString'] ?? '';
-                    $to = $item['toString'] ?? '';
+                    $field = trim((string) ($item['field'] ?? ''));
+                    $from = trim((string) ($item['fromString'] ?? ''));
+                    $to = trim((string) ($item['toString'] ?? ''));
+                    if ($field === '' && $from === '' && $to === '') {
+                        continue;
+                    }
                     $descriptions[] = trim("{$field}: {$from} → {$to}");
                 }
-                $content = $key . ': ' . implode('; ', $descriptions);
+                $detail = trim(implode('; ', $descriptions));
+                if ($detail === '') {
+                    $detail = 'Updated';
+                }
+                $content = $this->formatEventContent($key, $summary, $detail);
                 $events[] = $this->event(
                     "{$key}:changelog:{$historyId}",
                     $content,
@@ -176,7 +183,7 @@ class JiraSyncService
                 $commentCreated = $comment['created'] ?? $updated;
                 $events[] = $this->event(
                     "{$key}:comment:{$commentId}",
-                    "Commented on {$key}: {$body}",
+                    $this->formatEventContent($key, $summary, "Commented: {$body}"),
                     $projectTags,
                     $key,
                     $summary,
@@ -261,6 +268,19 @@ class JiraSyncService
         }
 
         return $tags;
+    }
+
+    private function formatEventContent(string $issueKey, ?string $issueSummary, ?string $detail): string
+    {
+        $summary = trim((string) $issueSummary);
+        $prefix = $summary !== '' ? "{$issueKey}: {$summary}" : $issueKey;
+        $normalizedDetail = trim((string) $detail);
+
+        if ($normalizedDetail === '') {
+            return $prefix;
+        }
+
+        return "{$prefix} - {$normalizedDetail}";
     }
 
     /**

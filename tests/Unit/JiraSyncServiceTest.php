@@ -42,8 +42,34 @@ class JiraSyncServiceTest extends TestCase
                     ],
                 ],
             ], 200),
-            '*rest/api/3/issue/PROJ-1*' => Http::response(['changelog' => ['histories' => []]], 200),
-            '*rest/api/3/issue/PROJ-1/comment' => Http::response(['comments' => []], 200),
+            '*rest/api/3/issue/PROJ-1/comment*' => Http::response([
+                'comments' => [
+                    [
+                        'id' => '90010',
+                        'created' => '2026-01-01T10:30:00.000+0000',
+                        'author' => ['accountId' => 'acc-123'],
+                        'body' => 'Looks good',
+                    ],
+                ],
+            ], 200),
+            '*rest/api/3/issue/PROJ-1*' => Http::response([
+                'changelog' => [
+                    'histories' => [
+                        [
+                            'id' => '30010',
+                            'created' => '2026-01-01T10:15:00.000+0000',
+                            'author' => ['accountId' => 'acc-123'],
+                            'items' => [
+                                [
+                                    'field' => 'status',
+                                    'fromString' => 'To Do',
+                                    'toString' => 'In Progress',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
         ]);
 
         $user = User::factory()->create();
@@ -69,6 +95,93 @@ class JiraSyncServiceTest extends TestCase
             $this->assertContains('jira', $event['metadata']['tags']);
             $this->assertSame($event['jira_event_id'], $event['source_metadata']['jira_event_id'] ?? null);
         }
+
+        $createdEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'created');
+        $updatedEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'updated');
+        $commentEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'comment');
+
+        $this->assertNotNull($createdEvent);
+        $this->assertSame('PROJ-1: Test issue - Created', $createdEvent['content']);
+
+        $this->assertNotNull($updatedEvent);
+        $this->assertSame('PROJ-1: Test issue - status: To Do → In Progress', $updatedEvent['content']);
+
+        $this->assertNotNull($commentEvent);
+        $this->assertSame('PROJ-1: Test issue - Commented: Looks good', $commentEvent['content']);
+    }
+
+    #[Test]
+    public function fetch_events_uses_updated_fallback_detail_when_changelog_descriptions_are_empty(): void
+    {
+        Http::fake([
+            '*rest/api/3/myself' => Http::response(['accountId' => 'acc-123'], 200),
+            '*rest/api/3/search*' => Http::response([
+                'issues' => [
+                    [
+                        'key' => 'PROJ-2',
+                        'id' => '10002',
+                        'fields' => [
+                            'summary' => '',
+                            'project' => ['key' => 'PROJ'],
+                            'created' => '2026-01-02T10:00:00.000+0000',
+                            'updated' => '2026-01-02T10:00:00.000+0000',
+                        ],
+                    ],
+                ],
+            ], 200),
+            '*rest/api/3/issue/PROJ-2/comment*' => Http::response([
+                'comments' => [
+                    [
+                        'id' => '90020',
+                        'created' => '2026-01-02T10:20:00.000+0000',
+                        'author' => ['accountId' => 'acc-123'],
+                        'body' => 'Needs triage from support',
+                    ],
+                ],
+            ], 200),
+            '*rest/api/3/issue/PROJ-2*' => Http::response([
+                'changelog' => [
+                    'histories' => [
+                        [
+                            'id' => '30020',
+                            'created' => '2026-01-02T10:15:00.000+0000',
+                            'author' => ['accountId' => 'acc-123'],
+                            'items' => [
+                                [
+                                    'field' => '',
+                                    'fromString' => '',
+                                    'toString' => '',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        UserJiraCredential::create([
+            'user_id' => $user->id,
+            'jira_site_url' => 'https://example.atlassian.net',
+            'jira_api_token' => 'secret-token',
+            'jira_email' => null,
+        ]);
+
+        $service = new JiraSyncService;
+        $events = $service->fetchEvents($user, 14);
+
+        $createdEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'created');
+        $updatedEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'updated');
+        $commentEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'comment');
+
+        $this->assertNotNull($createdEvent);
+        $this->assertSame('PROJ-2 - Created', $createdEvent['content']);
+
+        $this->assertNotNull($updatedEvent);
+        $this->assertSame('PROJ-2 - Updated', $updatedEvent['content']);
+
+        $this->assertNotNull($commentEvent);
+        $this->assertSame('PROJ-2 - Commented: Needs triage from support', $commentEvent['content']);
     }
 
     #[Test]
@@ -135,7 +248,7 @@ class JiraSyncServiceTest extends TestCase
         $commentEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'comment');
 
         $this->assertNotNull($commentEvent);
-        $this->assertStringContainsString('Commented on PROJ-1:', $commentEvent['content']);
+        $this->assertStringStartsWith('PROJ-1: Nested comment issue - Commented:', $commentEvent['content']);
         $this->assertStringContainsString('First line', $commentEvent['content']);
         $this->assertStringContainsString('Second line', $commentEvent['content']);
         $this->assertStringContainsString('Third line', $commentEvent['content']);
