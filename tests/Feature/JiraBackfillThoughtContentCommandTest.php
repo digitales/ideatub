@@ -109,4 +109,30 @@ class JiraBackfillThoughtContentCommandTest extends TestCase
         $this->assertSame('PROJ-404: Keep release notes visible - Updated', $thought->content);
         $this->assertTrue($thought->updated_at->equalTo($originalUpdatedAt));
     }
+
+    public function test_ambiguous_legacy_content_is_preserved_as_detail_payload(): void
+    {
+        $thought = Thought::factory()->create([
+            'source' => 'jira',
+            'content' => 'Legacy sync payload v1 :: unknown format {foo=bar}',
+            'source_metadata' => [
+                'jira_issue_key' => 'PROJ-505',
+                'jira_issue_summary' => 'Retain original migration note',
+                'jira_event_type' => 'updated',
+            ],
+        ]);
+
+        $this->artisan('jira:backfill-thought-content')
+            ->assertSuccessful()
+            ->expectsOutputToContain('Updated: 1')
+            ->expectsOutputToContain('Skipped: 0')
+            ->expectsOutputToContain('Unchanged: 0');
+
+        $thought->refresh();
+
+        $this->assertSame(
+            'PROJ-505: Retain original migration note - Legacy sync payload v1 :: unknown format {foo=bar}',
+            $thought->content
+        );
+    }
 }

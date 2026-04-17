@@ -129,7 +129,16 @@ class JiraSyncServiceTest extends TestCase
                     ],
                 ],
             ], 200),
-            '*rest/api/3/issue/PROJ-2/comment*' => Http::response(['comments' => []], 200),
+            '*rest/api/3/issue/PROJ-2/comment*' => Http::response([
+                'comments' => [
+                    [
+                        'id' => '90020',
+                        'created' => '2026-01-02T10:20:00.000+0000',
+                        'author' => ['accountId' => 'acc-123'],
+                        'body' => 'Needs triage from support',
+                    ],
+                ],
+            ], 200),
             '*rest/api/3/issue/PROJ-2*' => Http::response([
                 'changelog' => [
                     'histories' => [
@@ -163,12 +172,16 @@ class JiraSyncServiceTest extends TestCase
 
         $createdEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'created');
         $updatedEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'updated');
+        $commentEvent = collect($events)->firstWhere('source_metadata.jira_event_type', 'comment');
 
         $this->assertNotNull($createdEvent);
         $this->assertSame('PROJ-2 - Created', $createdEvent['content']);
 
         $this->assertNotNull($updatedEvent);
         $this->assertSame('PROJ-2 - Updated', $updatedEvent['content']);
+
+        $this->assertNotNull($commentEvent);
+        $this->assertSame('PROJ-2 - Commented: Needs triage from support', $commentEvent['content']);
     }
 
     #[Test]
