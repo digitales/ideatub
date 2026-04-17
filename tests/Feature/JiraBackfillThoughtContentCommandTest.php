@@ -110,6 +110,55 @@ class JiraBackfillThoughtContentCommandTest extends TestCase
         $this->assertTrue($thought->updated_at->equalTo($originalUpdatedAt));
     }
 
+    public function test_created_legacy_key_summary_format_normalizes_without_summary_duplication(): void
+    {
+        $thought = Thought::factory()->create([
+            'source' => 'jira',
+            'content' => 'Created PROJ-606: Ship onboarding updates',
+            'source_metadata' => [
+                'jira_issue_key' => 'PROJ-606',
+                'jira_issue_summary' => 'Ship onboarding updates',
+                'jira_event_type' => 'created',
+            ],
+        ]);
+
+        $this->artisan('jira:backfill-thought-content')
+            ->assertSuccessful()
+            ->expectsOutputToContain('Updated: 1')
+            ->expectsOutputToContain('Skipped: 0')
+            ->expectsOutputToContain('Unchanged: 0');
+
+        $thought->refresh();
+
+        $this->assertSame('PROJ-606: Ship onboarding updates - Created', $thought->content);
+    }
+
+    public function test_updated_key_prefixed_change_detail_strips_repeated_key_prefix(): void
+    {
+        $thought = Thought::factory()->create([
+            'source' => 'jira',
+            'content' => 'PROJ-707: status: To Do → In Progress',
+            'source_metadata' => [
+                'jira_issue_key' => 'PROJ-707',
+                'jira_issue_summary' => 'Refine status workflow',
+                'jira_event_type' => 'updated',
+            ],
+        ]);
+
+        $this->artisan('jira:backfill-thought-content')
+            ->assertSuccessful()
+            ->expectsOutputToContain('Updated: 1')
+            ->expectsOutputToContain('Skipped: 0')
+            ->expectsOutputToContain('Unchanged: 0');
+
+        $thought->refresh();
+
+        $this->assertSame(
+            'PROJ-707: Refine status workflow - status: To Do → In Progress',
+            $thought->content
+        );
+    }
+
     public function test_ambiguous_legacy_content_is_preserved_as_detail_payload(): void
     {
         $thought = Thought::factory()->create([

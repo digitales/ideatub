@@ -99,6 +99,16 @@ class BackfillJiraThoughtContentCommand extends Command
             return null;
         }
 
+        if (preg_match("/^{$issueKeyPattern}:\\s*(.+)$/us", $raw, $matches) === 1) {
+            $keyPrefixedDetail = trim($matches[1]);
+
+            if (mb_strtolower($keyPrefixedDetail) === mb_strtolower($issueSummary)) {
+                return null;
+            }
+
+            return $keyPrefixedDetail;
+        }
+
         if ($eventType === 'comment') {
             if (preg_match("/^Commented\\s+on\\s+{$issueKeyPattern}\\s*[:\\-]\\s*(.+)$/ius", $raw, $matches) === 1) {
                 return 'Commented: '.trim($matches[1]);
@@ -112,6 +122,9 @@ class BackfillJiraThoughtContentCommand extends Command
         if ($eventType === 'created') {
             if (preg_match("/^Created\\s+{$issueKeyPattern}(?:\\s*[:\\-]\\s*(.+))?$/ius", $raw, $matches) === 1) {
                 $suffix = trim((string) ($matches[1] ?? ''));
+                if (mb_strtolower($suffix) === mb_strtolower($issueSummary)) {
+                    return 'Created';
+                }
 
                 return $suffix === '' ? 'Created' : 'Created '.$suffix;
             }
