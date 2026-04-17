@@ -14,7 +14,7 @@
     @endif
 
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
-        <form method="POST" action="{{ route('settings.research-skills.update', $skill) }}">
+        <form method="POST" action="{{ route('settings.skills.research.update', $skill) }}">
             @csrf
             @method('PUT')
             @include('settings.research-skills._form', ['skill' => $skill, 'latest' => $latest])
@@ -27,7 +27,7 @@
                 >
                     Save changes
                 </button>
-                <a href="{{ route('settings.research-skills.index') }}" class="text-xs font-medium text-slate-brand hover:text-memory-violet">Cancel</a>
+                <a href="{{ route('settings.skills.index') }}#research-skills" class="text-xs font-medium text-slate-brand hover:text-memory-violet">Cancel</a>
             </div>
         </form>
     </div>

@@ -10,6 +10,7 @@ use App\Models\ResearchRun;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
+use App\Models\UserPreference;
 use App\Services\Meetings\MeetingSkillManager;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -843,6 +844,7 @@ class McpApiTest extends TestCase
             'is_default' => true,
             'allow_auto_run' => true,
         ]);
+        UserPreference::set($user, UserPreference::KEY_MEETING_AUTO_RUN_ENABLED, true);
         $fakeEmbedding = array_fill(0, 1536, 0.01);
         $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
             $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);

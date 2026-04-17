@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreResearchSkillRequest;
 use App\Http\Requests\UpdateResearchSkillRequest;
 use App\Models\ResearchSkill;
-use App\Models\UserPreference;
 use App\Services\Research\ResearchSkillManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,24 +16,6 @@ class ResearchSkillSettingsController extends Controller
         private readonly ResearchSkillManager $researchSkillManager
     ) {}
 
-    public function index(Request $request): View
-    {
-        $user = $request->user();
-        $skills = ResearchSkill::query()
-            ->where('user_id', $user->id)
-            ->with('latestVersion')
-            ->orderByDesc('is_default')
-            ->orderBy('name')
-            ->get();
-
-        $autoRunEnabled = (bool) UserPreference::get($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, false);
-
-        return view('settings.research-skills.index', [
-            'skills' => $skills,
-            'researchAutoRunEnabled' => $autoRunEnabled,
-        ]);
-    }
-
     public function create(Request $request): View
     {
         return view('settings.research-skills.create');
@@ -45,7 +26,8 @@ class ResearchSkillSettingsController extends Controller
         $this->researchSkillManager->create($request->user(), $request->validated());
 
         return redirect()
-            ->route('settings.research-skills.index')
+            ->route('settings.skills.index')
+            ->withFragment('research-skills')
             ->with('success', 'Research skill created.');
     }
 
@@ -66,7 +48,8 @@ class ResearchSkillSettingsController extends Controller
         $this->researchSkillManager->update($researchSkill, $request->validated());
 
         return redirect()
-            ->route('settings.research-skills.index')
+            ->route('settings.skills.index')
+            ->withFragment('research-skills')
             ->with('success', 'Research skill updated.');
     }
 
@@ -77,24 +60,8 @@ class ResearchSkillSettingsController extends Controller
         $this->researchSkillManager->update($researchSkill, ['is_default' => true]);
 
         return redirect()
-            ->route('settings.research-skills.index')
+            ->route('settings.skills.index')
+            ->withFragment('research-skills')
             ->with('success', 'Default research skill updated.');
-    }
-
-    public function updatePreferences(Request $request): RedirectResponse
-    {
-        $validated = $request->validate([
-            'research_auto_run_enabled' => ['required', 'boolean'],
-        ]);
-
-        UserPreference::set(
-            $request->user(),
-            UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED,
-            (bool) $validated['research_auto_run_enabled']
-        );
-
-        return redirect()
-            ->route('settings.research-skills.index')
-            ->with('success', 'Research preferences saved.');
     }
 }

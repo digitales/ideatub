@@ -150,7 +150,7 @@ class ProfileSettingsTest extends TestCase
         $response = $this->actingAs($user)->get(route('settings.profile.index'));
 
         $response->assertOk();
-        $response->assertSee(route('settings.research-skills.index'), false);
+        $response->assertSee(route('settings.skills.index'), false);
         $response->assertSee(route('settings.mcp-keys.index'), false);
         $response->assertSee(route('settings.inbound-emails.index'), false);
         $response->assertSee(route('settings.ideas-revisit.index'), false);

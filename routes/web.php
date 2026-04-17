@@ -19,6 +19,7 @@ use App\Http\Controllers\InboundEmailController;
 use App\Http\Controllers\InboxController;
 use App\Http\Controllers\JiraSettingsController;
 use App\Http\Controllers\McpKeyController;
+use App\Http\Controllers\MeetingSkillSettingsController;
 use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\PostmarkInboundController;
@@ -32,12 +33,14 @@ use App\Http\Controllers\ResearchSkillSettingsController;
 use App\Http\Controllers\SharedProjectViewController;
 use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
+use App\Http\Controllers\SkillSettingsController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\ThoughtLinkController;
 use App\Http\Controllers\ThoughtProjectController;
 use App\Http\Controllers\ToolController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\WebhookController;
+use App\Models\ResearchSkill;
 use Illuminate\Support\Facades\Route;
 
 // OAuth 2.1 / MCP well-known and OAuth server (ChatGPT connector)
@@ -209,13 +212,35 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'index'])->name('settings.ideas-revisit.index');
     Route::put('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'update'])->name('settings.ideas-revisit.update');
 
-    Route::get('/settings/research-skills/create', [ResearchSkillSettingsController::class, 'create'])->name('settings.research-skills.create');
+    Route::get('/settings/skills', [SkillSettingsController::class, 'index'])->name('settings.skills.index');
+    Route::put('/settings/skills/preferences', [SkillSettingsController::class, 'updatePreferences'])->name('settings.skills.preferences');
+    Route::put('/settings/research-skills/preferences', [SkillSettingsController::class, 'updatePreferences'])->name('settings.research-skills.preferences');
+
+    Route::get('/settings/skills/research/create', [ResearchSkillSettingsController::class, 'create'])->name('settings.skills.research.create');
+    Route::post('/settings/skills/research', [ResearchSkillSettingsController::class, 'store'])->name('settings.skills.research.store');
+    Route::get('/settings/skills/research/{researchSkill}/edit', [ResearchSkillSettingsController::class, 'edit'])->name('settings.skills.research.edit');
+    Route::put('/settings/skills/research/{researchSkill}', [ResearchSkillSettingsController::class, 'update'])->name('settings.skills.research.update');
+    Route::post('/settings/skills/research/{researchSkill}/default', [ResearchSkillSettingsController::class, 'setDefault'])->name('settings.skills.research.default');
+
+    Route::get('/settings/skills/meeting/create', [MeetingSkillSettingsController::class, 'create'])->name('settings.skills.meeting.create');
+    Route::post('/settings/skills/meeting', [MeetingSkillSettingsController::class, 'store'])->name('settings.skills.meeting.store');
+    Route::get('/settings/skills/meeting/{meetingSkill}/edit', [MeetingSkillSettingsController::class, 'edit'])->name('settings.skills.meeting.edit');
+    Route::put('/settings/skills/meeting/{meetingSkill}', [MeetingSkillSettingsController::class, 'update'])->name('settings.skills.meeting.update');
+    Route::post('/settings/skills/meeting/{meetingSkill}/default', [MeetingSkillSettingsController::class, 'setDefault'])->name('settings.skills.meeting.default');
+
     Route::post('/settings/research-skills', [ResearchSkillSettingsController::class, 'store'])->name('settings.research-skills.store');
-    Route::put('/settings/research-skills/preferences', [ResearchSkillSettingsController::class, 'updatePreferences'])->name('settings.research-skills.preferences');
-    Route::get('/settings/research-skills', [ResearchSkillSettingsController::class, 'index'])->name('settings.research-skills.index');
     Route::post('/settings/research-skills/{researchSkill}/default', [ResearchSkillSettingsController::class, 'setDefault'])->name('settings.research-skills.default');
-    Route::get('/settings/research-skills/{researchSkill}/edit', [ResearchSkillSettingsController::class, 'edit'])->name('settings.research-skills.edit');
     Route::put('/settings/research-skills/{researchSkill}', [ResearchSkillSettingsController::class, 'update'])->name('settings.research-skills.update');
+
+    Route::get('/settings/research-skills', function () {
+        return redirect()->route('settings.skills.index');
+    })->name('settings.research-skills.index');
+    Route::get('/settings/research-skills/create', function () {
+        return redirect()->route('settings.skills.research.create');
+    })->name('settings.research-skills.create');
+    Route::get('/settings/research-skills/{researchSkill}/edit', function (ResearchSkill $researchSkill) {
+        return redirect()->route('settings.skills.research.edit', $researchSkill);
+    })->name('settings.research-skills.edit');
 
     Route::get('/settings/inbound-emails', [InboundEmailController::class, 'index'])->name('settings.inbound-emails.index');
     Route::post('/settings/inbound-emails', [InboundEmailController::class, 'store'])->name('settings.inbound-emails.store');

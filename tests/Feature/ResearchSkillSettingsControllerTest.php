@@ -27,7 +27,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
 
     public function test_research_skills_index_requires_auth(): void
     {
-        $response = $this->get(route('settings.research-skills.index'));
+        $response = $this->get(route('settings.skills.index'));
 
         $response->assertRedirect(route('login'));
     }
@@ -36,9 +36,10 @@ class ResearchSkillSettingsControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get(route('settings.research-skills.index'));
+        $response = $this->actingAs($user)->get(route('settings.skills.index'));
 
         $response->assertStatus(200);
+        $response->assertSee('Skills');
         $response->assertSee('Research skills');
     }
 
@@ -60,7 +61,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'is_active' => true,
         ]);
 
-        $response->assertRedirect(route('settings.research-skills.index'));
+        $response->assertRedirect(route('settings.skills.index'));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('research_skills', [
@@ -103,7 +104,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'intensity' => 'standard',
         ]);
 
-        $response = $this->actingAs($user)->get(route('settings.research-skills.edit', $skill));
+        $response = $this->actingAs($user)->get(route('settings.skills.research.edit', $skill));
 
         $response->assertStatus(200);
         $response->assertSee('Original');
@@ -120,7 +121,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'intensity' => 'standard',
         ]);
 
-        $response = $this->actingAs($other)->get(route('settings.research-skills.edit', $skill));
+        $response = $this->actingAs($other)->get(route('settings.skills.research.edit', $skill));
 
         $response->assertForbidden();
     }
@@ -135,7 +136,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'intensity' => 'standard',
         ]);
 
-        $response = $this->actingAs($user)->put(route('settings.research-skills.update', $skill), [
+        $response = $this->actingAs($user)->put(route('settings.skills.research.update', $skill), [
             'name' => 'Updated name',
             'description' => '',
             'workflow_type' => 'quick_brief',
@@ -149,7 +150,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'is_active' => true,
         ]);
 
-        $response->assertRedirect(route('settings.research-skills.index'));
+        $response->assertRedirect(route('settings.skills.index'));
         $response->assertSessionHas('success');
 
         $skill->refresh();
@@ -173,7 +174,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'intensity' => 'standard',
         ]);
 
-        $response = $this->actingAs($other)->put(route('settings.research-skills.update', $skill), [
+        $response = $this->actingAs($other)->put(route('settings.skills.research.update', $skill), [
             'name' => 'Hacked',
             'description' => '',
             'workflow_type' => 'quick_brief',
@@ -208,9 +209,9 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'is_default' => false,
         ]);
 
-        $response = $this->actingAs($user)->post(route('settings.research-skills.default', $b));
+        $response = $this->actingAs($user)->post(route('settings.skills.research.default', $b));
 
-        $response->assertRedirect(route('settings.research-skills.index'));
+        $response->assertRedirect(route('settings.skills.index'));
         $response->assertSessionHas('success');
 
         $a->refresh();
@@ -230,7 +231,7 @@ class ResearchSkillSettingsControllerTest extends TestCase
             'intensity' => 'standard',
         ]);
 
-        $response = $this->actingAs($other)->post(route('settings.research-skills.default', $skill));
+        $response = $this->actingAs($other)->post(route('settings.skills.research.default', $skill));
 
         $response->assertForbidden();
     }
@@ -239,16 +240,18 @@ class ResearchSkillSettingsControllerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->put(route('settings.research-skills.preferences'), [
+        $response = $this->actingAs($user)->put(route('settings.skills.preferences'), [
             'research_auto_run_enabled' => true,
+            'meeting_auto_run_enabled' => false,
         ]);
 
-        $response->assertRedirect(route('settings.research-skills.index'));
+        $response->assertRedirect(route('settings.skills.index'));
         $response->assertSessionHas('success');
         $this->assertTrue(UserPreference::get($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, false));
 
-        $this->actingAs($user)->put(route('settings.research-skills.preferences'), [
+        $this->actingAs($user)->put(route('settings.skills.preferences'), [
             'research_auto_run_enabled' => false,
+            'meeting_auto_run_enabled' => false,
         ]);
 
         $this->assertFalse(UserPreference::get($user, UserPreference::KEY_RESEARCH_AUTO_RUN_ENABLED, false));

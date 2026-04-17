@@ -103,7 +103,7 @@
     <div class="rounded-2xl border border-memory-violet/15 bg-white/60 p-4">
         <h2 class="text-sm font-semibold text-deep-indigo mb-3">More settings</h2>
         <div class="flex flex-col gap-2 text-sm">
-            <a href="{{ route('settings.research-skills.index') }}" class="text-slate-brand hover:text-memory-violet">Research skills</a>
+            <a href="{{ route('settings.skills.index') }}" class="text-slate-brand hover:text-memory-violet">Skills</a>
             <a href="{{ route('settings.mcp-keys.index') }}" class="text-slate-brand hover:text-memory-violet">MCP key</a>
             <a href="{{ route('settings.inbound-emails.index') }}" class="text-slate-brand hover:text-memory-violet">Inbound email</a>
             <a href="{{ route('settings.ideas-revisit.index') }}" class="text-slate-brand hover:text-memory-violet">Ideas to revisit settings</a>

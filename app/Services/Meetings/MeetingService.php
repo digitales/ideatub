@@ -8,6 +8,7 @@ use App\Models\MeetingSkill;
 use App\Models\MeetingSkillVersion;
 use App\Models\Thought;
 use App\Models\User;
+use App\Models\UserPreference;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -129,6 +130,10 @@ class MeetingService
         }
 
         if (! $this->hasEligibleDefaultAutoRunSkillForUser($user)) {
+            return null;
+        }
+
+        if (! (bool) UserPreference::get($user, UserPreference::KEY_MEETING_AUTO_RUN_ENABLED, false)) {
             return null;
         }
 
