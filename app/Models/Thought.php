@@ -68,6 +68,22 @@ class Thought extends Model implements Commentable
                     'thought_deleted_at' => now(),
                 ]);
         });
+
+        // Hide thoughts that were migrated into the polymorphic comments table
+        // (old reply-shaped child thoughts). Use withoutGlobalScope('non_migrated')
+        // to inspect them (e.g. backfill verification or rollback).
+        static::addGlobalScope('non_migrated', function (Builder $query): void {
+            $driver = $query->getModel()->getConnection()->getDriverName();
+            $query->where(function (Builder $inner) use ($driver): void {
+                $inner->whereNull('metadata');
+                if ($driver === 'pgsql') {
+                    $inner->orWhereRaw("metadata->>'migrated_to_comment' IS DISTINCT FROM 'true'");
+                } else {
+                    // sqlite / mysql-ish fallback; keeps tests runnable without pgsql.
+                    $inner->orWhereRaw("COALESCE(json_extract(metadata, '$.migrated_to_comment'), '') <> 'true'");
+                }
+            });
+        });
     }
 
     /**
