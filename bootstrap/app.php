@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // OAuth 2.1 / DCR: called by remote MCP clients (no browser session)
             'oauth/register',
             'oauth/token',
+            'oauth/revoke',
         ]);
 
         $middleware->web(append: [

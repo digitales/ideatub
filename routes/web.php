@@ -54,6 +54,7 @@ if (config('oauth-mcp.enabled', true)) {
         ->middleware('throttle:10,1');
     Route::get('oauth/authorize', [OAuthServerController::class, 'showConsent'])->name('oauth.authorize');
     Route::post('oauth/token', [OAuthServerController::class, 'token']);
+    Route::post('oauth/revoke', [OAuthServerController::class, 'revoke']);
 }
 
 // Guest landing (optional; IdeaTub primary UI is at / when authenticated)
@@ -217,6 +218,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/mcp-keys', [McpKeyController::class, 'store'])->name('settings.mcp-keys.store');
     Route::patch('/settings/mcp-keys/{mcpKey}', [McpKeyController::class, 'update'])->name('settings.mcp-keys.update');
     Route::delete('/settings/mcp-keys/{mcpKey}', [McpKeyController::class, 'destroy'])->name('settings.mcp-keys.destroy');
+
+    // OAuth MCP connected apps (Claude, ChatGPT, etc.)
+    Route::get('/settings/connected-apps', [\App\Http\Controllers\Settings\ConnectedAppsController::class, 'index'])
+        ->name('settings.connected-apps.index');
+    Route::delete('/settings/connected-apps/{family}', [\App\Http\Controllers\Settings\ConnectedAppsController::class, 'destroy'])
+        ->name('settings.connected-apps.destroy');
+    Route::delete('/settings/connected-apps', [\App\Http\Controllers\Settings\ConnectedAppsController::class, 'destroyAll'])
+        ->name('settings.connected-apps.destroy-all');
 
     Route::get('/settings/profile', [ProfileSettingsController::class, 'index'])->name('settings.profile.index');
     Route::put('/settings/profile', [ProfileSettingsController::class, 'update'])->name('settings.profile.update');
