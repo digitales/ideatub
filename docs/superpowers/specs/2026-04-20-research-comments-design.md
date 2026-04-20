@@ -66,7 +66,7 @@ The current reply UI on thought detail pages reads child `Thought` rows through 
 ```
 id                  primary key (matches existing PK convention)
 commentable_type    string        -- morph alias
-commentable_id      uuid          -- matches Thought/Project PK
+commentable_id      string(36)    -- stores Thought UUID or Project integer PK as string; Laravel morph resolves type via commentable_type
 author_user_id      bigint null   -- fk users.id, set null on user delete
 author_name         varchar(100) null
 content             text
@@ -124,7 +124,7 @@ DELETE /comments/{comment}     CommentController@destroy
 `store` body:
 
 - `commentable_type` (string; must be in registered morph map)
-- `commentable_id` (uuid)
+- `commentable_id` (string; resolved against the commentable model's PK type)
 - `content` (string, ≤ 10,000)
 - `format` (optional, defaults to `markdown` for authenticated users)
 
@@ -141,7 +141,7 @@ POST /r/{token}/comments   SharedResearchCommentController@store
   - 5 requests/min per IP
   - 30 requests/hour per IP
 - Body:
-  - `commentable_id` (uuid — must equal the share's root thought or one of its section-children)
+  - `commentable_id` (string — must equal the share's root thought UUID or one of its section-children UUIDs)
   - `author_name` (string, 1–100, stripped of control chars, rejects obvious URLs)
   - `content` (string, ≤ 2,000)
   - `website_url` (honeypot; must be empty)
