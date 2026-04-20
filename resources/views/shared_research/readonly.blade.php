@@ -11,15 +11,51 @@
     @if($sections->isNotEmpty())
         <ul class="mt-8 space-y-8 border-t border-memory-violet/10 pt-8 list-none pl-0">
             @foreach($sections as $section)
-                <li>
+                @php($sectionRows = isset($commentsPresenter, $section->thought) ? $commentsPresenter->sectionRowsFor($section->thought) : [])
+                <li @isset($section->id) id="section-{{ $section->id }}" @endisset>
                     <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-headings:font-semibold prose-headings:tracking-tight prose-p:text-slate-brand prose-p:leading-relaxed prose-li:text-slate-brand prose-strong:text-deep-indigo prose-pre:bg-slate-100/90 prose-pre:border prose-pre:border-memory-violet/10 prose-pre:rounded-lg prose-pre:py-3 prose-pre:px-4 prose-code:text-deep-indigo prose-code:bg-slate-100/90 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-a:text-memory-violet prose-a:no-underline hover:prose-a:underline prose-blockquote:border-memory-violet/30 prose-blockquote:bg-memory-violet/5 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg text-[13px] md:text-[14px]">
                         {!! $section->content_html !!}
                     </div>
+                    @if(isset($commentsPresenter, $section->thought))
+                        <details class="mt-3">
+                            <summary class="cursor-pointer text-[11px] font-semibold uppercase tracking-wider text-memory-violet/80">
+                                {{ count($sectionRows) }} {{ \Illuminate\Support\Str::plural('comment', count($sectionRows)) }}
+                            </summary>
+                            <div class="mt-3">
+                                @include('comments._thread', [
+                                    'rows' => $sectionRows,
+                                    'formAction' => route('shared-research.comment', $share->token),
+                                    'commentableType' => 'thought',
+                                    'commentableId' => $section->thought->id,
+                                    'mode' => 'guest',
+                                    'disabledMessage' => $commentsPresenter->allowGuestComments() ? null : 'Comments are disabled on this share.',
+                                    'title' => 'Section comments',
+                                    'showControls' => false,
+                                ])
+                            </div>
+                        </details>
+                    @endif
                 </li>
             @endforeach
         </ul>
     @endif
 </div>
+
+@isset($commentsPresenter)
+    <div id="comments" class="mt-8">
+        @include('comments._thread', [
+            'rows' => $commentsPresenter->pageLevelRows(),
+            'formAction' => route('shared-research.comment', $share->token),
+            'commentableType' => 'thought',
+            'commentableId' => $root->id,
+            'mode' => 'guest',
+            'disabledMessage' => $commentsPresenter->allowGuestComments() ? null : 'Comments are disabled on this share.',
+            'title' => 'Comments',
+            'showControls' => false,
+        ])
+    </div>
+@endisset
+
 <div class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-slate-brand/70">
     @if($sharedBy ?? null)
         <span>Shared by {{ e($sharedBy->name ?: $sharedBy->email) }}</span>

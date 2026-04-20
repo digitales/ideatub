@@ -85,6 +85,8 @@ class SharedResearchViewController extends Controller
         $rootHtml = $converter->convert($thought->content)->getContent();
         $sectionsWithHtml = $sections->map(function ($section) use ($converter) {
             return (object) [
+                'id' => $section->id,
+                'thought' => $section,
                 'content_html' => $converter->convert($section->content)->getContent(),
                 'created_at' => $section->created_at,
             ];
@@ -92,12 +94,25 @@ class SharedResearchViewController extends Controller
 
         $share->load('user');
 
+        $shareContext = new \App\Support\Comments\ShareContext(
+            researchThoughtId: $thought->id,
+            shareId: $share->id,
+            allowComments: (bool) $share->allow_comments,
+        );
+        $commentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+            $thought,
+            null,
+            $shareContext,
+        );
+
         return view('shared_research.readonly', [
             'root' => $thought,
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
             'sharedBy' => $share->user,
             'documentTypeLabel' => $this->documentTypeLabelForSharedView($thought),
+            'share' => $share,
+            'commentsPresenter' => $commentsPresenter,
         ]);
     }
 
