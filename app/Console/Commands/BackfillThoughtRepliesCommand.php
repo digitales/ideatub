@@ -26,11 +26,20 @@ class BackfillThoughtRepliesCommand extends Command
               AND (t.source_metadata IS NULL OR t.source_metadata->>'section_index' IS NULL)
               AND (t.metadata IS NULL OR t.metadata->>'video_section_type' IS NULL)
               AND (t.metadata IS NULL OR t.metadata->>'migrated_to_comment' IS DISTINCT FROM 'true')
+              AND NOT EXISTS (
+                  SELECT 1 FROM comments c
+                  WHERE c.import_source = 'thought_reply_backfill'
+                    AND c.commentable_id = t.parent_id
+                    AND c.author_user_id = t.user_id
+                    AND c.created_at = t.created_at
+              )
         SQL);
 
         DB::statement(<<<'SQL'
             UPDATE thoughts
-            SET metadata = COALESCE(metadata, '{}'::jsonb) || '{"migrated_to_comment": true}'::jsonb
+            SET metadata = (
+                COALESCE(metadata::jsonb, '{}'::jsonb) || '{"migrated_to_comment": true}'::jsonb
+            )::json
             WHERE parent_id IS NOT NULL
               AND (source_metadata IS NULL OR source_metadata->>'section_index' IS NULL)
               AND (metadata IS NULL OR metadata->>'video_section_type' IS NULL)
