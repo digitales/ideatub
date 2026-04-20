@@ -1371,6 +1371,7 @@ class IdeaController extends Controller
         $sectionsWithHtml = $sections->map(function (Thought $section) use ($converter) {
             return (object) [
                 'id' => $section->id,
+                'thought' => $section,
                 'content_html' => $this->renderDemoSafeMarkdown(
                     $converter,
                     $section->content,
