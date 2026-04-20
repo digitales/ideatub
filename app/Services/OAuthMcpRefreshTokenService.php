@@ -53,6 +53,156 @@ class OAuthMcpRefreshTokenService
         });
     }
 
+    /**
+     * Validate + rotate a refresh token. Revokes the family on replay.
+     *
+     * @return array{user: \App\Models\User, resource: string, scope: ?string, raw: string}
+     */
+    public function rotate(
+        string $rawToken,
+        string $clientId,
+        string $resource,
+        ?string $requestedScope,
+        Request $request,
+    ): array {
+        $hash = hash('sha256', $rawToken);
+        $normalizedResource = OAuthMcpJwtService::normalizeResourceUrl($resource);
+
+        $startLevel = DB::transactionLevel();
+        DB::beginTransaction();
+
+        try {
+            $token = OauthMcpRefreshToken::where('token_hash', $hash)->lockForUpdate()->first();
+            if (! $token) {
+                DB::rollBack();
+                throw new \RuntimeException('invalid_grant');
+            }
+
+            $family = OauthMcpRefreshTokenFamily::lockForUpdate()->find($token->family_id);
+            if (! $family) {
+                DB::rollBack();
+                throw new \RuntimeException('invalid_grant');
+            }
+
+            if ($family->revoked_at !== null || now()->gt($family->absolute_expires_at)) {
+                DB::rollBack();
+                throw new \RuntimeException('invalid_grant');
+            }
+
+            if ($token->used_at !== null) {
+                // Reuse detected — burn the family and commit that revocation before raising.
+                $this->revokeFamily($family, 'reuse_detected');
+                DB::commit();
+                throw new \RuntimeException('invalid_grant');
+            }
+
+            if ($family->client_id !== $clientId) {
+                DB::rollBack();
+                throw new \RuntimeException('invalid_grant');
+            }
+
+            if ($family->resource !== $normalizedResource) {
+                DB::rollBack();
+                throw new \RuntimeException('invalid_grant');
+            }
+
+            if (now()->gt($token->expires_at)) {
+                DB::rollBack();
+                throw new \RuntimeException('invalid_grant');
+            }
+
+            try {
+                $this->validateScopeSubset($family->scope, $requestedScope);
+            } catch (\RuntimeException $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+            $effectiveScope = $requestedScope ?? $family->scope;
+
+            $now = now();
+            $newRaw = Str::random(64);
+
+            $new = OauthMcpRefreshToken::create([
+                'family_id' => $family->id,
+                'token_hash' => hash('sha256', $newRaw),
+                'expires_at' => $this->cappedRefreshExpiry($now, $family),
+            ]);
+
+            $token->update([
+                'used_at' => $now,
+                'replaced_by_id' => $new->id,
+            ]);
+
+            $family->update([
+                'last_used_at' => $now,
+                'user_agent' => $this->truncate($request->userAgent(), 512) ?? $family->user_agent,
+                'ip_address' => $request->ip() ?? $family->ip_address,
+            ]);
+
+            DB::commit();
+
+            return [
+                'user' => $family->user,
+                'resource' => $family->resource,
+                'scope' => $effectiveScope,
+                'raw' => $newRaw,
+            ];
+        } catch (\Throwable $e) {
+            // Only roll back savepoints WE created. Never touch the caller's transaction.
+            while (DB::transactionLevel() > $startLevel) {
+                try {
+                    DB::rollBack();
+                } catch (\Throwable $ignored) {
+                    break;
+                }
+            }
+            throw $e;
+        }
+    }
+
+    public function revokeFamily(OauthMcpRefreshTokenFamily $family, string $reason): void
+    {
+        if ($family->revoked_at !== null) {
+            return;
+        }
+
+        $family->update([
+            'revoked_at' => now(),
+            'revoked_reason' => $reason,
+        ]);
+    }
+
+    public function revokeByRawToken(string $rawToken, string $reason, ?string $clientId = null): void
+    {
+        $hash = hash('sha256', $rawToken);
+        $token = OauthMcpRefreshToken::where('token_hash', $hash)->first();
+        if (! $token) {
+            return;
+        }
+        $family = $token->family;
+        if ($clientId !== null && $family->client_id !== $clientId) {
+            return;
+        }
+        $this->revokeFamily($family, $reason);
+    }
+
+    private function validateScopeSubset(?string $familyScope, ?string $requestedScope): void
+    {
+        if ($requestedScope === null || $requestedScope === '') {
+            return;
+        }
+
+        $family = array_filter(explode(' ', (string) $familyScope));
+        $requested = array_filter(explode(' ', $requestedScope));
+
+        foreach ($requested as $scope) {
+            if (! in_array($scope, $family, true)) {
+                throw new \RuntimeException('invalid_scope');
+            }
+        }
+    }
+
     private function cappedRefreshExpiry(Carbon $now, OauthMcpRefreshTokenFamily $family): Carbon
     {
         $rolling = $now->copy()->addSeconds((int) config('oauth-mcp.refresh_token_ttl_seconds'));
