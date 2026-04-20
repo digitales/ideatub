@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Contracts\Commentable;
 use App\Events\ThoughtCreated;
 use App\Jobs\SyncThoughtToEvernote;
 use App\Models\Concerns\HasComments;
 use App\Services\EvernoteService;
+use App\Support\Comments\ShareContext;
 use App\Support\ThoughtTypeNavigation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -20,7 +22,7 @@ use Pgvector\Laravel\Distance;
 use Pgvector\Laravel\HasNeighbors;
 use Pgvector\Laravel\Vector;
 
-class Thought extends Model
+class Thought extends Model implements Commentable
 {
     use HasComments;
     use HasFactory;
@@ -775,5 +777,31 @@ class Thought extends Model
         return $query->getModel()->getConnection()->getDriverName() === 'pgsql'
             ? "LOWER(COALESCE(metadata->>'type', ''))"
             : "LOWER(COALESCE(json_extract(metadata, '$.type'), ''))";
+    }
+
+    public function commentableOwnerId(): ?int
+    {
+        return $this->user_id;
+    }
+
+    /**
+     * Owner may always comment; guests may comment only when arriving via a
+     * share that targets this thought's research root and has comments enabled.
+     */
+    public function authorizeCommentCreation(?User $user, ?ShareContext $shareContext): bool
+    {
+        if ($user !== null && $this->user_id === $user->id) {
+            return true;
+        }
+
+        if ($shareContext === null || ! $shareContext->allowComments) {
+            return false;
+        }
+
+        if ($shareContext->researchThoughtId === $this->id) {
+            return true;
+        }
+
+        return $this->parent_id === $shareContext->researchThoughtId;
     }
 }

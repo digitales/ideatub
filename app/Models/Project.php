@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Contracts\Commentable;
 use App\Models\Concerns\HasComments;
+use App\Support\Comments\ShareContext;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Project extends Model
+class Project extends Model implements Commentable
 {
     use HasComments;
     use HasFactory;
@@ -49,5 +51,19 @@ class Project extends Model
     public function shares(): HasMany
     {
         return $this->hasMany(ProjectShare::class);
+    }
+
+    public function commentableOwnerId(): ?int
+    {
+        return $this->user_id;
+    }
+
+    /**
+     * v1: only the project owner can comment on a project. Public project
+     * comments are out of scope.
+     */
+    public function authorizeCommentCreation(?User $user, ?ShareContext $shareContext): bool
+    {
+        return $user !== null && $this->user_id === $user->id;
     }
 }
