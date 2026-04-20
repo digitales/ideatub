@@ -33,7 +33,7 @@ class ThoughtDetailPresenterTest extends TestCase
                 'research_thought_id' => $research->id,
             ],
         ]);
-        $video->setRelation('comments', collect());
+        $video->setRelation('childThoughts', collect());
 
         $presenter = ThoughtDetailPresenter::forShow(
             thought: $video,

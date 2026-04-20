@@ -755,7 +755,7 @@ class ThoughtShowPageTest extends TestCase
         config(['services.demo_mode.enabled' => true]);
 
         [$owner, $emailThought, $researchThought] = $this->createEmailThoughtWithLinkedResearchPreviewFixture();
-        $researchSections = $researchThought->comments()->orderBy('created_at')->get();
+        $researchSections = $researchThought->childThoughts()->orderBy('created_at')->get();
 
         $response = $this->withSession([
             DemoMode::ENABLED_SESSION_KEY => true,

@@ -21,7 +21,7 @@ class IdeaIndexCardPresenterTest extends TestCase
         $thought = Thought::factory()->create();
 
         $this->expectException(MissingPresenterData::class);
-        $this->expectExceptionMessage('comments');
+        $this->expectExceptionMessage('childThoughts');
 
         IdeaIndexCardPresenter::fromThought($thought, 0);
     }
@@ -34,7 +34,7 @@ class IdeaIndexCardPresenterTest extends TestCase
             'user_id' => $parent->user_id,
             'parent_id' => $parent->id,
         ]);
-        $child->setRelation('comments', collect());
+        $child->setRelation('childThoughts', collect());
 
         $this->expectException(MissingPresenterData::class);
         $this->expectExceptionMessage('parent');
@@ -53,7 +53,7 @@ class IdeaIndexCardPresenterTest extends TestCase
             'parent_id' => null,
             'content' => 'Root',
         ]);
-        $thought->setRelation('comments', collect());
+        $thought->setRelation('childThoughts', collect());
 
         $card = IdeaIndexCardPresenter::fromThought($thought, 2);
 
@@ -76,7 +76,7 @@ class IdeaIndexCardPresenterTest extends TestCase
             'content' => 'Child',
         ]);
         $child->load('parent');
-        $child->setRelation('comments', collect());
+        $child->setRelation('childThoughts', collect());
 
         $card = IdeaIndexCardPresenter::fromThought($child, -1);
 
@@ -104,7 +104,7 @@ class IdeaIndexCardPresenterTest extends TestCase
                 'transcript_source' => 'youtube',
             ],
         ]);
-        $thought->setRelation('comments', collect());
+        $thought->setRelation('childThoughts', collect());
 
         $card = IdeaIndexCardPresenter::fromThought($thought, 0, null, 'https://example.org/research-page');
 
@@ -140,7 +140,7 @@ class IdeaIndexCardPresenterTest extends TestCase
             'parent_id' => $child->id,
             'content' => 'IDEATUB_DEMO_COMMENT_MARKER_IDX_LONG_TEXT_'.str_repeat('x', 300),
         ]);
-        $child->setRelation('comments', collect([$comment]));
+        $child->setRelation('childThoughts', collect([$comment]));
 
         $card = IdeaIndexCardPresenter::fromThought($child, -1);
 
@@ -153,7 +153,7 @@ class IdeaIndexCardPresenterTest extends TestCase
 
         session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
 
-        $cardNormal = IdeaIndexCardPresenter::fromThought($child->fresh(['parent', 'comments']), -1);
+        $cardNormal = IdeaIndexCardPresenter::fromThought($child->fresh(['parent', 'childThoughts']), -1);
         $this->assertTrue($cardNormal->editable());
         $this->assertSame('IDEATUB_DEMO_BODY_MARKER_IDX', $cardNormal->displayContent());
         $this->assertStringContainsString('IDEATUB_DEMO_PARENT_MARKER_IDX', $cardNormal->displayParentPreviewExcerpt() ?? '');

@@ -226,7 +226,7 @@ final class ThoughtDetailPresenter
             return false;
         }
 
-        foreach ($this->thought->comments as $comment) {
+        foreach ($this->thought->childThoughts as $comment) {
             if (
                 data_get($comment->metadata, 'video_section_type') !==
                 'transcript'
@@ -269,7 +269,7 @@ final class ThoughtDetailPresenter
 
         $this->videoTranscriptTextResolved = true;
 
-        $transcriptComments = $this->thought->comments->filter(
+        $transcriptComments = $this->thought->childThoughts->filter(
             fn (Thought $comment): bool => data_get(
                 $comment->metadata,
                 'video_section_type'
@@ -507,7 +507,7 @@ final class ThoughtDetailPresenter
      */
     public function replyRows(): array
     {
-        $comments = $this->thought->comments;
+        $comments = $this->thought->childThoughts;
         if ($this->isVideoThought()) {
             $comments = $comments
                 ->filter(

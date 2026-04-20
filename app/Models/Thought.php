@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Events\ThoughtCreated;
 use App\Jobs\SyncThoughtToEvernote;
+use App\Models\Concerns\HasComments;
 use App\Services\EvernoteService;
 use App\Support\ThoughtTypeNavigation;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,6 +22,7 @@ use Pgvector\Laravel\Vector;
 
 class Thought extends Model
 {
+    use HasComments;
     use HasFactory;
     use HasNeighbors;
     use HasUuids;
@@ -201,9 +203,14 @@ class Thought extends Model
     }
 
     /**
-     * Get child thoughts (comments on this thought).
+     * Get child thoughts (e.g. document sections under a research root).
+     *
+     * Renamed from `comments()` to avoid collision with the polymorphic
+     * `HasComments` trait. Research/meeting/document-section iteration uses
+     * this; user-authored discussion is handled by `$thought->comments()`
+     * (the MorphMany from the trait).
      */
-    public function comments(): HasMany
+    public function childThoughts(): HasMany
     {
         return $this->hasMany(Thought::class, 'parent_id');
     }

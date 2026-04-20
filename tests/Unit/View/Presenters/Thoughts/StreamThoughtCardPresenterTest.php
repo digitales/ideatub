@@ -22,7 +22,7 @@ class StreamThoughtCardPresenterTest extends TestCase
         $thought = Thought::factory()->create();
 
         $this->expectException(MissingPresenterData::class);
-        $this->expectExceptionMessage('comments');
+        $this->expectExceptionMessage('childThoughts');
 
         StreamThoughtCardPresenter::fromThought($thought, null, false);
     }
@@ -42,7 +42,7 @@ class StreamThoughtCardPresenterTest extends TestCase
                     'jira_updated_at' => '2026-03-20T12:00:00.000+0000',
                 ],
             ]);
-            $thought->setRelation('comments', collect());
+            $thought->setRelation('childThoughts', collect());
 
             $card = StreamThoughtCardPresenter::fromThought($thought, null, false);
 
@@ -66,7 +66,7 @@ class StreamThoughtCardPresenterTest extends TestCase
                 'jira_updated_at' => 'not-a-date',
             ],
         ]);
-        $thought->setRelation('comments', collect());
+        $thought->setRelation('childThoughts', collect());
 
         $card = StreamThoughtCardPresenter::fromThought($thought, null, false);
 
@@ -94,7 +94,7 @@ class StreamThoughtCardPresenterTest extends TestCase
             'parent_id' => $root->id,
             'content' => 'IDEATUB_DEMO_STREAM_COMMENT_MARKER_LONG_'.str_repeat('y', 300),
         ]);
-        $root->setRelation('comments', collect([$reply]));
+        $root->setRelation('childThoughts', collect([$reply]));
 
         $card = StreamThoughtCardPresenter::fromThought($root, null, false);
 
@@ -107,7 +107,7 @@ class StreamThoughtCardPresenterTest extends TestCase
         session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
 
         $rootFresh = $root->fresh();
-        $rootFresh->setRelation('comments', collect([$reply->fresh()]));
+        $rootFresh->setRelation('childThoughts', collect([$reply->fresh()]));
         $cardNormal = StreamThoughtCardPresenter::fromThought($rootFresh, null, false);
         $this->assertTrue($cardNormal->editable());
         $this->assertSame('IDEATUB_DEMO_STREAM_BODY_MARKER', $cardNormal->displayContent());
@@ -130,7 +130,7 @@ class StreamThoughtCardPresenterTest extends TestCase
                 'research_thought_id' => 'missing-research-id',
             ],
         ]);
-        $thought->setRelation('comments', collect());
+        $thought->setRelation('childThoughts', collect());
 
         $card = StreamThoughtCardPresenter::fromThought(
             $thought,

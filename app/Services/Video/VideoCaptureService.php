@@ -206,7 +206,7 @@ class VideoCaptureService
                 $duplicateRoot->delete();
             }
 
-            return $root->fresh(['comments']);
+            return $root->fresh(['childThoughts']);
         });
     }
 

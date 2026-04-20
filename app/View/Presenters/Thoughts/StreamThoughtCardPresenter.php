@@ -37,7 +37,7 @@ final class StreamThoughtCardPresenter
         private readonly ?NewsletterResearchStatusPresenter $newsletterResearchStatus,
         private readonly ?string $videoLatestResearchUrl,
     ) {
-        $this->requireRelationLoaded($this->thought, 'comments');
+        $this->requireRelationLoaded($this->thought, 'childThoughts');
     }
 
     public static function fromThought(
@@ -179,7 +179,7 @@ final class StreamThoughtCardPresenter
             return false;
         }
 
-        foreach ($this->thought->comments as $comment) {
+        foreach ($this->thought->childThoughts as $comment) {
             if (data_get($comment->metadata, 'video_section_type') !== 'transcript') {
                 continue;
             }
@@ -278,7 +278,7 @@ final class StreamThoughtCardPresenter
      */
     private function streamCommentCandidates(): Collection
     {
-        $comments = $this->thought->comments;
+        $comments = $this->thought->childThoughts;
         if ($this->isVideoThought()) {
             return $comments->filter(
                 fn (Thought $c) => ! in_array(
@@ -317,7 +317,7 @@ final class StreamThoughtCardPresenter
             return false;
         }
 
-        return $this->thought->relationLoaded('comments') && $this->thought->comments->isNotEmpty();
+        return $this->thought->relationLoaded('childThoughts') && $this->thought->childThoughts->isNotEmpty();
     }
 
     public function showCommentsBlock(): bool

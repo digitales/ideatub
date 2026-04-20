@@ -79,7 +79,7 @@ class SharedResearchViewController extends Controller
             abort(404, 'Link not found or no longer available.');
         }
 
-        $sections = $thought->comments()->orderBy('created_at')->get();
+        $sections = $thought->childThoughts()->orderBy('created_at')->get();
         $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
 
         $rootHtml = $converter->convert($thought->content)->getContent();
