@@ -165,8 +165,40 @@ class OAuthServerController extends Controller
 
     private function tokenRefresh(Request $request): Response
     {
-        // Implemented in Task 7.
-        return response()->json(['error' => 'unsupported_grant_type'], 400);
+        $request->validate([
+            'grant_type' => 'required|in:refresh_token',
+            'refresh_token' => 'required|string',
+            'client_id' => 'required|string',
+            'resource' => 'required|url',
+            'scope' => 'nullable|string',
+        ]);
+
+        try {
+            $result = $this->refreshTokens->rotate(
+                (string) $request->input('refresh_token'),
+                (string) $request->input('client_id'),
+                (string) $request->input('resource'),
+                $request->input('scope'),
+                $request,
+            );
+        } catch (\RuntimeException $e) {
+            $error = $e->getMessage();
+            if (! in_array($error, ['invalid_grant', 'invalid_scope'], true)) {
+                $error = 'invalid_grant';
+            }
+
+            return response()->json(['error' => $error], 400);
+        }
+
+        $accessToken = $this->jwt->issueAccessToken($result['user'], $result['resource']);
+
+        return response()->json([
+            'access_token' => $accessToken,
+            'token_type' => 'Bearer',
+            'expires_in' => config('oauth-mcp.access_token_ttl_seconds', 3600),
+            'refresh_token' => $result['raw'],
+            'scope' => $result['scope'] ?? config('oauth-mcp.scope'),
+        ]);
     }
 
     private function normalizeRedirectUris(array $uris): array
