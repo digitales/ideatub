@@ -502,53 +502,6 @@ final class ThoughtDetailPresenter
         return $this->relatedEmailCard;
     }
 
-    /**
-     * @return array<int, array{content: string, created_at_human: string}>
-     */
-    public function replyRows(): array
-    {
-        $comments = $this->thought->childThoughts;
-        if ($this->isVideoThought()) {
-            $comments = $comments
-                ->filter(
-                    fn (Thought $c) => data_get(
-                        $c->metadata,
-                        'video_section_type'
-                    ) !== 'transcript'
-                )
-                ->values();
-        }
-
-        $comments = $comments
-            ->filter(fn (Thought $c) => ! $this->isStructuredDocumentSection($c))
-            ->values();
-
-        return $comments
-            ->map(function (Thought $comment): array {
-                try {
-                    $content = $this->demoText(
-                        $comment->content,
-                        'thought_comment_preview'
-                    );
-                } catch (\Throwable $e) {
-                    $this->logDemoObfuscationFailure(
-                        boundary: 'thought_detail_presenter.reply_rows',
-                        context: 'thought_comment_preview',
-                        exception: $e,
-                        subjectThoughtId: $comment->id
-                    );
-
-                    $content = 'Demo content hidden';
-                }
-
-                return [
-                    'content' => $content ?? 'Demo content hidden',
-                    'created_at_human' => $comment->created_at->diffForHumans(),
-                ];
-            })
-            ->all();
-    }
-
     public function emailBodyText(): string
     {
         if ($this->thought->source !== 'email') {
@@ -596,10 +549,4 @@ final class ThoughtDetailPresenter
         );
     }
 
-    private function isStructuredDocumentSection(Thought $comment): bool
-    {
-        $sectionIndex = data_get($comment->source_metadata, 'section_index');
-
-        return $sectionIndex !== null && trim((string) $sectionIndex) !== '';
-    }
 }

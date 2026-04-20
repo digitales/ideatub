@@ -368,6 +368,12 @@ class IdeaController extends Controller
             });
         }
 
+        $detailCommentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+            $thought,
+            auth()->user(),
+            null,
+        );
+
         return view('idea.show', [
             'thoughtDetail' => $thoughtDetail,
             'thoughtDetailContentBlocks' => $thoughtDetailContentBlocks,
@@ -377,6 +383,7 @@ class IdeaController extends Controller
             'thoughtIncomingLinks' => $thoughtIncomingLinks,
             'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
             'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
+            'detailCommentsPresenter' => $detailCommentsPresenter,
         ]);
     }
 
