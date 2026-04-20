@@ -106,6 +106,30 @@ class OAuthServerController extends Controller
         ], 400);
     }
 
+    /**
+     * RFC 7009 OAuth 2.0 Token Revocation.
+     * Always returns 200 regardless of whether the token existed.
+     */
+    public function revoke(Request $request): Response
+    {
+        $request->validate([
+            'token' => 'required|string',
+            'client_id' => 'required|string',
+            'token_type_hint' => 'nullable|in:refresh_token,access_token',
+        ]);
+
+        $hint = (string) $request->input('token_type_hint', 'refresh_token');
+        if ($hint === 'refresh_token') {
+            $this->refreshTokens->revokeByRawToken(
+                (string) $request->input('token'),
+                'user',
+                (string) $request->input('client_id'),
+            );
+        }
+
+        return response()->json([], 200);
+    }
+
     private function tokenAuthorizationCode(Request $request): Response
     {
         $request->validate([

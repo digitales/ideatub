@@ -54,6 +54,7 @@ if (config('oauth-mcp.enabled', true)) {
         ->middleware('throttle:10,1');
     Route::get('oauth/authorize', [OAuthServerController::class, 'showConsent'])->name('oauth.authorize');
     Route::post('oauth/token', [OAuthServerController::class, 'token']);
+    Route::post('oauth/revoke', [OAuthServerController::class, 'revoke']);
 }
 
 // Guest landing (optional; IdeaTub primary UI is at / when authenticated)
