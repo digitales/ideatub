@@ -105,6 +105,7 @@
         <div class="flex flex-col gap-2 text-sm">
             <a href="{{ route('settings.skills.index') }}" class="text-slate-brand hover:text-memory-violet">Skills</a>
             <a href="{{ route('settings.mcp-keys.index') }}" class="text-slate-brand hover:text-memory-violet">MCP key</a>
+            <a href="{{ route('settings.connected-apps.index') }}" class="text-slate-brand hover:text-memory-violet">Connected apps</a>
             <a href="{{ route('settings.inbound-emails.index') }}" class="text-slate-brand hover:text-memory-violet">Inbound email</a>
             <a href="{{ route('settings.ideas-revisit.index') }}" class="text-slate-brand hover:text-memory-violet">Ideas to revisit settings</a>
             @if(config('services.mail_sync.enabled', true))
