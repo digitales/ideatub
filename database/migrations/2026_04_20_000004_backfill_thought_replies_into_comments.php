@@ -25,7 +25,7 @@ return new class extends Migration
               AND NOT EXISTS (
                   SELECT 1 FROM comments c
                   WHERE c.import_source = 'thought_reply_backfill'
-                    AND c.commentable_id = t.parent_id
+                    AND c.commentable_id = t.parent_id::text
                     AND c.author_user_id = t.user_id
                     AND c.created_at = t.created_at
               )
