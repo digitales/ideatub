@@ -1912,7 +1912,7 @@ Create `resources/views/settings/connected-apps.blade.php`:
             <ul class="space-y-4">
                 @foreach ($families as $family)
                     @php
-                        $host = optional(parse_url($family->client->redirect_uris[0] ?? '', PHP_URL_HOST)) ?: \Illuminate\Support\Str::limit($family->client_id, 16);
+                        $host = parse_url($family->client->redirect_uris[0] ?? '', PHP_URL_HOST) ?: \Illuminate\Support\Str::limit($family->client_id, 16);
                     @endphp
                     <li class="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-memory-violet/10 bg-white/60 px-4 py-3">
                         <div class="min-w-0 flex-1 space-y-1">
