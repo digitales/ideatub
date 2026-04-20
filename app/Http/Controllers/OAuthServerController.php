@@ -14,7 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
 class OAuthServerController extends Controller
 {
     public function __construct(
-        private OAuthMcpJwtService $jwt
+        private OAuthMcpJwtService $jwt,
+        private \App\Services\OAuthMcpRefreshTokenService $refreshTokens,
     ) {}
 
     /**
@@ -86,9 +87,26 @@ class OAuthServerController extends Controller
     }
 
     /**
-     * Token endpoint — exchange code for access token.
+     * Token endpoint — dispatches to the correct grant handler.
      */
     public function token(Request $request): Response
+    {
+        $grantType = (string) $request->input('grant_type');
+
+        if ($grantType === 'authorization_code') {
+            return $this->tokenAuthorizationCode($request);
+        }
+
+        if ($grantType === 'refresh_token') {
+            return $this->tokenRefresh($request);
+        }
+
+        return response()->json([
+            'error' => 'unsupported_grant_type',
+        ], 400);
+    }
+
+    private function tokenAuthorizationCode(Request $request): Response
     {
         $request->validate([
             'grant_type' => 'required|in:authorization_code',
@@ -128,12 +146,27 @@ class OAuthServerController extends Controller
 
         $accessToken = $this->jwt->issueAccessToken($code->user, $request->resource);
 
+        $issued = $this->refreshTokens->issueForCodeExchange(
+            $code->user,
+            $code->client,
+            (string) $request->resource,
+            $code->scope ?? config('oauth-mcp.scope'),
+            $request,
+        );
+
         return response()->json([
             'access_token' => $accessToken,
             'token_type' => 'Bearer',
             'expires_in' => config('oauth-mcp.access_token_ttl_seconds', 3600),
+            'refresh_token' => $issued['raw'],
             'scope' => $code->scope ?? config('oauth-mcp.scope'),
         ]);
+    }
+
+    private function tokenRefresh(Request $request): Response
+    {
+        // Implemented in Task 7.
+        return response()->json(['error' => 'unsupported_grant_type'], 400);
     }
 
     private function normalizeRedirectUris(array $uris): array
