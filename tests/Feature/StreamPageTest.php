@@ -493,7 +493,7 @@ class StreamPageTest extends TestCase
             'parent_id' => $root->id,
             'content' => 'IDEATUB_FEATURE_STREAM_COMMENT_SECRET',
         ]);
-        $root->setRelation('comments', collect([$reply]));
+        $root->setRelation('childThoughts', collect([$reply]));
 
         $demo = $this->withSession([
             DemoMode::ENABLED_SESSION_KEY => true,

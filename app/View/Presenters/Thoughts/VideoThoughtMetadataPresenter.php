@@ -129,7 +129,7 @@ final class VideoThoughtMetadataPresenter
 
     private function transcriptTextPresenceValue(): ?string
     {
-        foreach ($this->thought->comments as $comment) {
+        foreach ($this->thought->childThoughts as $comment) {
             if (data_get($comment->metadata, 'video_section_type') !== 'transcript') {
                 continue;
             }

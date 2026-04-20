@@ -55,7 +55,7 @@
                 </div>
             @endif
 
-            @if ($card->thought()->relationLoaded('comments') && $card->thought()->comments->isNotEmpty())
+            @if ($card->thought()->relationLoaded('childThoughts') && $card->thought()->childThoughts->isNotEmpty())
                 <a
                     href="{{ route('thoughts.show', $card->thought()) }}"
                     class="block rounded-lg -mx-1 px-1 py-0.5 hover:bg-memory-violet/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-memory-violet/40"

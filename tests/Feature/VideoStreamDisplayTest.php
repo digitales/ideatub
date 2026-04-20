@@ -50,7 +50,7 @@ class VideoStreamDisplayTest extends TestCase
             ],
         ]);
 
-        $video->refresh()->load(['comments' => fn ($q) => $q->orderBy('created_at')]);
+        $video->refresh()->load(['childThoughts' => fn ($q) => $q->orderBy('created_at')]);
 
         $response = $this->actingAs($user)->get(route('idea.stream'));
 

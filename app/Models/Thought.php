@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Contracts\Commentable;
 use App\Events\ThoughtCreated;
 use App\Jobs\SyncThoughtToEvernote;
+use App\Models\Concerns\HasComments;
 use App\Services\EvernoteService;
+use App\Support\Comments\ShareContext;
 use App\Support\ThoughtTypeNavigation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -19,8 +22,9 @@ use Pgvector\Laravel\Distance;
 use Pgvector\Laravel\HasNeighbors;
 use Pgvector\Laravel\Vector;
 
-class Thought extends Model
+class Thought extends Model implements Commentable
 {
+    use HasComments;
     use HasFactory;
     use HasNeighbors;
     use HasUuids;
@@ -63,6 +67,22 @@ class Thought extends Model
                     'thought_id' => null,
                     'thought_deleted_at' => now(),
                 ]);
+        });
+
+        // Hide thoughts that were migrated into the polymorphic comments table
+        // (old reply-shaped child thoughts). Use withoutGlobalScope('non_migrated')
+        // to inspect them (e.g. backfill verification or rollback).
+        static::addGlobalScope('non_migrated', function (Builder $query): void {
+            $driver = $query->getModel()->getConnection()->getDriverName();
+            $query->where(function (Builder $inner) use ($driver): void {
+                $inner->whereNull('metadata');
+                if ($driver === 'pgsql') {
+                    $inner->orWhereRaw("metadata->>'migrated_to_comment' IS DISTINCT FROM 'true'");
+                } else {
+                    // sqlite / mysql-ish fallback; keeps tests runnable without pgsql.
+                    $inner->orWhereRaw("COALESCE(json_extract(metadata, '$.migrated_to_comment'), '') <> 'true'");
+                }
+            });
         });
     }
 
@@ -201,9 +221,14 @@ class Thought extends Model
     }
 
     /**
-     * Get child thoughts (comments on this thought).
+     * Get child thoughts (e.g. document sections under a research root).
+     *
+     * Renamed from `comments()` to avoid collision with the polymorphic
+     * `HasComments` trait. Research/meeting/document-section iteration uses
+     * this; user-authored discussion is handled by `$thought->comments()`
+     * (the MorphMany from the trait).
      */
-    public function comments(): HasMany
+    public function childThoughts(): HasMany
     {
         return $this->hasMany(Thought::class, 'parent_id');
     }
@@ -768,5 +793,31 @@ class Thought extends Model
         return $query->getModel()->getConnection()->getDriverName() === 'pgsql'
             ? "LOWER(COALESCE(metadata->>'type', ''))"
             : "LOWER(COALESCE(json_extract(metadata, '$.type'), ''))";
+    }
+
+    public function commentableOwnerId(): ?int
+    {
+        return $this->user_id;
+    }
+
+    /**
+     * Owner may always comment; guests may comment only when arriving via a
+     * share that targets this thought's research root and has comments enabled.
+     */
+    public function authorizeCommentCreation(?User $user, ?ShareContext $shareContext): bool
+    {
+        if ($user !== null && $this->user_id === $user->id) {
+            return true;
+        }
+
+        if ($shareContext === null || ! $shareContext->allowComments) {
+            return false;
+        }
+
+        if ($shareContext->researchThoughtId === $this->id) {
+            return true;
+        }
+
+        return $this->parent_id === $shareContext->researchThoughtId;
     }
 }

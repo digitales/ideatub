@@ -1,0 +1,137 @@
+<?php
+
+namespace App\View\Presenters\Comments;
+
+use App\Models\Comment;
+use App\Models\Thought;
+use App\Models\ThoughtCommentRead;
+use App\Models\User;
+use App\Support\Comments\ShareContext;
+use League\CommonMark\CommonMarkConverter;
+
+class ResearchCommentsPresenter
+{
+    private ?CommonMarkConverter $converter = null;
+
+    public function __construct(
+        private readonly Thought $root,
+        private readonly ?User $viewer,
+        private readonly ?ShareContext $shareContext,
+    ) {}
+
+    /** @return array<int, array<string, mixed>> */
+    public function pageLevelRows(): array
+    {
+        return $this->rowsForIds([$this->root->id]);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function sectionRowsFor(Thought $section): array
+    {
+        return $this->rowsForIds([$section->id]);
+    }
+
+    public function canCommentOnPage(): bool
+    {
+        return $this->root->authorizeCommentCreation($this->viewer, $this->shareContext);
+    }
+
+    public function canCommentOnSection(Thought $section): bool
+    {
+        return $section->authorizeCommentCreation($this->viewer, $this->shareContext);
+    }
+
+    public function unreadCount(): int
+    {
+        if ($this->viewer === null) {
+            return 0;
+        }
+
+        $lastRead = ThoughtCommentRead::query()
+            ->where('user_id', $this->viewer->id)
+            ->where('thought_id', $this->root->id)
+            ->value('last_read_at');
+
+        $ids = collect([$this->root->id])
+            ->merge(
+                Thought::query()
+                    ->where('parent_id', $this->root->id)
+                    ->pluck('id')
+            )
+            ->unique()
+            ->values();
+
+        $q = Comment::query()
+            ->whereIn('commentable_id', $ids)
+            ->where('commentable_type', 'thought')
+            ->where(function ($q) {
+                $q->whereNull('author_user_id')
+                    ->orWhere('author_user_id', '<>', $this->viewer->id);
+            });
+
+        if ($lastRead !== null) {
+            $q->where('created_at', '>', $lastRead);
+        }
+
+        return (int) $q->count();
+    }
+
+    public function allowGuestComments(): bool
+    {
+        return $this->shareContext !== null && $this->shareContext->allowComments;
+    }
+
+    /**
+     * @param  array<int, string>  $ids
+     * @return array<int, array<string, mixed>>
+     */
+    private function rowsForIds(array $ids): array
+    {
+        return Comment::query()
+            ->where('commentable_type', 'thought')
+            ->whereIn('commentable_id', $ids)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (Comment $c) => $this->row($c))
+            ->all();
+    }
+
+    /** @return array<string, mixed> */
+    private function row(Comment $c): array
+    {
+        $isOwner = $c->author_user_id !== null
+            && $c->author_user_id === $this->root->user_id;
+
+        $contentHtml = $c->format === 'markdown'
+            ? $this->converter()->convert($c->content)->getContent()
+            : nl2br(e($c->content));
+
+        $canEdit = $this->viewer !== null
+            && $c->author_user_id === $this->viewer->id;
+
+        $canDelete = $canEdit
+            || ($this->viewer !== null && $this->viewer->id === $this->root->user_id);
+
+        return [
+            'id' => $c->id,
+            'author_name' => $c->displayName(),
+            'is_owner' => $isOwner,
+            'is_guest' => $c->isGuest(),
+            'content_html' => $contentHtml,
+            'created_at_human' => $c->created_at->diffForHumans(),
+            'updated_label' => $c->updated_at->greaterThan($c->created_at->copy()->addMinute())
+                ? '(edited)'
+                : null,
+            'can_edit' => $canEdit,
+            'can_delete' => $canDelete,
+        ];
+    }
+
+    private function converter(): CommonMarkConverter
+    {
+        return $this->converter ??= new CommonMarkConverter([
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
+        ]);
+    }
+}

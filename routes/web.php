@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\RealtimeCheckController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoModeController;
 use App\Http\Controllers\DraftController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\ProjectThoughtController;
 use App\Http\Controllers\ResearchSkillSettingsController;
 use App\Http\Controllers\SharedProjectViewController;
+use App\Http\Controllers\SharedResearchCommentController;
 use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
 use App\Http\Controllers\SkillSettingsController;
@@ -62,6 +64,11 @@ Route::get('/r/{token}', [SharedResearchViewController::class, 'show'])
     ->name('shared-research.show');
 Route::post('/r/{token}', [SharedResearchViewController::class, 'show'])
     ->middleware('throttle:shared-research-password');
+
+// Public guest comments on a shared research view (rate-limited, honeypot-protected)
+Route::post('/r/{token}/comments', [SharedResearchCommentController::class, 'store'])
+    ->middleware('throttle:shared-research-comment')
+    ->name('shared-research.comment');
 
 Route::get('/shared/projects/{token}', [SharedProjectViewController::class, 'hub'])->name('shared-projects.hub');
 Route::post('/shared/projects/{token}', [SharedProjectViewController::class, 'hub'])
@@ -143,6 +150,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('/thoughts/{thought}/sender-rules', [EmailThoughtSenderRuleController::class, 'destroy'])
         ->name('thoughts.sender-rules.destroy');
     Route::post('/thoughts', [IdeaController::class, 'store'])->name('thoughts.store');
+
+    Route::post('/comments', [CommentController::class, 'store'])->name('comments.store');
+    Route::patch('/comments/{comment}', [CommentController::class, 'update'])->name('comments.update');
+    Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->name('comments.destroy');
+
     Route::get('/stream/jira', [IdeaController::class, 'streamJira'])->name('idea.stream.jira');
     Route::get('/stream/emails', [IdeaController::class, 'streamEmails'])->name('idea.stream.emails');
     Route::get('/stream/research', [IdeaController::class, 'streamResearch'])->name('idea.stream.research');

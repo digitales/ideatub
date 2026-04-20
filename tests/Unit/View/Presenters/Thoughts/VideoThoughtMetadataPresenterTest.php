@@ -29,7 +29,7 @@ class VideoThoughtMetadataPresenterTest extends TestCase
                 'tags' => ['video', 'mvp'],
             ],
         ]);
-        $video->setRelation('comments', collect());
+        $video->setRelation('childThoughts', collect());
 
         $rows = VideoThoughtMetadataPresenter::forVideoRoot($video)->labeledRows();
 
@@ -50,7 +50,7 @@ class VideoThoughtMetadataPresenterTest extends TestCase
             'user_id' => $user->id,
             'metadata' => ['type' => 'idea'],
         ]);
-        $thought->setRelation('comments', collect());
+        $thought->setRelation('childThoughts', collect());
 
         $this->assertSame([], VideoThoughtMetadataPresenter::forVideoRoot($thought)->labeledRows());
     }

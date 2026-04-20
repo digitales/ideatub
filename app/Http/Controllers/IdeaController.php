@@ -97,7 +97,7 @@ class IdeaController extends Controller
                     'path' => $request->url(),
                     'query' => $request->query(),
                 ]);
-                $thoughts->getCollection()->load(['comments' => fn ($q) => $q->orderBy('created_at'), 'parent']);
+                $thoughts->getCollection()->load(['childThoughts' => fn ($q) => $q->orderBy('created_at'), 'parent']);
 
                 if ($request->ajax()) {
                     $replyableOffset = (int) $request->input('replyable_offset', 0);
@@ -126,7 +126,7 @@ class IdeaController extends Controller
                 ->topLevel()
                 ->excludingResearch()
                 ->excludingJira()
-                ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+                ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
                 ->orderByDesc('created_at')
                 ->limit(self::RECENT_LIMIT)
                 ->get();
@@ -185,7 +185,7 @@ class IdeaController extends Controller
     {
         $this->authorize('view', $thought);
 
-        $thought->load(['comments' => fn ($q) => $q->orderBy('created_at')]);
+        $thought->load(['childThoughts' => fn ($q) => $q->orderBy('created_at')]);
         $importedEmail = $thought->source === 'email' ? $thought->importedEmail() : null;
         if ($importedEmail !== null) {
             $importedEmail->loadMissing('mailAccount');
@@ -200,7 +200,7 @@ class IdeaController extends Controller
 
         if ($thought->source !== 'email') {
             $contentHtml = $this->renderedThoughtBodyHtml($thought);
-            $sectionThoughts = $thought->comments
+            $sectionThoughts = $thought->childThoughts
                 ->filter(fn (Thought $comment): bool => $this->isStructuredDocumentSection($comment))
                 ->sortBy(fn (Thought $comment): int => (int) data_get($comment->source_metadata, 'section_index', PHP_INT_MAX))
                 ->values();
@@ -368,6 +368,12 @@ class IdeaController extends Controller
             });
         }
 
+        $detailCommentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+            $thought,
+            auth()->user(),
+            null,
+        );
+
         return view('idea.show', [
             'thoughtDetail' => $thoughtDetail,
             'thoughtDetailContentBlocks' => $thoughtDetailContentBlocks,
@@ -377,6 +383,7 @@ class IdeaController extends Controller
             'thoughtIncomingLinks' => $thoughtIncomingLinks,
             'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
             'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
+            'detailCommentsPresenter' => $detailCommentsPresenter,
         ]);
     }
 
@@ -488,14 +495,14 @@ class IdeaController extends Controller
             ->visibleInStream()
             ->topLevel()
             ->excludingJira()
-            ->with(['comments' => fn ($q) => $q->orderBy('created_at')]);
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')]);
 
         if ($canonicalTag !== null) {
             // Include top-level thoughts that have the tag OR that have any child (section) with the tag,
             // so document roots show even if only section thoughts were tagged.
             $query->where(function ($q) use ($canonicalTag) {
                 $q->whereJsonContains('metadata->tags', $canonicalTag)
-                    ->orWhereHas('comments', fn ($cq) => $cq->whereJsonContains('metadata->tags', $canonicalTag));
+                    ->orWhereHas('childThoughts', fn ($cq) => $cq->whereJsonContains('metadata->tags', $canonicalTag));
             });
         } elseif ($tagSlug !== null) {
             $query->whereRaw('0 = 1');
@@ -568,7 +575,7 @@ class IdeaController extends Controller
             ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalSourceType('jira')
-            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
             ->orderByRaw("COALESCE((source_metadata->>'jira_updated_at')::timestamptz, created_at) DESC")
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
@@ -600,7 +607,7 @@ class IdeaController extends Controller
             ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalSourceType('email')
-            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
@@ -632,7 +639,7 @@ class IdeaController extends Controller
                     });
             })
             ->matchingCanonicalMetadataType('research')
-            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
@@ -659,7 +666,7 @@ class IdeaController extends Controller
             ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalMetadataType('plan')
-            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
@@ -686,7 +693,7 @@ class IdeaController extends Controller
             ->visibleInStream()
             ->topLevel()
             ->matchingCanonicalMetadataType('meeting')
-            ->with(['comments' => fn ($q) => $q->orderBy('created_at')])
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
             ->orderByDesc('created_at')
             ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
@@ -1206,7 +1213,7 @@ class IdeaController extends Controller
     {
         $this->authorize('delete', $thought);
 
-        if ($thought->comments()->exists()) {
+        if ($thought->childThoughts()->exists()) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(
                     ['message' => 'This thought has comments. Remove them first.'],
@@ -1360,7 +1367,7 @@ class IdeaController extends Controller
             return redirect()->route('thoughts.show', $thought);
         }
 
-        $sections = $thought->comments()->orderBy('created_at')->get();
+        $sections = $thought->childThoughts()->orderBy('created_at')->get();
         $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
 
         $rootHtml = $this->renderDemoSafeMarkdown(
@@ -1370,6 +1377,8 @@ class IdeaController extends Controller
         );
         $sectionsWithHtml = $sections->map(function (Thought $section) use ($converter) {
             return (object) [
+                'id' => $section->id,
+                'thought' => $section,
                 'content_html' => $this->renderDemoSafeMarkdown(
                     $converter,
                     $section->content,
@@ -1387,15 +1396,24 @@ class IdeaController extends Controller
             50
         );
 
+        $commentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+            $thought,
+            auth()->user(),
+            null,
+        );
+        \App\Models\ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
+
         return view('idea.research_show', [
             'root' => $thought,
             'pageTitle' => $pageTitle,
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
+            'sectionThoughts' => $sections,
             'relatedEmail' => $relatedEmail,
             'linkedVideo' => $linkedVideo,
             'editorialLinkSummaries' => $editorialLinkSummaries,
             'newsletterAnalysis' => $newsletterAnalysis,
+            'commentsPresenter' => $commentsPresenter,
         ]);
     }
 
@@ -1415,7 +1433,7 @@ class IdeaController extends Controller
         $video = Thought::query()
             ->whereKey($rawId)
             ->where('user_id', $researchRoot->user_id)
-            ->with('comments')
+            ->with('childThoughts')
             ->first();
         if ($video === null || data_get($video->metadata, 'type') !== 'video') {
             return null;
@@ -1812,7 +1830,7 @@ class IdeaController extends Controller
             $documentRoot->content,
             $rootContext
         );
-        $sections = $documentRoot->comments()->orderBy('created_at')->get();
+        $sections = $documentRoot->childThoughts()->orderBy('created_at')->get();
         $sectionHtmlChunks = $sections->take(2)->map(function (Thought $section) use ($converter, $sectionContext) {
             return $this->renderDemoSafeMarkdown(
                 $converter,

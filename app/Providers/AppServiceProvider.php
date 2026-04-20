@@ -9,6 +9,7 @@ use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
@@ -47,6 +48,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Relation::enforceMorphMap([
+            'thought' => \App\Models\Thought::class,
+            'project' => \App\Models\Project::class,
+        ]);
+
         RateLimiter::for('login', function (Request $request) {
             return [
                 Limit::perMinute(5)->by($request->ip()),
@@ -58,6 +64,13 @@ class AppServiceProvider extends ServiceProvider
             $token = $request->route('token') ?? 'unknown';
 
             return Limit::perMinutes(15, 10)->by($token.':'.$request->ip());
+        });
+
+        RateLimiter::for('shared-research-comment', function (Request $request) {
+            return [
+                Limit::perMinute(5)->by($request->ip()),
+                Limit::perHour(30)->by($request->ip()),
+            ];
         });
 
         RateLimiter::for('project-share-password', function (Request $request) {

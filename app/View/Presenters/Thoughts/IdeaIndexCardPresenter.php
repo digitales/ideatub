@@ -30,7 +30,7 @@ final class IdeaIndexCardPresenter
         private readonly ?NewsletterResearchStatusPresenter $newsletterResearchStatus,
         private readonly ?string $videoLatestResearchUrl,
     ) {
-        $this->requireRelationLoaded($this->thought, 'comments');
+        $this->requireRelationLoaded($this->thought, 'childThoughts');
         if ($this->thought->parent_id !== null) {
             $this->requireRelationLoaded($this->thought, 'parent');
         }
@@ -109,7 +109,7 @@ final class IdeaIndexCardPresenter
      */
     public function commentPreviewRows(): array
     {
-        return $this->thought->comments
+        return $this->thought->childThoughts
             ->map(function (Thought $comment): array {
                 $raw = Str::limit($comment->content, 200);
                 $content = $this->obfuscatedOrRaw($raw, 'thought_comment_preview', 'idea_index_card_presenter.comment_preview');

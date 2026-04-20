@@ -18,7 +18,7 @@ class ViewPresenterQueryBudgetTest extends TestCase
     /** Rows seeded for list-style routes (matches typical page size ~20) so per-row lazy loads blow the budget. */
     private const LIST_ROW_COUNT = 20;
 
-    /** Reply thoughts under the email detail fixture; show view iterates `@foreach ($thought->comments)`. */
+    /** Reply thoughts under the email detail fixture; show view iterates `@foreach ($thought->childThoughts)`. */
     private const EMAIL_DETAIL_REPLY_COUNT = 15;
 
     /**

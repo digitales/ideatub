@@ -107,6 +107,15 @@
         @endif
     </div>
 
-    @include('idea.partials.thought_detail_replies', ['thoughtDetail' => $thoughtDetail])
+    @include('comments._thread', [
+        'rows' => $detailCommentsPresenter->pageLevelRows(),
+        'formAction' => route('comments.store'),
+        'commentableType' => 'thought',
+        'commentableId' => $thoughtDetail->thought()->id,
+        'mode' => 'owner',
+        'disabledMessage' => $detailCommentsPresenter->canCommentOnPage() ? null : 'Comments are disabled.',
+        'title' => 'Comments',
+        'showControls' => true,
+    ])
 </div>
 @endsection
