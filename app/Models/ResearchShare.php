@@ -22,6 +22,7 @@ class ResearchShare extends Model
         'token',
         'password_hash',
         'expires_at',
+        'allow_comments',
     ];
 
     /**
@@ -33,6 +34,7 @@ class ResearchShare extends Model
     {
         return [
             'expires_at' => 'datetime',
+            'allow_comments' => 'bool',
         ];
     }
 
