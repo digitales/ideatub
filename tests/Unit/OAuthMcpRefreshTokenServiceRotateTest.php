@@ -187,4 +187,52 @@ class OAuthMcpRefreshTokenServiceRotateTest extends TestCase
             Request::create('/oauth/token', 'POST'),
         );
     }
+
+    public function test_rotate_caps_new_expires_at_at_absolute_lifetime(): void
+    {
+        // Move the absolute cap to just 60 seconds from now, well below the 30-day rolling TTL.
+        $this->family->update(['absolute_expires_at' => now()->addSeconds(60)]);
+
+        $result = $this->service->rotate(
+            $this->rawToken,
+            $this->client->id,
+            'https://example.test/api/mcp',
+            null,
+            Request::create('/oauth/token', 'POST'),
+        );
+
+        $newHash = hash('sha256', $result['raw']);
+        $newToken = OauthMcpRefreshToken::where('token_hash', $newHash)->firstOrFail();
+
+        // New expires_at must NOT exceed the family's absolute cap.
+        $this->assertTrue(
+            $newToken->expires_at->lte($this->family->fresh()->absolute_expires_at),
+            'new token expires_at should be capped at family.absolute_expires_at'
+        );
+        // And should be close to the cap, not to now+30d.
+        $this->assertTrue(
+            $newToken->expires_at->gt(now()->addSeconds(30)),
+            'new token expires_at should still be slightly in the future'
+        );
+        $this->assertTrue(
+            $newToken->expires_at->lt(now()->addDays(1)),
+            'new token expires_at should not be 30 days out when cap is 60s out'
+        );
+    }
+
+    public function test_rotate_fails_after_absolute_expiry(): void
+    {
+        $this->family->update(['absolute_expires_at' => now()->subSecond()]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('invalid_grant');
+
+        $this->service->rotate(
+            $this->rawToken,
+            $this->client->id,
+            'https://example.test/api/mcp',
+            null,
+            Request::create('/oauth/token', 'POST'),
+        );
+    }
 }

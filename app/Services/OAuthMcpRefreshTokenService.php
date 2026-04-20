@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OAuthMcpRefreshTokenService
@@ -91,6 +92,11 @@ class OAuthMcpRefreshTokenService
 
             if ($token->used_at !== null) {
                 // Reuse detected — burn the family and commit that revocation before raising.
+                Log::warning('oauth.mcp.refresh.reuse_detected', [
+                    'family_id' => $family->id,
+                    'user_id' => $family->user_id,
+                    'client_id' => $family->client_id,
+                ]);
                 $this->revokeFamily($family, 'reuse_detected');
                 DB::commit();
                 throw new \RuntimeException('invalid_grant');
@@ -140,6 +146,11 @@ class OAuthMcpRefreshTokenService
                 'ip_address' => $request->ip() ?? $family->ip_address,
             ]);
 
+            Log::info('oauth.mcp.refresh.success', [
+                'family_id' => $family->id,
+                'user_id' => $family->user_id,
+                'client_id' => $family->client_id,
+            ]);
             DB::commit();
 
             return [
