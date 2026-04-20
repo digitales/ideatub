@@ -32,6 +32,7 @@ use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\ProjectThoughtController;
 use App\Http\Controllers\ResearchSkillSettingsController;
 use App\Http\Controllers\SharedProjectViewController;
+use App\Http\Controllers\SharedResearchCommentController;
 use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
 use App\Http\Controllers\SkillSettingsController;
@@ -63,6 +64,11 @@ Route::get('/r/{token}', [SharedResearchViewController::class, 'show'])
     ->name('shared-research.show');
 Route::post('/r/{token}', [SharedResearchViewController::class, 'show'])
     ->middleware('throttle:shared-research-password');
+
+// Public guest comments on a shared research view (rate-limited, honeypot-protected)
+Route::post('/r/{token}/comments', [SharedResearchCommentController::class, 'store'])
+    ->middleware('throttle:shared-research-comment')
+    ->name('shared-research.comment');
 
 Route::get('/shared/projects/{token}', [SharedProjectViewController::class, 'hub'])->name('shared-projects.hub');
 Route::post('/shared/projects/{token}', [SharedProjectViewController::class, 'hub'])

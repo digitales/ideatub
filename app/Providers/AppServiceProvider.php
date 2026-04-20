@@ -66,6 +66,13 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinutes(15, 10)->by($token.':'.$request->ip());
         });
 
+        RateLimiter::for('shared-research-comment', function (Request $request) {
+            return [
+                Limit::perMinute(5)->by($request->ip()),
+                Limit::perHour(30)->by($request->ip()),
+            ];
+        });
+
         RateLimiter::for('project-share-password', function (Request $request) {
             $token = $request->route('token') ?? 'unknown';
 
