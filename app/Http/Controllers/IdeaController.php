@@ -1370,6 +1370,7 @@ class IdeaController extends Controller
         );
         $sectionsWithHtml = $sections->map(function (Thought $section) use ($converter) {
             return (object) [
+                'id' => $section->id,
                 'content_html' => $this->renderDemoSafeMarkdown(
                     $converter,
                     $section->content,
@@ -1387,15 +1388,24 @@ class IdeaController extends Controller
             50
         );
 
+        $commentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+            $thought,
+            auth()->user(),
+            null,
+        );
+        \App\Models\ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
+
         return view('idea.research_show', [
             'root' => $thought,
             'pageTitle' => $pageTitle,
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
+            'sectionThoughts' => $sections,
             'relatedEmail' => $relatedEmail,
             'linkedVideo' => $linkedVideo,
             'editorialLinkSummaries' => $editorialLinkSummaries,
             'newsletterAnalysis' => $newsletterAnalysis,
+            'commentsPresenter' => $commentsPresenter,
         ]);
     }
 

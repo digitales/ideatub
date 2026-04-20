@@ -41,5 +41,24 @@
             'sections' => $sections,
         ])
     </div>
+    @if(isset($commentsPresenter))
+        @if($commentsPresenter->unreadCount() > 0)
+            <p class="mt-6 text-[12px] font-semibold text-memory-violet">
+                {{ $commentsPresenter->unreadCount() }} new comment(s) since your last visit.
+            </p>
+        @endif
+        <div class="mt-8">
+            @include('comments._thread', [
+                'rows' => $commentsPresenter->pageLevelRows(),
+                'formAction' => route('comments.store'),
+                'commentableType' => 'thought',
+                'commentableId' => $root->id,
+                'mode' => 'owner',
+                'disabledMessage' => $commentsPresenter->canCommentOnPage() ? null : 'Comments are disabled.',
+                'title' => 'Comments',
+                'showControls' => true,
+            ])
+        </div>
+    @endif
 </div>
 @endsection
