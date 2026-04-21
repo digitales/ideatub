@@ -29,7 +29,11 @@ return [
 
     'authorization_code_ttl_seconds' => 600, // 10 minutes
 
-    'access_token_ttl_seconds' => 3600, // 1 hour
+    'access_token_ttl_seconds' => (int) env('OAUTH_MCP_ACCESS_TOKEN_TTL', 3600),
+
+    'refresh_token_ttl_seconds' => (int) env('OAUTH_MCP_REFRESH_TOKEN_TTL', 60 * 60 * 24 * 30),
+
+    'refresh_token_absolute_lifetime_seconds' => (int) env('OAUTH_MCP_REFRESH_TOKEN_ABSOLUTE_LIFETIME', 60 * 60 * 24 * 90),
 
     /*
     | Keys: use PEM files locally, or B64/inline PEM env vars on ephemeral hosts (Laravel Cloud, etc.).

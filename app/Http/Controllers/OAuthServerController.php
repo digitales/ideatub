@@ -14,7 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
 class OAuthServerController extends Controller
 {
     public function __construct(
-        private OAuthMcpJwtService $jwt
+        private OAuthMcpJwtService $jwt,
+        private \App\Services\OAuthMcpRefreshTokenService $refreshTokens,
     ) {}
 
     /**
@@ -86,9 +87,50 @@ class OAuthServerController extends Controller
     }
 
     /**
-     * Token endpoint — exchange code for access token.
+     * Token endpoint — dispatches to the correct grant handler.
      */
     public function token(Request $request): Response
+    {
+        $grantType = (string) $request->input('grant_type');
+
+        if ($grantType === 'authorization_code') {
+            return $this->tokenAuthorizationCode($request);
+        }
+
+        if ($grantType === 'refresh_token') {
+            return $this->tokenRefresh($request);
+        }
+
+        return response()->json([
+            'error' => 'unsupported_grant_type',
+        ], 400);
+    }
+
+    /**
+     * RFC 7009 OAuth 2.0 Token Revocation.
+     * Always returns 200 regardless of whether the token existed.
+     */
+    public function revoke(Request $request): Response
+    {
+        $request->validate([
+            'token' => 'required|string',
+            'client_id' => 'required|string',
+            'token_type_hint' => 'nullable|in:refresh_token,access_token',
+        ]);
+
+        $hint = (string) $request->input('token_type_hint', 'refresh_token');
+        if ($hint === 'refresh_token') {
+            $this->refreshTokens->revokeByRawToken(
+                (string) $request->input('token'),
+                'user',
+                (string) $request->input('client_id'),
+            );
+        }
+
+        return response()->json([], 200);
+    }
+
+    private function tokenAuthorizationCode(Request $request): Response
     {
         $request->validate([
             'grant_type' => 'required|in:authorization_code',
@@ -128,11 +170,58 @@ class OAuthServerController extends Controller
 
         $accessToken = $this->jwt->issueAccessToken($code->user, $request->resource);
 
+        $issued = $this->refreshTokens->issueForCodeExchange(
+            $code->user,
+            $code->client,
+            (string) $request->resource,
+            $code->scope ?? config('oauth-mcp.scope'),
+            $request,
+        );
+
         return response()->json([
             'access_token' => $accessToken,
             'token_type' => 'Bearer',
             'expires_in' => config('oauth-mcp.access_token_ttl_seconds', 3600),
+            'refresh_token' => $issued['raw'],
             'scope' => $code->scope ?? config('oauth-mcp.scope'),
+        ]);
+    }
+
+    private function tokenRefresh(Request $request): Response
+    {
+        $request->validate([
+            'grant_type' => 'required|in:refresh_token',
+            'refresh_token' => 'required|string',
+            'client_id' => 'required|string',
+            'resource' => 'required|url',
+            'scope' => 'nullable|string',
+        ]);
+
+        try {
+            $result = $this->refreshTokens->rotate(
+                (string) $request->input('refresh_token'),
+                (string) $request->input('client_id'),
+                (string) $request->input('resource'),
+                $request->input('scope'),
+                $request,
+            );
+        } catch (\RuntimeException $e) {
+            $error = $e->getMessage();
+            if (! in_array($error, ['invalid_grant', 'invalid_scope'], true)) {
+                $error = 'invalid_grant';
+            }
+
+            return response()->json(['error' => $error], 400);
+        }
+
+        $accessToken = $this->jwt->issueAccessToken($result['user'], $result['resource']);
+
+        return response()->json([
+            'access_token' => $accessToken,
+            'token_type' => 'Bearer',
+            'expires_in' => config('oauth-mcp.access_token_ttl_seconds', 3600),
+            'refresh_token' => $result['raw'],
+            'scope' => $result['scope'] ?? config('oauth-mcp.scope'),
         ]);
     }
 
