@@ -43,9 +43,9 @@
         ])
     </div>
     @if(isset($commentsPresenter))
-        @if($commentsPresenter->unreadCount() > 0)
+        @if(($researchUnreadBannerCount ?? 0) > 0)
             <p class="mt-6 text-[12px] font-semibold text-memory-violet">
-                {{ $commentsPresenter->unreadCount() }} new comment(s) since your last visit.
+                {{ $researchUnreadBannerCount }} new comment(s) since your last visit.
             </p>
         @endif
         <div class="mt-8">

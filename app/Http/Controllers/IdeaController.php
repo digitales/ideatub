@@ -1405,6 +1405,7 @@ class IdeaController extends Controller
             auth()->user(),
             null,
         );
+        $researchUnreadBannerCount = $commentsPresenter->unreadCount();
         ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
 
         return view('idea.research_show', [
@@ -1419,6 +1420,7 @@ class IdeaController extends Controller
             'newsletterAnalysis' => $newsletterAnalysis,
             'commentsPresenter' => $commentsPresenter,
             'researchContentComments' => ResearchContentCommentsViewData::none(),
+            'researchUnreadBannerCount' => $researchUnreadBannerCount,
         ]);
     }
 

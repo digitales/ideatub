@@ -1,7 +1,7 @@
 # IdeaTub — Research unread comment count (denormalized + reconcile)
 
 **Date:** 2026-04-21  
-**Status:** Draft (awaiting review)  
+**Status:** Implemented  
 **Scope:** Replace per-request SQL recomputation of research document unread comment counts with a stored **`unread_count`** on **`thought_comment_reads`**, maintained on comment create/delete with parity to current rules, plus a **scheduled reconcile** job to correct drift.
 
 ## Overview

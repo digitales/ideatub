@@ -3,7 +3,11 @@
 namespace App\Providers;
 
 use App\Contracts\EvernoteApiGateway;
+use App\Models\Comment;
 use App\Models\InboxItem;
+use App\Models\Project;
+use App\Models\Thought;
+use App\Observers\CommentObserver;
 use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
@@ -48,9 +52,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Comment::observe(CommentObserver::class);
+
         Relation::enforceMorphMap([
-            'thought' => \App\Models\Thought::class,
-            'project' => \App\Models\Project::class,
+            'thought' => Thought::class,
+            'project' => Project::class,
         ]);
 
         RateLimiter::for('login', function (Request $request) {
