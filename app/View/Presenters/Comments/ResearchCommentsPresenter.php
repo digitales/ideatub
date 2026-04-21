@@ -82,6 +82,40 @@ class ResearchCommentsPresenter
     }
 
     /**
+     * Props for `comments._thread` include.
+     *
+     * @return array{
+     *     rows: array<int, array<string, mixed>>,
+     *     formAction: string,
+     *     commentableType: string,
+     *     commentableId: string,
+     *     mode: string,
+     *     disabledMessage: string|null,
+     *     title: string,
+     *     showControls: bool
+     * }
+     */
+    public function threadIncludeForSection(
+        Thought $section,
+        string $formAction,
+        string $mode,
+        bool $showControls,
+        string $title,
+        ?string $disabledMessage = null,
+    ): array {
+        return [
+            'rows' => $this->sectionRowsFor($section),
+            'formAction' => $formAction,
+            'commentableType' => 'thought',
+            'commentableId' => (string) $section->id,
+            'mode' => $mode,
+            'disabledMessage' => $disabledMessage,
+            'title' => $title,
+            'showControls' => $showControls,
+        ];
+    }
+
+    /**
      * @param  array<int, string>  $ids
      * @return array<int, array<string, mixed>>
      */
