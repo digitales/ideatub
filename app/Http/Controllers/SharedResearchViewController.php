@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\ResearchShare;
 use App\Models\Thought;
+use App\Support\Comments\ShareContext;
 use App\Support\ThoughtTypeNavigation;
+use App\View\Presenters\Comments\ResearchCommentsPresenter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use League\CommonMark\CommonMarkConverter;
 
@@ -94,25 +97,73 @@ class SharedResearchViewController extends Controller
 
         $share->load('user');
 
-        $shareContext = new \App\Support\Comments\ShareContext(
+        $shareContext = new ShareContext(
             researchThoughtId: $thought->id,
             shareId: $share->id,
             allowComments: (bool) $share->allow_comments,
         );
-        $commentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+        $commentsPresenter = new ResearchCommentsPresenter(
             $thought,
             null,
             $shareContext,
         );
 
+        $guestDisabled = $commentsPresenter->allowGuestComments()
+            ? null
+            : 'Comments are disabled on this share.';
+        $commentFormAction = route('shared-research.comment', $share->token);
+
+        $sharedResearchSectionComments = $sectionsWithHtml->map(
+            function (object $section) use ($commentsPresenter, $commentFormAction, $guestDisabled): array {
+                $thought = $section->thought ?? null;
+                if ($thought === null) {
+                    return [
+                        'id' => $section->id ?? null,
+                        'content_html' => $section->content_html,
+                        'details_thread_include' => null,
+                        'comment_summary' => null,
+                    ];
+                }
+
+                $detailsInclude = $commentsPresenter->threadIncludeForSection(
+                    $thought,
+                    $commentFormAction,
+                    'guest',
+                    false,
+                    'Section comments',
+                    $guestDisabled,
+                );
+                $count = count($detailsInclude['rows']);
+
+                return [
+                    'id' => $section->id ?? null,
+                    'content_html' => $section->content_html,
+                    'details_thread_include' => $detailsInclude,
+                    'comment_summary' => [
+                        'count' => $count,
+                        'label' => Str::plural('comment', $count),
+                    ],
+                ];
+            }
+        );
+
+        $pageThreadInclude = $commentsPresenter->threadIncludeForSection(
+            $thought,
+            $commentFormAction,
+            'guest',
+            false,
+            'Comments',
+            $guestDisabled,
+        );
+
         return view('shared_research.readonly', [
             'root' => $thought,
             'root_html' => $rootHtml,
-            'sections' => $sectionsWithHtml,
             'sharedBy' => $share->user,
             'documentTypeLabel' => $this->documentTypeLabelForSharedView($thought),
             'share' => $share,
-            'commentsPresenter' => $commentsPresenter,
+            'sharedResearchSectionComments' => $sharedResearchSectionComments,
+            'pageThreadInclude' => $pageThreadInclude,
         ]);
     }
 

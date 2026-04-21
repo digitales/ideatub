@@ -6,13 +6,9 @@
     $commentableId (string)
     $mode ('owner' | 'guest')
     $disabledMessage (string|null)
-    $title (string, default 'Comments')
-    $showControls (bool, default true)
+    $title (string) — required (callers must pass explicitly)
+    $showControls (bool) — required
 --}}
-@php
-    $title = $title ?? 'Comments';
-    $showControls = $showControls ?? true;
-@endphp
 <section class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
     <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80">{{ $title }}</p>
     @if (count($rows) > 0)

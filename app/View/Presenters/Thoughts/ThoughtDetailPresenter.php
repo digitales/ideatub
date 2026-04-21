@@ -12,6 +12,7 @@ use App\Services\Video\VideoTranscriptAggregator;
 use App\View\Presenters\Concerns\ObfuscatesDemoText;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -474,6 +475,47 @@ final class ThoughtDetailPresenter
         return $this->videoResearchPreview;
     }
 
+    public function videoResearchPreviewSections(): Collection
+    {
+        return $this->mapResearchPreviewToSections($this->videoResearchPreview());
+    }
+
+    public function emailResearchPreviewSections(): Collection
+    {
+        return $this->mapResearchPreviewToSections($this->emailResearchPreview());
+    }
+
+    /**
+     * @param  array{tags?: mixed}|null  $preview
+     * @return list<string>
+     */
+    public function researchPreviewTagList(?array $preview): array
+    {
+        if ($preview === null) {
+            return [];
+        }
+        $tags = $preview['tags'] ?? [];
+        if (! is_array($tags)) {
+            return [];
+        }
+
+        return $tags;
+    }
+
+    /**
+     * @param  array{section_html_chunks?: array<int, string>}|null  $preview
+     */
+    private function mapResearchPreviewToSections(?array $preview): Collection
+    {
+        if ($preview === null) {
+            return collect();
+        }
+
+        return collect($preview['section_html_chunks'] ?? [])->map(
+            fn (string $html) => (object) ['content_html' => $html]
+        );
+    }
+
     public function newsletterResearchStatus(): ?NewsletterResearchStatusPresenter
     {
         return $this->newsletterResearchStatus;
@@ -548,5 +590,4 @@ final class ThoughtDetailPresenter
             ]
         );
     }
-
 }

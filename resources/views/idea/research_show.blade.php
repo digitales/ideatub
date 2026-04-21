@@ -39,6 +39,7 @@
         @include('idea.partials.research_content', [
             'root_html' => $root_html,
             'sections' => $sections,
+            'researchContentComments' => $researchContentComments,
         ])
     </div>
     @if(isset($commentsPresenter))

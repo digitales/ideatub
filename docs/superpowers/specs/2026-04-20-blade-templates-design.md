@@ -1,7 +1,7 @@
 # IdeaTub — Clean Blade templates (no logic in views)
 
 **Date:** 2026-04-20  
-**Status:** Draft (awaiting review)  
+**Status:** Implemented (see [`docs/superpowers/plans/2026-04-20-blade-templates-cleanup.md`](../plans/2026-04-20-blade-templates-cleanup.md))  
 **Scope:** Systematic refactor of idea, research, and shared-research Blade views so templates avoid PHP variable assignment, default merging, and presenter calls inside loops. Aligns with existing `App\View\Presenters` usage.
 
 ## Overview
