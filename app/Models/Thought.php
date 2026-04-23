@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Pgvector\Laravel\Distance;
 use Pgvector\Laravel\HasNeighbors;
@@ -287,12 +288,64 @@ class Thought extends Model implements Commentable
     }
 
     /**
+     * Child thoughts that belong to a microsite (same as {@see childThoughts()}; no SQL ordering).
+     * Use {@see micrositePageChildrenInOrder()} for nav and other display order.
+     *
      * @return HasMany<Thought, $this>
      */
     public function childThoughtsForMicrosite(): HasMany
     {
-        return $this->childThoughts()
-            ->orderBy('source_metadata->import_order', 'asc');
+        return $this->childThoughts();
+    }
+
+    /**
+     * Microsite child pages ordered by numeric `import_order` in `source_metadata` (1, 2, … 10, 11), not string sort.
+     *
+     * @return Collection<int, Thought>
+     */
+    public function micrositePageChildrenInOrder(): Collection
+    {
+        return self::sortByMicrositeImportOrder(
+            $this->childThoughtsForMicrosite()->get()
+        );
+    }
+
+    /**
+     * @param  Collection<int, Thought>  $thoughts
+     * @return Collection<int, Thought>
+     */
+    public static function sortByMicrositeImportOrder(Collection $thoughts): Collection
+    {
+        return $thoughts
+            ->sort(function (Thought $a, Thought $b) {
+                $o = self::micrositeImportOrderAsInt($a)
+                    <=> self::micrositeImportOrderAsInt($b);
+                if ($o !== 0) {
+                    return $o;
+                }
+
+                return strcmp((string) $a->id, (string) $b->id);
+            })
+            ->values();
+    }
+
+    private static function micrositeImportOrderAsInt(Thought $t): int
+    {
+        $o = data_get($t->source_metadata, 'import_order');
+        if ($o === null || $o === '') {
+            return 2147483646;
+        }
+        if (is_int($o)) {
+            return $o;
+        }
+        if (is_float($o)) {
+            return (int) $o;
+        }
+        if (is_string($o) && is_numeric($o)) {
+            return (int) $o;
+        }
+
+        return 2147483646;
     }
 
     /**

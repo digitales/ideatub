@@ -266,6 +266,83 @@ class ResearchShowTest extends TestCase
         ]));
     }
 
+    public function test_research_show_microsite_nav_sorts_by_numeric_import_order_not_string_order(): void
+    {
+        $user = User::factory()->create();
+        $root = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => "# Home index\n\nIndex body.",
+            'source_metadata' => [
+                'document_layout' => 'microsite',
+                'page_path_segment' => 'index',
+                'import_order' => 0,
+            ],
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $root->id,
+            'content' => '# Zebra ten',
+            'source_metadata' => [
+                'document_layout' => 'microsite',
+                'page_path_segment' => 'p10',
+                'import_order' => '10',
+                'microsite_root_id' => (string) $root->id,
+            ],
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $root->id,
+            'content' => '# Alpha one',
+            'source_metadata' => [
+                'document_layout' => 'microsite',
+                'page_path_segment' => 'p1',
+                'import_order' => '1',
+                'microsite_root_id' => (string) $root->id,
+            ],
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $root->id,
+            'content' => '# Beta two',
+            'source_metadata' => [
+                'document_layout' => 'microsite',
+                'page_path_segment' => 'p2',
+                'import_order' => '2',
+                'microsite_root_id' => (string) $root->id,
+            ],
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.research.show', $root));
+        $response->assertOk();
+        $response->assertSeeInOrder(
+            [
+                'Home index',
+                'Alpha one',
+                'Beta two',
+                'Zebra ten',
+            ],
+            false
+        );
+    }
+
     public function test_research_show_returns_403_for_other_users_thought(): void
     {
         $owner = User::factory()->create();

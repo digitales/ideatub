@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+
 class SharedResearchViewController extends Controller
 {
     public function show(Request $request, string $token): View|RedirectResponse|Response
@@ -182,7 +183,7 @@ class SharedResearchViewController extends Controller
         $converter = SafeCommonMarkConverter::make();
         $html = $converter->convert($active->content)->getContent();
         $html = MicrositeSharedUrlHelper::rewriteInAppQueryLinksInHtmlForShare($html, $share->token);
-        $pages = collect([$root])->merge($root->childThoughtsForMicrosite()->get());
+        $pages = collect([$root])->merge($root->micrositePageChildrenInOrder());
         $micrositeNav = $this->buildMicrositeNav($share, $pages, $active);
         $commentFormAction = route('shared-research.comment', $share->token);
         $shareContext = new ShareContext(

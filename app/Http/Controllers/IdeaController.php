@@ -24,10 +24,10 @@ use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
-use App\Support\SafeCommonMarkConverter;
 use App\Support\IdeaCompletedAtSql;
 use App\Support\Research\MicrositeInAppPathHelper;
 use App\Support\Research\MicrositePageLabel;
+use App\Support\SafeCommonMarkConverter;
 use App\Support\TagSlug;
 use App\View\Presenters\Comments\ResearchCommentsPresenter;
 use App\View\Presenters\Email\EmailMetadataPresenter;
@@ -1910,7 +1910,7 @@ class IdeaController extends Controller
     private function buildInAppMicrositeNav(Thought $root, Thought $active): Collection
     {
         $all = collect([$root])
-            ->merge($root->childThoughtsForMicrosite()->get());
+            ->merge($root->micrositePageChildrenInOrder());
 
         return $all
             ->map(function (Thought $t) use ($root, $active) {
