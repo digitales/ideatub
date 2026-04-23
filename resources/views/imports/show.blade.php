@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="max-w-3xl mx-auto px-6 py-10"
-     x-data="importBatch('{{ $batch->id }}', '{{ route('imports.status', $batch) }}', {{ (int) $batch->file_count }})"
+     x-data="importBatch('{{ $batch->id }}', '{{ route('imports.status', $batch) }}', {{ (int) $batch->file_count }}, {{ (int) data_get($batch->options, 'local_asset_ref_count', 0) }})"
      @if (session('success')) data-flash="{{ e(session('success')) }}" @endif
 >
     @if (session('success'))
@@ -15,11 +15,29 @@
 
     <header class="mb-6" aria-live="polite" role="status">
         <h1 class="text-xl font-semibold text-deep-indigo">
-            Importing {{ $batch->root_folder_name ?? 'files' }}
+            @if (data_get($batch->options, 'import_kind') === 'microsite')
+                Importing research site — {{ $batch->root_folder_name ?? 'files' }}
+            @else
+                Importing {{ $batch->root_folder_name ?? 'files' }}
+            @endif
         </h1>
+        @if (data_get($batch->options, 'import_kind') === 'microsite')
+            <p class="text-sm text-slate-brand mt-1">
+                Numbered markdown site: <strong>{{ (int) $batch->file_count }} pages</strong> (one thought per file). Chunking is off for this batch.
+            </p>
+        @endif
         <p class="text-sm text-slate-brand mt-1">
             <span x-text="processedCount"></span> / {{ (int) $batch->file_count }} processed · Status <span x-text="batchStatus"></span>
         </p>
+        <div
+            x-show="localAssetRefCount &gt; 0"
+            x-cloak
+            class="mt-2 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-sm text-amber-950/90"
+            role="status"
+        >
+            <span class="font-medium">Local image references in source (not included in v1):</span>
+            <span x-text="localAssetRefCount"></span> — the pages were saved as text only.
+        </div>
         <div class="mt-3 w-full h-2 bg-memory-violet/10 rounded" aria-hidden="true">
             <div class="h-2 bg-memory-violet rounded transition-all" :style="`width: ${progressWidth}%`"></div>
         </div>
@@ -48,11 +66,12 @@
 
 @push('scripts')
 <script>
-function importBatch(batchId, statusUrl, fileCount) {
+function importBatch(batchId, statusUrl, fileCount, initialLocalAssets) {
     return {
         batchStatus: @json($batch->status),
         processedCount: 0,
         fileCount: fileCount,
+        localAssetRefCount: typeof initialLocalAssets === 'number' ? initialLocalAssets : 0,
         files: @json($batch->files->map(fn ($f) => [
             'id' => $f->id, 'relative_path' => $f->relative_path, 'status' => $f->status,
         ])->values()),
@@ -101,6 +120,9 @@ function importBatch(batchId, statusUrl, fileCount) {
                         : (this.files || []).filter(
                             f => f.status && f.status !== 'pending' && f.status !== 'processing',
                         ).length;
+                    if (data.batch && data.batch.local_asset_ref_count != null) {
+                        this.localAssetRefCount = data.batch.local_asset_ref_count;
+                    }
                 }
             } catch (e) { /* ignore */ }
             if (!this.terminal(this.batchStatus)) {

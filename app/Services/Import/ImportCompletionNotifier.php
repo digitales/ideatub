@@ -77,6 +77,16 @@ class ImportCompletionNotifier
 
     private function title(ImportBatch $batch): string
     {
+        if ($batch->isMicrositeImport()) {
+            $n = (int) $batch->processed_count;
+            $name = $batch->root_folder_name ?? 'files';
+            if ($batch->failed_count > 0) {
+                return "Research site: {$n} pages — {$name} ({$batch->failed_count} failed)";
+            }
+
+            return "Research site: {$n} pages — {$name}";
+        }
+
         $name = $batch->root_folder_name ?? 'files';
 
         return "Imported {$name} — {$batch->processed_count} thoughts".($batch->failed_count > 0 ? ", {$batch->failed_count} failed" : '');
@@ -84,6 +94,24 @@ class ImportCompletionNotifier
 
     private function body(ImportBatch $batch): string
     {
+        if ($batch->isMicrositeImport()) {
+            $lines = [
+                '**Research site** (numbered markdown site): **'.(int) $batch->file_count."** page files, **{$batch->processed_count}** pages created.",
+            ];
+            if ($batch->localAssetRefCount() > 0) {
+                $c = $batch->localAssetRefCount();
+                $lines[] = "- **{$c}** local image references in the source files; images are not included in this import (v1).";
+            }
+            if ($batch->failed_count > 0) {
+                $lines[] = "- {$batch->failed_count} failed";
+            }
+            if ($batch->skipped_count > 0) {
+                $lines[] = "- {$batch->skipped_count} skipped as duplicates";
+            }
+
+            return implode("\n", $lines);
+        }
+
         $lines = ["Imported **{$batch->file_count}** files.", "- {$batch->processed_count} thoughts created"];
         if ($batch->failed_count > 0) {
             $lines[] = "- {$batch->failed_count} failed";

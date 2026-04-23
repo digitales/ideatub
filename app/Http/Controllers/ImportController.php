@@ -198,6 +198,8 @@ class ImportController extends Controller
                 'failed_count' => $batch->failed_count,
                 'skipped_count' => $batch->skipped_count,
                 'file_count' => $batch->file_count,
+                'import_kind' => data_get($batch->options, 'import_kind'),
+                'local_asset_ref_count' => (int) data_get($batch->options, 'local_asset_ref_count', 0),
             ],
             'files' => $batch->files->map(fn (ImportBatchFile $f) => [
                 'id' => $f->id,

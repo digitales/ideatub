@@ -6,7 +6,7 @@
 <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 md:p-8 shadow-[0_4px_24px_rgba(109,106,247,0.08)] max-w-md mx-auto">
     <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-2">Protected</p>
     <h2 class="text-lg font-semibold text-deep-indigo mb-4">Enter password to view</h2>
-    <form method="POST" action="{{ route('shared-research.show', $token) }}" class="space-y-4">
+    <form method="POST" action="{{ $formAction ?? route('shared-research.show', $token) }}" class="space-y-4">
         @csrf
         <div>
             <label for="password" class="block text-sm font-medium text-deep-indigo mb-1">Password</label>

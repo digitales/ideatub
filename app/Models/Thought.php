@@ -240,6 +240,44 @@ class Thought extends Model implements Commentable
         return $this->hasMany(Thought::class, 'parent_id');
     }
 
+    public function isMicrositeDocumentLayout(): bool
+    {
+        return data_get($this->source_metadata, 'document_layout') === 'microsite';
+    }
+
+    public function isMicrositeRoot(): bool
+    {
+        return $this->isMicrositeDocumentLayout() && $this->parent_id === null;
+    }
+
+    /**
+     * @return HasMany<Thought, $this>
+     */
+    public function childThoughtsForMicrosite(): HasMany
+    {
+        return $this->childThoughts()
+            ->orderBy('source_metadata->import_order', 'asc');
+    }
+
+    /**
+     * @param  ?string  $pagePathSegment  from query or shared URL; null/empty = index (this root)
+     */
+    public function findMicrositePageByPathSegment(?string $pagePathSegment): ?Thought
+    {
+        if ($pagePathSegment === null || $pagePathSegment === '') {
+            return $this;
+        }
+        if ((string) data_get($this->source_metadata, 'page_path_segment') === $pagePathSegment) {
+            return $this;
+        }
+
+        return $this->childThoughtsForMicrosite()
+            ->get()
+            ->first(
+                fn (Thought $c) => (string) data_get($c->source_metadata, 'page_path_segment') === $pagePathSegment
+            );
+    }
+
     /**
      * @return BelongsToMany<Project, $this>
      */
