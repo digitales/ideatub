@@ -21,6 +21,9 @@ class ImportStagingStore
     public function readStaged(ImportBatch $batch, ImportBatchFile $row): string
     {
         $path = $batch->staging_path.'/'.$row->id;
+        if (! Storage::disk('local')->exists($path)) {
+            return '';
+        }
 
         return (string) Storage::disk('local')->get($path);
     }
