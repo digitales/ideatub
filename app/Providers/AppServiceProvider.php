@@ -67,6 +67,10 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('import-upload', function (Request $request) {
+            return Limit::perHour(200)->by($request->user()?->id ?? $request->ip());
+        });
+
         RateLimiter::for('shared-research-password', function (Request $request) {
             $token = $request->route('token') ?? 'unknown';
 
