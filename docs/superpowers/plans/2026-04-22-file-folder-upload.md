@@ -220,12 +220,11 @@ return new class extends Migration
 
 - [ ] **Step 4: Modify `app/Models/Thought.php`**
 
-In the `$fillable` array (around line 94), add `'content_sha256'`:
+Leave the `$fillable` array (around line 94) unchanged — it already lists every mass-assignable attribute:
 
 ```php
 protected $fillable = [
     'content',
-    'content_sha256',
     'embedding',
     'metadata',
     'user_id',
@@ -237,6 +236,8 @@ protected $fillable = [
     'visibility_reason',
 ];
 ```
+
+`content_sha256` is intentionally NOT in `$fillable` — it's a derived column written by the mutator below, so exposing it to mass assignment would only create desync opportunities between `content` and its hash.
 
 Update `setContentAttribute` (around line 177) to also set the hash:
 
