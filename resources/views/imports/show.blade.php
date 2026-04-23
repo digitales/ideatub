@@ -47,15 +47,20 @@
 </div>
 
 @push('scripts')
+@php
+    $importFileRows = $batch->files->map(fn ($f) => [
+        'id' => $f->id,
+        'relative_path' => $f->relative_path,
+        'status' => $f->status,
+    ])->values();
+@endphp
 <script>
 function importBatch(batchId, statusUrl, fileCount) {
     return {
         batchStatus: @json($batch->status),
         processedCount: 0,
         fileCount: fileCount,
-        files: @json($batch->files->map(fn ($f) => [
-            'id' => $f->id, 'relative_path' => $f->relative_path, 'status' => $f->status,
-        ])->values()),
+        files: @json($importFileRows),
         get progressWidth() {
             if (!this.fileCount) return 0;
             return Math.min(100, (this.processedCount / this.fileCount) * 100);
