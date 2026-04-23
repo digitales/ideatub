@@ -14,6 +14,7 @@ use App\Models\Thought;
 use App\Services\DemoMode;
 use App\Services\Import\FileImportService;
 use App\Services\Import\ImportStagingStore;
+use App\Services\Import\MicrositeImportDetector;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Bus\Batch;
 use Illuminate\Http\JsonResponse;
@@ -114,6 +115,9 @@ class ImportController extends Controller
         $source = count($segments) > 1 ? 'upload_folder' : 'upload_multi';
         $rootFolder = count($segments) > 1 ? $segments[0] : $title;
 
+        $isMicrosite = MicrositeImportDetector::shouldUseMicrosite($paths, $files);
+        $batchOptions = $isMicrosite ? ['import_kind' => 'microsite'] : null;
+
         $batch = new ImportBatch;
         $batch->id = (string) Str::uuid();
         $batch->forceFill([
@@ -127,6 +131,7 @@ class ImportController extends Controller
             'no_chunking' => $noChunking,
             'skip_ai_metadata' => $skipAi,
             'staging_path' => "imports/{$user->id}/{$batch->id}",
+            'options' => $batchOptions,
         ]);
         $batch->save();
 

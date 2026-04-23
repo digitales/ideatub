@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\Import\MicrositeImportDetector;
 use Illuminate\Foundation\Http\FormRequest;
 
 class BatchImportRequest extends FormRequest
@@ -53,6 +54,13 @@ class BatchImportRequest extends FormRequest
                 if (! is_string($p) || ! $this->pathIsSafe($p)) {
                     $v->errors()->add("relative_paths.{$i}", 'Illegal path segment.');
                 }
+            }
+
+            if ($v->errors()->isNotEmpty()) {
+                return;
+            }
+            if (MicrositeImportDetector::hasDuplicatePagePathSegments($paths, $files)) {
+                $v->errors()->add('files', 'This folder uses the same page name twice (same numbered .md name). Remove or rename a file.');
             }
         });
     }
