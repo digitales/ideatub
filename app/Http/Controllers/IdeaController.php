@@ -11,6 +11,7 @@ use App\Models\ResearchRun;
 use App\Models\ResearchShare;
 use App\Models\ResearchSkill;
 use App\Models\Thought;
+use App\Models\ThoughtCommentRead;
 use App\Models\ThoughtLink;
 use App\Models\ThoughtLinkSummary;
 use App\Models\User;
@@ -25,6 +26,7 @@ use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Support\IdeaCompletedAtSql;
 use App\Support\TagSlug;
+use App\View\Presenters\Comments\ResearchCommentsPresenter;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
 use App\View\Presenters\Ideas\CompletedIdeaPresenter;
@@ -368,7 +370,7 @@ class IdeaController extends Controller
             });
         }
 
-        $detailCommentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+        $detailCommentsPresenter = new ResearchCommentsPresenter(
             $thought,
             auth()->user(),
             null,
@@ -1238,9 +1240,14 @@ class IdeaController extends Controller
     /**
      * Run research for an existing idea in the background. Authorizes that the user owns the thought.
      */
-    public function research(Request $request, Thought $thought): RedirectResponse
+    public function research(Request $request, Thought $thought): RedirectResponse|JsonResponse
     {
         $this->authorize('update', $thought);
+
+        if (data_get($thought->source_metadata, 'provenance') === 'upload'
+            && ! filter_var($request->input('provenance_ack'), FILTER_VALIDATE_BOOLEAN)) {
+            return response()->json(['error' => 'provenance_ack_required'], 409);
+        }
 
         if (($thought->metadata['type'] ?? null) !== 'idea') {
             return redirect()->route('idea.ideas')->with('error', 'Not an idea.');
@@ -1396,12 +1403,12 @@ class IdeaController extends Controller
             50
         );
 
-        $commentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+        $commentsPresenter = new ResearchCommentsPresenter(
             $thought,
             auth()->user(),
             null,
         );
-        \App\Models\ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
+        ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
 
         return view('idea.research_show', [
             'root' => $thought,
