@@ -9,6 +9,7 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Services\Email\EmailNewsletterResearchService;
 use App\Services\Email\YouTubeTranscriptService;
+use App\Services\MetadataSanitiser;
 use App\Services\OpenRouterService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtChunkingService;
@@ -38,7 +39,7 @@ class EmailNewsletterResearchServiceTest extends TestCase
         $this->app->instance(OpenRouterService::class, $openRouter);
         $this->app->instance(
             ThoughtCaptureService::class,
-            new ThoughtCaptureService($openRouter, new ThoughtChunkingService)
+            new ThoughtCaptureService($openRouter, new ThoughtChunkingService, new MetadataSanitiser)
         );
     }
 

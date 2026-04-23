@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\UserPreference;
 use App\Services\DemoMode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,5 +33,21 @@ class ProfileSettingsController extends Controller
         return redirect()
             ->route('settings.profile.index')
             ->with('success', 'Profile updated.');
+    }
+
+    public function updateNotifications(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email_on_import_completion' => ['nullable', 'boolean'],
+        ]);
+
+        $value = filter_var($validated['email_on_import_completion'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
+        UserPreference::query()->updateOrCreate(
+            ['user_id' => $request->user()->id, 'key' => 'email_on_import_completion'],
+            ['value' => $value ? 'true' : 'false']
+        );
+
+        return back()->with('success', 'Notification preferences updated.');
     }
 }

@@ -14,3 +14,4 @@ Schedule::command('thoughts:extract-untagged')->hourly();
 Schedule::command('inbox:generate')->hourly();
 Schedule::command('jira:sync-all')->hourly()->when(fn () => config('services.jira.enabled', true));
 Schedule::command('mail:sync-all')->hourly()->when(fn () => config('services.mail_sync.enabled', true));
+Schedule::command('imports:prune-expired-batches')->dailyAt('03:00');

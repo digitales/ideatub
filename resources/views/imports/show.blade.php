@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="max-w-3xl mx-auto px-6 py-10"
-     x-data="importBatch('{{ $batch->id }}', '{{ route("imports.status", $batch) }}', {{ (int) $batch->file_count }})"
+     x-data="importBatch('{{ $batch->id }}', '{{ route('imports.status', $batch) }}', {{ (int) $batch->file_count }})"
      @if (session('success')) data-flash="{{ e(session('success')) }}" @endif
 >
     @if (session('success'))

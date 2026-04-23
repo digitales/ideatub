@@ -27,6 +27,9 @@
         $initialContent = old('youtube_url', old('content', ''));
         $initialContent = ($initialContent === '[object HTMLTextAreaElement]' ? '' : $initialContent);
         $forceHomeVideoMode = filled(old('youtube_url'));
+        $importUploadsEnabled = (bool) config('features.file_upload', false)
+            && \Illuminate\Support\Facades\Route::has('imports.quick')
+            && ! app(\App\Services\DemoMode::class)->enabled();
     @endphp
     <div
         x-data="captureBox()"
@@ -36,6 +39,11 @@
         data-focus-reply="{{ (isset($replyingTo) && $replyingTo) ? '1' : '0' }}"
         data-idea-index-url="{{ route('idea.index') }}"
         data-drafts-url="{{ route('ideas.drafts.index') }}"
+        @if ($importUploadsEnabled)
+            data-file-upload="1"
+            data-import-quick-url="{{ route('imports.quick') }}"
+            data-import-batch-url="{{ route('imports.batch') }}"
+        @endif
         @focus-capture.window="focusCapture()"
         class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
         :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6' : ''"
@@ -200,6 +208,112 @@
                 </div>
             </div>
         </form>
+
+        @if ($importUploadsEnabled && ! isset($replyingTo))
+            <div
+                class="mt-2 flex items-center justify-between gap-2 flex-wrap"
+                data-capture-import-toolbar
+            >
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[11px] text-slate-brand/45">Files</span>
+                    <input
+                        type="file"
+                        x-ref="importQuickInput"
+                        class="sr-only"
+                        accept=".txt,.md,.mdown,.markdown"
+                        multiple
+                        @change="onImportQuickPicked($event)"
+                    />
+                    <input
+                        type="file"
+                        x-ref="importFolderInput"
+                        class="sr-only"
+                        webkitdirectory
+                        multiple
+                        @change="onImportFolderPicked($event)"
+                    />
+                    <button
+                        type="button"
+                        class="p-1.5 rounded-md border border-memory-violet/15 text-slate-brand/70 hover:bg-memory-violet/5 hover:text-deep-indigo transition-colors"
+                        @click="triggerImportFilePick()"
+                        title="Import from files (up to 5)"
+                    >
+                        <span class="sr-only">Import files</span>
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-5.364 5.364a1.5 1.5 0 000 2.12l.707.707a1.5 1.5 0 102.12 0L18 6.12M3 17h1M6 4h.01" />
+                        </svg>
+                    </button>
+                    <button
+                        type="button"
+                        class="p-1.5 rounded-md border border-memory-violet/15 text-slate-brand/70 hover:bg-memory-violet/5 hover:text-deep-indigo transition-colors"
+                        @click="triggerImportFolderPick()"
+                        title="Import a folder (async batch)"
+                    >
+                        <span class="sr-only">Import folder</span>
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path d="M4 8a2 2 0 012-2h3l1.4 1.4A2 2 0 0012.8 8H20a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V8z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        @endif
+
+        @if ($importUploadsEnabled && ! isset($replyingTo))
+            <div
+                x-cloak
+                x-show="importModalOpen"
+                x-transition.opacity
+                class="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-deep-indigo/20 backdrop-blur-sm"
+                role="dialog"
+                aria-modal="true"
+                :aria-label="importModalKind === 'batch' ? 'Import folder' : 'Import files'"
+            >
+                <div
+                    class="w-full max-w-sm rounded-2xl border border-memory-violet/20 bg-white/95 p-4 shadow-lg"
+                    @click.outside="!importSubmitting && (importModalOpen = false)"
+                >
+                    <h2 class="text-sm font-semibold text-deep-indigo" x-text="importModalKind === 'batch' ? 'Import folder' : 'Import files'"></h2>
+                    <p class="mt-2 text-xs text-slate-brand/80 leading-relaxed">
+                        Files are scanned and stored like regular captures. Folder imports are processed in the background; you can watch progress on the next screen.
+                    </p>
+                    <div class="mt-3 space-y-2" x-show="importModalKind === 'batch'">
+                        <label class="block">
+                            <span class="text-[11px] font-medium text-slate-brand/70">Project name</span>
+                            <input
+                                type="text"
+                                x-model="importBatchProjectTitle"
+                                class="mt-1 w-full rounded-lg border border-memory-violet/20 px-3 py-1.5 text-sm text-deep-indigo"
+                                placeholder="My notes"
+                            />
+                        </label>
+                        <div class="flex items-center gap-2 text-xs text-slate-brand/80">
+                            <input type="radio" id="importDedupeNew" x-model="importBatchDedupe" value="new" class="text-memory-violet" />
+                            <label for="importDedupeNew">New project (rename if the title exists)</label>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-slate-brand/80">
+                            <input type="radio" id="importDedupeEx" x-model="importBatchDedupe" value="existing" class="text-memory-violet" />
+                            <label for="importDedupeEx">Add to an existing project with the same name</label>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-red-600/90" x-show="importError" x-text="importError"></p>
+                    <div class="mt-4 flex justify-end gap-2">
+                        <button
+                            type="button"
+                            class="text-xs font-medium text-slate-brand/70 px-2 py-1.5"
+                            :disabled="importSubmitting"
+                            @click="importModalOpen = false; importError = ''"
+                        >Cancel</button>
+                        <button
+                            type="button"
+                            class="text-xs font-medium text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
+                            style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);"
+                            :disabled="importSubmitting"
+                            @click="confirmImport()"
+                        >Import</button>
+                    </div>
+                </div>
+            </div>
+        @endif
         </div>
     </div>
 

@@ -86,8 +86,24 @@ Alpine.data('captureBox', () => ({
   videoDetectTimer: null,
   videoDetectDebounceMs: 380,
 
+  importEnabled: false,
+  importModalOpen: false,
+  importModalKind: null,
+  importPendingList: null,
+  importBatchProjectTitle: 'Imported project',
+  importBatchDedupe: 'new',
+  importSubmitting: false,
+  importError: '',
+
   init() {
     this._rootEl = this.$el;
+    this.importEnabled =
+      (this._rootEl?.dataset?.fileUpload === '1' && !!this._rootEl?.dataset?.importQuickUrl) ||
+      false;
+    this.importQuickUrl = this._rootEl?.dataset?.importQuickUrl || '';
+    this.importBatchUrl = this._rootEl?.dataset?.importBatchUrl || '';
+    this.importBatchProjectTitle = 'Imported project';
+    this.importBatchDedupe = 'new';
     const raw = this._rootEl.dataset.initialContent;
     this.content = raw !== undefined ? raw : '';
     this.isReplyMode = this._rootEl.dataset.focusReply === '1';
@@ -452,6 +468,127 @@ Alpine.data('captureBox', () => ({
       this.messageType = 'error';
     } finally {
       this.saving = false;
+    }
+  },
+
+  triggerImportFilePick() {
+    this.$refs.importQuickInput?.click();
+  },
+
+  triggerImportFolderPick() {
+    this.$refs.importFolderInput?.click();
+  },
+
+  onImportQuickPicked(e) {
+    const input = e?.target;
+    if (!input?.files?.length) return;
+    this.importPendingList = Array.from(input.files);
+    this.importModalKind = 'quick';
+    this.importError = '';
+    this.importModalOpen = true;
+    input.value = '';
+  },
+
+  onImportFolderPicked(e) {
+    const input = e?.target;
+    if (!input?.files?.length) return;
+    this.importPendingList = Array.from(input.files);
+    this.importModalKind = 'batch';
+    const first = this.importPendingList[0];
+    const p = (first && first.webkitRelativePath) ? first.webkitRelativePath : first.name;
+    const root = p && p.indexOf('/') >= 0 ? p.split('/')[0] : 'Imported project';
+    this.importBatchProjectTitle = root;
+    this.importError = '';
+    this.importModalOpen = true;
+    input.value = '';
+  },
+
+  async confirmImport() {
+    this.importError = '';
+    const list = this.importPendingList;
+    if (!this.importModalKind || !list || !list.length) {
+      this.importModalOpen = false;
+      return;
+    }
+    if (this.importModalKind === 'quick') {
+      if (list.length > 5) {
+        this.importError = 'You can import at most 5 text or Markdown files at once.';
+        return;
+      }
+    }
+    if (this.importModalKind === 'batch' && this.importBatchUrl) {
+      const title = (this.importBatchProjectTitle || '').trim();
+      if (title.length === 0) {
+        this.importError = 'Enter a project name.';
+        return;
+      }
+      if (list.length > 200) {
+        this.importError = 'You can import at most 200 files per batch.';
+        return;
+      }
+    }
+    this.importSubmitting = true;
+    const csrf = this.csrfToken;
+    try {
+      if (this.importModalKind === 'quick') {
+        const fd = new FormData();
+        fd.append('_token', csrf);
+        for (const file of list) {
+          fd.append('files[]', file);
+        }
+        const res = await fetch(this.importQuickUrl, {
+          method: 'POST',
+          body: fd,
+          redirect: 'follow',
+          credentials: 'same-origin',
+        });
+        if (!res.ok) {
+          this.importError =
+            res.status === 422
+              ? 'Check file types and sizes: up to 5 .txt or Markdown files (max 1 MB each).'
+              : 'Import was rejected. Please try again.';
+          return;
+        }
+        if (res.url) {
+          window.location.href = res.url;
+        }
+        return;
+      }
+      if (this.importModalKind === 'batch' && this.importBatchUrl) {
+        const fd = new FormData();
+        fd.append('_token', csrf);
+        fd.append('project_title', (this.importBatchProjectTitle || '').trim());
+        fd.append('dedupe_mode', this.importBatchDedupe === 'existing' ? 'existing' : 'new');
+        if (this.noChunking) {
+          fd.append('no_chunking', '1');
+        }
+        for (const file of list) {
+          fd.append('files[]', file);
+          const rel = file.webkitRelativePath || file.name;
+          fd.append('relative_paths[]', rel);
+        }
+        const res = await fetch(this.importBatchUrl, {
+          method: 'POST',
+          body: fd,
+          redirect: 'follow',
+          credentials: 'same-origin',
+        });
+        if (!res.ok) {
+          this.importError =
+            res.status === 422
+              ? 'Check paths, project name, and size (20 MB max per batch).'
+              : 'Import batch could not be started. Please try again.';
+          return;
+        }
+        if (res.url) {
+          window.location.href = res.url;
+        }
+        return;
+      }
+    } catch {
+      this.importError = 'Import could not be started. Check your network and try again.';
+    } finally {
+      this.importSubmitting = false;
     }
   },
 
