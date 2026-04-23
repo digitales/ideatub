@@ -11,6 +11,7 @@
     </p>
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 md:p-8 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
         <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-4">Research</p>
+        @if (empty($isMicrosite) || ! empty($onMicrositeRootIndex))
         @if (! empty($linkedVideo ?? null))
             <div class="mb-6 rounded-xl border border-rose-400/25 bg-rose-500/[0.06] p-4 md:p-5">
                 <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-rose-600/90 mb-3">Related video</p>
@@ -33,6 +34,8 @@
         @endif
         @include('idea.partials.research_newsletter_analysis', ['newsletterAnalysis' => $newsletterAnalysis ?? null])
         @include('idea.partials.research_editorial_link_summaries', ['editorialLinkSummaries' => $editorialLinkSummaries])
+        @endif
+        @if (empty($isMicrosite))
         @push('research-after-root')
             <p class="text-[11px] text-slate-brand/50 mt-4">{{ $root->created_at->diffForHumans() }}</p>
         @endpush
@@ -41,6 +44,13 @@
             'sections' => $sections,
             'researchContentComments' => $researchContentComments,
         ])
+        @else
+        @include('idea.partials.microsite_reader', [
+            'root_html' => $root_html,
+            'micrositeNav' => $micrositeNav,
+            'activeMicrositePage' => $activeMicrositePage,
+        ])
+        @endif
     </div>
     @if(isset($commentsPresenter))
         @if(($researchUnreadBannerCount ?? 0) > 0)
@@ -49,6 +59,9 @@
             </p>
         @endif
         <div class="mt-8">
+            @if($isMicrosite ?? false)
+                @include('comments._thread', $micrositePageThreadInclude)
+            @else
             @include('comments._thread', [
                 'rows' => $commentsPresenter->pageLevelRows(),
                 'formAction' => route('comments.store'),
@@ -59,6 +72,7 @@
                 'title' => 'Comments',
                 'showControls' => true,
             ])
+            @endif
         </div>
     @endif
 </div>

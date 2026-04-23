@@ -63,9 +63,16 @@ if (config('oauth-mcp.enabled', true)) {
 Route::get('/welcome', [HomeController::class, 'index'])->name('home');
 
 // Public shared research view (no auth; password gate per share)
+Route::get('/r/{token}/p/{page}', [SharedResearchViewController::class, 'showPage'])
+    ->where('page', '[0-9A-Za-z._-]+')
+    ->name('shared-research.page');
+// Public shared research view (no auth; password gate per share)
 Route::get('/r/{token}', [SharedResearchViewController::class, 'show'])
     ->name('shared-research.show');
 Route::post('/r/{token}', [SharedResearchViewController::class, 'show'])
+    ->middleware('throttle:shared-research-password');
+Route::post('/r/{token}/p/{page}', [SharedResearchViewController::class, 'showPage'])
+    ->where('page', '[0-9A-Za-z._-]+')
     ->middleware('throttle:shared-research-password');
 
 // Public guest comments on a shared research view (rate-limited, honeypot-protected)
@@ -183,6 +190,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/ideas/{thought}', [IdeaController::class, 'destroy'])->name('ideas.destroy');
     Route::post('/ideas/research', [IdeaController::class, 'researchNew'])->name('ideas.research-new');
     Route::post('/ideas/{thought}/research', [IdeaController::class, 'research'])->name('ideas.research');
+    Route::get('/research/{thought}/p/{page}', [IdeaController::class, 'showResearch'])
+        ->where('page', '[0-9A-Za-z._-]+')
+        ->name('idea.research.page');
     Route::get('/research/{thought}', [IdeaController::class, 'showResearch'])->name('idea.research.show');
 
     // Email research actions

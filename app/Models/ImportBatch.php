@@ -68,4 +68,14 @@ class ImportBatch extends Model
     {
         return $this->hasMany(ImportBatchFile::class);
     }
+
+    public function isMicrositeImport(): bool
+    {
+        return data_get($this->options, 'import_kind') === 'microsite';
+    }
+
+    public function localAssetRefCount(): int
+    {
+        return (int) data_get($this->options, 'local_asset_ref_count', 0);
+    }
 }

@@ -25,6 +25,8 @@ use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Support\IdeaCompletedAtSql;
+use App\Support\Research\MicrositeInAppPathHelper;
+use App\Support\Research\MicrositePageLabel;
 use App\Support\TagSlug;
 use App\View\Presenters\Comments\ResearchCommentsPresenter;
 use App\View\Presenters\Email\EmailMetadataPresenter;
@@ -71,8 +73,7 @@ class IdeaController extends Controller
         private ResearchService $researchService,
         private ThoughtSearchService $searchService,
         private ThoughtEmailSenderContextResolver $thoughtEmailSenderContextResolver
-    ) {
-    }
+    ) {}
 
     /**
      * Idea index: semantic search when ?q= present, otherwise recent top-level thoughts (with comments).
@@ -80,26 +81,26 @@ class IdeaController extends Controller
      */
     public function index(Request $request): View|RedirectResponse|JsonResponse
     {
-        $query = $request->input("q");
-        $query = is_string($query) ? trim($query) : "";
+        $query = $request->input('q');
+        $query = is_string($query) ? trim($query) : '';
         if (mb_strlen($query) > self::SEARCH_QUERY_MAX_LENGTH) {
             $query = mb_substr($query, 0, self::SEARCH_QUERY_MAX_LENGTH);
         }
 
-        if ($query !== "") {
+        if ($query !== '') {
             try {
                 $result = $this->searchService->search(
                     $query,
                     (int) auth()->id(),
                     [
-                        "max_distance" => self::SEARCH_MAX_DISTANCE,
-                        "tag_limit" => 100,
-                        "semantic_limit" => 100,
+                        'max_distance' => self::SEARCH_MAX_DISTANCE,
+                        'tag_limit' => 100,
+                        'semantic_limit' => 100,
                     ]
                 );
-                $all = $result["thoughts"];
-                $total = $result["total"];
-                $page = (int) $request->input("page", 1);
+                $all = $result['thoughts'];
+                $total = $result['total'];
+                $page = (int) $request->input('page', 1);
                 $pageItems = $all
                     ->slice(
                         ($page - 1) * self::SEARCH_LIMIT,
@@ -112,25 +113,25 @@ class IdeaController extends Controller
                     self::SEARCH_LIMIT,
                     $page,
                     [
-                        "path" => $request->url(),
-                        "query" => $request->query(),
+                        'path' => $request->url(),
+                        'query' => $request->query(),
                     ]
                 );
                 $thoughts->getCollection()->load([
-                    "childThoughts" => fn ($q) => $q->orderBy("created_at"),
-                    "parent",
+                    'childThoughts' => fn ($q) => $q->orderBy('created_at'),
+                    'parent',
                 ]);
 
                 if ($request->ajax()) {
                     $replyableOffset = (int) $request->input(
-                        "replyable_offset",
+                        'replyable_offset',
                         0
                     );
                     $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters(
                         $thoughts->getCollection()
                     );
-                    $html = view("idea.index_thought_cards", [
-                        "cards" => $this->buildIdeaIndexCardPresenters(
+                    $html = view('idea.index_thought_cards', [
+                        'cards' => $this->buildIdeaIndexCardPresenters(
                             $thoughts,
                             $replyableOffset,
                             $newsletterResearchStatusPresenters
@@ -138,31 +139,31 @@ class IdeaController extends Controller
                     ])->render();
 
                     return response()->json([
-                        "html" => $html,
-                        "has_more" => $thoughts->hasMorePages(),
-                        "next_page" => $thoughts->currentPage() + 1,
-                        "count" => $thoughts->count(),
+                        'html' => $html,
+                        'has_more' => $thoughts->hasMorePages(),
+                        'next_page' => $thoughts->currentPage() + 1,
+                        'count' => $thoughts->count(),
                     ]);
                 }
             } catch (\Throwable $e) {
                 report($e);
 
                 return redirect()
-                    ->route("idea.index")
+                    ->route('idea.index')
                     ->with(
-                        "error",
-                        "Search is temporarily unavailable. Please try again."
+                        'error',
+                        'Search is temporarily unavailable. Please try again.'
                     );
             }
         } else {
             $thoughts = Thought::query()
-                ->where("user_id", auth()->id())
+                ->where('user_id', auth()->id())
                 ->visibleInStream()
                 ->topLevel()
                 ->excludingResearch()
                 ->excludingJira()
-                ->with(["childThoughts" => fn ($q) => $q->orderBy("created_at")])
-                ->orderByDesc("created_at")
+                ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
+                ->orderByDesc('created_at')
                 ->limit(self::RECENT_LIMIT)
                 ->get();
 
@@ -170,8 +171,8 @@ class IdeaController extends Controller
                 $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters(
                     $thoughts
                 );
-                $html = view("idea.index_thought_cards", [
-                    "cards" => $this->buildIdeaIndexCardPresenters(
+                $html = view('idea.index_thought_cards', [
+                    'cards' => $this->buildIdeaIndexCardPresenters(
                         $thoughts,
                         0,
                         $newsletterResearchStatusPresenters
@@ -182,17 +183,17 @@ class IdeaController extends Controller
                     : $thoughts->first()->created_at->toIso8601String();
 
                 return response()->json([
-                    "html" => $html,
-                    "total" => $thoughts->count(),
-                    "latest_created_at" => $latest,
+                    'html' => $html,
+                    'total' => $thoughts->count(),
+                    'latest_created_at' => $latest,
                 ]);
             }
         }
 
         $replyingTo = null;
-        if ($request->filled("parent_id")) {
+        if ($request->filled('parent_id')) {
             $parent = Thought::query()
-                ->where("user_id", auth()->id())
+                ->where('user_id', auth()->id())
                 ->find($request->parent_id);
             if ($parent !== null) {
                 $replyingTo = $parent;
@@ -205,7 +206,7 @@ class IdeaController extends Controller
             $replyingToPreview = app(DemoMode::class)->enabled()
                 ? app(DemoObfuscator::class)->obfuscate(
                     $limited,
-                    "idea_index_replying_to_preview"
+                    'idea_index_replying_to_preview'
                 )
                 : $limited;
         }
@@ -218,12 +219,12 @@ class IdeaController extends Controller
             $indexThoughtCollection
         );
 
-        return view("idea.index", [
-            "thoughts" => $thoughts,
-            "query" => $query !== "" ? $query : null,
-            "replyingTo" => $replyingTo,
-            "replyingToPreview" => $replyingToPreview,
-            "cards" => $this->buildIdeaIndexCardPresenters(
+        return view('idea.index', [
+            'thoughts' => $thoughts,
+            'query' => $query !== '' ? $query : null,
+            'replyingTo' => $replyingTo,
+            'replyingToPreview' => $replyingToPreview,
+            'cards' => $this->buildIdeaIndexCardPresenters(
                 $thoughts,
                 0,
                 $newsletterResearchStatusPresenters
@@ -236,17 +237,17 @@ class IdeaController extends Controller
      */
     public function show(Thought $thought): View
     {
-        $this->authorize("view", $thought);
+        $this->authorize('view', $thought);
 
         $thought->load([
-            "childThoughts" => fn ($q) => $q->orderBy("created_at"),
+            'childThoughts' => fn ($q) => $q->orderBy('created_at'),
         ]);
         $importedEmail =
-            $thought->source === "email" ? $thought->importedEmail() : null;
+            $thought->source === 'email' ? $thought->importedEmail() : null;
         if ($importedEmail !== null) {
-            $importedEmail->loadMissing("mailAccount");
+            $importedEmail->loadMissing('mailAccount');
         }
-        $emailDetailPreloadedImport = $thought->source === "email";
+        $emailDetailPreloadedImport = $thought->source === 'email';
         $senderRuleContext = $emailDetailPreloadedImport
             ? $this->thoughtEmailSenderContextResolver->resolve(
                 $thought,
@@ -258,7 +259,7 @@ class IdeaController extends Controller
         $documentSectionHtmlChunks = [];
         $thoughtDetailContentBlocks = [];
 
-        if ($thought->source !== "email") {
+        if ($thought->source !== 'email') {
             $contentHtml = $this->renderedThoughtBodyHtml($thought);
             $sectionThoughts = $thought->childThoughts
                 ->filter(
@@ -269,7 +270,7 @@ class IdeaController extends Controller
                 ->sortBy(
                     fn (Thought $comment): int => (int) data_get(
                         $comment->source_metadata,
-                        "section_index",
+                        'section_index',
                         PHP_INT_MAX
                     )
                 )
@@ -286,22 +287,22 @@ class IdeaController extends Controller
             $detailContentEditable =
                 auth()->check() &&
                 (int) auth()->id() === (int) $thought->user_id &&
-                !app(DemoMode::class)->enabled();
+                ! app(DemoMode::class)->enabled();
 
             $thoughtDetailContentBlocks = [
                 [
-                    "thought" => $thought,
-                    "content_html" => $contentHtml,
-                    "editable" => $detailContentEditable,
+                    'thought' => $thought,
+                    'content_html' => $contentHtml,
+                    'editable' => $detailContentEditable,
                 ],
             ];
             foreach ($sectionThoughts as $sectionThought) {
                 $thoughtDetailContentBlocks[] = [
-                    "thought" => $sectionThought,
-                    "content_html" => $this->renderedThoughtBodyHtml(
+                    'thought' => $sectionThought,
+                    'content_html' => $this->renderedThoughtBodyHtml(
                         $sectionThought
                     ),
-                    "editable" => $detailContentEditable,
+                    'editable' => $detailContentEditable,
                 ];
             }
         }
@@ -331,26 +332,26 @@ class IdeaController extends Controller
             )
             : null;
         $emailMetadata =
-            $thought->source === "email"
+            $thought->source === 'email'
                 ? EmailMetadataPresenter::from($thought, $importedEmail)
                 : null;
 
         $relatedEmailCard =
-            data_get($thought->metadata, "type") === "video"
+            data_get($thought->metadata, 'type') === 'video'
                 ? $this->resolveRelatedEmailCardForThought($thought)
                 : null;
 
         // Same predicate as ThoughtDetailPresenter::isVideoThought()
         $videoResearchPreview =
-            data_get($thought->metadata, "type") === "video"
+            data_get($thought->metadata, 'type') === 'video'
                 ? $this->buildVideoResearchPreview($thought)
                 : null;
 
         $documentShareEligible = $thought->isShareableDocumentRoot();
         $documentShare = $documentShareEligible
             ? ResearchShare::query()
-                ->where("thought_id", $thought->id)
-                ->where("user_id", auth()->id())
+                ->where('thought_id', $thought->id)
+                ->where('user_id', auth()->id())
                 ->first()
             : null;
 
@@ -372,42 +373,42 @@ class IdeaController extends Controller
 
         $thoughtProjectsForDetail = $thought
             ->projects()
-            ->where("projects.user_id", auth()->id())
-            ->orderBy("title")
+            ->where('projects.user_id', auth()->id())
+            ->orderBy('title')
             ->get();
 
-        $memberProjectIds = $thoughtProjectsForDetail->pluck("id");
+        $memberProjectIds = $thoughtProjectsForDetail->pluck('id');
         $projectsToAttachToThought = Project::query()
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->when(
                 $memberProjectIds->isNotEmpty(),
-                fn (Builder $q) => $q->whereNotIn("id", $memberProjectIds)
+                fn (Builder $q) => $q->whereNotIn('id', $memberProjectIds)
             )
-            ->orderBy("title")
-            ->get(["id", "title"]);
+            ->orderBy('title')
+            ->get(['id', 'title']);
 
         $thoughtOutgoingLinks = ThoughtLink::query()
-            ->where("user_id", auth()->id())
-            ->where("from_thought_id", $thought->id)
-            ->with("toThought")
-            ->orderBy("link_type")
+            ->where('user_id', auth()->id())
+            ->where('from_thought_id', $thought->id)
+            ->with('toThought')
+            ->orderBy('link_type')
             ->get();
 
         $thoughtIncomingLinks = ThoughtLink::query()
-            ->where("user_id", auth()->id())
-            ->where("to_thought_id", $thought->id)
-            ->with("fromThought")
-            ->orderBy("link_type")
+            ->where('user_id', auth()->id())
+            ->where('to_thought_id', $thought->id)
+            ->with('fromThought')
+            ->orderBy('link_type')
             ->get();
 
         $globalLinkTargets = static function () use ($thought) {
             return Thought::query()
-                ->where("user_id", auth()->id())
-                ->whereNull("parent_id")
+                ->where('user_id', auth()->id())
+                ->whereNull('parent_id')
                 ->whereKeyNot($thought->id)
-                ->orderByDesc("updated_at")
+                ->orderByDesc('updated_at')
                 ->limit(100)
-                ->get(["id", "content"]);
+                ->get(['id', 'content']);
         };
 
         if ($memberProjectIds->isEmpty()) {
@@ -415,19 +416,19 @@ class IdeaController extends Controller
             $linkTargetThoughtOptionsUsedGlobalFallback = false;
         } else {
             $scopedLinkTargets = Thought::query()
-                ->where("user_id", auth()->id())
-                ->whereNull("parent_id")
+                ->where('user_id', auth()->id())
+                ->whereNull('parent_id')
                 ->whereKeyNot($thought->id)
                 ->whereHas(
-                    "projects",
+                    'projects',
                     fn (Builder $q) => $q->whereIn(
-                        "projects.id",
+                        'projects.id',
                         $memberProjectIds
                     )
                 )
-                ->orderByDesc("updated_at")
+                ->orderByDesc('updated_at')
                 ->limit(100)
-                ->get(["id", "content"]);
+                ->get(['id', 'content']);
 
             if ($scopedLinkTargets->isNotEmpty()) {
                 $linkTargetThoughtOptions = $scopedLinkTargets;
@@ -443,11 +444,11 @@ class IdeaController extends Controller
             $linkTargetThoughtOptions = $linkTargetThoughtOptions->map(
                 function (Thought $t) use ($obfuscator): Thought {
                     $t->setAttribute(
-                        "content",
+                        'content',
                         $obfuscator->obfuscate(
                             $t->content,
-                            "thought_detail_link_picker"
-                        ) ?? "Demo content hidden"
+                            'thought_detail_link_picker'
+                        ) ?? 'Demo content hidden'
                     );
 
                     return $t;
@@ -457,11 +458,11 @@ class IdeaController extends Controller
                 ThoughtLink $link
             ) use ($obfuscator): ThoughtLink {
                 $link->toThought->setAttribute(
-                    "content",
+                    'content',
                     $obfuscator->obfuscate(
                         $link->toThought->content,
-                        "thought_detail_link_outgoing"
-                    ) ?? "Demo content hidden"
+                        'thought_detail_link_outgoing'
+                    ) ?? 'Demo content hidden'
                 );
 
                 return $link;
@@ -470,11 +471,11 @@ class IdeaController extends Controller
                 ThoughtLink $link
             ) use ($obfuscator): ThoughtLink {
                 $link->fromThought->setAttribute(
-                    "content",
+                    'content',
                     $obfuscator->obfuscate(
                         $link->fromThought->content,
-                        "thought_detail_link_incoming"
-                    ) ?? "Demo content hidden"
+                        'thought_detail_link_incoming'
+                    ) ?? 'Demo content hidden'
                 );
 
                 return $link;
@@ -487,17 +488,17 @@ class IdeaController extends Controller
             null
         );
 
-        return view("idea.show", [
-            "thoughtDetail" => $thoughtDetail,
-            "thoughtDetailContentBlocks" => $thoughtDetailContentBlocks,
-            "thoughtProjectsForDetail" => $thoughtProjectsForDetail,
-            "projectsToAttachToThought" => $projectsToAttachToThought,
-            "thoughtOutgoingLinks" => $thoughtOutgoingLinks,
-            "thoughtIncomingLinks" => $thoughtIncomingLinks,
-            "linkTargetThoughtOptions" => $linkTargetThoughtOptions,
-            "linkTargetThoughtOptionsUsedGlobalFallback" => $linkTargetThoughtOptionsUsedGlobalFallback,
-            "detailCommentsPresenter" => $detailCommentsPresenter,
-            "researchContentComments" => ResearchContentCommentsViewData::none(),
+        return view('idea.show', [
+            'thoughtDetail' => $thoughtDetail,
+            'thoughtDetailContentBlocks' => $thoughtDetailContentBlocks,
+            'thoughtProjectsForDetail' => $thoughtProjectsForDetail,
+            'projectsToAttachToThought' => $projectsToAttachToThought,
+            'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
+            'thoughtIncomingLinks' => $thoughtIncomingLinks,
+            'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
+            'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
+            'detailCommentsPresenter' => $detailCommentsPresenter,
+            'researchContentComments' => ResearchContentCommentsViewData::none(),
         ]);
     }
 
@@ -508,13 +509,13 @@ class IdeaController extends Controller
     public function store(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
-            "content" => "required|string|max:65535",
-            "parent_id" => "sometimes|nullable|uuid|exists:thoughts,id",
-            "no_chunking" => "sometimes|nullable|boolean",
+            'content' => 'required|string|max:65535',
+            'parent_id' => 'sometimes|nullable|uuid|exists:thoughts,id',
+            'no_chunking' => 'sometimes|nullable|boolean',
         ]);
-        $content = $validated["content"];
-        $parentId = $validated["parent_id"] ?? null;
-        $noChunking = !empty($validated["no_chunking"]);
+        $content = $validated['content'];
+        $parentId = $validated['parent_id'] ?? null;
+        $noChunking = ! empty($validated['no_chunking']);
 
         $parent = null;
         if ($parentId !== null) {
@@ -522,7 +523,7 @@ class IdeaController extends Controller
             if ($parent === null) {
                 if ($request->expectsJson()) {
                     return response()->json(
-                        ["message" => "Parent thought not found."],
+                        ['message' => 'Parent thought not found.'],
                         404
                     );
                 }
@@ -530,25 +531,25 @@ class IdeaController extends Controller
                 return redirect()
                     ->back()
                     ->withInput()
-                    ->with("error", "Parent thought not found.");
+                    ->with('error', 'Parent thought not found.');
             }
-            $this->authorize("comment", $parent);
+            $this->authorize('comment', $parent);
         }
 
         try {
             $result = $this->captureService->create([
-                "content" => $content,
-                "user_id" => auth()->id(),
-                "parent_id" => $parent?->id,
-                "source" => "web",
-                "source_metadata" => null,
-                "no_chunking" => $noChunking,
+                'content' => $content,
+                'user_id' => auth()->id(),
+                'parent_id' => $parent?->id,
+                'source' => 'web',
+                'source_metadata' => null,
+                'no_chunking' => $noChunking,
             ]);
         } catch (\Throwable $e) {
             report($e);
             if ($request->expectsJson()) {
                 return response()->json(
-                    ["message" => "Unable to save thought. Please try again."],
+                    ['message' => 'Unable to save thought. Please try again.'],
                     503
                 );
             }
@@ -556,56 +557,55 @@ class IdeaController extends Controller
             return redirect()
                 ->back()
                 ->withInput()
-                ->with("error", "Unable to save thought. Please try again.");
+                ->with('error', 'Unable to save thought. Please try again.');
         }
 
-        if ($result["chunked"]) {
-            $root = $result["root"];
+        if ($result['chunked']) {
+            $root = $result['root'];
             if ($request->expectsJson()) {
-                $root->load("parent");
+                $root->load('parent');
 
                 return response()->json([
-                    "message" =>
-                        "Thought saved as " . $result["count"] . " sections.",
-                    "thought" => [
-                        "id" => $root->id,
-                        "content" => $root->getDecodedContent(),
-                        "parent_id" => null,
-                        "created_at" => $root->created_at->toIso8601String(),
-                        "created_at_human" => $root->created_at->diffForHumans(),
+                    'message' => 'Thought saved as '.$result['count'].' sections.',
+                    'thought' => [
+                        'id' => $root->id,
+                        'content' => $root->getDecodedContent(),
+                        'parent_id' => null,
+                        'created_at' => $root->created_at->toIso8601String(),
+                        'created_at_human' => $root->created_at->diffForHumans(),
                     ],
-                    "chunked" => true,
-                    "section_ids" => $result["section_ids"],
+                    'chunked' => true,
+                    'section_ids' => $result['section_ids'],
                 ]);
             }
 
             return redirect()
-                ->route("idea.index")
+                ->route('idea.index')
                 ->with(
-                    "success",
-                    "Saved as " . $result["count"] . " sections."
+                    'success',
+                    'Saved as '.$result['count'].' sections.'
                 );
         }
 
-        $thought = $result["thought"];
+        $thought = $result['thought'];
         if ($request->expectsJson()) {
-            $thought->load("parent");
+            $thought->load('parent');
 
             return response()->json([
-                "message" => "Thought saved.",
-                "thought" => [
-                    "id" => $thought->id,
-                    "content" => $thought->getDecodedContent(),
-                    "parent_id" => $thought->parent_id,
-                    "created_at" => $thought->created_at->toIso8601String(),
-                    "created_at_human" => $thought->created_at->diffForHumans(),
+                'message' => 'Thought saved.',
+                'thought' => [
+                    'id' => $thought->id,
+                    'content' => $thought->getDecodedContent(),
+                    'parent_id' => $thought->parent_id,
+                    'created_at' => $thought->created_at->toIso8601String(),
+                    'created_at_human' => $thought->created_at->diffForHumans(),
                 ],
             ]);
         }
 
         return redirect()
-            ->route("idea.index")
-            ->with("success", "Thought saved.");
+            ->route('idea.index')
+            ->with('success', 'Thought saved.');
     }
 
     /**
@@ -616,12 +616,12 @@ class IdeaController extends Controller
     public function stream(Request $request): View|JsonResponse
     {
         $request->validate([
-            "tag" => "nullable|string|max:100",
-            "page" => "nullable|integer|min:1",
+            'tag' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1',
         ]);
-        $tagSlug = $request->input("tag");
-        $tagSlug = is_string($tagSlug) ? trim($tagSlug) : "";
-        $tagSlug = $tagSlug !== "" ? $tagSlug : null;
+        $tagSlug = $request->input('tag');
+        $tagSlug = is_string($tagSlug) ? trim($tagSlug) : '';
+        $tagSlug = $tagSlug !== '' ? $tagSlug : null;
 
         $canonicalTag =
             $tagSlug !== null
@@ -630,57 +630,57 @@ class IdeaController extends Controller
         $tagForDisplay = $tagSlug !== null ? $canonicalTag ?? $tagSlug : null;
 
         $query = Thought::query()
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->visibleInStream()
             ->topLevel()
             ->excludingJira()
-            ->with(["childThoughts" => fn ($q) => $q->orderBy("created_at")]);
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')]);
 
         if ($canonicalTag !== null) {
             // Include top-level thoughts that have the tag OR that have any child (section) with the tag,
             // so document roots show even if only section thoughts were tagged.
             $query->where(function ($q) use ($canonicalTag) {
                 $q->whereJsonContains(
-                    "metadata->tags",
+                    'metadata->tags',
                     $canonicalTag
                 )->orWhereHas(
-                    "childThoughts",
+                    'childThoughts',
                     fn ($cq) => $cq->whereJsonContains(
-                        "metadata->tags",
+                        'metadata->tags',
                         $canonicalTag
                     )
                 );
             });
         } elseif ($tagSlug !== null) {
-            $query->whereRaw("0 = 1");
+            $query->whereRaw('0 = 1');
         }
 
         // Tag view = linked document: oldest first (section 1 at top). No tag = general stream: newest first.
         $orderAsc = $canonicalTag !== null;
-        $query->orderBy("created_at", $orderAsc ? "asc" : "desc");
+        $query->orderBy('created_at', $orderAsc ? 'asc' : 'desc');
 
-        $page = (int) $request->input("page", 1);
+        $page = (int) $request->input('page', 1);
         $thoughts = $query->paginate(
             self::STREAM_PAGE_SIZE,
-            ["*"],
-            "page",
+            ['*'],
+            'page',
             $page
         );
 
         $shareByThoughtId = ResearchShare::whereIn(
-            "thought_id",
-            $thoughts->pluck("id")
+            'thought_id',
+            $thoughts->pluck('id')
         )
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->get()
-            ->keyBy("thought_id");
+            ->keyBy('thought_id');
 
         if ($request->ajax()) {
             $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters(
                 $thoughts->getCollection()
             );
-            $html = view("idea.stream_thoughts", [
-                "cards" => $this->buildStreamThoughtCardPresenters(
+            $html = view('idea.stream_thoughts', [
+                'cards' => $this->buildStreamThoughtCardPresenters(
                     $thoughts,
                     $shareByThoughtId,
                     $tagForDisplay !== null,
@@ -694,12 +694,12 @@ class IdeaController extends Controller
             );
 
             return response()->json([
-                "html" => $html,
-                "has_more" => $thoughts->hasMorePages(),
-                "next_page" => $thoughts->currentPage() + 1,
-                "count" => $thoughts->count(),
-                "total" => $thoughts->total(),
-                "latest_created_at" => $streamSince,
+                'html' => $html,
+                'has_more' => $thoughts->hasMorePages(),
+                'next_page' => $thoughts->currentPage() + 1,
+                'count' => $thoughts->count(),
+                'total' => $thoughts->total(),
+                'latest_created_at' => $streamSince,
             ]);
         }
 
@@ -707,18 +707,18 @@ class IdeaController extends Controller
             $thoughts->getCollection()
         );
 
-        return view("idea.stream", [
-            "thoughts" => $thoughts,
-            "tag" => $tagForDisplay,
-            "tagSlug" => $tagSlug,
-            "streamJira" => false,
-            "streamCollectionKey" => null,
-            "streamSince" => $this->firstPageCreatedAtCursor(
+        return view('idea.stream', [
+            'thoughts' => $thoughts,
+            'tag' => $tagForDisplay,
+            'tagSlug' => $tagSlug,
+            'streamJira' => false,
+            'streamCollectionKey' => null,
+            'streamSince' => $this->firstPageCreatedAtCursor(
                 $thoughts,
                 $canonicalTag !== null
             ),
-            "shareByThoughtId" => $shareByThoughtId,
-            "cards" => $this->buildStreamThoughtCardPresenters(
+            'shareByThoughtId' => $shareByThoughtId,
+            'cards' => $this->buildStreamThoughtCardPresenters(
                 $thoughts,
                 $shareByThoughtId,
                 $tagForDisplay !== null,
@@ -732,31 +732,31 @@ class IdeaController extends Controller
      */
     public function streamJira(Request $request): View|JsonResponse
     {
-        $request->validate(["page" => "nullable|integer|min:1"]);
-        $page = (int) $request->input("page", 1);
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
 
         $thoughts = Thought::query()
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->visibleInStream()
             ->topLevel()
-            ->matchingCanonicalSourceType("jira")
-            ->with(["childThoughts" => fn ($q) => $q->orderBy("created_at")])
+            ->matchingCanonicalSourceType('jira')
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
             ->orderByRaw(
                 "COALESCE((source_metadata->>'jira_updated_at')::timestamptz, created_at) DESC"
             )
-            ->paginate(self::STREAM_PAGE_SIZE, ["*"], "page", $page);
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
         return $this->streamCollectionResponse(
             $request,
             $thoughts,
-            "jira",
+            'jira',
             function (LengthAwarePaginator $thoughts) {
                 if ($thoughts->isEmpty()) {
                     return null;
                 }
                 $first = $thoughts->first();
 
-                return $first->source_metadata["jira_updated_at"] ??
+                return $first->source_metadata['jira_updated_at'] ??
                     $first->created_at?->toIso8601String();
             }
         );
@@ -767,22 +767,22 @@ class IdeaController extends Controller
      */
     public function streamEmails(Request $request): View|JsonResponse
     {
-        $request->validate(["page" => "nullable|integer|min:1"]);
-        $page = (int) $request->input("page", 1);
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
 
         $thoughts = Thought::query()
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->visibleInStream()
             ->topLevel()
-            ->matchingCanonicalSourceType("email")
-            ->with(["childThoughts" => fn ($q) => $q->orderBy("created_at")])
-            ->orderByDesc("created_at")
-            ->paginate(self::STREAM_PAGE_SIZE, ["*"], "page", $page);
+            ->matchingCanonicalSourceType('email')
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
         return $this->streamCollectionResponse(
             $request,
             $thoughts,
-            "email",
+            'email',
             fn (LengthAwarePaginator $thoughts) => $thoughts->isNotEmpty()
                 ? $thoughts->first()->created_at->toIso8601String()
                 : null
@@ -794,28 +794,28 @@ class IdeaController extends Controller
      */
     public function streamResearch(Request $request): View|JsonResponse
     {
-        $request->validate(["page" => "nullable|integer|min:1"]);
-        $page = (int) $request->input("page", 1);
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
 
         $thoughts = Thought::query()
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->visibleInStream()
             ->where(function ($q): void {
-                $q->whereNull("parent_id")->orWhereHas("parent", function (
+                $q->whereNull('parent_id')->orWhereHas('parent', function (
                     $pq
                 ): void {
-                    $pq->where("metadata->type", "video");
+                    $pq->where('metadata->type', 'video');
                 });
             })
-            ->matchingCanonicalMetadataType("research")
-            ->with(["childThoughts" => fn ($q) => $q->orderBy("created_at")])
-            ->orderByDesc("created_at")
-            ->paginate(self::STREAM_PAGE_SIZE, ["*"], "page", $page);
+            ->matchingCanonicalMetadataType('research')
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
         return $this->streamCollectionResponse(
             $request,
             $thoughts,
-            "research",
+            'research',
             fn (LengthAwarePaginator $thoughts) => $thoughts->isNotEmpty()
                 ? $thoughts->first()->created_at->toIso8601String()
                 : null
@@ -827,22 +827,22 @@ class IdeaController extends Controller
      */
     public function streamPlans(Request $request): View|JsonResponse
     {
-        $request->validate(["page" => "nullable|integer|min:1"]);
-        $page = (int) $request->input("page", 1);
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
 
         $thoughts = Thought::query()
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->visibleInStream()
             ->topLevel()
-            ->matchingCanonicalMetadataType("plan")
-            ->with(["childThoughts" => fn ($q) => $q->orderBy("created_at")])
-            ->orderByDesc("created_at")
-            ->paginate(self::STREAM_PAGE_SIZE, ["*"], "page", $page);
+            ->matchingCanonicalMetadataType('plan')
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
         return $this->streamCollectionResponse(
             $request,
             $thoughts,
-            "plan",
+            'plan',
             fn (LengthAwarePaginator $thoughts) => $thoughts->isNotEmpty()
                 ? $thoughts->first()->created_at->toIso8601String()
                 : null
@@ -854,22 +854,22 @@ class IdeaController extends Controller
      */
     public function streamMeetings(Request $request): View|JsonResponse
     {
-        $request->validate(["page" => "nullable|integer|min:1"]);
-        $page = (int) $request->input("page", 1);
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
 
         $thoughts = Thought::query()
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->visibleInStream()
             ->topLevel()
-            ->matchingCanonicalMetadataType("meeting")
-            ->with(["childThoughts" => fn ($q) => $q->orderBy("created_at")])
-            ->orderByDesc("created_at")
-            ->paginate(self::STREAM_PAGE_SIZE, ["*"], "page", $page);
+            ->matchingCanonicalMetadataType('meeting')
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
 
         return $this->streamCollectionResponse(
             $request,
             $thoughts,
-            "meeting",
+            'meeting',
             fn (LengthAwarePaginator $thoughts) => $thoughts->isNotEmpty()
                 ? $thoughts->first()->created_at->toIso8601String()
                 : null
@@ -888,19 +888,19 @@ class IdeaController extends Controller
         callable $latestForAjax
     ): View|JsonResponse {
         $shareByThoughtId = ResearchShare::whereIn(
-            "thought_id",
-            $thoughts->pluck("id")
+            'thought_id',
+            $thoughts->pluck('id')
         )
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->get()
-            ->keyBy("thought_id");
+            ->keyBy('thought_id');
 
         if ($request->ajax()) {
             $newsletterResearchStatusPresenters = $this->buildEmailNewsletterResearchStatusPresenters(
                 $thoughts->getCollection()
             );
-            $html = view("idea.stream_thoughts", [
-                "cards" => $this->buildStreamThoughtCardPresenters(
+            $html = view('idea.stream_thoughts', [
+                'cards' => $this->buildStreamThoughtCardPresenters(
                     $thoughts,
                     $shareByThoughtId,
                     false,
@@ -910,12 +910,12 @@ class IdeaController extends Controller
             $streamSince = $latestForAjax($thoughts);
 
             return response()->json([
-                "html" => $html,
-                "has_more" => $thoughts->hasMorePages(),
-                "next_page" => $thoughts->currentPage() + 1,
-                "count" => $thoughts->count(),
-                "total" => $thoughts->total(),
-                "latest_created_at" => $streamSince,
+                'html' => $html,
+                'has_more' => $thoughts->hasMorePages(),
+                'next_page' => $thoughts->currentPage() + 1,
+                'count' => $thoughts->count(),
+                'total' => $thoughts->total(),
+                'latest_created_at' => $streamSince,
             ]);
         }
 
@@ -923,15 +923,15 @@ class IdeaController extends Controller
             $thoughts->getCollection()
         );
 
-        return view("idea.stream", [
-            "thoughts" => $thoughts,
-            "tag" => null,
-            "tagSlug" => null,
-            "streamJira" => $streamCollectionKey === "jira",
-            "streamCollectionKey" => $streamCollectionKey,
-            "streamSince" => $latestForAjax($thoughts),
-            "shareByThoughtId" => $shareByThoughtId,
-            "cards" => $this->buildStreamThoughtCardPresenters(
+        return view('idea.stream', [
+            'thoughts' => $thoughts,
+            'tag' => null,
+            'tagSlug' => null,
+            'streamJira' => $streamCollectionKey === 'jira',
+            'streamCollectionKey' => $streamCollectionKey,
+            'streamSince' => $latestForAjax($thoughts),
+            'shareByThoughtId' => $shareByThoughtId,
+            'cards' => $this->buildStreamThoughtCardPresenters(
                 $thoughts,
                 $shareByThoughtId,
                 false,
@@ -966,7 +966,7 @@ class IdeaController extends Controller
             $newsletterPresenters,
             $videoResearchUrlByThoughtId
         ) {
-            if (!$thought->parent_id) {
+            if (! $thought->parent_id) {
                 $currentReplyable = $replyableIndex;
                 $replyableIndex++;
             } else {
@@ -1026,16 +1026,16 @@ class IdeaController extends Controller
     ): array {
         $researchIdsByThoughtId = $thoughts
             ->filter(
-                fn (Thought $thought) => data_get($thought->metadata, "type") ===
-                    "video"
+                fn (Thought $thought) => data_get($thought->metadata, 'type') ===
+                    'video'
             )
             ->mapWithKeys(function (Thought $thought): array {
                 $researchId = data_get(
                     $thought->metadata,
-                    "research_thought_id"
+                    'research_thought_id'
                 );
 
-                return is_string($researchId) && $researchId !== ""
+                return is_string($researchId) && $researchId !== ''
                     ? [$thought->id => $researchId]
                     : [];
             });
@@ -1045,15 +1045,15 @@ class IdeaController extends Controller
         }
 
         $researchThoughts = Thought::query()
-            ->where("user_id", auth()->id())
-            ->whereIn("id", $researchIdsByThoughtId->values()->all())
-            ->where("metadata->type", "research")
-            ->get(["id"]);
+            ->where('user_id', auth()->id())
+            ->whereIn('id', $researchIdsByThoughtId->values()->all())
+            ->where('metadata->type', 'research')
+            ->get(['id']);
 
         $resolvedUrlsByResearchId = $researchThoughts
             ->mapWithKeys(
                 fn (Thought $thought): array => [
-                    $thought->id => route("idea.research.show", $thought),
+                    $thought->id => route('idea.research.show', $thought),
                 ]
             )
             ->all();
@@ -1089,7 +1089,7 @@ class IdeaController extends Controller
     {
         $ideas = $revisitService->forUser(auth()->user());
 
-        return view("idea.revisit", ["ideas" => $ideas]);
+        return view('idea.revisit', ['ideas' => $ideas]);
     }
 
     /**
@@ -1099,15 +1099,15 @@ class IdeaController extends Controller
     {
         $ideas = IdeaCompletedAtSql::applyCompletedIdeaOrdering(
             Thought::query()
-                ->where("user_id", auth()->id())
+                ->where('user_id', auth()->id())
                 ->completedIdeas()
         )->paginate(20);
 
         $completedRows = $this->buildCompletedIdeaPresenters($ideas);
 
-        return view("idea.completed", [
-            "ideas" => $ideas,
-            "completedRows" => $completedRows,
+        return view('idea.completed', [
+            'ideas' => $ideas,
+            'completedRows' => $completedRows,
         ]);
     }
 
@@ -1119,45 +1119,45 @@ class IdeaController extends Controller
     public function ideas(Request $request): View|JsonResponse
     {
         $ideas = $this->withIdeaResearchRunStateColumns(
-            Thought::query()->select("thoughts.*")
+            Thought::query()->select('thoughts.*')
         )
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->incompleteIdeas()
-            ->orderByDesc("created_at")
+            ->orderByDesc('created_at')
             ->paginate(20);
 
-        $ideaIds = $ideas->pluck("id");
+        $ideaIds = $ideas->pluck('id');
         $researchByIdea = collect();
         if ($ideaIds->isNotEmpty()) {
             $researchThoughts = Thought::query()
-                ->where("user_id", auth()->id())
-                ->where("metadata->type", "research")
+                ->where('user_id', auth()->id())
+                ->where('metadata->type', 'research')
                 ->where(function ($q) use ($ideaIds) {
                     foreach ($ideaIds as $id) {
-                        $q->orWhere("metadata->idea_id", $id);
+                        $q->orWhere('metadata->idea_id', $id);
                     }
                 })
-                ->orderByDesc("created_at")
+                ->orderByDesc('created_at')
                 ->get();
             $researchByIdea = $researchThoughts->groupBy(
-                fn (Thought $t) => $t->metadata["idea_id"] ?? ""
+                fn (Thought $t) => $t->metadata['idea_id'] ?? ''
             );
         }
 
         $ideaRows = $this->buildIdeaListItemPresenters($ideas, $researchByIdea);
 
         if ($request->ajax()) {
-            $html = view("idea.partials.ideas_list", [
-                "ideas" => $ideas,
-                "ideaRows" => $ideaRows,
+            $html = view('idea.partials.ideas_list', [
+                'ideas' => $ideas,
+                'ideaRows' => $ideaRows,
             ])->render();
             $latest = $ideas->isEmpty()
                 ? null
                 : $ideas->first()->created_at->toIso8601String();
 
             return response()->json([
-                "html" => $html,
-                "latest_created_at" => $latest,
+                'html' => $html,
+                'latest_created_at' => $latest,
             ]);
         }
 
@@ -1181,11 +1181,11 @@ class IdeaController extends Controller
                 : false;
         $researchAutoRunEligible = $autoRunEnabled && $hasEligibleDefaultSkill;
 
-        return view("idea.ideas", [
-            "ideas" => $ideas,
-            "ideaRows" => $ideaRows,
-            "researchAutoRunEligible" => $researchAutoRunEligible,
-            "manualResearchSkills" => $manualResearchSkills,
+        return view('idea.ideas', [
+            'ideas' => $ideas,
+            'ideaRows' => $ideaRows,
+            'researchAutoRunEligible' => $researchAutoRunEligible,
+            'manualResearchSkills' => $manualResearchSkills,
         ]);
     }
 
@@ -1195,14 +1195,14 @@ class IdeaController extends Controller
     private function manualResearchSkillsForUser(User $user): Collection
     {
         return ResearchSkill::query()
-            ->where("user_id", $user->id)
-            ->where("is_active", true)
-            ->where("is_manual_enabled", true)
-            ->withExists("latestVersion")
-            ->orderByDesc("is_default")
-            ->orderBy("name")
-            ->orderBy("id")
-            ->get(["id", "name", "is_default", "allow_auto_run"]);
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->where('is_manual_enabled', true)
+            ->withExists('latestVersion')
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name', 'is_default', 'allow_auto_run']);
     }
 
     /**
@@ -1236,51 +1236,51 @@ class IdeaController extends Controller
     private function withIdeaResearchRunStateColumns(Builder $query): Builder
     {
         $latestRun = ResearchRun::query()
-            ->whereColumn("research_runs.idea_thought_id", "thoughts.id")
-            ->orderByDesc("research_runs.id");
+            ->whereColumn('research_runs.idea_thought_id', 'thoughts.id')
+            ->orderByDesc('research_runs.id');
         $activeRun = ResearchRun::query()
-            ->whereColumn("research_runs.idea_thought_id", "thoughts.id")
-            ->whereIn("research_runs.status", ["queued", "running"])
-            ->orderByDesc("research_runs.id");
+            ->whereColumn('research_runs.idea_thought_id', 'thoughts.id')
+            ->whereIn('research_runs.status', ['queued', 'running'])
+            ->orderByDesc('research_runs.id');
 
         return $query
             ->selectSub(
-                (clone $latestRun)->select("research_runs.status")->limit(1),
-                "latest_research_run_status"
+                (clone $latestRun)->select('research_runs.status')->limit(1),
+                'latest_research_run_status'
             )
             ->selectSub(
                 (clone $latestRun)
-                    ->select("research_runs.error_summary")
+                    ->select('research_runs.error_summary')
                     ->limit(1),
-                "latest_research_run_error_summary"
+                'latest_research_run_error_summary'
             )
             ->selectSub(
                 (clone $latestRun)
                     ->join(
-                        "research_skills",
-                        "research_skills.id",
-                        "=",
-                        "research_runs.research_skill_id"
+                        'research_skills',
+                        'research_skills.id',
+                        '=',
+                        'research_runs.research_skill_id'
                     )
-                    ->select("research_skills.name")
+                    ->select('research_skills.name')
                     ->limit(1),
-                "latest_research_run_skill_name"
+                'latest_research_run_skill_name'
             )
             ->selectSub(
-                (clone $activeRun)->select("research_runs.status")->limit(1),
-                "active_research_run_status"
+                (clone $activeRun)->select('research_runs.status')->limit(1),
+                'active_research_run_status'
             )
             ->selectSub(
                 (clone $activeRun)
                     ->join(
-                        "research_skills",
-                        "research_skills.id",
-                        "=",
-                        "research_runs.research_skill_id"
+                        'research_skills',
+                        'research_skills.id',
+                        '=',
+                        'research_runs.research_skill_id'
                     )
-                    ->select("research_skills.name")
+                    ->select('research_skills.name')
                     ->limit(1),
-                "active_research_run_skill_name"
+                'active_research_run_skill_name'
             );
     }
 
@@ -1305,40 +1305,40 @@ class IdeaController extends Controller
     public function storeIdea(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            "content" => "required|string|max:65535",
-            "logged_date" => "nullable|date_format:Y-m-d",
-            "completed" => "sometimes|boolean",
+            'content' => 'required|string|max:65535',
+            'logged_date' => 'nullable|date_format:Y-m-d',
+            'completed' => 'sometimes|boolean',
         ]);
-        $content = $validated["content"];
-        $loggedDate = $validated["logged_date"] ?? now()->toDateString();
+        $content = $validated['content'];
+        $loggedDate = $validated['logged_date'] ?? now()->toDateString();
 
         try {
             $result = $this->captureService->create([
-                "content" => $content,
-                "user_id" => auth()->id(),
-                "parent_id" => null,
-                "source" => "web",
-                "source_metadata" => null,
-                "idea_metadata" => [
-                    "type" => "idea",
-                    "completed" => $validated["completed"] ?? false,
-                    "logged_date" => $loggedDate,
+                'content' => $content,
+                'user_id' => auth()->id(),
+                'parent_id' => null,
+                'source' => 'web',
+                'source_metadata' => null,
+                'idea_metadata' => [
+                    'type' => 'idea',
+                    'completed' => $validated['completed'] ?? false,
+                    'logged_date' => $loggedDate,
                 ],
             ]);
         } catch (\Throwable $e) {
             report($e);
 
             return redirect()
-                ->route("idea.ideas")
+                ->route('idea.ideas')
                 ->withInput()
-                ->with("error", "Unable to save idea. Please try again.");
+                ->with('error', 'Unable to save idea. Please try again.');
         }
 
-        $idea = $result["thought"] ?? ($result["root"] ?? null);
-        if (!$idea instanceof Thought) {
+        $idea = $result['thought'] ?? ($result['root'] ?? null);
+        if (! $idea instanceof Thought) {
             return redirect()
-                ->route("idea.ideas")
-                ->with("error", "Unable to save idea. Please try again.");
+                ->route('idea.ideas')
+                ->with('error', 'Unable to save idea. Please try again.');
         }
 
         $user = $request->user();
@@ -1354,27 +1354,27 @@ class IdeaController extends Controller
         ) {
             $this->markResearchPending($idea);
             try {
-                $this->researchService->queueResearchRunForIdea($idea, "web");
+                $this->researchService->queueResearchRunForIdea($idea, 'web');
                 $queuedResearch = true;
             } catch (\Throwable $e) {
                 report($e);
                 $this->clearResearchPending($idea);
 
                 return redirect()
-                    ->route("idea.ideas")
+                    ->route('idea.ideas')
                     ->withInput()
                     ->with(
-                        "error",
-                        "Idea saved, but research could not be queued. Please try again."
+                        'error',
+                        'Idea saved, but research could not be queued. Please try again.'
                     );
             }
         }
 
         $message = $queuedResearch
-            ? "Idea saved. Research queued — refresh in a moment to see results."
-            : "Idea saved.";
+            ? 'Idea saved. Research queued — refresh in a moment to see results.'
+            : 'Idea saved.';
 
-        return redirect()->route("idea.ideas")->with("success", $message);
+        return redirect()->route('idea.ideas')->with('success', $message);
     }
 
     /**
@@ -1384,51 +1384,51 @@ class IdeaController extends Controller
         Request $request,
         Thought $thought
     ): RedirectResponse|JsonResponse {
-        $this->authorize("update", $thought);
+        $this->authorize('update', $thought);
 
-        if (($thought->metadata["type"] ?? null) !== "idea") {
+        if (($thought->metadata['type'] ?? null) !== 'idea') {
             if ($request->expectsJson()) {
-                return response()->json(["message" => "Not an idea."], 422);
+                return response()->json(['message' => 'Not an idea.'], 422);
             }
 
             return redirect()
-                ->route("idea.ideas")
-                ->with("error", "Not an idea.")
+                ->route('idea.ideas')
+                ->with('error', 'Not an idea.')
                 ->setStatusCode(Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $metadata = $thought->metadata ?? [];
         $wasCompleted = $thought->isIdeaCompleted();
-        $completed = !$wasCompleted;
+        $completed = ! $wasCompleted;
 
-        $metadata["type"] = "idea";
-        $metadata["completed"] = $completed;
-        $metadata["logged_date"] =
-            $metadata["logged_date"] ?? $thought->created_at->toDateString();
+        $metadata['type'] = 'idea';
+        $metadata['completed'] = $completed;
+        $metadata['logged_date'] =
+            $metadata['logged_date'] ?? $thought->created_at->toDateString();
 
         if ($completed) {
-            $metadata["completed_at"] = now()->toIso8601String();
+            $metadata['completed_at'] = now()->toIso8601String();
         } else {
-            unset($metadata["completed_at"]);
+            unset($metadata['completed_at']);
         }
 
-        $thought->update(["metadata" => $metadata]);
+        $thought->update(['metadata' => $metadata]);
         $thought->refresh();
 
         if ($request->expectsJson()) {
             return response()->json([
-                "completed" => $completed,
-                "completed_at" => $completed
-                    ? $thought->metadata["completed_at"] ?? null
+                'completed' => $completed,
+                'completed_at' => $completed
+                    ? $thought->metadata['completed_at'] ?? null
                     : null,
             ]);
         }
 
         return redirect()
-            ->back(fallback: route("idea.ideas"))
+            ->back(fallback: route('idea.ideas'))
             ->with(
-                "success",
-                $completed ? "Marked as complete." : "Marked as incomplete."
+                'success',
+                $completed ? 'Marked as complete.' : 'Marked as incomplete.'
             );
     }
 
@@ -1439,25 +1439,25 @@ class IdeaController extends Controller
         Request $request,
         Thought $thought
     ): RedirectResponse|JsonResponse {
-        $this->authorize("update", $thought);
+        $this->authorize('update', $thought);
 
         $validated = $request->validate([
-            "tags" => "present|array",
-            "tags.*" => "string|max:100",
+            'tags' => 'present|array',
+            'tags.*' => 'string|max:100',
         ]);
-        $tags = $validated["tags"];
+        $tags = $validated['tags'];
         $tags = array_map(fn ($t) => trim((string) $t), $tags);
-        $normalized = Thought::normalizeMetadataTags(["tags" => $tags]);
-        $tags = array_values(array_unique($normalized["tags"]));
+        $normalized = Thought::normalizeMetadataTags(['tags' => $tags]);
+        $tags = array_values(array_unique($normalized['tags']));
 
-        $metadata = array_merge($thought->metadata ?? [], ["tags" => $tags]);
-        $thought->update(["metadata" => $metadata]);
+        $metadata = array_merge($thought->metadata ?? [], ['tags' => $tags]);
+        $thought->update(['metadata' => $metadata]);
 
         if ($request->expectsJson()) {
-            return response()->json(["tags" => $tags]);
+            return response()->json(['tags' => $tags]);
         }
 
-        return redirect()->back()->with("success", "Tags updated.");
+        return redirect()->back()->with('success', 'Tags updated.');
     }
 
     /**
@@ -1467,30 +1467,30 @@ class IdeaController extends Controller
         Request $request,
         Thought $thought
     ): RedirectResponse|JsonResponse {
-        $this->authorize("update", $thought);
+        $this->authorize('update', $thought);
 
         $validated = $request->validate([
-            "content" => ["required", "string", "max:65535"],
+            'content' => ['required', 'string', 'max:65535'],
         ]);
 
-        $content = trim($validated["content"]);
-        if ($content === "") {
+        $content = trim($validated['content']);
+        if ($content === '') {
             throw ValidationException::withMessages([
-                "content" => ["Content cannot be empty."],
+                'content' => ['Content cannot be empty.'],
             ]);
         }
 
-        $thought->update(["content" => $content]);
+        $thought->update(['content' => $content]);
         $thought->refresh();
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
-                "content" => $thought->content,
-                "content_html" => $this->renderedThoughtBodyHtml($thought),
+                'content' => $thought->content,
+                'content_html' => $this->renderedThoughtBodyHtml($thought),
             ]);
         }
 
-        return redirect()->back()->with("success", "Thought updated.");
+        return redirect()->back()->with('success', 'Thought updated.');
     }
 
     /**
@@ -1500,14 +1500,13 @@ class IdeaController extends Controller
         Request $request,
         Thought $thought
     ): RedirectResponse|JsonResponse {
-        $this->authorize("delete", $thought);
+        $this->authorize('delete', $thought);
 
         if ($thought->childThoughts()->exists()) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(
                     [
-                        "message" =>
-                            "This thought has comments. Remove them first.",
+                        'message' => 'This thought has comments. Remove them first.',
                     ],
                     Response::HTTP_UNPROCESSABLE_ENTITY
                 );
@@ -1515,7 +1514,7 @@ class IdeaController extends Controller
 
             return redirect()
                 ->back()
-                ->with("error", "This thought has comments. Remove them first.")
+                ->with('error', 'This thought has comments. Remove them first.')
                 ->setStatusCode(Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -1525,7 +1524,7 @@ class IdeaController extends Controller
             return response()->json(null, Response::HTTP_NO_CONTENT);
         }
 
-        return redirect()->back()->with("success", "Thought deleted.");
+        return redirect()->back()->with('success', 'Thought deleted.');
     }
 
     /**
@@ -1535,18 +1534,18 @@ class IdeaController extends Controller
         Request $request,
         Thought $thought
     ): RedirectResponse|JsonResponse {
-        $this->authorize("update", $thought);
+        $this->authorize('update', $thought);
 
         if (
-            data_get($thought->source_metadata, "provenance") === "upload" &&
-            !filter_var(
-                $request->input("provenance_ack"),
+            data_get($thought->source_metadata, 'provenance') === 'upload' &&
+            ! filter_var(
+                $request->input('provenance_ack'),
                 FILTER_VALIDATE_BOOLEAN
             )
         ) {
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json(
-                    ["error" => "provenance_ack_required"],
+                    ['error' => 'provenance_ack_required'],
                     409
                 );
             }
@@ -1554,19 +1553,19 @@ class IdeaController extends Controller
             return redirect()
                 ->back()
                 ->with(
-                    "error",
-                    "Confirm that you want to run research on imported file content (use the button and confirm the prompt)."
+                    'error',
+                    'Confirm that you want to run research on imported file content (use the button and confirm the prompt).'
                 );
         }
 
-        if (($thought->metadata["type"] ?? null) !== "idea") {
+        if (($thought->metadata['type'] ?? null) !== 'idea') {
             return redirect()
-                ->route("idea.ideas")
-                ->with("error", "Not an idea.");
+                ->route('idea.ideas')
+                ->with('error', 'Not an idea.');
         }
 
         $validated = $request->validate([
-            "research_skill_id" => $this->manualResearchSkillValidationRules(
+            'research_skill_id' => $this->manualResearchSkillValidationRules(
                 $thought->user_id
             ),
         ]);
@@ -1576,8 +1575,8 @@ class IdeaController extends Controller
         try {
             $this->researchService->queueResearchRunForIdea(
                 $thought,
-                "web",
-                $validated["research_skill_id"] ?? null
+                'web',
+                $validated['research_skill_id'] ?? null
             );
         } catch (\Throwable $e) {
             report($e);
@@ -1585,14 +1584,14 @@ class IdeaController extends Controller
 
             return redirect()
                 ->back()
-                ->with("error", "Unable to start research. Please try again.");
+                ->with('error', 'Unable to start research. Please try again.');
         }
 
         return redirect()
             ->back()
             ->with(
-                "success",
-                "Research started. This may take a moment — refresh to see results."
+                'success',
+                'Research started. This may take a moment — refresh to see results.'
             );
     }
 
@@ -1602,22 +1601,22 @@ class IdeaController extends Controller
     public function researchNew(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            "content" => "required|string|max:65535",
-            "research_skill_id" => $this->manualResearchSkillValidationRules(
+            'content' => 'required|string|max:65535',
+            'research_skill_id' => $this->manualResearchSkillValidationRules(
                 (int) auth()->id()
             ),
         ]);
-        $content = $validated["content"];
+        $content = $validated['content'];
 
         try {
-            $idea = $this->researchService->createIdeaOnly($content, "web");
+            $idea = $this->researchService->createIdeaOnly($content, 'web');
         } catch (\Throwable $e) {
             report($e);
 
             return redirect()
-                ->route("idea.ideas")
+                ->route('idea.ideas')
                 ->withInput()
-                ->with("error", "Unable to save idea. Please try again.");
+                ->with('error', 'Unable to save idea. Please try again.');
         }
 
         $this->markResearchPending($idea);
@@ -1625,26 +1624,26 @@ class IdeaController extends Controller
         try {
             $this->researchService->queueResearchRunForIdea(
                 $idea,
-                "web",
-                $validated["research_skill_id"] ?? null
+                'web',
+                $validated['research_skill_id'] ?? null
             );
         } catch (\Throwable $e) {
             report($e);
             $this->clearResearchPending($idea);
 
             return redirect()
-                ->route("idea.ideas")
+                ->route('idea.ideas')
                 ->with(
-                    "error",
-                    "Idea saved, but research could not be queued. Please try again."
+                    'error',
+                    'Idea saved, but research could not be queued. Please try again.'
                 );
         }
 
         return redirect()
-            ->route("idea.ideas")
+            ->route('idea.ideas')
             ->with(
-                "success",
-                "Idea saved. Research started — refresh in a moment to see results."
+                'success',
+                'Idea saved. Research started — refresh in a moment to see results.'
             );
     }
 
@@ -1654,15 +1653,15 @@ class IdeaController extends Controller
     private function manualResearchSkillValidationRules(int $userId): array
     {
         return [
-            "nullable",
-            "integer",
-            Rule::exists("research_skills", "id")->where(function ($query) use (
+            'nullable',
+            'integer',
+            Rule::exists('research_skills', 'id')->where(function ($query) use (
                 $userId
             ) {
                 $query
-                    ->where("user_id", $userId)
-                    ->where("is_active", true)
-                    ->where("is_manual_enabled", true);
+                    ->where('user_id', $userId)
+                    ->where('is_active', true)
+                    ->where('is_manual_enabled', true);
             }),
         ];
     }
@@ -1670,9 +1669,9 @@ class IdeaController extends Controller
     private function markResearchPending(Thought $thought): void
     {
         $metadata = array_merge($thought->metadata ?? [], [
-            "research_pending" => true,
+            'research_pending' => true,
         ]);
-        $thought->update(["metadata" => $metadata]);
+        $thought->update(['metadata' => $metadata]);
     }
 
     private function clearResearchPending(Thought $thought): void
@@ -1680,61 +1679,87 @@ class IdeaController extends Controller
         $thought->refresh();
 
         $metadata = $thought->metadata ?? [];
-        unset($metadata["research_pending"]);
-        $thought->update(["metadata" => $metadata]);
+        unset($metadata['research_pending']);
+        $thought->update(['metadata' => $metadata]);
     }
 
     /**
      * Show a single thought (research document) with formatted markdown. Full app chrome.
      * If the thought has a parent, redirect to the parent so the full document is shown.
+     * Microsite roots: single-page + path nav `/research/{id}/p/{page}`; `?page=` redirects to the path; microsite
+     * child thought URLs redirect to the canonical in-app page route.
      */
-    public function showResearch(Thought $thought): View|RedirectResponse
+    public function showResearch(Request $request, Thought $thought, ?string $page = null): View|RedirectResponse
     {
-        $this->authorize("view", $thought);
+        $this->authorize('view', $thought);
 
         if ($thought->parent_id !== null) {
             $parent = Thought::query()->whereKey($thought->parent_id)->first();
             $parentIsVideo =
                 $parent !== null &&
-                data_get($parent->metadata, "type") === "video";
-            if (!$parentIsVideo) {
-                return redirect()->route("idea.research.show", [
-                    "thought" => $thought->parent_id,
+                data_get($parent->metadata, 'type') === 'video';
+            if (! $parentIsVideo) {
+                if ($parent !== null && $parent->isMicrositeRoot()) {
+                    $seg = (string) data_get($thought->source_metadata, 'page_path_segment', '');
+                    if ($seg !== '') {
+                        return redirect()->route('idea.research.page', [
+                            'thought' => $parent,
+                            'page' => $seg,
+                        ]);
+                    }
+
+                    return redirect()->route('idea.research.show', $parent);
+                }
+
+                return redirect()->route('idea.research.show', [
+                    'thought' => $thought->parent_id,
                 ]);
             }
         }
 
         $isResearchRoot = Thought::query()
             ->whereKey($thought->id)
-            ->where("user_id", auth()->id())
-            ->matchingCanonicalMetadataType("research")
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
             ->exists();
 
-        if (!$isResearchRoot) {
-            return redirect()->route("thoughts.show", $thought);
+        if (! $isResearchRoot) {
+            return redirect()->route('thoughts.show', $thought);
         }
 
-        $sections = $thought->childThoughts()->orderBy("created_at")->get();
+        if ($thought->isMicrositeRoot()) {
+            if ($page === null && $request->routeIs('idea.research.show')) {
+                $q = $request->query('page');
+                if (is_string($q) && $q !== '') {
+                    return redirect()->route('idea.research.page', [
+                        'thought' => $thought,
+                        'page' => $q,
+                    ], 301);
+                }
+            }
+
+            return $this->showMicrositeResearch($request, $thought, $page);
+        }
+
+        $sections = $thought->childThoughts()->orderBy('created_at')->get();
         $converter = new CommonMarkConverter([
-            "html_input" => "strip",
-            "allow_unsafe_links" => false,
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
         ]);
 
         $rootHtml = $this->renderDemoSafeMarkdown(
             $converter,
             $thought->content,
-            "research_show_root"
+            'research_show_root'
         );
-        $sectionsWithHtml = $sections->map(function (Thought $section) use (
-            $converter
-        ) {
+        $sectionsWithHtml = $sections->map(function (Thought $section) use ($converter) {
             return (object) [
-                "id" => $section->id,
-                "thought" => $section,
-                "content_html" => $this->renderDemoSafeMarkdown(
+                'id' => $section->id,
+                'thought' => $section,
+                'content_html' => $this->renderDemoSafeMarkdown(
                     $converter,
                     $section->content,
-                    "research_show_section"
+                    'research_show_section'
                 ),
             ];
         });
@@ -1746,8 +1771,8 @@ class IdeaController extends Controller
         );
         $newsletterAnalysis = $this->buildNewsletterAnalysisViewModel($thought);
         $pageTitle = Str::limit(
-            preg_replace("/\s+/", " ", trim(strip_tags($rootHtml))) ?:
-            "Research",
+            preg_replace("/\s+/", ' ', trim(strip_tags($rootHtml))) ?:
+            'Research',
             50
         );
 
@@ -1761,20 +1786,156 @@ class IdeaController extends Controller
 
         ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
 
-        return view("idea.research_show", [
-            "root" => $thought,
-            "pageTitle" => $pageTitle,
-            "root_html" => $rootHtml,
-            "sections" => $sectionsWithHtml,
-            "sectionThoughts" => $sections,
-            "relatedEmail" => $relatedEmail,
-            "linkedVideo" => $linkedVideo,
-            "editorialLinkSummaries" => $editorialLinkSummaries,
-            "newsletterAnalysis" => $newsletterAnalysis,
-            "commentsPresenter" => $commentsPresenter,
-            "researchContentComments" => ResearchContentCommentsViewData::none(),
-            "researchUnreadBannerCount" => $researchUnreadBannerCount,
+        return view('idea.research_show', [
+            'root' => $thought,
+            'isMicrosite' => false,
+            'pageTitle' => $pageTitle,
+            'root_html' => $rootHtml,
+            'sections' => $sectionsWithHtml,
+            'sectionThoughts' => $sections,
+            'relatedEmail' => $relatedEmail,
+            'linkedVideo' => $linkedVideo,
+            'editorialLinkSummaries' => $editorialLinkSummaries,
+            'newsletterAnalysis' => $newsletterAnalysis,
+            'commentsPresenter' => $commentsPresenter,
+            'researchContentComments' => ResearchContentCommentsViewData::none(),
+            'researchUnreadBannerCount' => $researchUnreadBannerCount,
         ]);
+    }
+
+    /**
+     * Paged in-app view for a microsite (path segment from `idea.research.page`; home uses `idea.research.show` only).
+     */
+    private function showMicrositeResearch(
+        Request $request,
+        Thought $thought,
+        ?string $pathPage,
+    ): View|RedirectResponse {
+        $active = $thought->findMicrositePageByPathSegment($pathPage);
+        if ($active === null) {
+            abort(404);
+        }
+        if (
+            $pathPage !== null
+            && $pathPage !== ''
+            && (string) $active->id === (string) $thought->id
+            && $request->routeIs('idea.research.page')
+        ) {
+            return redirect()->route('idea.research.show', $thought, 301);
+        }
+
+        $converter = new CommonMarkConverter([
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
+        ]);
+        $rootHtml = $this->renderDemoSafeMarkdown(
+            $converter,
+            $active->content,
+            'research_show_root'
+        );
+        $rootHtml = MicrositeInAppPathHelper::rewriteQueryPageLinksInHtml($thought, $rootHtml);
+
+        $onRoot = (string) $active->id === (string) $thought->id;
+        $relatedEmail = $onRoot ? $this->resolveResearchRelatedEmailCard($thought) : null;
+        $linkedVideo = $onRoot
+            ? $this->resolveLinkedVideoForResearchThought($thought)
+            : null;
+        $editorialLinkSummaries = $onRoot
+            ? $this->buildResearchEditorialLinkSummaryViewModel($thought)
+            : [
+                'show' => false,
+                'sections' => [],
+                'pending_count' => 0,
+                'failed_count' => 0,
+            ];
+        $newsletterAnalysis = $onRoot
+            ? $this->buildNewsletterAnalysisViewModel($thought)
+            : null;
+
+        $fromHtml = Str::limit(
+            preg_replace("/\s+/", ' ', trim(strip_tags($rootHtml))) ?:
+            '',
+            50
+        );
+        $pageTitle = $fromHtml !== ''
+            ? $fromHtml
+            : (string) Str::limit(
+                (string) MicrositePageLabel::forThought($active),
+                50
+            );
+
+        $nav = $this->buildInAppMicrositeNav($thought, $active);
+        $commentsPresenter = new ResearchCommentsPresenter(
+            $thought,
+            auth()->user(),
+            null
+        );
+        $researchUnreadBannerCount = $commentsPresenter->unreadCount();
+        ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
+        $micrositePageThreadInclude = $commentsPresenter->threadIncludeForSection(
+            $active,
+            route('comments.store'),
+            'owner',
+            true,
+            'Comments on this page',
+            $commentsPresenter->canCommentOnSection($active)
+                ? null
+                : 'Comments are disabled for this page.',
+        );
+
+        return view('idea.research_show', [
+            'root' => $thought,
+            'isMicrosite' => true,
+            'onMicrositeRootIndex' => $onRoot,
+            'activeMicrositePage' => $active,
+            'micrositeNav' => $nav,
+            'micrositePageThreadInclude' => $micrositePageThreadInclude,
+            'pageTitle' => $pageTitle,
+            'root_html' => $rootHtml,
+            'sections' => collect(),
+            'sectionThoughts' => collect(),
+            'relatedEmail' => $relatedEmail,
+            'linkedVideo' => $linkedVideo,
+            'editorialLinkSummaries' => $editorialLinkSummaries,
+            'newsletterAnalysis' => $newsletterAnalysis,
+            'commentsPresenter' => $commentsPresenter,
+            'researchContentComments' => ResearchContentCommentsViewData::none(),
+            'researchUnreadBannerCount' => $researchUnreadBannerCount,
+        ]);
+    }
+
+    /**
+     * @return Collection<int, object{url: string, label: string, is_active: bool}>
+     */
+    private function buildInAppMicrositeNav(Thought $root, Thought $active): Collection
+    {
+        $all = collect([$root])
+            ->merge($root->childThoughtsForMicrosite()->get());
+
+        return $all
+            ->map(function (Thought $t) use ($root, $active) {
+                $isActive = (string) $t->id === (string) $active->id;
+                if ($t->isMicrositeRoot() || (string) data_get($t->source_metadata, 'page_path_segment', '') === ''
+                ) {
+                    $url = route('idea.research.show', $root, true);
+                } else {
+                    $seg = (string) data_get(
+                        $t->source_metadata,
+                        'page_path_segment'
+                    );
+                    $url = route('idea.research.page', [
+                        'thought' => $root,
+                        'page' => $seg,
+                    ], true);
+                }
+
+                return (object) [
+                    'url' => $url,
+                    'label' => MicrositePageLabel::forThought($t),
+                    'is_active' => $isActive,
+                ];
+            })
+            ->values();
     }
 
     /**
@@ -1786,35 +1947,35 @@ class IdeaController extends Controller
         Thought $researchRoot
     ): ?array {
         $rawId =
-            data_get($researchRoot->source_metadata, "video_thought_id") ??
-            data_get($researchRoot->metadata, "video_thought_id");
-        if (!is_string($rawId) || trim($rawId) === "") {
+            data_get($researchRoot->source_metadata, 'video_thought_id') ??
+            data_get($researchRoot->metadata, 'video_thought_id');
+        if (! is_string($rawId) || trim($rawId) === '') {
             return null;
         }
 
         $video = Thought::query()
             ->whereKey($rawId)
-            ->where("user_id", $researchRoot->user_id)
-            ->with("childThoughts")
+            ->where('user_id', $researchRoot->user_id)
+            ->with('childThoughts')
             ->first();
-        if ($video === null || data_get($video->metadata, "type") !== "video") {
+        if ($video === null || data_get($video->metadata, 'type') !== 'video') {
             return null;
         }
 
-        $label = data_get($video->metadata, "video_url");
+        $label = data_get($video->metadata, 'video_url');
         $label =
-            is_string($label) && trim($label) !== ""
+            is_string($label) && trim($label) !== ''
                 ? trim($label)
-                : "Video thought";
+                : 'Video thought';
 
         $metadataRows = VideoThoughtMetadataPresenter::forVideoRoot(
             $video
         )->labeledRows();
 
         return [
-            "detail_url" => route("thoughts.show", $video),
-            "label" => $label,
-            "metadata_rows" => $metadataRows,
+            'detail_url' => route('thoughts.show', $video),
+            'label' => $label,
+            'metadata_rows' => $metadataRows,
         ];
     }
 
@@ -1832,14 +1993,14 @@ class IdeaController extends Controller
         Thought $root
     ): array {
         $rows = ThoughtLinkSummary::query()
-            ->where("parent_research_thought_id", $root->id)
-            ->where("user_id", $root->user_id)
+            ->where('parent_research_thought_id', $root->id)
+            ->where('user_id', $root->user_id)
             ->get();
 
         $editorial = $rows
             ->filter(
                 fn (ThoughtLinkSummary $row) => $row->classification ===
-                    "editorial"
+                    'editorial'
             )
             ->values();
 
@@ -1847,7 +2008,7 @@ class IdeaController extends Controller
             ->filter(
                 fn (ThoughtLinkSummary $row) => in_array(
                     $row->processing_status,
-                    ["queued", "fetching"],
+                    ['queued', 'fetching'],
                     true
                 )
             )
@@ -1855,35 +2016,35 @@ class IdeaController extends Controller
         $failedCount = $editorial
             ->filter(
                 fn (ThoughtLinkSummary $row) => $row->processing_status ===
-                    "failed"
+                    'failed'
             )
             ->count();
 
         $show =
             $editorial->isNotEmpty() || $pendingCount > 0 || $failedCount > 0;
 
-        if (!$show) {
+        if (! $show) {
             return [
-                "show" => false,
-                "sections" => [],
-                "pending_count" => 0,
-                "failed_count" => 0,
+                'show' => false,
+                'sections' => [],
+                'pending_count' => 0,
+                'failed_count' => 0,
             ];
         }
 
         $groups = $editorial->groupBy(
-            fn (ThoughtLinkSummary $row) => $row->newsletter_section_label ?? ""
+            fn (ThoughtLinkSummary $row) => $row->newsletter_section_label ?? ''
         );
 
         $sections = $groups
             ->map(function (Collection $items, string $labelKey) {
                 $minOrder = $items
-                    ->pluck("newsletter_section_order")
+                    ->pluck('newsletter_section_order')
                     ->filter(fn ($v) => $v !== null)
                     ->min();
                 $sectionOrder =
                     $minOrder === null ? PHP_INT_MAX : (int) $minOrder;
-                $displayLabel = $labelKey === "" ? "Other links" : $labelKey;
+                $displayLabel = $labelKey === '' ? 'Other links' : $labelKey;
 
                 $sortedItems = $items
                     ->sort(
@@ -1908,21 +2069,21 @@ class IdeaController extends Controller
                     ->all();
 
                 return [
-                    "label" => $displayLabel,
-                    "section_order" => $sectionOrder,
-                    "items" => $mappedItems,
+                    'label' => $displayLabel,
+                    'section_order' => $sectionOrder,
+                    'items' => $mappedItems,
                 ];
             })
             ->values()
-            ->sortBy("section_order")
+            ->sortBy('section_order')
             ->values()
             ->all();
 
         return [
-            "show" => true,
-            "sections" => $sections,
-            "pending_count" => $pendingCount,
-            "failed_count" => $failedCount,
+            'show' => true,
+            'sections' => $sections,
+            'pending_count' => $pendingCount,
+            'failed_count' => $failedCount,
         ];
     }
 
@@ -1930,7 +2091,7 @@ class IdeaController extends Controller
         Thought $researchThought
     ): ?array {
         $analysis = NewsletterAnalysis::query()
-            ->where("research_thought_id", $researchThought->id)
+            ->where('research_thought_id', $researchThought->id)
             ->first();
 
         if ($analysis === null) {
@@ -1938,13 +2099,13 @@ class IdeaController extends Controller
         }
 
         return [
-            "status" => (string) $analysis->status,
-            "summary" => $analysis->summary,
-            "key_points" => $analysis->key_points ?? [],
-            "positives_mentioned" => $analysis->positives_mentioned ?? [],
-            "negatives_mentioned" => $analysis->negatives_mentioned ?? [],
-            "highlights" => $analysis->highlights ?? [],
-            "quality_notes" => $analysis->quality_notes,
+            'status' => (string) $analysis->status,
+            'summary' => $analysis->summary,
+            'key_points' => $analysis->key_points ?? [],
+            'positives_mentioned' => $analysis->positives_mentioned ?? [],
+            'negatives_mentioned' => $analysis->negatives_mentioned ?? [],
+            'highlights' => $analysis->highlights ?? [],
+            'quality_notes' => $analysis->quality_notes,
         ];
     }
 
@@ -1955,38 +2116,37 @@ class IdeaController extends Controller
         ThoughtLinkSummary $row
     ): array {
         $title = $row->resolved_title;
-        if ($title === null || trim($title) === "") {
+        if ($title === null || trim($title) === '') {
             $title = $row->original_url;
         }
 
         return [
-            "title" =>
-                $row->resolved_title !== null &&
-                trim($row->resolved_title) !== ""
+            'title' => $row->resolved_title !== null &&
+                trim($row->resolved_title) !== ''
                     ? $this->demoSafeResearchText(
                         $title,
-                        "research_editorial_title",
-                        "research_show.editorial_title"
-                    ) ?? "Demo content hidden"
+                        'research_editorial_title',
+                        'research_show.editorial_title'
+                    ) ?? 'Demo content hidden'
                     : $title,
-            "url" => $row->original_url,
-            "summary_text" => $this->demoSafeResearchText(
+            'url' => $row->original_url,
+            'summary_text' => $this->demoSafeResearchText(
                 $row->summary_text,
-                "research_editorial_summary",
-                "research_show.editorial_summary"
+                'research_editorial_summary',
+                'research_show.editorial_summary'
             ),
-            "relation_label" => $row->support_judgment,
-            "why_it_matters" => $this->demoSafeResearchText(
+            'relation_label' => $row->support_judgment,
+            'why_it_matters' => $this->demoSafeResearchText(
                 $row->why_it_matters,
-                "research_editorial_why",
-                "research_show.editorial_why"
+                'research_editorial_why',
+                'research_show.editorial_why'
             ),
-            "quality_notes" => $this->demoSafeResearchText(
+            'quality_notes' => $this->demoSafeResearchText(
                 $row->quality_notes,
-                "research_editorial_quality_notes",
-                "research_show.editorial_quality_notes"
+                'research_editorial_quality_notes',
+                'research_show.editorial_quality_notes'
             ),
-            "processing_status" => $row->processing_status,
+            'processing_status' => $row->processing_status,
         ];
     }
 
@@ -2050,7 +2210,7 @@ class IdeaController extends Controller
         );
 
         return $research !== null
-            ? route("idea.research.show", $research)
+            ? route('idea.research.show', $research)
             : null;
     }
 
@@ -2064,12 +2224,12 @@ class IdeaController extends Controller
         ?ImportedEmail $preloadedImportedEmail = null,
         bool $usePreloadedImportedEmail = false
     ): ?Thought {
-        if ($thought->source !== "email") {
+        if ($thought->source !== 'email') {
             return null;
         }
 
         $metaId = $this->normalizeResearchThoughtId(
-            data_get($thought->source_metadata, "research_thought_id")
+            data_get($thought->source_metadata, 'research_thought_id')
         );
 
         $imported = $usePreloadedImportedEmail
@@ -2113,8 +2273,8 @@ class IdeaController extends Controller
 
         return Thought::query()
             ->whereKey($candidateId)
-            ->where("user_id", auth()->id())
-            ->matchingCanonicalMetadataType("research")
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
             ->first();
     }
 
@@ -2169,30 +2329,30 @@ class IdeaController extends Controller
         ?ImportedEmail $preloadedImportedEmail = null,
         bool $usePreloadedImportedEmail = false
     ): ?array {
-        if ($thought->source !== "email") {
+        if ($thought->source !== 'email') {
             return null;
         }
 
         $newsletterResearch = data_get(
             $thought->source_metadata,
-            "newsletter_research"
+            'newsletter_research'
         );
         $metadataStatus = is_array($newsletterResearch)
-            ? trim((string) ($newsletterResearch["status"] ?? ""))
-            : "";
+            ? trim((string) ($newsletterResearch['status'] ?? ''))
+            : '';
         $metadataResearchThoughtId = is_array($newsletterResearch)
             ? $this->normalizeResearchThoughtId(
-                $newsletterResearch["research_thought_id"] ?? null
+                $newsletterResearch['research_thought_id'] ?? null
             )
             : null;
         $reasonRaw = is_array($newsletterResearch)
-            ? $newsletterResearch["reason"] ?? null
+            ? $newsletterResearch['reason'] ?? null
             : null;
         $skipReason = is_string($reasonRaw)
             ? trim($reasonRaw)
             : (is_scalar($reasonRaw)
                 ? trim((string) $reasonRaw)
-                : "");
+                : '');
 
         $linkedResearch = $this->resolveEmailLinkedResearchThought(
             $thought,
@@ -2201,31 +2361,29 @@ class IdeaController extends Controller
         );
         $researchThoughtId = $linkedResearch?->id ?? $metadataResearchThoughtId;
 
-        $effectiveStatus = $metadataStatus !== "" ? $metadataStatus : null;
+        $effectiveStatus = $metadataStatus !== '' ? $metadataStatus : null;
         if ($linkedResearch !== null) {
             $effectiveStatus =
-                $metadataStatus === "research_partial"
-                    ? "research_partial"
-                    : "research_completed";
+                $metadataStatus === 'research_partial'
+                    ? 'research_partial'
+                    : 'research_completed';
         }
 
-        if (!is_string($effectiveStatus) || $effectiveStatus === "") {
+        if (! is_string($effectiveStatus) || $effectiveStatus === '') {
             return null;
         }
 
         return [
-            "status" => $effectiveStatus,
-            "research_thought_id" => $researchThoughtId,
-            "skip_reason" => $skipReason,
-            "show_research_link" =>
-                $researchThoughtId !== null &&
+            'status' => $effectiveStatus,
+            'research_thought_id' => $researchThoughtId,
+            'skip_reason' => $skipReason,
+            'show_research_link' => $researchThoughtId !== null &&
                 in_array(
                     $effectiveStatus,
-                    ["research_completed", "research_partial"],
+                    ['research_completed', 'research_partial'],
                     true
                 ),
-            "show_skip_info" =>
-                $effectiveStatus === "research_skipped" && $skipReason !== "",
+            'show_skip_info' => $effectiveStatus === 'research_skipped' && $skipReason !== '',
         ];
     }
 
@@ -2285,11 +2443,11 @@ class IdeaController extends Controller
 
         $isResearchRoot = Thought::query()
             ->whereKey($documentRoot->id)
-            ->where("user_id", auth()->id())
-            ->matchingCanonicalMetadataType("research")
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
             ->exists();
 
-        if (!$isResearchRoot) {
+        if (! $isResearchRoot) {
             return null;
         }
 
@@ -2297,8 +2455,8 @@ class IdeaController extends Controller
         $sectionContext = $previewSource->demoSafeMarkdownSectionContext();
 
         $converter = new CommonMarkConverter([
-            "html_input" => "strip",
-            "allow_unsafe_links" => false,
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
         ]);
         $rootHtml = $this->renderDemoSafeMarkdown(
             $converter,
@@ -2307,7 +2465,7 @@ class IdeaController extends Controller
         );
         $sections = $documentRoot
             ->childThoughts()
-            ->orderBy("created_at")
+            ->orderBy('created_at')
             ->get();
         $sectionHtmlChunks = $sections
             ->take(2)
@@ -2325,7 +2483,7 @@ class IdeaController extends Controller
             ->all();
 
         if (
-            !$this->researchPreviewHasRenderableBody(
+            ! $this->researchPreviewHasRenderableBody(
                 $rootHtml,
                 $sectionHtmlChunks
             )
@@ -2334,21 +2492,21 @@ class IdeaController extends Controller
         }
 
         $previewTags = [];
-        $rawTags = data_get($documentRoot->metadata, "tags");
+        $rawTags = data_get($documentRoot->metadata, 'tags');
         if (is_array($rawTags)) {
             foreach ($rawTags as $t) {
                 $s = trim((string) $t);
-                if ($s !== "") {
+                if ($s !== '') {
                     $previewTags[] = $s;
                 }
             }
         }
 
         return [
-            "full_research_url" => route("idea.research.show", $documentRoot),
-            "root_html" => $rootHtml,
-            "section_html_chunks" => $sectionHtmlChunks,
-            "tags" => array_values(array_unique($previewTags)),
+            'full_research_url' => route('idea.research.show', $documentRoot),
+            'root_html' => $rootHtml,
+            'section_html_chunks' => $sectionHtmlChunks,
+            'tags' => array_values(array_unique($previewTags)),
         ];
     }
 
@@ -2359,12 +2517,12 @@ class IdeaController extends Controller
     private function resolveVideoLinkedResearchThought(
         Thought $thought
     ): ?Thought {
-        if (data_get($thought->metadata, "type") !== "video") {
+        if (data_get($thought->metadata, 'type') !== 'video') {
             return null;
         }
 
         $id = $this->normalizeResearchThoughtId(
-            data_get($thought->metadata, "research_thought_id")
+            data_get($thought->metadata, 'research_thought_id')
         );
         if ($id === null) {
             return null;
@@ -2372,8 +2530,8 @@ class IdeaController extends Controller
 
         return Thought::query()
             ->whereKey($id)
-            ->where("user_id", auth()->id())
-            ->matchingCanonicalMetadataType("research")
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
             ->first();
     }
 
@@ -2386,21 +2544,21 @@ class IdeaController extends Controller
 
         $parent = Thought::query()
             ->whereKey($resolvedResearch->parent_id)
-            ->where("user_id", auth()->id())
+            ->where('user_id', auth()->id())
             ->first();
 
         if ($parent === null) {
             return null;
         }
 
-        if (data_get($parent->metadata, "type") === "video") {
+        if (data_get($parent->metadata, 'type') === 'video') {
             return $resolvedResearch;
         }
 
         $parentIsResearchRoot = Thought::query()
             ->whereKey($parent->id)
-            ->where("user_id", auth()->id())
-            ->matchingCanonicalMetadataType("research")
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalMetadataType('research')
             ->exists();
 
         return $parentIsResearchRoot ? $parent : null;
@@ -2413,7 +2571,7 @@ class IdeaController extends Controller
         string $rootHtml,
         array $sectionHtmlChunks
     ): bool {
-        $hasText = fn (string $html): bool => trim(strip_tags($html)) !== "";
+        $hasText = fn (string $html): bool => trim(strip_tags($html)) !== '';
 
         if ($hasText($rootHtml)) {
             return true;
@@ -2435,20 +2593,20 @@ class IdeaController extends Controller
     private function demoSafeNewsletterResearchStatusPayload(
         ?array $payload
     ): ?array {
-        if ($payload === null || !app(DemoMode::class)->enabled()) {
+        if ($payload === null || ! app(DemoMode::class)->enabled()) {
             return $payload;
         }
 
-        $skip = $payload["skip_reason"] ?? "";
-        if (!is_string($skip) || $skip === "") {
+        $skip = $payload['skip_reason'] ?? '';
+        if (! is_string($skip) || $skip === '') {
             return $payload;
         }
 
-        $payload["skip_reason"] =
+        $payload['skip_reason'] =
             app(DemoObfuscator::class)->obfuscate(
                 $skip,
-                "newsletter_research_skip_reason"
-            ) ?? "Demo content hidden";
+                'newsletter_research_skip_reason'
+            ) ?? 'Demo content hidden';
 
         return $payload;
     }
@@ -2458,7 +2616,7 @@ class IdeaController extends Controller
         ?string $markdown,
         string $context
     ): string {
-        $displayMarkdown = $markdown ?? "";
+        $displayMarkdown = $markdown ?? '';
 
         if (app(DemoMode::class)->enabled()) {
             try {
@@ -2466,18 +2624,17 @@ class IdeaController extends Controller
                     app(DemoObfuscator::class)->obfuscate(
                         $displayMarkdown,
                         $context
-                    ) ?? "Demo content hidden";
+                    ) ?? 'Demo content hidden';
             } catch (\Throwable $e) {
                 Log::warning(
-                    "Demo obfuscation failed before markdown render.",
+                    'Demo obfuscation failed before markdown render.',
                     [
-                        "boundary" =>
-                            "idea_controller.render_demo_safe_markdown",
-                        "context" => $context,
-                        "exception" => $e::class,
+                        'boundary' => 'idea_controller.render_demo_safe_markdown',
+                        'context' => $context,
+                        'exception' => $e::class,
                     ]
                 );
-                $displayMarkdown = "Demo content hidden";
+                $displayMarkdown = 'Demo content hidden';
             }
         }
 
@@ -2491,23 +2648,23 @@ class IdeaController extends Controller
     ): ?string {
         if (
             $value === null ||
-            $value === "" ||
-            !app(DemoMode::class)->enabled()
+            $value === '' ||
+            ! app(DemoMode::class)->enabled()
         ) {
             return $value;
         }
 
         try {
             return app(DemoObfuscator::class)->obfuscate($value, $context) ??
-                "Demo content hidden";
+                'Demo content hidden';
         } catch (\Throwable $e) {
-            Log::warning("Demo obfuscation failed for research page field.", [
-                "boundary" => $boundary,
-                "context" => $context,
-                "exception" => $e::class,
+            Log::warning('Demo obfuscation failed for research page field.', [
+                'boundary' => $boundary,
+                'context' => $context,
+                'exception' => $e::class,
             ]);
 
-            return "Demo content hidden";
+            return 'Demo content hidden';
         }
     }
 
@@ -2536,14 +2693,14 @@ class IdeaController extends Controller
             return null;
         }
 
-        $emailThoughtId = $merged["email_thought_id"];
-        $subject = $merged["email_subject"];
-        $sender = $merged["email_sender"];
+        $emailThoughtId = $merged['email_thought_id'];
+        $subject = $merged['email_subject'];
+        $sender = $merged['email_sender'];
 
         $emailThought = Thought::query()
             ->whereKey($emailThoughtId)
-            ->where("user_id", auth()->id())
-            ->matchingCanonicalSourceType("email")
+            ->where('user_id', auth()->id())
+            ->matchingCanonicalSourceType('email')
             ->first();
 
         if ($emailThought === null) {
@@ -2551,14 +2708,13 @@ class IdeaController extends Controller
         }
 
         return [
-            "subject" =>
-                $this->demoSafeResearchText(
-                    $subject,
-                    "research_related_email_subject",
-                    "research_show.related_email_subject"
-                ) ?? "Demo content hidden",
-            "sender" => $sender,
-            "url" => route("thoughts.show", $emailThought),
+            'subject' => $this->demoSafeResearchText(
+                $subject,
+                'research_related_email_subject',
+                'research_show.related_email_subject'
+            ) ?? 'Demo content hidden',
+            'sender' => $sender,
+            'url' => route('thoughts.show', $emailThought),
         ];
     }
 
@@ -2572,18 +2728,18 @@ class IdeaController extends Controller
         array $metadata,
         array $sourceMetadata
     ): ?array {
-        $keys = ["email_thought_id", "email_subject", "email_sender"];
+        $keys = ['email_thought_id', 'email_subject', 'email_sender'];
         $merged = [];
 
         foreach ($keys as $key) {
             $rawM = data_get($metadata, $key);
             $rawS = data_get($sourceMetadata, $key);
             $normM =
-                $key === "email_thought_id"
+                $key === 'email_thought_id'
                     ? $this->normalizeResearchThoughtId($rawM)
                     : $this->normalizeResearchEmailCardTextField($rawM);
             $normS =
-                $key === "email_thought_id"
+                $key === 'email_thought_id'
                     ? $this->normalizeResearchThoughtId($rawS)
                     : $this->normalizeResearchEmailCardTextField($rawS);
 
@@ -2605,13 +2761,13 @@ class IdeaController extends Controller
 
     private function normalizeResearchEmailCardTextField(mixed $value): ?string
     {
-        if (!is_string($value)) {
+        if (! is_string($value)) {
             return null;
         }
 
         $trimmed = trim($value);
 
-        return $trimmed === "" ? null : $trimmed;
+        return $trimmed === '' ? null : $trimmed;
     }
 
     private function normalizeResearchThoughtId(mixed $value): ?string
@@ -2622,7 +2778,7 @@ class IdeaController extends Controller
 
         $id = strtolower(trim((string) $value));
 
-        return $id === "" ? null : $id;
+        return $id === '' ? null : $id;
     }
 
     private function resolveCapturedInboundEmailForThought(
@@ -2630,11 +2786,11 @@ class IdeaController extends Controller
     ): ?CapturedInboundEmail {
         $capturedId = data_get(
             $thought->source_metadata,
-            "captured_inbound_email_id"
+            'captured_inbound_email_id'
         );
-        if ($capturedId !== null && (string) $capturedId !== "") {
+        if ($capturedId !== null && (string) $capturedId !== '') {
             $row = CapturedInboundEmail::query()
-                ->where("user_id", $thought->user_id)
+                ->where('user_id', $thought->user_id)
                 ->find($capturedId);
             if ($row !== null) {
                 return $row;
@@ -2642,8 +2798,8 @@ class IdeaController extends Controller
         }
 
         return CapturedInboundEmail::query()
-            ->where("user_id", $thought->user_id)
-            ->where("thought_id", $thought->id)
+            ->where('user_id', $thought->user_id)
+            ->where('thought_id', $thought->id)
             ->first();
     }
 
@@ -2653,11 +2809,11 @@ class IdeaController extends Controller
     private function resolveTagSlugToCanonical(string $tagSlug): ?string
     {
         $tags = Thought::query()
-            ->where("user_id", auth()->id())
-            ->select("metadata")
+            ->where('user_id', auth()->id())
+            ->select('metadata')
             ->get()
-            ->pluck("metadata")
-            ->pluck("tags")
+            ->pluck('metadata')
+            ->pluck('tags')
             ->flatten()
             ->unique()
             ->filter()
@@ -2678,12 +2834,12 @@ class IdeaController extends Controller
     private function renderedThoughtBodyHtml(Thought $thought): string
     {
         $converter = new CommonMarkConverter([
-            "html_input" => "strip",
-            "allow_unsafe_links" => false,
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
         ]);
         $context = $this->isStructuredDocumentSection($thought)
-            ? "thought_content_section"
-            : "thought_content";
+            ? 'thought_content_section'
+            : 'thought_content';
 
         return $this->renderDemoSafeMarkdown(
             $converter,
@@ -2694,10 +2850,10 @@ class IdeaController extends Controller
 
     private function isStructuredDocumentSection(Thought $thought): bool
     {
-        $sectionIndex = data_get($thought->source_metadata, "section_index");
+        $sectionIndex = data_get($thought->source_metadata, 'section_index');
 
         return $thought->parent_id !== null &&
             $sectionIndex !== null &&
-            trim((string) $sectionIndex) !== "";
+            trim((string) $sectionIndex) !== '';
     }
 }

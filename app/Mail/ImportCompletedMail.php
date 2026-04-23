@@ -17,10 +17,22 @@ class ImportCompletedMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        $title = $this->batch->root_folder_name ?? 'Your files';
+        $b = $this->batch;
+        if ($b->isMicrositeImport()) {
+            $n = (int) $b->processed_count;
+            $label = $b->root_folder_name ?? 'Your files';
+            if ($b->failed_count > 0) {
+                $subject = "IdeaTub: Research site ({$n} pages) — {$label} ({$b->failed_count} failed)";
+            } else {
+                $subject = "IdeaTub: Research site ({$n} pages) — {$label} imported";
+            }
+        } else {
+            $title = $b->root_folder_name ?? 'Your files';
+            $subject = "IdeaTub: {$title} imported — {$b->processed_count} thoughts, {$b->failed_count} failed";
+        }
 
         return new Envelope(
-            subject: "IdeaTub: {$title} imported — {$this->batch->processed_count} thoughts, {$this->batch->failed_count} failed",
+            subject: $subject,
         );
     }
 
@@ -37,6 +49,7 @@ class ImportCompletedMail extends Mailable implements ShouldQueue
                     : null,
                 'importUrl' => route('imports.show', $this->batch->id),
                 'failedFiles' => $this->batch->files()->where('status', 'failed')->get(),
+                'isMicrosite' => $this->batch->isMicrositeImport(),
             ],
         );
     }
