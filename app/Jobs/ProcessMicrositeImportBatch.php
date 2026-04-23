@@ -20,11 +20,11 @@ class ProcessMicrositeImportBatch implements ShouldQueue
 
     public int $timeout = 300;
 
-    public function __construct(public string $batchId) {}
+    public function __construct(public string $importBatchId) {}
 
     public function handle(MicrositeImportService $import): void
     {
-        $batch = ImportBatch::query()->find($this->batchId);
+        $batch = ImportBatch::query()->find($this->importBatchId);
         if ($batch === null) {
             return;
         }
