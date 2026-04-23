@@ -4953,6 +4953,27 @@ git commit -m "docs(upload): deployment notes and manual QA checklist"
 
 ---
 
+## Follow-up tasks surfaced during execution
+
+### FOLLOWUP-7a: Delimit idea/research/related-thoughts in `ResearchPromptBuilder`
+
+The Task 7 delimiting only protects `OpenRouterService::researchNote` (fallback path).
+The primary modern path is `ResearchWorkflowRunner::run()` → `ResearchPromptBuilder::buildQuickBriefPrompt()` → `OpenRouterService::researchFromPrompt()`. The builder
+concatenates `$idea->getDecodedContent()`, `$existingResearchContent`, and any
+related-thought content without delimiting or neutralising closing tags. This
+path sees more traffic than `researchNote` and currently has no injection-
+hardening.
+
+**Scope:** Apply the same `<user_idea>…</user_idea>` + escape-before-substitute
+pattern to every concatenation in `ResearchPromptBuilder` (idea, existing
+research, related thoughts — each with its own tag name e.g. `<user_idea>`,
+`<user_existing_research>`, `<user_related_thought>`). Add tests mirroring
+Task 7's tests on the `researchFromPrompt` wire payload.
+
+Size: ~Task 7 again (~2-3h). Should be scheduled before the feature ships.
+
+---
+
 ## Post-implementation
 
 1. Run the manual QA checklist (Task 30) on staging before enabling `FEATURE_FILE_UPLOAD=true` in production.
