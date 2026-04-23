@@ -3,7 +3,11 @@
 namespace App\Providers;
 
 use App\Contracts\EvernoteApiGateway;
+use App\Models\ImportBatch;
 use App\Models\InboxItem;
+use App\Models\Project;
+use App\Models\Thought;
+use App\Policies\ImportPolicy;
 use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
@@ -13,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -48,9 +53,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(ImportBatch::class, ImportPolicy::class);
+
         Relation::enforceMorphMap([
-            'thought' => \App\Models\Thought::class,
-            'project' => \App\Models\Project::class,
+            'thought' => Thought::class,
+            'project' => Project::class,
         ]);
 
         RateLimiter::for('login', function (Request $request) {
