@@ -50,6 +50,26 @@ class ImportCompletionNotifierTest extends TestCase
         Mail::assertQueuedCount(1);
     }
 
+    public function test_inbox_shows_only_ok_dismissal_for_import_completed_item(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create();
+        InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'generator_type' => 'import_completed',
+            'title' => 'Research site: 2 pages',
+            'dedupe_key' => 'import:99',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('inbox.index'));
+        $response->assertOk();
+        $response->assertSee('data-idle-label="OK"', false);
+        $response->assertDontSee('>Done<', false);
+        $response->assertDontSee('Tomorrow', false);
+        $response->assertDontSee('Next week', false);
+        $response->assertDontSee('Save as thought', false);
+    }
+
     private function makeCompletedBatch(User $user, Project $project): ImportBatch
     {
         $batch = ImportBatch::create([

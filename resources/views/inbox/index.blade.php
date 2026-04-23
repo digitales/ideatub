@@ -83,6 +83,13 @@
                                 <button type="submit" data-idle-label="Save as thought" data-pending-label="Saving as thought..." class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Save as thought</button>
                             </form>
                         </div>
+                    @elseif (($item->generator_type ?? '') === 'import_completed')
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <form method="POST" action="{{ route('inbox.done', $item) }}" @submit.prevent="submitAction($event)">
+                                @csrf
+                                <button type="submit" data-idle-label="OK" data-pending-label="Dismissing..." class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white">OK</button>
+                            </form>
+                        </div>
                     @else
                         <div class="mt-4 flex flex-wrap gap-2">
                             <form method="POST" action="{{ route('inbox.done', $item) }}" @submit.prevent="submitAction($event)">
