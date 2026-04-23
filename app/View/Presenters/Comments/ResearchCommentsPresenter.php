@@ -6,6 +6,7 @@ use App\Models\Comment;
 use App\Models\Thought;
 use App\Models\ThoughtCommentRead;
 use App\Models\User;
+use App\Services\Comments\ResearchCommentUnreadService;
 use App\Support\Comments\ShareContext;
 use League\CommonMark\CommonMarkConverter;
 
@@ -47,38 +48,58 @@ class ResearchCommentsPresenter
             return 0;
         }
 
-        $lastRead = ThoughtCommentRead::query()
+        $row = ThoughtCommentRead::query()
             ->where('user_id', $this->viewer->id)
             ->where('thought_id', $this->root->id)
-            ->value('last_read_at');
+            ->first();
 
-        $ids = collect([$this->root->id])
-            ->merge(
-                Thought::query()
-                    ->where('parent_id', $this->root->id)
-                    ->pluck('id')
-            )
-            ->unique()
-            ->values();
-
-        $q = Comment::query()
-            ->whereIn('commentable_id', $ids)
-            ->where('commentable_type', 'thought')
-            ->where(function ($q) {
-                $q->whereNull('author_user_id')
-                    ->orWhere('author_user_id', '<>', $this->viewer->id);
-            });
-
-        if ($lastRead !== null) {
-            $q->where('created_at', '>', $lastRead);
+        if ($row !== null) {
+            return (int) $row->unread_count;
         }
 
-        return (int) $q->count();
+        return app(ResearchCommentUnreadService::class)->recomputeCanonicalCount(
+            (int) $this->viewer->id,
+            (string) $this->root->id,
+        );
     }
 
     public function allowGuestComments(): bool
     {
         return $this->shareContext !== null && $this->shareContext->allowComments;
+    }
+
+    /**
+     * Props for `comments._thread` include.
+     *
+     * @return array{
+     *     rows: array<int, array<string, mixed>>,
+     *     formAction: string,
+     *     commentableType: string,
+     *     commentableId: string,
+     *     mode: string,
+     *     disabledMessage: string|null,
+     *     title: string,
+     *     showControls: bool
+     * }
+     */
+    public function threadIncludeForSection(
+        Thought $section,
+        string $formAction,
+        string $mode,
+        bool $showControls,
+        string $title,
+        ?string $disabledMessage = null,
+    ): array {
+        return [
+            'rows' => $this->sectionRowsFor($section),
+            'formAction' => $formAction,
+            'commentableType' => 'thought',
+            'commentableId' => (string) $section->id,
+            'mode' => $mode,
+            'disabledMessage' => $disabledMessage,
+            'title' => $title,
+            'showControls' => $showControls,
+        ];
     }
 
     /**

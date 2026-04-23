@@ -25,6 +25,7 @@ class ThoughtCommentReadTest extends TestCase
 
         $this->assertNotNull($row);
         $this->assertNotNull($row->last_read_at);
+        $this->assertSame(0, (int) $row->unread_count);
 
         $before = $row->last_read_at;
         $this->travel(1)->minutes();

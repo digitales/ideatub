@@ -87,4 +87,32 @@ class ResearchCommentsPresenterTest extends TestCase
         $this->assertTrue((new ResearchCommentsPresenter($root, null, $ctxOn))->allowGuestComments());
         $this->assertFalse((new ResearchCommentsPresenter($root, null, $ctxOff))->allowGuestComments());
     }
+
+    public function test_thread_include_for_section_matches_manual_include_keys(): void
+    {
+        $user = User::factory()->create();
+        $root = Thought::factory()->create(['user_id' => $user->id]);
+        $section = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $root->id,
+        ]);
+        $presenter = new ResearchCommentsPresenter($root, $user, null);
+
+        $props = $presenter->threadIncludeForSection(
+            $section,
+            formAction: 'https://example.test/comments',
+            mode: 'owner',
+            showControls: true,
+            title: 'Section comments',
+        );
+
+        $this->assertSame('https://example.test/comments', $props['formAction']);
+        $this->assertSame('thought', $props['commentableType']);
+        $this->assertSame((string) $section->id, $props['commentableId']);
+        $this->assertSame('owner', $props['mode']);
+        $this->assertSame('Section comments', $props['title']);
+        $this->assertTrue($props['showControls']);
+        $this->assertNull($props['disabledMessage']);
+        $this->assertIsArray($props['rows']);
+    }
 }

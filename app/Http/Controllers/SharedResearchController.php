@@ -34,10 +34,15 @@ class SharedResearchController extends Controller
             ->take(50)
             ->values();
 
+        $shareUrls = $shares->mapWithKeys(
+            fn (ResearchShare $s) => [$s->id => url(route('shared-research.show', $s->token))]
+        );
+
         return view('shared_research.index', [
             'shares' => $shares,
             'focusShareId' => $request->query('share'),
             'topLevelThoughts' => $topLevelThoughts,
+            'shareUrls' => $shareUrls,
         ]);
     }
 

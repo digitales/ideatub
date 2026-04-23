@@ -3,11 +3,16 @@
 namespace App\Providers;
 
 use App\Contracts\EvernoteApiGateway;
+
+use App\Models\Comment;
 use App\Models\ImportBatch;
 use App\Models\InboxItem;
 use App\Models\Project;
 use App\Models\Thought;
 use App\Policies\ImportPolicy;
+
+use App\Observers\CommentObserver;
+
 use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
@@ -53,7 +58,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+<<<<<<< HEAD
         Gate::policy(ImportBatch::class, ImportPolicy::class);
+=======
+        Comment::observe(CommentObserver::class);
+>>>>>>> master
 
         Relation::enforceMorphMap([
             'thought' => Thought::class,

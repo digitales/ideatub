@@ -68,6 +68,9 @@
         @if ($isVideoThought && ! empty($thoughtDetail->videoResearchPreview()))
             @include('idea.partials.thought_detail_research_preview_card', [
                 'researchPreview' => $thoughtDetail->videoResearchPreview(),
+                'researchPreviewSections' => $thoughtDetail->videoResearchPreviewSections(),
+                'researchPreviewTagList' => $thoughtDetail->researchPreviewTagList($thoughtDetail->videoResearchPreview()),
+                'researchContentComments' => $researchContentComments,
             ])
         @endif
 
@@ -83,6 +86,9 @@
         @if ($isEmailThought && ! empty($thoughtDetail->emailResearchPreview()))
             @include('idea.partials.thought_detail_research_preview_card', [
                 'researchPreview' => $thoughtDetail->emailResearchPreview(),
+                'researchPreviewSections' => $thoughtDetail->emailResearchPreviewSections(),
+                'researchPreviewTagList' => $thoughtDetail->researchPreviewTagList($thoughtDetail->emailResearchPreview()),
+                'researchContentComments' => $researchContentComments,
             ])
         @endif
 
