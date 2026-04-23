@@ -21,7 +21,7 @@ class ThoughtCaptureService
      * Create one thought or chunked thoughts. When parent_id is set, always creates a single thought.
      * Otherwise chunks when content has >500 words and no_chunking is not set.
      *
-     * @param  array{content: string, user_id: int, parent_id?: string|null, source: string, source_metadata?: array|null, no_chunking?: bool, plan_slug?: string|null, doc_type?: string|null, file_path?: string|null, project?: string|null, extra_tags?: array, idea_metadata?: array}  $options
+     * @param  array{content: string, user_id: int, parent_id?: string|null, source: string, source_metadata?: array|null, no_chunking?: bool, plan_slug?: string|null, doc_type?: string|null, file_path?: string|null, project?: string|null, extra_tags?: array, idea_metadata?: array, skip_ai_metadata?: bool}  $options
      * @return array{thought?: Thought, root?: Thought, chunked: bool, section_ids?: array<int, string>, count?: int}
      */
     public function create(array $options): array
@@ -62,6 +62,7 @@ class ThoughtCaptureService
         $ideaMetadata = isset($options['idea_metadata']) && is_array($options['idea_metadata'])
             ? $options['idea_metadata']
             : null;
+        $skipAiMetadata = ! empty($options['skip_ai_metadata']);
 
         $parent = null;
         if ($parentId !== null) {
@@ -83,14 +84,14 @@ class ThoughtCaptureService
         $shouldChunk = $parent === null && $this->chunkingService->shouldChunk($content, $chunkOptions);
 
         if ($shouldChunk) {
-            return $this->createChunked($content, $userId, $source, $sourceMetadata, $planSlug, $docType, $filePath, $project, $extraTags, $ideaMetadata);
+            return $this->createChunked($content, $userId, $source, $sourceMetadata, $planSlug, $docType, $filePath, $project, $extraTags, $ideaMetadata, $skipAiMetadata);
         }
 
         if ($parent === null) {
             $sourceMetadata = $this->mergeDocumentHintsIntoSourceMetadata($sourceMetadata, $filePath, $project);
         }
 
-        $thought = $this->createOne($content, $userId, $parent?->id, $source, $sourceMetadata, $planSlug, $docType, $extraTags, $ideaMetadata);
+        $thought = $this->createOne($content, $userId, $parent?->id, $source, $sourceMetadata, $planSlug, $docType, $extraTags, $ideaMetadata, $skipAiMetadata);
 
         return [
             'thought' => $thought,
@@ -113,9 +114,11 @@ class ThoughtCaptureService
         ?string $docType,
         array $extraTags,
         ?array $ideaMetadata = null,
+        bool $skipAiMetadata = false,
     ): Thought {
         $embedding = $this->openRouter->embed($content);
-        $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
+        $rawMetadata = $skipAiMetadata ? [] : $this->openRouter->extractMetadata($content);
+        $metadata = Thought::normalizeMetadataTags($rawMetadata);
         $metadata = $this->sanitiser->sanitise($metadata);
         $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
         if ($planSlug !== null && $docType !== null) {
@@ -165,9 +168,11 @@ class ThoughtCaptureService
         ?string $project,
         array $extraTags,
         ?array $ideaMetadata = null,
+        bool $skipAiMetadata = false,
     ): array {
         $sections = $this->chunkingService->splitAtHeadings($content);
-        $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
+        $rawMetadata = $skipAiMetadata ? [] : $this->openRouter->extractMetadata($content);
+        $metadata = Thought::normalizeMetadataTags($rawMetadata);
         $metadata = $this->sanitiser->sanitise($metadata);
         $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
         if ($planSlug !== null && $docType !== null) {
