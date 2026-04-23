@@ -331,6 +331,27 @@ class BackfillThoughtContentSha256CommandTest extends TestCase
             ->expectsOutputToContain('Backfilled 0 thoughts.')
             ->assertExitCode(0);
     }
+
+    public function test_it_hashes_the_decoded_form_of_stored_content(): void
+    {
+        $user = User::factory()->create();
+
+        $thoughtId = (string) \Illuminate\Support\Str::uuid();
+        DB::table('thoughts')->insert([
+            'id' => $thoughtId,
+            'user_id' => $user->id,
+            'content' => "it&#039;s fine",
+            'source' => 'test',
+            'content_sha256' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('thoughts:backfill-content-sha256')->assertExitCode(0);
+
+        $row = DB::table('thoughts')->where('id', $thoughtId)->first();
+        $this->assertSame(hash('sha256', "it's fine"), $row->content_sha256);
+    }
 }
 ```
 
@@ -370,33 +391,26 @@ class BackfillThoughtContentSha256Command extends Command
         $total = 0;
 
         do {
-            $ids = DB::table('thoughts')
+            // Select id + content in the chunk query (not just id); avoids N+1 by not re-fetching each row.
+            $rows = DB::table('thoughts')
+                ->select('id', 'content')
                 ->whereNull('content_sha256')
                 ->orderBy('id')
                 ->limit($chunk)
-                ->pluck('id');
+                ->get();
 
-            if ($ids->isEmpty()) {
+            if ($rows->isEmpty()) {
                 break;
             }
 
-            foreach ($ids as $id) {
-                $row = DB::table('thoughts')
-                    ->select('id', 'content')
-                    ->where('id', $id)
-                    ->first();
-
-                if ($row === null) {
-                    continue;
-                }
-
+            foreach ($rows as $row) {
                 $decoded = Thought::decodeContentEntities((string) $row->content);
                 DB::table('thoughts')
-                    ->where('id', $id)
+                    ->where('id', $row->id)
                     ->update(['content_sha256' => hash('sha256', $decoded)]);
                 $total++;
             }
-        } while ($ids->count() === $chunk);
+        } while ($rows->count() === $chunk);
 
         $this->info("Backfilled {$total} thoughts.");
 
