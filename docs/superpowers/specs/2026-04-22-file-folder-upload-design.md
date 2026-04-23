@@ -446,6 +446,7 @@ Request / response contracts are filled in during the implementation plan (§9).
   - Research confirm dialog.
 - Settings toggle placement (profile settings page; exact section).
 - Whether the 24-hour failed-file retention should be configurable.
+- **Delimit `ResearchPromptBuilder` prompts** — Task 7 only hardens `researchNote`; the primary research path (`ResearchWorkflowRunner` → `ResearchPromptBuilder::buildQuickBriefPrompt`) remains undelimited. See FOLLOWUP-7a in the plan.
 
 These are filled in during `writing-plans`.
 

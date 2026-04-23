@@ -3,11 +3,16 @@
 namespace App\Providers;
 
 use App\Contracts\EvernoteApiGateway;
+
 use App\Models\Comment;
+use App\Models\ImportBatch;
 use App\Models\InboxItem;
 use App\Models\Project;
 use App\Models\Thought;
+use App\Policies\ImportPolicy;
+
 use App\Observers\CommentObserver;
+
 use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
@@ -17,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -52,7 +58,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+<<<<<<< HEAD
+        Gate::policy(ImportBatch::class, ImportPolicy::class);
+=======
         Comment::observe(CommentObserver::class);
+>>>>>>> master
 
         Relation::enforceMorphMap([
             'thought' => Thought::class,
@@ -64,6 +74,10 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(5)->by($request->ip()),
                 Limit::perMinute(10)->by($request->input('email')),
             ];
+        });
+
+        RateLimiter::for('import-upload', function (Request $request) {
+            return Limit::perHour(200)->by($request->user()?->id ?? $request->ip());
         });
 
         RateLimiter::for('shared-research-password', function (Request $request) {

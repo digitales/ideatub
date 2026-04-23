@@ -172,11 +172,18 @@ class Thought extends Model implements Commentable
     }
 
     /**
-     * Normalize content before saving: decode HTML entities so we store plain text.
+     * Normalise content before saving (decode HTML entities) and refresh content_sha256.
+     *
+     * NOTE: content_sha256 is a derived column; it MUST stay in sync with the stored,
+     * decoded `content` value. Any code path that writes `content` via a raw DB query
+     * (e.g. Schema::table(...)->update([...])) bypasses this mutator and will produce
+     * a stale hash — re-run `php artisan thoughts:backfill-content-sha256` to heal.
      */
     protected function setContentAttribute(mixed $value): void
     {
-        $this->attributes['content'] = static::decodeContentEntities((string) $value);
+        $decoded = static::decodeContentEntities((string) $value);
+        $this->attributes['content'] = $decoded;
+        $this->attributes['content_sha256'] = hash('sha256', $decoded);
     }
 
     /**

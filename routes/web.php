@@ -16,6 +16,7 @@ use App\Http\Controllers\HelpController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\IdeaController;
 use App\Http\Controllers\IdeasRevisitSettingsController;
+use App\Http\Controllers\ImportController;
 use App\Http\Controllers\InboundEmailController;
 use App\Http\Controllers\InboxController;
 use App\Http\Controllers\JiraSettingsController;
@@ -31,6 +32,7 @@ use App\Http\Controllers\ProjectGraphController;
 use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\ProjectThoughtController;
 use App\Http\Controllers\ResearchSkillSettingsController;
+use App\Http\Controllers\Settings\ConnectedAppsController;
 use App\Http\Controllers\SharedProjectViewController;
 use App\Http\Controllers\SharedResearchCommentController;
 use App\Http\Controllers\SharedResearchController;
@@ -205,6 +207,24 @@ Route::middleware('auth')->group(function () {
     Route::delete('/projects/{project}/thoughts/{thought}', [ProjectThoughtController::class, 'destroy'])->name('projects.thoughts.destroy');
     Route::get('/projects/{project}/graph', [ProjectGraphController::class, 'show'])->name('projects.graph');
     Route::get('/projects/{project}/graph/data', [ProjectGraphController::class, 'data'])->name('projects.graph.data');
+    if (config('features.file_upload')) {
+        Route::prefix('imports')->name('imports.')->group(function () {
+            Route::post('/quick', [ImportController::class, 'quick'])
+                ->middleware('throttle:import-upload')->name('quick');
+            Route::post('/batch', [ImportController::class, 'batch'])
+                ->middleware('throttle:import-upload')->name('batch');
+            Route::get('/{batch}', [ImportController::class, 'show'])
+                ->middleware('can:view,batch')->name('show');
+            Route::get('/{batch}/status', [ImportController::class, 'status'])
+                ->middleware(['can:view,batch', 'throttle:60,1'])->name('status');
+            Route::post('/{batch}/cancel', [ImportController::class, 'cancel'])
+                ->middleware('can:cancel,batch')->name('cancel');
+            Route::post('/{batch}/retry-failed', [ImportController::class, 'retryFailed'])
+                ->middleware('can:retryFailed,batch')->name('retry-failed');
+            Route::delete('/{batch}/thoughts', [ImportController::class, 'destroyThoughts'])
+                ->middleware('can:deleteThoughts,batch')->name('thoughts.destroy');
+        });
+    }
     Route::get('/projects/{project}/shares', [ProjectShareController::class, 'index'])->name('projects.shares.index');
     Route::post('/projects/{project}/shares', [ProjectShareController::class, 'store'])->name('projects.shares.store');
     Route::patch('/project-shares/{projectShare}', [ProjectShareController::class, 'update'])->name('project-shares.update');
@@ -220,15 +240,16 @@ Route::middleware('auth')->group(function () {
     Route::delete('/settings/mcp-keys/{mcpKey}', [McpKeyController::class, 'destroy'])->name('settings.mcp-keys.destroy');
 
     // OAuth MCP connected apps (Claude, ChatGPT, etc.)
-    Route::get('/settings/connected-apps', [\App\Http\Controllers\Settings\ConnectedAppsController::class, 'index'])
+    Route::get('/settings/connected-apps', [ConnectedAppsController::class, 'index'])
         ->name('settings.connected-apps.index');
-    Route::delete('/settings/connected-apps/{family}', [\App\Http\Controllers\Settings\ConnectedAppsController::class, 'destroy'])
+    Route::delete('/settings/connected-apps/{family}', [ConnectedAppsController::class, 'destroy'])
         ->name('settings.connected-apps.destroy');
-    Route::delete('/settings/connected-apps', [\App\Http\Controllers\Settings\ConnectedAppsController::class, 'destroyAll'])
+    Route::delete('/settings/connected-apps', [ConnectedAppsController::class, 'destroyAll'])
         ->name('settings.connected-apps.destroy-all');
 
     Route::get('/settings/profile', [ProfileSettingsController::class, 'index'])->name('settings.profile.index');
     Route::put('/settings/profile', [ProfileSettingsController::class, 'update'])->name('settings.profile.update');
+    Route::post('/settings/notifications', [ProfileSettingsController::class, 'updateNotifications'])->name('settings.profile.notifications');
 
     Route::get('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'index'])->name('settings.ideas-revisit.index');
     Route::put('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'update'])->name('settings.ideas-revisit.update');

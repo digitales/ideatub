@@ -10,6 +10,12 @@
             'class' => 'text-[11px] font-medium uppercase tracking-[0.08em] text-slate-brand/60',
             'fallbackLabel' => 'Thought',
         ])
+        @if (data_get($thought->source_metadata, 'provenance') === 'upload')
+            <span
+                class="inline-flex items-center rounded-md border border-amber-200/80 bg-amber-50/80 px-2 py-0.5 text-[10.5px] font-medium text-amber-800/90"
+                data-imported-badge
+            >Imported from file</span>
+        @endif
         <span class="text-[10.5px] text-slate-brand/40">{{ $thought->created_at->diffForHumans() }}</span>
     </div>
 

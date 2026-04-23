@@ -65,6 +65,21 @@
     </div>
 
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-6">
+        <h2 class="text-lg font-semibold text-deep-indigo mb-4">Notifications</h2>
+        <form method="POST" action="{{ route('settings.profile.notifications') }}" class="space-y-3">
+            @csrf
+            <label class="flex items-start gap-2 text-sm text-slate-brand">
+                @php($emailImport = \App\Models\UserPreference::query()->where('user_id', auth()->id())->where('key', 'email_on_import_completion')->value('value'))
+                <input type="checkbox" name="email_on_import_completion" value="1"
+                       {{ ($emailImport ?? 'true') !== 'false' ? 'checked' : '' }}
+                       class="mt-0.5 rounded border-slate-300 text-memory-violet">
+                <span>Email me when a file or folder import completes</span>
+            </label>
+            <button type="submit" class="px-3 py-1.5 text-sm rounded-lg text-white" style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);">Save</button>
+        </form>
+    </div>
+
+    <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-6">
         <h2 class="text-lg font-semibold text-deep-indigo mb-2">Demo mode</h2>
         <p class="text-sm text-slate-brand mb-4">Demo mode is session-based. It obfuscates narrative content for this browser session without changing stored data.</p>
 

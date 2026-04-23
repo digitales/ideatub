@@ -20,6 +20,7 @@
                 $contentEditable = $row->contentEditable();
                 $displayContent = $row->displayContent();
                 $rawEditorContent = $contentEditable ? $thought->content : $displayContent;
+                $importedIdeaResearchAck = data_get($thought->source_metadata, 'provenance') === 'upload';
             @endphp
             <li data-thought-id="{{ $thought->id }}" class="rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3 flex items-start gap-3">
                 <form method="POST" action="{{ route('ideas.toggle-completed', $thought) }}" class="flex-shrink-0 mt-0.5">
@@ -73,7 +74,14 @@
                         @endif
 
                         @if (! $researchStatus->showsInProgress())
-                            <form method="POST" action="{{ route('ideas.research', $thought) }}" class="inline">
+                            <form
+                                method="POST"
+                                action="{{ route('ideas.research', $thought) }}"
+                                class="inline"
+                                @if ($importedIdeaResearchAck)
+                                    onsubmit="if (this.dataset.ackDone!=='1'){event.preventDefault();if(confirm('This idea was imported from a file. Research will send its text to the AI. Continue?')){this.dataset.ackDone='1';var h=document.createElement('input');h.type='hidden';h.name='provenance_ack';h.value='1';this.appendChild(h);if(typeof this.requestSubmit==='function'){this.requestSubmit();}else{this.submit();}}return false;}"
+                                @endif
+                            >
                                 @csrf
                                 <button type="submit" class="text-xs font-medium text-neural-teal hover:underline">
                                     {{ $actionLabel }}

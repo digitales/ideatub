@@ -14,6 +14,7 @@ use App\Services\Email\EmailLinkExtractor;
 use App\Services\Email\EmailReviewInboxService;
 use App\Services\Email\EmailSenderRuleService;
 use App\Services\Email\EmailThoughtStreamVisibilityService;
+use App\Services\MetadataSanitiser;
 use App\Services\OpenRouterService;
 use App\Services\PostmarkInboundService;
 use App\Services\ThoughtCaptureService;
@@ -137,7 +138,8 @@ class PostmarkInboundWebhookTest extends TestCase
         $capturedInboundEmailAtThoughtCreation = null;
         $realCaptureService = new ThoughtCaptureService(
             app(OpenRouterService::class),
-            app(ThoughtChunkingService::class)
+            app(ThoughtChunkingService::class),
+            app(MetadataSanitiser::class),
         );
 
         $this->mock(ThoughtCaptureService::class, function ($mock) use (&$capturedInboundEmailAtThoughtCreation, $realCaptureService): void {

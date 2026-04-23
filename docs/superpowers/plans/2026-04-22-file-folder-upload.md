@@ -220,12 +220,11 @@ return new class extends Migration
 
 - [ ] **Step 4: Modify `app/Models/Thought.php`**
 
-In the `$fillable` array (around line 94), add `'content_sha256'`:
+Leave the `$fillable` array (around line 94) unchanged — it already lists every mass-assignable attribute:
 
 ```php
 protected $fillable = [
     'content',
-    'content_sha256',
     'embedding',
     'metadata',
     'user_id',
@@ -237,6 +236,8 @@ protected $fillable = [
     'visibility_reason',
 ];
 ```
+
+`content_sha256` is intentionally NOT in `$fillable` — it's a derived column written by the mutator below, so exposing it to mass assignment would only create desync opportunities between `content` and its hash.
 
 Update `setContentAttribute` (around line 177) to also set the hash:
 
@@ -330,6 +331,27 @@ class BackfillThoughtContentSha256CommandTest extends TestCase
             ->expectsOutputToContain('Backfilled 0 thoughts.')
             ->assertExitCode(0);
     }
+
+    public function test_it_hashes_the_decoded_form_of_stored_content(): void
+    {
+        $user = User::factory()->create();
+
+        $thoughtId = (string) \Illuminate\Support\Str::uuid();
+        DB::table('thoughts')->insert([
+            'id' => $thoughtId,
+            'user_id' => $user->id,
+            'content' => "it&#039;s fine",
+            'source' => 'test',
+            'content_sha256' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('thoughts:backfill-content-sha256')->assertExitCode(0);
+
+        $row = DB::table('thoughts')->where('id', $thoughtId)->first();
+        $this->assertSame(hash('sha256', "it's fine"), $row->content_sha256);
+    }
 }
 ```
 
@@ -369,33 +391,26 @@ class BackfillThoughtContentSha256Command extends Command
         $total = 0;
 
         do {
-            $ids = DB::table('thoughts')
+            // Select id + content in the chunk query (not just id); avoids N+1 by not re-fetching each row.
+            $rows = DB::table('thoughts')
+                ->select('id', 'content')
                 ->whereNull('content_sha256')
                 ->orderBy('id')
                 ->limit($chunk)
-                ->pluck('id');
+                ->get();
 
-            if ($ids->isEmpty()) {
+            if ($rows->isEmpty()) {
                 break;
             }
 
-            foreach ($ids as $id) {
-                $row = DB::table('thoughts')
-                    ->select('id', 'content')
-                    ->where('id', $id)
-                    ->first();
-
-                if ($row === null) {
-                    continue;
-                }
-
+            foreach ($rows as $row) {
                 $decoded = Thought::decodeContentEntities((string) $row->content);
                 DB::table('thoughts')
-                    ->where('id', $id)
+                    ->where('id', $row->id)
                     ->update(['content_sha256' => hash('sha256', $decoded)]);
                 $total++;
             }
-        } while ($ids->count() === $chunk);
+        } while ($rows->count() === $chunk);
 
         $this->info("Backfilled {$total} thoughts.");
 
@@ -513,6 +528,25 @@ class MetadataSanitiserTest extends TestCase
         $this->assertSame('note', $result['type']);
         $this->assertSame(['untouched'], $result['custom_key']);
     }
+
+    public function test_dedupe_applies_before_cap_so_later_unique_tags_survive(): void
+    {
+        $dupes = array_fill(0, 25, 'foo');
+        $dupes[] = 'bar';
+
+        $result = $this->sanitiser->sanitise(['tags' => $dupes]);
+
+        $this->assertSame(['foo', 'bar'], $result['tags']);
+    }
+
+    public function test_injection_phrase_match_is_case_insensitive(): void
+    {
+        $result = $this->sanitiser->sanitise([
+            'tags' => ['IGNORE Previous Instructions', 'fine tag'],
+        ]);
+
+        $this->assertSame(['fine tag'], $result['tags']);
+    }
 }
 ```
 
@@ -596,12 +630,15 @@ class MetadataSanitiser
     }
 
     /**
+     * Validate, injection-check, regex-check, dedupe, and cap a single metadata list in one pass.
+     *
      * @param  array<int, mixed>  $items
      * @return list<string>
      */
     private function filterList(array $items, int $maxLen, int $maxCount, string $allowedRegex): array
     {
         $filtered = [];
+        $seen = [];
         foreach ($items as $item) {
             if (! is_string($item)) {
                 continue;
@@ -610,19 +647,23 @@ class MetadataSanitiser
             if ($item === '' || mb_strlen($item) > $maxLen) {
                 continue;
             }
+            if (isset($seen[$item])) {
+                continue;
+            }
             if ($this->containsInjectionPhrase($item)) {
                 continue;
             }
             if ($allowedRegex !== '//' && preg_match($allowedRegex, $item) !== 1) {
                 continue;
             }
+            $seen[$item] = true;
             $filtered[] = $item;
             if (count($filtered) >= $maxCount) {
                 break;
             }
         }
 
-        return array_values(array_unique($filtered));
+        return $filtered;
     }
 
     private function containsInjectionPhrase(string $value): bool
@@ -4909,6 +4950,27 @@ Create `docs/superpowers/plans/2026-04-22-file-folder-upload-manual-qa.md`:
 git add DEPLOY.md docs/superpowers/plans/2026-04-22-file-folder-upload-manual-qa.md
 git commit -m "docs(upload): deployment notes and manual QA checklist"
 ```
+
+---
+
+## Follow-up tasks surfaced during execution
+
+### FOLLOWUP-7a: Delimit idea/research/related-thoughts in `ResearchPromptBuilder`
+
+The Task 7 delimiting only protects `OpenRouterService::researchNote` (fallback path).
+The primary modern path is `ResearchWorkflowRunner::run()` → `ResearchPromptBuilder::buildQuickBriefPrompt()` → `OpenRouterService::researchFromPrompt()`. The builder
+concatenates `$idea->getDecodedContent()`, `$existingResearchContent`, and any
+related-thought content without delimiting or neutralising closing tags. This
+path sees more traffic than `researchNote` and currently has no injection-
+hardening.
+
+**Scope:** Apply the same `<user_idea>…</user_idea>` + escape-before-substitute
+pattern to every concatenation in `ResearchPromptBuilder` (idea, existing
+research, related thoughts — each with its own tag name e.g. `<user_idea>`,
+`<user_existing_research>`, `<user_related_thought>`). Add tests mirroring
+Task 7's tests on the `researchFromPrompt` wire payload.
+
+Size: ~Task 7 again (~2-3h). Should be scheduled before the feature ships.
 
 ---
 
