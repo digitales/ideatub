@@ -528,6 +528,25 @@ class MetadataSanitiserTest extends TestCase
         $this->assertSame('note', $result['type']);
         $this->assertSame(['untouched'], $result['custom_key']);
     }
+
+    public function test_dedupe_applies_before_cap_so_later_unique_tags_survive(): void
+    {
+        $dupes = array_fill(0, 25, 'foo');
+        $dupes[] = 'bar';
+
+        $result = $this->sanitiser->sanitise(['tags' => $dupes]);
+
+        $this->assertSame(['foo', 'bar'], $result['tags']);
+    }
+
+    public function test_injection_phrase_match_is_case_insensitive(): void
+    {
+        $result = $this->sanitiser->sanitise([
+            'tags' => ['IGNORE Previous Instructions', 'fine tag'],
+        ]);
+
+        $this->assertSame(['fine tag'], $result['tags']);
+    }
 }
 ```
 
@@ -611,12 +630,15 @@ class MetadataSanitiser
     }
 
     /**
+     * Validate, injection-check, regex-check, dedupe, and cap a single metadata list in one pass.
+     *
      * @param  array<int, mixed>  $items
      * @return list<string>
      */
     private function filterList(array $items, int $maxLen, int $maxCount, string $allowedRegex): array
     {
         $filtered = [];
+        $seen = [];
         foreach ($items as $item) {
             if (! is_string($item)) {
                 continue;
@@ -625,19 +647,23 @@ class MetadataSanitiser
             if ($item === '' || mb_strlen($item) > $maxLen) {
                 continue;
             }
+            if (isset($seen[$item])) {
+                continue;
+            }
             if ($this->containsInjectionPhrase($item)) {
                 continue;
             }
             if ($allowedRegex !== '//' && preg_match($allowedRegex, $item) !== 1) {
                 continue;
             }
+            $seen[$item] = true;
             $filtered[] = $item;
             if (count($filtered) >= $maxCount) {
                 break;
             }
         }
 
-        return array_values(array_unique($filtered));
+        return $filtered;
     }
 
     private function containsInjectionPhrase(string $value): bool
