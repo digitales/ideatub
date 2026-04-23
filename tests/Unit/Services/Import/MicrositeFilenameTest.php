@@ -24,6 +24,19 @@ class MicrositeFilenameTest extends TestCase
         $this->assertFalse(MicrositeFilename::isValidPageBasename('narrative'));
     }
 
+    public function test_index_basename_is_cover_only_not_numbered(): void
+    {
+        $this->assertTrue(MicrositeFilename::isIndexBasename('index'));
+        $this->assertTrue(MicrositeFilename::isIndexBasename('Index'));
+        $this->assertTrue(MicrositeFilename::isMicrositePageBasename('index'));
+        $this->assertFalse(MicrositeFilename::isValidPageBasename('index'));
+    }
+
+    public function test_index_segment_is_lowercase_index(): void
+    {
+        $this->assertSame('index', MicrositeFilename::pagePathSegmentFromBasename('Index'));
+    }
+
     public function test_basename_collision_detection(): void
     {
         $a = MicrositeFilename::pagePathSegmentFromBasename('00-a');
@@ -49,6 +62,21 @@ class MicrositeFilenameTest extends TestCase
             ['00-a', '1-z', '2-b'],
             array_map(fn (array $r) => $r['basename'], $sorted)
         );
+    }
+
+    public function test_sorted_site_rows_places_index_cover_first_then_numbered_pages(): void
+    {
+        $rows = [
+            ['relative_path' => 'site/01-b.md'],
+            ['relative_path' => 'site/index.md'],
+            ['relative_path' => 'site/00-a.md'],
+        ];
+        $sorted = MicrositeFilename::sortedSiteRowsFromRelativePaths($rows);
+        $this->assertSame(
+            ['index', '00-a', '01-b'],
+            array_map(fn (array $r) => $r['basename'], $sorted)
+        );
+        $this->assertSame('index', $sorted[0]['page_path_segment']);
     }
 
     public function test_sorted_site_rows_from_relative_paths_skips_invalid_basename(): void

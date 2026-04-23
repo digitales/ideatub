@@ -5,7 +5,7 @@ namespace App\Services\Import;
 use Illuminate\Http\UploadedFile;
 
 /**
- * Decides whether a file batch should use the research microsite import path (strict N-title .md set).
+ * Decides whether a file batch should use the research microsite import path (strict N-title .md set, optional `index` cover).
  */
 final class MicrositeImportDetector
 {
@@ -13,7 +13,7 @@ final class MicrositeImportDetector
 
     /**
      * True when this batch is a strict microsite: at least two files, all markdown by extension,
-     * every file basename matches the numbered page pattern, and page_path_segment values are unique.
+     * every file basename is either `index` (cover) or the numbered page pattern, and page_path_segment values are unique.
      *
      * @param  list<string>  $relativePaths
      * @param  array<int, UploadedFile>  $files
@@ -43,7 +43,7 @@ final class MicrositeImportDetector
                 return false;
             }
             $basename = MicrositeFilename::basenameFromRelativePath($path);
-            if (! MicrositeFilename::isValidPageBasename($basename)) {
+            if (! MicrositeFilename::isMicrositePageBasename($basename)) {
                 return false;
             }
             $segments[] = MicrositeFilename::pagePathSegmentFromBasename($basename);
@@ -84,7 +84,7 @@ final class MicrositeImportDetector
                 return false;
             }
             $basename = MicrositeFilename::basenameFromRelativePath($path);
-            if (! MicrositeFilename::isValidPageBasename($basename)) {
+            if (! MicrositeFilename::isMicrositePageBasename($basename)) {
                 return false;
             }
         }

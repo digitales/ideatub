@@ -19,10 +19,30 @@ final class MicrositeFilename
     }
 
     /**
+     * Optional cover page: basename `index` (any case) without numeric prefix.
+     */
+    public static function isIndexBasename(string $basenameNoExt): bool
+    {
+        return strcasecmp($basenameNoExt, 'index') === 0;
+    }
+
+    /**
+     * Numbered page pattern or `index` cover.
+     */
+    public static function isMicrositePageBasename(string $basenameNoExt): bool
+    {
+        return self::isIndexBasename($basenameNoExt) || self::isValidPageBasename($basenameNoExt);
+    }
+
+    /**
      * Un-normalised string from the file (e.g. 00-summary). Used in URLs and dedupe of nav.
      */
     public static function pagePathSegmentFromBasename(string $basenameNoExt): string
     {
+        if (self::isIndexBasename($basenameNoExt)) {
+            return 'index';
+        }
+
         return $basenameNoExt;
     }
 
@@ -69,10 +89,12 @@ final class MicrositeFilename
                 continue;
             }
             $basename = self::basenameFromRelativePath($path);
-            if (! self::isValidPageBasename($basename)) {
+            if (! self::isMicrositePageBasename($basename)) {
                 continue;
             }
-            $sortKey = self::parseSortKeyFromBasename($basename);
+            $sortKey = self::isIndexBasename($basename)
+                ? -1
+                : self::parseSortKeyFromBasename($basename);
             $pagePath = self::pagePathSegmentFromBasename($basename);
             $mapped[] = [
                 'relative_path' => $path,
