@@ -3,16 +3,13 @@
 namespace App\Providers;
 
 use App\Contracts\EvernoteApiGateway;
-
 use App\Models\Comment;
 use App\Models\ImportBatch;
 use App\Models\InboxItem;
 use App\Models\Project;
 use App\Models\Thought;
-use App\Policies\ImportPolicy;
-
 use App\Observers\CommentObserver;
-
+use App\Policies\ImportPolicy;
 use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
@@ -35,22 +32,28 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton('files', fn () => new Filesystem);
+        $this->app->singleton("files", fn () => new Filesystem());
 
-        $this->app->bind(EvernoteApiGateway::class, EvernoteSdkApiGateway::class);
+        $this->app->bind(
+            EvernoteApiGateway::class,
+            EvernoteSdkApiGateway::class
+        );
 
-        $this->app->singleton(TranscriptListFetcher::class, function (): TranscriptListFetcher {
-            $httpFactory = new HttpFactory;
+        $this->app->singleton(
+            TranscriptListFetcher::class,
+            function (): TranscriptListFetcher {
+                $httpFactory = new HttpFactory();
 
-            return new TranscriptListFetcher(
-                new Client([
-                    'timeout' => 30,
-                    'connect_timeout' => 10,
-                ]),
-                $httpFactory,
-                $httpFactory,
-            );
-        });
+                return new TranscriptListFetcher(
+                    new Client([
+                        "timeout" => 30,
+                        "connect_timeout" => 10,
+                    ]),
+                    $httpFactory,
+                    $httpFactory
+                );
+            }
+        );
     }
 
     /**
@@ -58,55 +61,59 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-<<<<<<< HEAD
         Gate::policy(ImportBatch::class, ImportPolicy::class);
-=======
+
         Comment::observe(CommentObserver::class);
->>>>>>> master
 
         Relation::enforceMorphMap([
-            'thought' => Thought::class,
-            'project' => Project::class,
+            "thought" => Thought::class,
+            "project" => Project::class,
         ]);
 
-        RateLimiter::for('login', function (Request $request) {
+        RateLimiter::for("login", function (Request $request) {
             return [
                 Limit::perMinute(5)->by($request->ip()),
-                Limit::perMinute(10)->by($request->input('email')),
+                Limit::perMinute(10)->by($request->input("email")),
             ];
         });
 
-        RateLimiter::for('import-upload', function (Request $request) {
-            return Limit::perHour(200)->by($request->user()?->id ?? $request->ip());
+        RateLimiter::for("import-upload", function (Request $request) {
+            return Limit::perHour(200)->by(
+                $request->user()?->id ?? $request->ip()
+            );
         });
 
-        RateLimiter::for('shared-research-password', function (Request $request) {
-            $token = $request->route('token') ?? 'unknown';
+        RateLimiter::for("shared-research-password", function (
+            Request $request
+        ) {
+            $token = $request->route("token") ?? "unknown";
 
-            return Limit::perMinutes(15, 10)->by($token.':'.$request->ip());
+            return Limit::perMinutes(15, 10)->by($token . ":" . $request->ip());
         });
 
-        RateLimiter::for('shared-research-comment', function (Request $request) {
+        RateLimiter::for("shared-research-comment", function (
+            Request $request
+        ) {
             return [
                 Limit::perMinute(5)->by($request->ip()),
                 Limit::perHour(30)->by($request->ip()),
             ];
         });
 
-        RateLimiter::for('project-share-password', function (Request $request) {
-            $token = $request->route('token') ?? 'unknown';
+        RateLimiter::for("project-share-password", function (Request $request) {
+            $token = $request->route("token") ?? "unknown";
 
-            return Limit::perMinutes(15, 10)->by($token.':'.$request->ip());
+            return Limit::perMinutes(15, 10)->by($token . ":" . $request->ip());
         });
 
-        Broadcast::routes(['middleware' => ['web', 'auth']]);
+        Broadcast::routes(["middleware" => ["web", "auth"]]);
 
-        $channelsPath = base_path('routes/channels.php');
+        $channelsPath = base_path("routes/channels.php");
         if (file_exists($channelsPath)) {
             require $channelsPath;
         }
 
-        View::composer('layouts.idea', function ($view): void {
+        View::composer("layouts.idea", function ($view): void {
             $count = 0;
 
             if (auth()->check()) {
@@ -116,8 +123,8 @@ class AppServiceProvider extends ServiceProvider
                     ->count();
             }
 
-            $view->with('inboxActionableCount', $count);
-            $view->with('demoModeEnabled', app(DemoMode::class)->enabled());
+            $view->with("inboxActionableCount", $count);
+            $view->with("demoModeEnabled", app(DemoMode::class)->enabled());
         });
     }
 }
