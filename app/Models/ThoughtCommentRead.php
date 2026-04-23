@@ -16,10 +16,11 @@ class ThoughtCommentRead extends Model
 
     public $keyType = 'string';
 
-    protected $fillable = ['user_id', 'thought_id', 'last_read_at'];
+    protected $fillable = ['user_id', 'thought_id', 'last_read_at', 'unread_count'];
 
     protected $casts = [
         'last_read_at' => 'datetime',
+        'unread_count' => 'integer',
     ];
 
     public static function markRead(int $userId, string $thoughtId): void
@@ -29,9 +30,10 @@ class ThoughtCommentRead extends Model
                 'user_id' => $userId,
                 'thought_id' => $thoughtId,
                 'last_read_at' => now(),
+                'unread_count' => 0,
             ]],
             ['user_id', 'thought_id'],
-            ['last_read_at'],
+            ['last_read_at', 'unread_count'],
         );
     }
 }

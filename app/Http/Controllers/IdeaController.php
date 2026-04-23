@@ -11,6 +11,7 @@ use App\Models\ResearchRun;
 use App\Models\ResearchShare;
 use App\Models\ResearchSkill;
 use App\Models\Thought;
+use App\Models\ThoughtCommentRead;
 use App\Models\ThoughtLink;
 use App\Models\ThoughtLinkSummary;
 use App\Models\User;
@@ -25,6 +26,7 @@ use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Support\IdeaCompletedAtSql;
 use App\Support\TagSlug;
+use App\View\Presenters\Comments\ResearchCommentsPresenter;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
 use App\View\Presenters\Ideas\CompletedIdeaPresenter;
@@ -34,6 +36,7 @@ use App\View\Presenters\Thoughts\IdeaIndexCardPresenter;
 use App\View\Presenters\Thoughts\StreamThoughtCardPresenter;
 use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
 use App\View\Presenters\Thoughts\VideoThoughtMetadataPresenter;
+use App\View\Research\ResearchContentCommentsViewData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -368,7 +371,7 @@ class IdeaController extends Controller
             });
         }
 
-        $detailCommentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+        $detailCommentsPresenter = new ResearchCommentsPresenter(
             $thought,
             auth()->user(),
             null,
@@ -384,6 +387,7 @@ class IdeaController extends Controller
             'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
             'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
             'detailCommentsPresenter' => $detailCommentsPresenter,
+            'researchContentComments' => ResearchContentCommentsViewData::none(),
         ]);
     }
 
@@ -1396,12 +1400,13 @@ class IdeaController extends Controller
             50
         );
 
-        $commentsPresenter = new \App\View\Presenters\Comments\ResearchCommentsPresenter(
+        $commentsPresenter = new ResearchCommentsPresenter(
             $thought,
             auth()->user(),
             null,
         );
-        \App\Models\ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
+        $researchUnreadBannerCount = $commentsPresenter->unreadCount();
+        ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
 
         return view('idea.research_show', [
             'root' => $thought,
@@ -1414,6 +1419,8 @@ class IdeaController extends Controller
             'editorialLinkSummaries' => $editorialLinkSummaries,
             'newsletterAnalysis' => $newsletterAnalysis,
             'commentsPresenter' => $commentsPresenter,
+            'researchContentComments' => ResearchContentCommentsViewData::none(),
+            'researchUnreadBannerCount' => $researchUnreadBannerCount,
         ]);
     }
 

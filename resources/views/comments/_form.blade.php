@@ -9,7 +9,14 @@
 @if($disabledMessage)
     <p class="mt-4 text-[12px] text-slate-brand/50">{{ $disabledMessage }}</p>
 @else
-    <form method="POST" action="{{ $formAction }}" class="mt-4 space-y-3">
+    <form
+        x-data="{}"
+        method="POST"
+        action="{{ $formAction }}"
+        class="mt-4 space-y-3"
+        @keydown.meta.enter.prevent="$el.requestSubmit()"
+        @keydown.ctrl.enter.prevent="$el.requestSubmit()"
+    >
         @csrf
         @if($mode === 'owner')
             <input type="hidden" name="commentable_type" value="{{ $commentableType }}">

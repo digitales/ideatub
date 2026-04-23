@@ -70,10 +70,9 @@
                 @if ($share->thought)
                     <p class="text-sm text-deep-indigo mb-2">{{ Str::limit($share->thought->content, 80) }}</p>
                 @endif
-                @php $shareUrl = url(route('shared-research.show', $share->token)); @endphp
                 <div class="flex flex-wrap items-center gap-2 mb-3">
-                    <a href="{{ $shareUrl }}" target="_blank" rel="noopener" class="text-xs font-mono text-memory-violet hover:underline bg-white/80 px-2 py-1 rounded break-all flex-1 min-w-0">{{ $shareUrl }}</a>
-                    <button type="button" data-copy-url="{{ $shareUrl }}" class="copy-url-btn text-xs font-medium text-white px-3 py-1.5 rounded-lg transition-opacity hover:opacity-90 flex-shrink-0" style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);">
+                    <a href="{{ $shareUrls[$share->id] }}" target="_blank" rel="noopener" class="text-xs font-mono text-memory-violet hover:underline bg-white/80 px-2 py-1 rounded break-all flex-1 min-w-0">{{ $shareUrls[$share->id] }}</a>
+                    <button type="button" data-copy-url="{{ $shareUrls[$share->id] }}" class="copy-url-btn text-xs font-medium text-white px-3 py-1.5 rounded-lg transition-opacity hover:opacity-90 flex-shrink-0" style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);">
                         Copy
                     </button>
                 </div>
