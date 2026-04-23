@@ -235,9 +235,14 @@ class IdeaController extends Controller
     /**
      * Show a single thought with its comments (replies). Owner only.
      */
-    public function show(Thought $thought): View
+    public function show(Thought $thought): View|RedirectResponse
     {
         $this->authorize('view', $thought);
+
+        $readerUrl = $thought->inAppResearchReaderUrl();
+        if ($readerUrl !== null) {
+            return redirect()->to($readerUrl);
+        }
 
         $thought->load([
             'childThoughts' => fn ($q) => $q->orderBy('created_at'),

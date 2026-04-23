@@ -202,6 +202,70 @@ class ResearchShowTest extends TestCase
         $response->assertRedirect(route('idea.research.show', $root));
     }
 
+    public function test_thoughts_show_redirects_to_research_reader_for_microsite_root(): void
+    {
+        $user = User::factory()->create();
+        $root = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => '---\ntitle: Index\n---\n# Home',
+            'source_metadata' => [
+                'document_layout' => 'microsite',
+                'page_path_segment' => 'index',
+                'import_order' => 0,
+            ],
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('thoughts.show', $root));
+
+        $response->assertRedirect(route('idea.research.show', $root));
+    }
+
+    public function test_thoughts_show_redirects_to_research_page_for_microsite_child(): void
+    {
+        $user = User::factory()->create();
+        $root = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Index',
+            'source_metadata' => [
+                'document_layout' => 'microsite',
+                'page_path_segment' => 'index',
+                'import_order' => 0,
+            ],
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+        ]);
+        $child = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $root->id,
+            'content' => '# Executive summary',
+            'source_metadata' => [
+                'document_layout' => 'microsite',
+                'page_path_segment' => '01-executive-summary',
+                'import_order' => 1,
+                'microsite_root_id' => (string) $root->id,
+            ],
+            'metadata' => [
+                'type' => 'research',
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('thoughts.show', $child));
+
+        $response->assertRedirect(route('idea.research.page', [
+            'thought' => $root,
+            'page' => '01-executive-summary',
+        ]));
+    }
+
     public function test_research_show_returns_403_for_other_users_thought(): void
     {
         $owner = User::factory()->create();

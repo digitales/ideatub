@@ -56,8 +56,12 @@
             <ul class="space-y-2">
                 @foreach ($project->thoughts as $thought)
                     <li class="flex items-start justify-between gap-3 rounded-xl border border-memory-violet/10 bg-white/60 px-4 py-3">
-                        <a href="{{ route('thoughts.show', $thought) }}" class="text-sm text-deep-indigo hover:text-memory-violet line-clamp-3">
+                        <a href="{{ $thought->ideaTubViewUrl() }}" class="text-sm text-deep-indigo hover:text-memory-violet line-clamp-3">
+                            @if ($thought->isMicrositeDocumentLayout())
+                                {{ \App\Support\Research\MicrositePageLabel::forThought($thought) }}
+                            @else
                             {{ \Illuminate\Support\Str::limit($thought->content, 200) }}
+                            @endif
                         </a>
                         <form method="POST" action="{{ route('projects.thoughts.destroy', [$project, $thought]) }}">
                             @csrf

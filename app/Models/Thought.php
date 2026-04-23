@@ -251,6 +251,42 @@ class Thought extends Model implements Commentable
     }
 
     /**
+     * In-app research reader URL for microsite roots/pages; null to use the standard thought detail view.
+     */
+    public function inAppResearchReaderUrl(): ?string
+    {
+        if ($this->isMicrositeRoot()) {
+            return route('idea.research.show', $this);
+        }
+        if ($this->isMicrositeDocumentLayout() && $this->parent_id !== null) {
+            $parent = $this->relationLoaded('parent')
+                ? $this->getRelation('parent')
+                : $this->parent()->first();
+            if ($parent instanceof self && $parent->isMicrositeRoot()) {
+                $seg = (string) data_get($this->source_metadata, 'page_path_segment', '');
+                if ($seg === '' || strcasecmp($seg, 'index') === 0) {
+                    return route('idea.research.show', $parent);
+                }
+
+                return route('idea.research.page', [
+                    'thought' => $parent,
+                    'page' => $seg,
+                ]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * URL for list links (e.g. project members): microsite research reader, or default thought page.
+     */
+    public function ideaTubViewUrl(): string
+    {
+        return $this->inAppResearchReaderUrl() ?? route('thoughts.show', $this);
+    }
+
+    /**
      * @return HasMany<Thought, $this>
      */
     public function childThoughtsForMicrosite(): HasMany
