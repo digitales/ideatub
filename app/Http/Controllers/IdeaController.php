@@ -1246,7 +1246,14 @@ class IdeaController extends Controller
 
         if (data_get($thought->source_metadata, 'provenance') === 'upload'
             && ! filter_var($request->input('provenance_ack'), FILTER_VALIDATE_BOOLEAN)) {
-            return response()->json(['error' => 'provenance_ack_required'], 409);
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['error' => 'provenance_ack_required'], 409);
+            }
+
+            return redirect()->back()->with(
+                'error',
+                'Confirm that you want to run research on imported file content (use the button and confirm the prompt).',
+            );
         }
 
         if (($thought->metadata['type'] ?? null) !== 'idea') {

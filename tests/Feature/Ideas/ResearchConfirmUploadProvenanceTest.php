@@ -22,7 +22,7 @@ class ResearchConfirmUploadProvenanceTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)
-            ->post(route('ideas.research', $thought));
+            ->postJson(route('ideas.research', $thought));
 
         $response->assertStatus(409);
         $response->assertJson(['error' => 'provenance_ack_required']);

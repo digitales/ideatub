@@ -173,6 +173,15 @@ Edit `public/sitemap.xml` and replace `https://your-domain.com` with your actual
 - Stripe: 2.9% + $0.30 per transaction
 - Total: ~$5/month + transaction fees
 
+## File and folder import (IdeaTub)
+
+When enabling this feature in production:
+
+1. Set `FEATURE_FILE_UPLOAD=true` in the environment after the `thoughts.content_sha256` migration and `php artisan thoughts:backfill-content-sha256` (or equivalent) have been run on that environment, as required by the rollout order for imports.
+2. Run standard queue workers on the default queue. Import jobs (`ProcessImportFile` and `FinaliseImportBatch`) do not use a separate queue name.
+3. Optional: the scheduled task `imports:prune-expired-batches` (see `routes/console.php`) runs daily; ensure the app scheduler is active (`php artisan schedule:work` in dev, or a cron that runs `php artisan schedule:run` in production).
+4. Ensure `upload_max_filesize` and `post_max_size` in PHP are consistent with the app limits (batch total 20 MB; quick upload per file 1 MB in validation).
+
 ## Next Steps
 
 1. Set up custom domain (optional)
