@@ -8,11 +8,12 @@ use App\Models\ThoughtCommentRead;
 use App\Models\User;
 use App\Services\Comments\ResearchCommentUnreadService;
 use App\Support\Comments\ShareContext;
-use League\CommonMark\CommonMarkConverter;
+use App\Support\SafeCommonMarkConverter;
+use League\CommonMark\MarkdownConverter;
 
 class ResearchCommentsPresenter
 {
-    private ?CommonMarkConverter $converter = null;
+    private ?MarkdownConverter $converter = null;
 
     public function __construct(
         private readonly Thought $root,
@@ -148,11 +149,8 @@ class ResearchCommentsPresenter
         ];
     }
 
-    private function converter(): CommonMarkConverter
+    private function converter(): MarkdownConverter
     {
-        return $this->converter ??= new CommonMarkConverter([
-            'html_input' => 'strip',
-            'allow_unsafe_links' => false,
-        ]);
+        return $this->converter ??= SafeCommonMarkConverter::make();
     }
 }

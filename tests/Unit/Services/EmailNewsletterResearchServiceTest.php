@@ -15,7 +15,7 @@ use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtChunkingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use League\CommonMark\CommonMarkConverter;
+use App\Support\SafeCommonMarkConverter;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -204,7 +204,9 @@ class EmailNewsletterResearchServiceTest extends TestCase
 
         $this->assertSame('created', $result['status']);
 
-        $html = (new CommonMarkConverter)->convert($result['research_thought']->content)->getContent();
+        $html = SafeCommonMarkConverter::make()
+            ->convert($result['research_thought']->content)
+            ->getContent();
 
         $this->assertStringContainsString('Permanent plus Access to My Skills Repo', $html);
         $this->assertStringNotContainsString('<h2>Permanent plus Access to My Skills Repo</h2>', $html);

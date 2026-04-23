@@ -24,6 +24,7 @@ use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
+use App\Support\SafeCommonMarkConverter;
 use App\Support\IdeaCompletedAtSql;
 use App\Support\Research\MicrositeInAppPathHelper;
 use App\Support\Research\MicrositePageLabel;
@@ -50,7 +51,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use League\CommonMark\CommonMarkConverter;
+use League\CommonMark\MarkdownConverter;
 use Symfony\Component\HttpFoundation\Response;
 
 class IdeaController extends Controller
@@ -1747,10 +1748,7 @@ class IdeaController extends Controller
         }
 
         $sections = $thought->childThoughts()->orderBy('created_at')->get();
-        $converter = new CommonMarkConverter([
-            'html_input' => 'strip',
-            'allow_unsafe_links' => false,
-        ]);
+        $converter = SafeCommonMarkConverter::make();
 
         $rootHtml = $this->renderDemoSafeMarkdown(
             $converter,
@@ -1829,10 +1827,7 @@ class IdeaController extends Controller
             return redirect()->route('idea.research.show', $thought, 301);
         }
 
-        $converter = new CommonMarkConverter([
-            'html_input' => 'strip',
-            'allow_unsafe_links' => false,
-        ]);
+        $converter = SafeCommonMarkConverter::make();
         $rootHtml = $this->renderDemoSafeMarkdown(
             $converter,
             $active->content,
@@ -2459,10 +2454,7 @@ class IdeaController extends Controller
         $rootContext = $previewSource->demoSafeMarkdownRootContext();
         $sectionContext = $previewSource->demoSafeMarkdownSectionContext();
 
-        $converter = new CommonMarkConverter([
-            'html_input' => 'strip',
-            'allow_unsafe_links' => false,
-        ]);
+        $converter = SafeCommonMarkConverter::make();
         $rootHtml = $this->renderDemoSafeMarkdown(
             $converter,
             $documentRoot->content,
@@ -2617,7 +2609,7 @@ class IdeaController extends Controller
     }
 
     private function renderDemoSafeMarkdown(
-        CommonMarkConverter $converter,
+        MarkdownConverter $converter,
         ?string $markdown,
         string $context
     ): string {
@@ -2838,10 +2830,7 @@ class IdeaController extends Controller
      */
     private function renderedThoughtBodyHtml(Thought $thought): string
     {
-        $converter = new CommonMarkConverter([
-            'html_input' => 'strip',
-            'allow_unsafe_links' => false,
-        ]);
+        $converter = SafeCommonMarkConverter::make();
         $context = $this->isStructuredDocumentSection($thought)
             ? 'thought_content_section'
             : 'thought_content';

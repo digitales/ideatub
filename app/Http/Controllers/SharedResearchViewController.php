@@ -7,6 +7,7 @@ use App\Models\Thought;
 use App\Support\Comments\ShareContext;
 use App\Support\Research\MicrositePageLabel;
 use App\Support\Research\MicrositeSharedUrlHelper;
+use App\Support\SafeCommonMarkConverter;
 use App\Support\ThoughtTypeNavigation;
 use App\View\Presenters\Comments\ResearchCommentsPresenter;
 use Illuminate\Http\RedirectResponse;
@@ -17,8 +18,6 @@ use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use League\CommonMark\CommonMarkConverter;
-
 class SharedResearchViewController extends Controller
 {
     public function show(Request $request, string $token): View|RedirectResponse|Response
@@ -100,7 +99,7 @@ class SharedResearchViewController extends Controller
         }
 
         $sections = $root->childThoughts()->orderBy('created_at')->get();
-        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
+        $converter = SafeCommonMarkConverter::make();
         $rootHtml = $converter->convert($root->content)->getContent();
         $sectionsWithHtml = $sections->map(function ($section) use ($converter) {
             return (object) [
@@ -180,7 +179,7 @@ class SharedResearchViewController extends Controller
             abort(404, 'Page not found in this site.');
         }
         $share->load('user');
-        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
+        $converter = SafeCommonMarkConverter::make();
         $html = $converter->convert($active->content)->getContent();
         $html = MicrositeSharedUrlHelper::rewriteInAppQueryLinksInHtmlForShare($html, $share->token);
         $pages = collect([$root])->merge($root->childThoughtsForMicrosite()->get());

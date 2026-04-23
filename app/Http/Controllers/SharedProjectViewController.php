@@ -9,8 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use App\Support\SafeCommonMarkConverter;
 use Illuminate\View\View;
-use League\CommonMark\CommonMarkConverter;
 
 class SharedProjectViewController extends Controller
 {
@@ -95,7 +95,7 @@ class SharedProjectViewController extends Controller
         $project->load(['thoughts' => fn ($q) => $q->orderByPivot('sort_order')]);
         $share->load('user');
 
-        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
+        $converter = SafeCommonMarkConverter::make();
         $descriptionHtml = $project->description
             ? $converter->convert($project->description)->getContent()
             : null;
@@ -113,7 +113,7 @@ class SharedProjectViewController extends Controller
     {
         $project = $share->project;
         $thoughts = $project->thoughts()->orderByPivot('sort_order')->get();
-        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
+        $converter = SafeCommonMarkConverter::make();
 
         $blocks = $thoughts->map(function (Thought $thought) use ($converter) {
             return (object) [
@@ -146,7 +146,7 @@ class SharedProjectViewController extends Controller
             abort(404, 'Not found.');
         }
 
-        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
+        $converter = SafeCommonMarkConverter::make();
         $contentHtml = $converter->convert($thought->content)->getContent();
         $share->load('user');
 

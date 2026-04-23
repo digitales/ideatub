@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\SafeCommonMarkConverter;
 use Illuminate\Support\Facades\File;
 use Illuminate\View\View;
-use League\CommonMark\CommonMarkConverter;
 
 class HelpController extends Controller
 {
@@ -37,7 +37,7 @@ class HelpController extends Controller
      */
     private function loadExamplePrompts(): array
     {
-        $converter = new CommonMarkConverter(['html_input' => 'strip', 'allow_unsafe_links' => false]);
+        $converter = SafeCommonMarkConverter::make();
         $promptsDir = resource_path('content/example-prompts');
         $slugs = ['01-memory-migration', '02-second-brain-migration', '03-open-brain-spark', '04-quick-capture-templates', '05-weekly-review'];
         $prompts = [];
