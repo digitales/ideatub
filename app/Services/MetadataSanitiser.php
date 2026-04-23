@@ -16,6 +16,11 @@ class MetadataSanitiser
 
     private const ACTION_MAX_COUNT = 20;
 
+    // Case-insensitive substring match is deliberately aggressive: may drop a handful
+    // of legitimate multi-segment tags (e.g. "priority:system:high") but guarantees no
+    // injection phrase survives regardless of surrounding punctuation. See spec §5.6.3
+    // — this sanitiser is the backstop; over-filtering 1–2 tags is the intended
+    // trade-off vs. letting an injection payload through.
     /** @var list<string> */
     private const INJECTION_PHRASES = [
         'ignore',

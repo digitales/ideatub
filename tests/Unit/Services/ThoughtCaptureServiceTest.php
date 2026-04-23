@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Models\User;
+use App\Services\MetadataSanitiser;
 use App\Services\OpenRouterService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtChunkingService;
@@ -32,7 +33,8 @@ class ThoughtCaptureServiceTest extends TestCase
             ->andReturn(['tags' => []]);
 
         $chunking = new ThoughtChunkingService;
-        $service = new ThoughtCaptureService($openRouter, $chunking);
+        $sanitiser = new MetadataSanitiser;
+        $service = new ThoughtCaptureService($openRouter, $chunking, $sanitiser);
 
         $result = $service->create([
             'content' => 'My idea',

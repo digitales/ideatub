@@ -13,7 +13,8 @@ class ThoughtCaptureService
 {
     public function __construct(
         private OpenRouterService $openRouter,
-        private ThoughtChunkingService $chunkingService
+        private ThoughtChunkingService $chunkingService,
+        private MetadataSanitiser $sanitiser,
     ) {}
 
     /**
@@ -115,6 +116,7 @@ class ThoughtCaptureService
     ): Thought {
         $embedding = $this->openRouter->embed($content);
         $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
+        $metadata = $this->sanitiser->sanitise($metadata);
         $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
         if ($planSlug !== null && $docType !== null) {
             $docTag = $docType.':'.mb_strtolower($planSlug);
@@ -166,6 +168,7 @@ class ThoughtCaptureService
     ): array {
         $sections = $this->chunkingService->splitAtHeadings($content);
         $metadata = Thought::normalizeMetadataTags($this->openRouter->extractMetadata($content));
+        $metadata = $this->sanitiser->sanitise($metadata);
         $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
         if ($planSlug !== null && $docType !== null) {
             $docTag = $docType.':'.mb_strtolower($planSlug);
