@@ -7,6 +7,7 @@ use App\Http\Requests\BatchImportRequest;
 use App\Http\Requests\QuickImportRequest;
 use App\Jobs\FinaliseImportBatch;
 use App\Jobs\ProcessImportFile;
+use App\Jobs\ProcessMicrositeImportBatch;
 use App\Models\ImportBatch;
 use App\Models\ImportBatchFile;
 use App\Models\Project;
@@ -148,7 +149,11 @@ class ImportController extends Controller
             $rows[] = $row;
         }
 
-        $jobs = array_map(fn (ImportBatchFile $r) => new ProcessImportFile($r->id), $rows);
+        if ($isMicrosite) {
+            $jobs = [new ProcessMicrositeImportBatch($batch->id)];
+        } else {
+            $jobs = array_map(fn (ImportBatchFile $r) => new ProcessImportFile($r->id), $rows);
+        }
 
         $laravelBatch = Bus::batch($jobs)
             ->name('import:'.$batch->id)
@@ -238,10 +243,21 @@ class ImportController extends Controller
             return back()->with('info', 'No failed files to retry.');
         }
 
-        foreach ($failed as $f) {
-            $f->update(['status' => ImportBatchFile::STATUS_PENDING, 'error_code' => null, 'error_message' => null]);
+        if (data_get($batch->options, 'import_kind') === 'microsite') {
+            $failed->each(
+                fn (ImportBatchFile $f) => $f->update([
+                    'status' => ImportBatchFile::STATUS_PENDING,
+                    'error_code' => null,
+                    'error_message' => null,
+                ])
+            );
+            $jobs = [new ProcessMicrositeImportBatch($batch->id)];
+        } else {
+            foreach ($failed as $f) {
+                $f->update(['status' => ImportBatchFile::STATUS_PENDING, 'error_code' => null, 'error_message' => null]);
+            }
+            $jobs = $failed->map(fn (ImportBatchFile $f) => new ProcessImportFile($f->id))->all();
         }
-        $jobs = $failed->map(fn (ImportBatchFile $f) => new ProcessImportFile($f->id))->all();
 
         $laravelBatch = Bus::batch($jobs)
             ->name('import-retry:'.$batch->id)

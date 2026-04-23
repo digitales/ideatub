@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Import;
 
-use App\Jobs\ProcessImportFile;
+use App\Jobs\ProcessMicrositeImportBatch;
 use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\OpenRouterService;
@@ -50,7 +50,12 @@ class MicrositeImportDetectionTest extends TestCase
         $this->assertSame('microsite', data_get($batch->options, 'import_kind'));
 
         Bus::assertBatched(function (PendingBatch $b): bool {
-            return collect($b->jobs)->every(fn ($j) => $j instanceof ProcessImportFile);
+            $js = $b->jobs;
+            if (count($js) !== 1) {
+                return false;
+            }
+
+            return $js[0] instanceof ProcessMicrositeImportBatch;
         });
     }
 
