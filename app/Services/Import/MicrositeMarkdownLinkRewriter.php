@@ -4,6 +4,7 @@ namespace App\Services\Import;
 
 /**
  * Rewrites in-batch relative .md links to query form (?page=segment) and counts local (non-URL) image refs.
+ * Rewrites absolute IdeaTub `/reports/{slug}/{page}` URLs when `{page}` matches a batch segment (published microsite URLs).
  */
 final class MicrositeMarkdownLinkRewriter
 {
@@ -36,9 +37,19 @@ final class MicrositeMarkdownLinkRewriter
                     return $m[0];
                 }
 
-                if ($this->isRemoteOrSpecial($target) || $target === '') {
+                if ($target === '') {
                     return $m[0];
                 }
+
+                if ($this->isRemoteOrSpecial($target)) {
+                    $portable = $this->ideatubReportsUrlToPageQuery($target, $pathSegmentByPathKey);
+                    if ($portable !== null) {
+                        return '['.$label.']('.$portable.')';
+                    }
+
+                    return $m[0];
+                }
+
                 $pathPart = explode('#', $target, 2)[0];
                 if ($pathPart === '') {
                     return $m[0];
@@ -93,6 +104,70 @@ final class MicrositeMarkdownLinkRewriter
             || str_starts_with($l, 'mailto:')
             || str_starts_with($l, 'tel:')
             || str_starts_with($l, 'data:');
+    }
+
+    /**
+     * If URL is IdeaTub `/reports/{reportSlug}/{pageSegment}` (or deeper under `/reports/…`) and the last
+     * segment matches a batch page segment, return portable `?page=…` plus `#fragment` for view-layer rewriting.
+     */
+    private function ideatubReportsUrlToPageQuery(string $target, array $pathSegmentByPathKey): ?string
+    {
+        $parsed = parse_url($target);
+        if ($parsed === false || ! isset($parsed['scheme'], $parsed['host'])) {
+            return null;
+        }
+        $scheme = mb_strtolower((string) $parsed['scheme']);
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            return null;
+        }
+        if (! $this->hostMatchesIdeatubFrontend(mb_strtolower((string) $parsed['host']))) {
+            return null;
+        }
+        $path = isset($parsed['path']) ? (string) $parsed['path'] : '/';
+        $path = trim(str_replace('\\', '/', $path), '/');
+        if ($path === '') {
+            return null;
+        }
+        $segments = array_values(array_filter(explode('/', $path), fn ($s) => $s !== ''));
+        if ($segments === [] || mb_strtolower($segments[0]) !== 'reports') {
+            return null;
+        }
+        $tail = array_slice($segments, 1);
+        if (count($tail) < 2) {
+            return null;
+        }
+        $encodedCandidate = (string) $tail[count($tail) - 1];
+        $candidate = rawurldecode($encodedCandidate);
+        $canonicalByLower = [];
+        foreach ($pathSegmentByPathKey as $segment) {
+            $canonicalByLower[mb_strtolower((string) $segment)] = (string) $segment;
+        }
+        $lookup = mb_strtolower($candidate);
+        if (! isset($canonicalByLower[$lookup])) {
+            return null;
+        }
+        $page = $canonicalByLower[$lookup];
+        $frag = isset($parsed['fragment']) && $parsed['fragment'] !== ''
+            ? '#'.$parsed['fragment']
+            : '';
+
+        return '?page='.rawurlencode($page).$frag;
+    }
+
+    private function hostMatchesIdeatubFrontend(string $host): bool
+    {
+        if (preg_match('/^(www\.)?ideatub\.com$/', $host) === 1) {
+            return true;
+        }
+        $appUrl = config('app.url');
+        if ($appUrl !== null && $appUrl !== '') {
+            $appHost = parse_url((string) $appUrl, PHP_URL_HOST);
+            if ($appHost !== null && $appHost !== '' && strcasecmp($host, (string) $appHost) === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function normaliseJoin(string $fromRelativePath, string $ref): ?string

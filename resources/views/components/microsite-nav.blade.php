@@ -3,7 +3,7 @@
     'ariaLabel' => 'Document pages',
 ])
 
-<nav {{ $attributes->class('mb-6 flex flex-wrap gap-2') }} aria-label="{{ e($ariaLabel) }}">
+<nav {{ $attributes->class('mb-6 flex flex-wrap gap-2') }} aria-label="{{ $ariaLabel }}">
     @foreach ($items as $item)
         <a href="{{ $item->url }}"
             @if ($item->is_active) aria-current="page" @endif
@@ -12,6 +12,6 @@
                 'bg-memory-violet/10 text-memory-violet' => $item->is_active,
                 'text-slate-brand hover:bg-memory-violet/5' => ! $item->is_active,
             ])
-        >{{ e($item->label) }}</a>
+        >{{ $item->label }}</a>
     @endforeach
 </nav>

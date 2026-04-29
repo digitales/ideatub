@@ -32,4 +32,49 @@ class MicrositeMarkdownLinkRewriterTest extends TestCase
         );
         $this->assertSame(1, $out['localAssetRefCount']);
     }
+
+    public function test_rewrites_ideatub_reports_absolute_url_when_segment_matches_batch(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $map = [
+            $r->pathKeyForRelativePath('01-spdd-and-reasons.md') => '01-spdd-and-reasons',
+        ];
+        $out = $r->rewrite(
+            'See [canvas](https://ideatub.com/reports/structured-prompt-driven/01-spdd-and-reasons).',
+            '00-intro.md',
+            $map
+        );
+        $this->assertStringContainsString('[canvas](?page=01-spdd-and-reasons)', (string) $out['markdown']);
+        $this->assertStringNotContainsString('reports/', (string) $out['markdown']);
+    }
+
+    public function test_preserves_fragment_on_ideatub_reports_rewrite(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $map = [$r->pathKeyForRelativePath('01-spdd-and-reasons.md') => '01-spdd-and-reasons'];
+        $out = $r->rewrite(
+            '[x](https://www.ideatub.com/reports/foo/01-spdd-and-reasons#heading)',
+            '00-intro.md',
+            $map
+        );
+        $this->assertStringContainsString('?page=01-spdd-and-reasons#heading', (string) $out['markdown']);
+    }
+
+    public function test_leaves_ideatub_reports_url_unchanged_when_segment_not_in_batch(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $map = [$r->pathKeyForRelativePath('00-intro.md') => '00-intro'];
+        $md = '[other report](https://ideatub.com/reports/other-slug/99-other-page)';
+        $out = $r->rewrite($md, '00-intro.md', $map);
+        $this->assertSame($md, (string) $out['markdown']);
+    }
+
+    public function test_leaves_two_segment_reports_path_unchanged(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $map = [$r->pathKeyForRelativePath('01-spdd-and-reasons.md') => '01-spdd-and-reasons'];
+        $md = '[home](https://ideatub.com/reports/structured-prompt-driven)';
+        $out = $r->rewrite($md, '00-intro.md', $map);
+        $this->assertSame($md, (string) $out['markdown']);
+    }
 }
