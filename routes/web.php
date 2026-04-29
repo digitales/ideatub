@@ -241,6 +241,15 @@ Route::middleware('auth')->group(function () {
     Route::delete('/project-shares/{projectShare}', [ProjectShareController::class, 'destroy'])->name('project-shares.destroy');
 
     Route::redirect('/example-prompts', '/help#example-prompts')->name('example-prompts');
+    Route::get('/help/third-party/ob1', [HelpController::class, 'thirdPartyOb1'])->name('help.third-party.ob1');
+    Route::get('/help/research-to-decision/skills/zip', [HelpController::class, 'researchToDecisionSkillsDownloadZip'])->name('help.research-to-decision.skills.zip');
+    Route::get('/help/research-to-decision/skills/{skill}/download', [HelpController::class, 'researchToDecisionSkillDownload'])
+        ->where('skill', '[a-z0-9-]+')
+        ->name('help.research-to-decision.skills.download-one');
+    Route::get('/help/research-to-decision/skills/{skill}', [HelpController::class, 'researchToDecisionSkillShow'])
+        ->where('skill', '[a-z0-9-]+')
+        ->name('help.research-to-decision.skills.show');
+    Route::get('/help/research-to-decision/skills', [HelpController::class, 'researchToDecisionSkillsIndex'])->name('help.research-to-decision.skills.index');
     Route::get('/help/research-to-decision', [HelpController::class, 'researchToDecision'])->name('help.research-to-decision');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
 

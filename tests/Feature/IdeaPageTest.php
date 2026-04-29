@@ -339,6 +339,60 @@ class IdeaPageTest extends TestCase
         $response->assertSee('Research-to-decision workflow', false);
         $response->assertSee('OB1', false);
         $response->assertSee('Panning for Gold', false);
+        $response->assertSee('Open skills', false);
+    }
+
+    public function test_research_to_decision_skills_index_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.research-to-decision.skills.index'));
+
+        $response->assertOk();
+        $response->assertSee('Research-to-decision skills', false);
+        $response->assertSee('Competitive analysis', false);
+        $response->assertSee('Download ZIP', false);
+    }
+
+    public function test_research_to_decision_skill_show_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.research-to-decision.skills.show', 'competitive-analysis'));
+
+        $response->assertOk();
+        $response->assertSee('Competitive analysis', false);
+        $response->assertSee('IdeaTub MCP', false);
+    }
+
+    public function test_research_to_decision_unknown_skill_returns_404(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.research-to-decision.skills.show', 'not-a-skill'));
+
+        $response->assertNotFound();
+    }
+
+    public function test_research_to_decision_skills_zip_download_succeeds(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.research-to-decision.skills.zip'));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/zip');
+    }
+
+    public function test_third_party_ob1_help_page_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.third-party.ob1'));
+
+        $response->assertOk();
+        $response->assertSee('Third-party notice', false);
+        $response->assertSee('OB1', false);
     }
 
     public function test_help_page_includes_example_prompts(): void

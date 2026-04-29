@@ -10,6 +10,10 @@ This page explains how to use the **[Research-to-Decision Workflow](https://gith
 
 Also read **`resources/prompts/research-to-decision-ideatub.md`** for workspace paths and `capture_plan` conventions.
 
+## Browse and download in the app
+
+Open **[Research-to-decision skills](/help/research-to-decision/skills)** (when logged in) to **view** each `SKILL.md` in the browser, download a single file, or grab the **ZIP** bundle (skills + README + `THIRD_PARTY_OB1.md`).
+
 ## Workspace folders
 
 In your **code or files project** (not only inside IdeaTub’s repo), create:
