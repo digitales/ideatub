@@ -2,6 +2,8 @@
 
 These **`SKILL.md`** files are adapted from **[OB1](https://github.com/NateBJones-Projects/OB1)** (Nate B. Jones). Each folder mirrors upstream `skills/<name>/` so you can copy into `~/.claude/skills/<name>/` or your client’s skills directory.
 
+**License:** Redistribution is under the terms linked in **[`THIRD_PARTY_OB1.md`](../../../THIRD_PARTY_OB1.md)** (FSL-1.1-MIT; [upstream `LICENSE.md`](https://github.com/NateBJones-Projects/OB1/blob/main/LICENSE.md)).
+
 | Folder | Upstream |
 |--------|----------|
 | [competitive-analysis](./competitive-analysis/SKILL.md) | [OB1](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis) |
