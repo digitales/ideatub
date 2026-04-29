@@ -136,4 +136,30 @@ class MicrositeMarkdownLinkRewriterTest extends TestCase
         $this->assertStringContainsString('Link: ?page=01-other.', (string) $out['markdown']);
         $this->assertStringNotContainsString('/research/', (string) $out['markdown']);
     }
+
+    public function test_rewrites_bracket_link_with_root_relative_reports_path(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $map = [$r->pathKeyForRelativePath('01-spdd-and-reasons.md') => '01-spdd-and-reasons'];
+        $out = $r->rewrite(
+            '[Section](/reports/structured-prompt-driven/01-spdd-and-reasons)',
+            '00-intro.md',
+            $map
+        );
+        $this->assertStringContainsString('[Section](?page=01-spdd-and-reasons)', (string) $out['markdown']);
+        $this->assertStringNotContainsString('/reports/', (string) $out['markdown']);
+    }
+
+    public function test_rewrites_bare_root_relative_reports_path(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $map = [$r->pathKeyForRelativePath('01-x.md') => '01-x'];
+        $out = $r->rewrite(
+            "Summary\n\n/reports/z/01-x\n",
+            '00-intro.md',
+            $map
+        );
+        $this->assertStringContainsString('?page=01-x', (string) $out['markdown']);
+        $this->assertStringNotContainsString('/reports/', (string) $out['markdown']);
+    }
 }

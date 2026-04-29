@@ -48,6 +48,22 @@ final class MicrositeMarkdownLinkRewriter
                     return $m[0];
                 }
 
+                // Root-relative in-app paths: `[label](/reports/…)` / `[label](/research/{uuid}/p/…)`
+                if (! $this->isRemoteOrSpecial($target) && str_starts_with($target, '/') && ! str_starts_with($target, '//')) {
+                    $abs = $this->absolutizeRootPathForIdeatub($target);
+                    $portable = $this->ideatubReportsUrlToPageQuery($abs, $pathSegmentByPathKey);
+                    if ($portable === null && $rewriteAbsoluteResearchUrlsForRootId !== null) {
+                        $portable = $this->ideatubInAppResearchUrlToPageQuery(
+                            $abs,
+                            $pathSegmentByPathKey,
+                            $rewriteAbsoluteResearchUrlsForRootId
+                        );
+                    }
+                    if ($portable !== null) {
+                        return '['.$label.']('.$portable.')';
+                    }
+                }
+
                 if ($this->isRemoteOrSpecial($target)) {
                     $portable = $this->ideatubReportsUrlToPageQuery($target, $pathSegmentByPathKey);
                     if ($portable === null && $rewriteAbsoluteResearchUrlsForRootId !== null) {
@@ -106,7 +122,7 @@ final class MicrositeMarkdownLinkRewriter
         array $pathSegmentByPathKey,
         ?string $rewriteAbsoluteResearchUrlsForRootId,
     ): string {
-        return (string) preg_replace_callback(
+        $step = (string) preg_replace_callback(
             '/\b(https?:\/\/(?:www\.)?ideatub\.com[^\s<>`"\')\]]+)/iu',
             function (array $m) use ($pathSegmentByPathKey, $rewriteAbsoluteResearchUrlsForRootId) {
                 $matched = (string) $m[1];
@@ -133,6 +149,64 @@ final class MicrositeMarkdownLinkRewriter
             },
             $markdown
         );
+
+        return $this->rewriteBareRootRelativeIdeatubPaths(
+            $step,
+            $pathSegmentByPathKey,
+            $rewriteAbsoluteResearchUrlsForRootId
+        );
+    }
+
+    /**
+     * Lines/tables with `/reports/…` or `/research/…` without a hostname (not matched by the https:// regex).
+     */
+    private function rewriteBareRootRelativeIdeatubPaths(
+        string $markdown,
+        array $pathSegmentByPathKey,
+        ?string $rewriteAbsoluteResearchUrlsForRootId,
+    ): string {
+        return (string) preg_replace_callback(
+            '/(?:^|(?<=[\s>"\'(|]))(\/reports\/[^\s<>`"\')\]]+|\/research\/[0-9a-fA-F-]{36}(?:\/p\/[0-9A-Za-z._-]+)?)/mu',
+            function (array $m) use ($pathSegmentByPathKey, $rewriteAbsoluteResearchUrlsForRootId) {
+                $full = (string) $m[0];
+                $pathPart = (string) $m[1];
+                $prefix = $pathPart !== '' && str_ends_with($full, $pathPart)
+                    ? substr($full, 0, -strlen($pathPart))
+                    : '';
+                $trail = '';
+                $path = $pathPart;
+                if (preg_match('/([.,;:!?]+)$/u', $pathPart, $tm)) {
+                    $trail = $tm[1];
+                    $path = mb_substr($pathPart, 0, -mb_strlen($trail));
+                }
+
+                $abs = $this->absolutizeRootPathForIdeatub($path);
+                $portable = $this->ideatubReportsUrlToPageQuery($abs, $pathSegmentByPathKey);
+                if ($portable === null && $rewriteAbsoluteResearchUrlsForRootId !== null) {
+                    $portable = $this->ideatubInAppResearchUrlToPageQuery(
+                        $abs,
+                        $pathSegmentByPathKey,
+                        $rewriteAbsoluteResearchUrlsForRootId
+                    );
+                }
+                if ($portable === null) {
+                    return $m[0];
+                }
+
+                return $prefix.$portable.$trail;
+            },
+            $markdown
+        );
+    }
+
+    private function absolutizeRootPathForIdeatub(string $path): string
+    {
+        $base = rtrim((string) config('app.url'), '/');
+        if ($base === '') {
+            $base = 'https://ideatub.com';
+        }
+
+        return $base.$path;
     }
 
     public function countAllLocalAssetRefsInBatch(array $perFileCounts): int

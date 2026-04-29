@@ -25,6 +25,7 @@ use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Support\IdeaCompletedAtSql;
+use App\Support\MarkdownDisplayHelper;
 use App\Support\Research\MicrositeInAppPathHelper;
 use App\Support\Research\MicrositePageLabel;
 use App\Support\SafeCommonMarkConverter;
@@ -1828,9 +1829,12 @@ class IdeaController extends Controller
         }
 
         $converter = SafeCommonMarkConverter::make();
+        $bodyMarkdown = MarkdownDisplayHelper::stripPreambleForMarkdownDisplay(
+            (string) $active->content
+        );
         $rootHtml = $this->renderDemoSafeMarkdown(
             $converter,
-            $active->content,
+            $bodyMarkdown,
             'research_show_root'
         );
         $rootHtml = MicrositeInAppPathHelper::rewriteQueryPageLinksInHtml($thought, $rootHtml);

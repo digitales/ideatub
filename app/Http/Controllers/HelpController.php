@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\MarkdownDisplayHelper;
 use App\Support\SafeCommonMarkConverter;
 use Illuminate\Support\Facades\File;
 use Illuminate\View\View;
@@ -61,7 +62,7 @@ class HelpController extends Controller
             abort(404);
         }
         $raw = File::get($path);
-        $forDisplay = $this->stripSkillPreambleForDisplay($raw);
+        $forDisplay = MarkdownDisplayHelper::stripPreambleForMarkdownDisplay($raw);
         $converter = SafeCommonMarkConverter::make();
         $bodyHtml = $converter->convert($forDisplay)->getContent();
 
@@ -70,22 +71,6 @@ class HelpController extends Controller
             'skillLabel' => $catalog[$skill],
             'bodyHtml' => $bodyHtml,
         ]);
-    }
-
-    /**
-     * Strip HTML comment and YAML front matter so CommonMark display is readable.
-     */
-    private function stripSkillPreambleForDisplay(string $raw): string
-    {
-        $s = $raw;
-        if (preg_match('/\A<!--.*?-->\s*/s', $s, $m)) {
-            $s = substr($s, strlen($m[0]));
-        }
-        if (preg_match('/\A---\s*\r?\n.*?\r?\n---\s*\r?\n/s', $s, $m)) {
-            $s = substr($s, strlen($m[0]));
-        }
-
-        return $s;
     }
 
     public function researchToDecisionSkillsDownloadZip(): BinaryFileResponse
@@ -215,7 +200,7 @@ class HelpController extends Controller
             abort(404);
         }
         $raw = File::get($path);
-        $forDisplay = $this->stripSkillPreambleForDisplay($raw);
+        $forDisplay = MarkdownDisplayHelper::stripPreambleForMarkdownDisplay($raw);
         $converter = SafeCommonMarkConverter::make();
         $bodyHtml = $converter->convert($forDisplay)->getContent();
 

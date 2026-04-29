@@ -3,13 +3,14 @@
 namespace App\Support\Research;
 
 use App\Models\Thought;
+use App\Services\Import\MicrositeMarkdownLinkRewriter;
 
 /**
  * Stored microsite markdown may use portable (?page=segment) links; HTML output uses
  * canonical /research/{root}/p/{segment} URLs in-app.
  *
  * GFM autolinks bare https:// URLs to &lt;a href="https://…"&gt;; those never pass through
- * {@see \App\Services\Import\MicrositeMarkdownLinkRewriter}. After CommonMark, rewrite remaining
+ * {@see MicrositeMarkdownLinkRewriter}. After CommonMark, rewrite remaining
  * IdeaTub /reports/… and matching /research/{thisRoot}/… hrefs to named routes.
  */
 final class MicrositeInAppPathHelper
@@ -102,7 +103,12 @@ final class MicrositeInAppPathHelper
         array $canonicalByLower,
         ?string $shareToken,
     ): ?string {
-        $parsed = parse_url($url);
+        $absoluteForParse = self::absolutizeIdeatubHrefForParsing($url);
+        if ($absoluteForParse === null) {
+            return null;
+        }
+
+        $parsed = parse_url($absoluteForParse);
         if ($parsed === false || ! isset($parsed['scheme'], $parsed['host'])) {
             return null;
         }
@@ -163,6 +169,34 @@ final class MicrositeInAppPathHelper
             }
 
             return self::absoluteUrlForMicrositeRoot($root, $shareToken).$fragSuffix;
+        }
+
+        return null;
+    }
+
+    /**
+     * CommonMark turns `[label](/reports/…)` into href="/reports/…" (no scheme). Browsers resolve it to
+     * the full origin URL; our rewrite logic needs an absolute URL for parse_url().
+     */
+    private static function absolutizeIdeatubHrefForParsing(string $href): ?string
+    {
+        $href = trim($href);
+        if ($href === '') {
+            return null;
+        }
+        if (preg_match('#^https?://#i', $href) === 1) {
+            return $href;
+        }
+        if (str_starts_with($href, '//')) {
+            return 'https:'.$href;
+        }
+        if (str_starts_with($href, '/')) {
+            $base = rtrim((string) config('app.url'), '/');
+            if ($base === '') {
+                $base = 'https://ideatub.com';
+            }
+
+            return $base.$href;
         }
 
         return null;
