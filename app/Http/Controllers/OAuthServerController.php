@@ -49,6 +49,14 @@ class OAuthServerController extends Controller
      */
     public function showConsent(Request $request): View|RedirectResponse
     {
+        // MCP clients (e.g. Codex CLI) sometimes omit `resource` on the authorize URL; RFC 8707-style
+        // resource indicators are still satisfied using the server default audience for this MCP.
+        if (! $request->filled('resource')) {
+            $request->merge([
+                'resource' => config('oauth-mcp.resource'),
+            ]);
+        }
+
         $request->validate([
             'response_type' => 'required|in:code',
             'client_id' => 'required|string',
