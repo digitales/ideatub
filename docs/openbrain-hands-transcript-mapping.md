@@ -68,7 +68,7 @@ So: “household knowledge base” in IdeaTub = thoughts tagged e.g. `household`
 ### 6. MCP and protocol
 
 - **Transcript:** Assumes “MCP server” in general.
-- **IdeaTub:** MCP is **JSON-RPC 2.0** at `POST /api/mcp`, not the official MCP Streamable HTTP transport. Some clients may need a bridge. Document this in integration docs (already in `docs/mcp-integration-guide.md`, `docs/cursor-mcp-integration.md`).
+- **IdeaTub:** MCP is **JSON-RPC 2.0** at **`POST /api/mcp`**. The same endpoint supports **legacy** HTTP and **MCP Streamable HTTP** (when `Accept` includes both `application/json` and `text/event-stream`); see `docs/mcp-integration-guide.md`. Clients that require SSE-only framing may still need a bridge.
 
 ---
 

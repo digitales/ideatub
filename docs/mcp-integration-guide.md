@@ -4,7 +4,16 @@ This guide explains how to connect your AI assistant (Cursor, Claude Desktop, Ch
 
 ## Overview
 
-IdeaTub exposes an **MCP-style API** at `POST /api/mcp`. It uses **JSON-RPC 2.0** with thought capture/search tools, meeting/research tools, and helper aliases:
+IdeaTub exposes **`POST /api/mcp`** with **JSON-RPC 2.0** payloads for thought capture/search tools, meeting/research tools, and helper aliases. The same URL supports two transports:
+
+| Transport | When it applies |
+|-----------|-----------------|
+| **Legacy JSON-RPC** | Typical clients send `Accept: application/json` (no `text/event-stream`). Single-request JSON in, JSON out. |
+| **MCP Streamable HTTP** ([spec 2025-03-26](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports)) | Clients send **`Accept: application/json, text/event-stream`** (both parts required). Uses `initialize` → **`Mcp-Session-Id`** on responses, then `notifications/initialized` (202), then `tools/list`, `tools/call`, and JSON-RPC tool methods. |
+
+See [Protocol note](#protocol-note) for Origin allowlisting, OAuth, and limitations.
+
+Tools available:
 
 | Tool | Description |
 |------|-------------|
@@ -16,7 +25,7 @@ IdeaTub exposes an **MCP-style API** at `POST /api/mcp`. It uses **JSON-RPC 2.0*
 | `capture_meeting` / `add_meeting` / `add_meeting_notes` | Meeting aliases for `capture_plan` with `doc_type=meeting` |
 | `process_meeting` | Queue meeting summarization + categorization (from existing meeting thought or raw transcript content) |
 
-Authentication is by **per-user MCP key**: you send your key via query parameter or header. The same key works in every client; it identifies **you**, not the app.
+Authentication is either **per-user MCP key** (`x-ideatub-key` header; query `?key=` is discouraged—prefer header) or **OAuth** (`Authorization: Bearer` after connector login). The MCP key identifies **your user account**, not the app.
 
 ---
 
@@ -90,7 +99,7 @@ Use the **same key** in every AI client (Cursor, Claude, ChatGPT, etc.). It alwa
    If it only accepts a base URL, use the base URL and add the key as a custom header if the UI allows (e.g. `x-ideatub-key: YOUR_MCP_KEY`).
 5. Save and start a new conversation. Enable the IdeaTub connector via the "+" → Connectors menu.
 
-If tools do not appear, Claude may expect the standard MCP HTTP/SSE transport. IdeaTub uses JSON-RPC; see [Protocol note](#protocol-note) and consider using a small bridge.
+If tools do not appear, ensure the client uses **MCP Streamable HTTP** (`Accept` includes both `application/json` and `text/event-stream`) or legacy JSON-RPC per [Protocol note](#protocol-note). For blocked browser `Origin` hosts, set **`MCP_STREAMABLE_ALLOWED_HOSTS`** (comma-separated hostnames) on the server.
 
 ---
 
@@ -116,7 +125,7 @@ If ChatGPT does not call the tools automatically, try: “Use the IdeaTub search
    If the UI allows custom headers, you can use the base URL and set `x-ideatub-key` to your key.
 4. Save and restart Cursor if needed.
 
-Cursor’s MCP layer may expect the official MCP Streamable HTTP transport. IdeaTub speaks JSON-RPC; if tools do not show up, see [Protocol note](#protocol-note) and the [JSON-RPC API reference](#json-rpc-api-reference) to use or build a bridge.
+Cursor **remote / streamable HTTP** connectors should use the base URL with **`Accept`** listing **both** JSON and **SSE** as above, plus your key header if required. If tools do not show up, see [Protocol note](#protocol-note) (Origin allowlist, session headers) and the [JSON-RPC API reference](#json-rpc-api-reference) for scripting or bridges.
 
 **See also:** [Cursor MCP integration](cursor-mcp-integration.md) — setup and using `capture_thought` from Cursor.
 
@@ -152,10 +161,33 @@ Use your real key in place of `YOUR_MCP_KEY`. If your client only supports URL-b
 
 ## Protocol note
 
-IdeaTub’s `/api/mcp` endpoint uses **JSON-RPC 2.0** with method names that match the Open Brain tool set (`search_thoughts`, `browse_recent`, `thought_stats`, `capture_thought`). It does **not** speak the official MCP wire protocol (e.g. Streamable HTTP / SSE used by some clients).
+### JSON-RPC shape (both transports)
 
-- Clients that accept a “custom HTTP connector” or “generic JSON-RPC” and let you set URL + headers may work with IdeaTub directly.
-- Clients that only support the standard MCP transport may need a local or hosted **adapter** that translates MCP ↔ IdeaTub JSON-RPC. The API reference below is enough to implement that.
+Requests and responses use **JSON-RPC 2.0**. Tool-style methods (`search_thoughts`, `browse_recent`, etc.) and MCP methods (`initialize`, `tools/list`, `tools/call`) share the same JSON-RPC envelope; the server maps `tools/call` to those tools.
+
+### Legacy JSON-RPC (simple HTTP clients)
+
+Send **`POST /api/mcp`** with **`Content-Type: application/json`** and an **`Accept`** header that does **not** imply Streamable HTTP—typically `Accept: application/json` only. Authenticate with **`x-ideatub-key`** or **`Authorization: Bearer`** (OAuth). No session header is required.
+
+### MCP Streamable HTTP (remote connectors, Claude/Cursor-class clients)
+
+Implemented on the **same** URL: **`POST /api/mcp`**. The client must send **`Accept`** including **both** `application/json` and `text/event-stream` (per spec). Flow:
+
+1. **`initialize`** — response includes **`Mcp-Session-Id`** (new session).
+2. **`notifications/initialized`** — notification only; server returns **202** with empty body.
+3. Subsequent requests include **`Mcp-Session-Id`** matching that session (except `initialize`).
+
+**Origin:** For Streamable requests that include an **`Origin`** header, the host must match an allowlist (defaults include Claude, ChatGPT, Cursor, and your **`APP_URL`** host). Add extra hosts via env **`MCP_STREAMABLE_ALLOWED_HOSTS`** (comma-separated), e.g. a connector preview domain.
+
+**OAuth:** Works with Streamable HTTP the same way as legacy (Bearer token after authorization).
+
+**Not implemented or partial (check client compatibility):**
+
+- **`GET /api/mcp`** with `Accept: text/event-stream` returns **405** (reserved; SSE GET not offered yet).
+- **Batched** JSON-RPC arrays in one POST body are rejected in Streamable mode (`400`).
+- Responses are primarily **`application/json`** bodies; some clients expect SSE-framed bodies for every message—if a client still fails after correct `Accept` and session headers, a thin **adapter** may be needed. The [JSON-RPC API reference](#json-rpc-api-reference) is enough to build one.
+
+Implementation reference: `App\Http\Controllers\Api\McpController`, `config/mcp.php`, tests `tests/Feature/McpStreamableHttpTest.php`.
 
 ---
 
@@ -241,8 +273,8 @@ Use **`capture_plan`** when syncing plans, decisions, dev notes, support docs, s
 
 | Issue | What to check |
 |-------|----------------|
-| **401 Unauthorized** | Key is wrong or missing. Use `?key=...` or `x-ideatub-key`; ensure no extra spaces. Key is per-user and shown only once when created. |
-| **Tools don’t appear** | Client may expect standard MCP transport. Try the URL with key; if it still fails, use or build a bridge (see [Protocol note](#protocol-note) and [JSON-RPC API reference](#json-rpc-api-reference)). |
+| **401 Unauthorized** | Key or OAuth token missing/invalid. Prefer **`x-ideatub-key`** (or Bearer after OAuth); ensure no extra spaces. Key is per-user and shown only once when created. |
+| **Tools don’t appear** | Confirm **`Accept`** for Streamable HTTP includes **both** `application/json` and `text/event-stream`; send **`Mcp-Session-Id`** after `initialize`. Check **`Origin`** against [Protocol note](#protocol-note) allowlist (`MCP_STREAMABLE_ALLOWED_HOSTS`). If the client requires SSE-framed responses only, use or build a bridge ([JSON-RPC API reference](#json-rpc-api-reference)). |
 | **Search returns nothing** | Capture some thoughts first (web UI or `capture_thought`). Ensure you’re using the key for the user who owns those thoughts. |
 | **Key lost** | Keys are stored hashed; the plain key cannot be retrieved. An admin must create a new key with `ideatub:create-mcp-keys --force` for your user; use the new key everywhere. |
 
@@ -251,8 +283,8 @@ Use **`capture_plan`** when syncing plans, decisions, dev notes, support docs, s
 ## Summary
 
 1. Get your **MCP key** (from an admin or `php artisan ideatub:create-mcp-keys`).
-2. Build the **connection URL**: `https://your-ideatub.com/api/mcp?key=YOUR_MCP_KEY` (or use base URL + `x-ideatub-key` header if the client supports it).
-3. Add IdeaTub as a **custom/remote MCP connector** in your AI client using that URL (and header if needed).
+2. Build the **connection URL**: `https://your-ideatub.com/api/mcp` with **`x-ideatub-key`** (preferred), OAuth, or legacy `?key=` if the client cannot send headers. For **Streamable HTTP**, ensure **`Accept`** lists both JSON and **`text/event-stream`** ([Protocol note](#protocol-note)).
+3. Add IdeaTub as a **custom/remote MCP connector** in your AI client using that URL (and headers your client expects).
 4. Use the same key in every client; it always means “this user’s IdeaTub brain.”
 
 For prompt ideas (memory migration, second brain migration, weekly review), see the [Companion Prompt Kit](https://promptkit.natebjones.com/20260224_uq1_promptkit_1) and the example prompts in `resources/content/example-prompts/`.

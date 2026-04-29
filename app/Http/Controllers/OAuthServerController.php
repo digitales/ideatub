@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\OauthMcpAuthorizationCode;
 use App\Models\OauthMcpClient;
 use App\Services\OAuthMcpJwtService;
+use App\Services\OAuthMcpRefreshTokenService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -15,7 +16,7 @@ class OAuthServerController extends Controller
 {
     public function __construct(
         private OAuthMcpJwtService $jwt,
-        private \App\Services\OAuthMcpRefreshTokenService $refreshTokens,
+        private OAuthMcpRefreshTokenService $refreshTokens,
     ) {}
 
     /**
@@ -70,7 +71,11 @@ class OAuthServerController extends Controller
                 'code_challenge', 'code_challenge_method', 'resource'
             ));
 
-            return redirect()->route('login')->with('url.intended', $intended)->with('error', 'Please log in to connect IdeaTub.');
+            // Must persist until POST /login (redirect()->intended()). Flashing with ->with('url.intended')
+            // loses the URL after the GET /login request, so users fell through to idea.index instead of OAuth.
+            $request->session()->put('url.intended', $intended);
+
+            return redirect()->route('login')->with('error', 'Please log in to connect IdeaTub.');
         }
 
         if ($request->has('approve') && $request->approve === '1') {

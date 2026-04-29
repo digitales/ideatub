@@ -19,7 +19,7 @@ How to connect Cursor to IdeaTub so you can **capture thoughts** (and search/bro
    - Save and restart Cursor if needed.
 
 3. **Verify tools**  
-   In a new chat, check that IdeaTub tools are available (e.g. `capture_thought`, `capture_plan`, `capture_meeting`, `process_meeting`, `search_thoughts`, `browse_recent`, `thought_stats`). If they don’t appear, Cursor may expect the standard MCP transport; see [Protocol note](#protocol-note) in the main [MCP integration guide](mcp-integration-guide.md).
+   In a new chat, check that IdeaTub tools are available (e.g. `capture_thought`, `capture_plan`, `capture_meeting`, `process_meeting`, `search_thoughts`, `browse_recent`, `thought_stats`). If they don’t appear, confirm Cursor is using **MCP Streamable HTTP** (`Accept` includes both `application/json` and `text/event-stream`) and that **`Mcp-Session-Id`** is sent after `initialize`; see [Protocol note](#protocol-note) and the main [MCP integration guide](mcp-integration-guide.md#protocol-note).
 
 ## Using capture_thought from Cursor
 
@@ -75,7 +75,7 @@ The **capture_plan** tool saves a plan, decision, dev note, support doc, spec, r
 
 ## Protocol note
 
-IdeaTub’s `/api/mcp` endpoint uses **JSON-RPC 2.0**, not the official MCP Streamable HTTP transport. If Cursor only supports standard MCP and tools don’t show up, you may need an adapter that translates MCP ↔ IdeaTub JSON-RPC; the [JSON-RPC API reference](mcp-integration-guide.md#json-rpc-api-reference) has the request/response format.
+IdeaTub’s **`POST /api/mcp`** uses **JSON-RPC 2.0** for both **legacy** clients (`Accept: application/json` only) and **MCP Streamable HTTP** clients that send **`Accept`** with **both** `application/json` and **`text/event-stream`** (session via `initialize` → **`Mcp-Session-Id`**). See [Protocol note](mcp-integration-guide.md#protocol-note) in the main guide for Origin allowlisting (`MCP_STREAMABLE_ALLOWED_HOSTS`), OAuth, and edge cases. If a Cursor build still cannot complete the handshake (e.g. requires SSE-framed bodies only), use or build an adapter; the [JSON-RPC API reference](mcp-integration-guide.md#json-rpc-api-reference) has the wire format.
 
 ## More
 

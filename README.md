@@ -86,8 +86,8 @@ Thoughts can be mirrored to Evernote as notes. Set `EVERNOTE_ACCESS_TOKEN` (and 
 
 ## MCP URL and per-user key
 
-- **Endpoint:** `POST https://your-app-domain/api/mcp` (or `http://localhost:8000/api/mcp` in development.)
-- **Auth:** Send your **per-user MCP key** via query param `?key=YOUR_KEY` or header `x-ideatub-key: YOUR_KEY`. Prefer the header so the key is less likely to appear in logs.
+- **Endpoint:** `POST https://your-app-domain/api/mcp` (or `http://localhost:8000/api/mcp` in development.) The same path supports **legacy JSON-RPC** and **MCP Streamable HTTP** (clients must send `Accept` with both `application/json` and `text/event-stream` for the latter). Details: [docs/mcp-integration-guide.md](docs/mcp-integration-guide.md).
+- **Auth:** Send your **per-user MCP key** via header `x-ideatub-key: YOUR_KEY` (preferred), or OAuth Bearer after connector login. Query `?key=` is discouraged (prefer header so keys are less likely to appear in logs).
 - **Getting a key:** Each user gets at least one key from:
 
   ```bash
