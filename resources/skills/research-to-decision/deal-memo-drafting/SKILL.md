@@ -1,7 +1,3 @@
-<!--
-  IdeaTub distribution — adapted from OB1 deal-memo-drafting.
-  Upstream: https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting
--->
 ---
 name: deal-memo-drafting
 description: |
@@ -14,6 +10,11 @@ description: |
 author: Nate B. Jones
 version: 1.0.0-ideatub.1
 ---
+
+<!--
+  IdeaTub distribution — adapted from OB1 deal-memo-drafting.
+  Upstream: https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting
+-->
 
 # Deal Memo Drafting
 

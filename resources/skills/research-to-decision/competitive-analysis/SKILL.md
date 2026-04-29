@@ -1,7 +1,3 @@
-<!--
-  IdeaTub distribution — adapted from OB1 competitive-analysis.
-  Upstream: https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis
--->
 ---
 name: competitive-analysis
 description: |
@@ -15,6 +11,11 @@ description: |
 author: Nate B. Jones
 version: 1.0.0-ideatub.1
 ---
+
+<!--
+  IdeaTub distribution — adapted from OB1 competitive-analysis.
+  Upstream: https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis
+-->
 
 # Competitive Analysis
 

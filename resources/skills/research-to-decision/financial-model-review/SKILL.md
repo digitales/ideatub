@@ -1,7 +1,3 @@
-<!--
-  IdeaTub distribution — adapted from OB1 financial-model-review.
-  Upstream: https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review
--->
 ---
 name: financial-model-review
 description: |
@@ -14,6 +10,11 @@ description: |
 author: Nate B. Jones
 version: 1.0.0-ideatub.1
 ---
+
+<!--
+  IdeaTub distribution — adapted from OB1 financial-model-review.
+  Upstream: https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review
+-->
 
 # Financial Model Review
 
