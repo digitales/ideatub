@@ -12,7 +12,7 @@
 
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-6">
         <h2 class="text-base font-semibold text-deep-indigo mb-3">Download bundle</h2>
-        <p class="text-sm text-slate-brand mb-4">ZIP includes each skill’s <code class="bg-memory-violet/10 px-1 rounded text-xs">SKILL.md</code>, the bundle <strong>README</strong>, and <strong>THIRD_PARTY_OB1.md</strong> (license notice).</p>
+        <p class="text-sm text-slate-brand mb-4">ZIP includes each skill’s <code class="bg-memory-violet/10 px-1 rounded text-xs">SKILL.md</code>, <code class="bg-memory-violet/10 px-1 rounded text-xs">README.md</code>, and <code class="bg-memory-violet/10 px-1 rounded text-xs">metadata.json</code> (OB1-style layout), plus the bundle <strong>README</strong>, and <strong>THIRD_PARTY_OB1.md</strong> (license notice).</p>
         <a href="{{ route('help.research-to-decision.skills.zip') }}" class="inline-flex items-center gap-2 rounded-lg bg-memory-violet/15 px-4 py-2 text-sm font-medium text-memory-violet hover:bg-memory-violet/25 transition-colors">Download ZIP</a>
     </div>
 

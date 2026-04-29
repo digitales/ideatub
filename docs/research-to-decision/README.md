@@ -4,15 +4,15 @@ This folder holds **local artifacts** for the [OB1 Research-to-Decision Workflow
 
 ## Skills (bundled in this repo)
 
-Prefilled IdeaTub MCP and Help URLs live in **`resources/skills/research-to-decision/`** (one folder per skill; each contains `SKILL.md`). Copy those files into your agent’s skills directory (see [`resources/skills/research-to-decision/README.md`](../../resources/skills/research-to-decision/README.md)).
+Prefilled IdeaTub MCP and Help URLs live in **`resources/skills/research-to-decision/`** (one folder per skill; each contains **`SKILL.md`**, **`README.md`**, **`metadata.json`** — OB1-style layout). Copy into your agent’s skills directory (see [`resources/skills/research-to-decision/README.md`](../../resources/skills/research-to-decision/README.md)).
 
-| Skill | Bundled `SKILL.md` | Upstream OB1 |
-|-------|-------------------|--------------|
-| Competitive analysis | [`SKILL.md`](../../resources/skills/research-to-decision/competitive-analysis/SKILL.md) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis) |
-| Financial model review | [`SKILL.md`](../../resources/skills/research-to-decision/financial-model-review/SKILL.md) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review) |
-| Research synthesis | [`SKILL.md`](../../resources/skills/research-to-decision/research-synthesis/SKILL.md) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis) |
-| Meeting synthesis | [`SKILL.md`](../../resources/skills/research-to-decision/meeting-synthesis/SKILL.md) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/meeting-synthesis) |
-| Deal memo drafting | [`SKILL.md`](../../resources/skills/research-to-decision/deal-memo-drafting/SKILL.md) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting) |
+| Skill | Bundled folder | Upstream OB1 |
+|-------|----------------|--------------|
+| Competitive analysis | [`competitive-analysis/`](../../resources/skills/research-to-decision/competitive-analysis/) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis) |
+| Financial model review | [`financial-model-review/`](../../resources/skills/research-to-decision/financial-model-review/) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review) |
+| Research synthesis | [`research-synthesis/`](../../resources/skills/research-to-decision/research-synthesis/) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis) |
+| Meeting synthesis | [`meeting-synthesis/`](../../resources/skills/research-to-decision/meeting-synthesis/) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/meeting-synthesis) |
+| Deal memo drafting | [`deal-memo-drafting/`](../../resources/skills/research-to-decision/deal-memo-drafting/) | [GitHub](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting) |
 
 The **recipe** defines sequencing and handoffs; the skills define **how** each step behaves. Refresh from upstream when OB1 updates; keep the IdeaTub URL table in sync.
 

@@ -1,6 +1,6 @@
 # Research-to-Decision skills (IdeaTub bundle)
 
-These **`SKILL.md`** files are adapted from **[OB1](https://github.com/NateBJones-Projects/OB1)** (Nate B. Jones). Each folder mirrors upstream `skills/<name>/` so you can copy into `~/.claude/skills/<name>/` or your client’s skills directory.
+Each skill folder mirrors **[OB1](https://github.com/NateBJones-Projects/OB1)** `skills/<name>/` and includes **`SKILL.md`** (adapted for IdeaTub), **`README.md`** (install/troubleshooting), and **`metadata.json`** (manifest with `ideatub_mcp` in `requires`). Copy the whole folder into `~/.claude/skills/<name>/` or your client’s skills directory.
 
 **License:** Redistribution is under the terms linked in **[`THIRD_PARTY_OB1.md`](../../../THIRD_PARTY_OB1.md)** (FSL-1.1-MIT; [upstream `LICENSE.md`](https://github.com/NateBJones-Projects/OB1/blob/main/LICENSE.md)).
 

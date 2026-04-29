@@ -104,9 +104,12 @@ class HelpController extends Controller
         $root = 'ideatub-research-to-decision-skills';
 
         foreach (self::researchToDecisionSkillCatalog() as $slug => $_label) {
-            $full = self::researchToDecisionSkillsBasePath()."/{$slug}/SKILL.md";
-            if (File::isFile($full)) {
-                $zip->addFile($full, "{$root}/{$slug}/SKILL.md");
+            $dir = self::researchToDecisionSkillsBasePath().'/'.$slug;
+            foreach (['SKILL.md', 'README.md', 'metadata.json'] as $basename) {
+                $full = $dir.'/'.$basename;
+                if (File::isFile($full)) {
+                    $zip->addFile($full, "{$root}/{$slug}/{$basename}");
+                }
             }
         }
 

@@ -6,13 +6,13 @@ This repository redistributes **adapted** skill definitions derived from **[OB1]
 
 | Location in this repo | Upstream |
 |-----------------------|----------|
-| `resources/skills/research-to-decision/competitive-analysis/SKILL.md` | [`skills/competitive-analysis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis) |
-| `resources/skills/research-to-decision/financial-model-review/SKILL.md` | [`skills/financial-model-review`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review) |
-| `resources/skills/research-to-decision/research-synthesis/SKILL.md` | [`skills/research-synthesis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis) |
-| `resources/skills/research-to-decision/meeting-synthesis/SKILL.md` | [`skills/meeting-synthesis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/meeting-synthesis) |
-| `resources/skills/research-to-decision/deal-memo-drafting/SKILL.md` | [`skills/deal-memo-drafting`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting) |
+| `resources/skills/research-to-decision/competitive-analysis/` (`SKILL.md`, `README.md`, `metadata.json`) | [`skills/competitive-analysis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis) |
+| `resources/skills/research-to-decision/financial-model-review/` | [`skills/financial-model-review`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review) |
+| `resources/skills/research-to-decision/research-synthesis/` | [`skills/research-synthesis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis) |
+| `resources/skills/research-to-decision/meeting-synthesis/` | [`skills/meeting-synthesis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/meeting-synthesis) |
+| `resources/skills/research-to-decision/deal-memo-drafting/` | [`skills/deal-memo-drafting`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting) |
 
-IdeaTub-specific edits (for example IdeaTub MCP URLs, tool names, and workspace pointers) are **derivative works** of that material. Original authorship and upstream links are noted in each file’s header comment and YAML front matter where applicable.
+IdeaTub-specific edits (for example IdeaTub MCP URLs, tool names, workspace pointers, and **`metadata.json`** `requires.ideatub_mcp`) are **derivative works** of that material. Original authorship and upstream links are noted in each `SKILL.md` header comment and YAML front matter where applicable; `README.md` / `metadata.json` follow OB1 structure with IdeaTub substitutions.
 
 ## License
 
