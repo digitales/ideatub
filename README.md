@@ -8,6 +8,7 @@ A Laravel app for your personal knowledge system: semantic search over thoughts,
 - **Retrieval:** Semantic search and browse recent thoughts via web (`GET /?q=...`) or MCP tools (`search_thoughts`, `browse_recent`, `thought_stats`).
 - **Storage:** PostgreSQL with pgvector; thoughts are embedded and stored per user.
 - **Auth:** Per-user isolation; Laravel web login and per-user MCP keys.
+- **Agent workflows:** **Panning for Gold** prompts under [`resources/prompts/panning-for-gold-*.md`](resources/prompts/) process meeting transcripts and brain dumps into inventory / gold-found markdown and IdeaTub MCP captures; see [design spec](docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md) and [`CLAUDE.md`](CLAUDE.md).
 
 ## Setup
 
@@ -101,6 +102,8 @@ Thoughts can be mirrored to Evernote as notes. Set `EVERNOTE_ACCESS_TOKEN` (and 
 ### Cursor rule: sync plans and docs to IdeaTub
 
 This repo includes a Cursor rule so that when you work with plan, decision, dev, support, or spec markdown files, the AI knows how to sync them to IdeaTub via **capture_plan** (correct `doc_type`, `file_path`, `plan_slug`). The rule lives in [.cursor/rules/ideatub-sync-docs.mdc](.cursor/rules/ideatub-sync-docs.mdc). To use it in another project, copy that `.mdc` file into that project’s `.cursor/rules/` and ensure IdeaTub MCP is configured there. See [.cursor/rules/README.md](.cursor/rules/README.md) for details. You can also **download the rule** from the in-app **Help** page (MCP section).
+
+**Panning for Gold:** [.cursor/rules/panning-for-gold.mdc](.cursor/rules/panning-for-gold.mdc) applies when working under `docs/brainstorming/` or the panning prompt files; it routes the agent to the meeting vs brain-dump wrappers and shared core prompt.
 
 ## Web login
 
