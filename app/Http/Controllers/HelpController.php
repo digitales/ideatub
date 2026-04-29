@@ -145,6 +145,116 @@ class HelpController extends Controller
         ]);
     }
 
+    /**
+     * @return array<string, array{label: string, file: string}>
+     */
+    private static function panningForGoldCatalog(): array
+    {
+        return [
+            'core' => ['label' => 'Core methodology', 'file' => 'panning-for-gold-core.md'],
+            'meeting' => ['label' => 'Meeting wrapper', 'file' => 'panning-for-gold-meeting.md'],
+            'brain-dump' => ['label' => 'Brain-dump wrapper', 'file' => 'panning-for-gold-brain-dump.md'],
+        ];
+    }
+
+    private static function panningForGoldPromptAbsolutePath(string $file): string
+    {
+        $allowed = array_column(self::panningForGoldCatalog(), 'file');
+        if (! in_array($file, $allowed, true)) {
+            abort(404);
+        }
+
+        return resource_path('prompts/'.$file);
+    }
+
+    public function panningForGoldIndex(): View
+    {
+        $prompts = [];
+        foreach (self::panningForGoldCatalog() as $slug => $meta) {
+            $path = resource_path('prompts/'.$meta['file']);
+            $prompts[] = [
+                'slug' => $slug,
+                'label' => $meta['label'],
+                'filename' => $meta['file'],
+                'missing' => ! File::isFile($path),
+            ];
+        }
+
+        return view('help-panning-for-gold', [
+            'prompts' => $prompts,
+        ]);
+    }
+
+    public function panningForGoldShow(string $prompt): View
+    {
+        $catalog = self::panningForGoldCatalog();
+        if (! isset($catalog[$prompt])) {
+            abort(404);
+        }
+        $file = $catalog[$prompt]['file'];
+        $path = self::panningForGoldPromptAbsolutePath($file);
+        if (! File::isFile($path)) {
+            abort(404);
+        }
+        $raw = File::get($path);
+        $forDisplay = $this->stripSkillPreambleForDisplay($raw);
+        $converter = SafeCommonMarkConverter::make();
+        $bodyHtml = $converter->convert($forDisplay)->getContent();
+
+        return view('help-panning-for-gold-prompt', [
+            'promptSlug' => $prompt,
+            'promptLabel' => $catalog[$prompt]['label'],
+            'filename' => $file,
+            'bodyHtml' => $bodyHtml,
+        ]);
+    }
+
+    public function panningForGoldDownloadZip(): BinaryFileResponse
+    {
+        $zipPath = tempnam(sys_get_temp_dir(), 'pfg-prompts-');
+        if ($zipPath === false) {
+            abort(500, 'Could not create temporary file.');
+        }
+
+        $zip = new ZipArchive;
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            @unlink($zipPath);
+            abort(500, 'Could not create archive.');
+        }
+
+        $root = 'ideatub-panning-for-gold';
+
+        foreach (self::panningForGoldCatalog() as $_slug => $meta) {
+            $full = resource_path('prompts/'.$meta['file']);
+            if (File::isFile($full)) {
+                $zip->addFile($full, "{$root}/{$meta['file']}");
+            }
+        }
+
+        $zip->close();
+
+        return response()->download($zipPath, 'ideatub-panning-for-gold-prompts.zip', [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
+    }
+
+    public function panningForGoldDownload(string $prompt): BinaryFileResponse
+    {
+        $catalog = self::panningForGoldCatalog();
+        if (! isset($catalog[$prompt])) {
+            abort(404);
+        }
+        $file = $catalog[$prompt]['file'];
+        $path = self::panningForGoldPromptAbsolutePath($file);
+        if (! File::isFile($path)) {
+            abort(404);
+        }
+
+        return response()->download($path, $file, [
+            'Content-Type' => 'text/markdown; charset=UTF-8',
+        ]);
+    }
+
     public function thirdPartyOb1(): View
     {
         $path = base_path('THIRD_PARTY_OB1.md');

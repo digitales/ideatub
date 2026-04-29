@@ -79,6 +79,7 @@
                     <tr><td class="py-2 font-mono text-xs">sync_jira</td><td class="py-2 text-slate-brand">Refresh Jira activity into thoughts (shown only when Jira is enabled for your workspace)</td></tr>
                 </tbody>
             </table>
+            <p class="text-sm text-slate-brand mt-4"><strong class="text-deep-indigo">Agent prompt bundles</strong> — View or download Markdown prompts in the app: <a href="{{ route('help.panning-for-gold.index') }}" class="text-memory-violet hover:underline">Panning for Gold</a> · <a href="{{ route('help.research-to-decision.skills.index') }}" class="text-memory-violet hover:underline">Research-to-decision skills</a>.</p>
         </div>
 
         <div id="plans" class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">

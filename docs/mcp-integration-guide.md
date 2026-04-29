@@ -15,7 +15,7 @@ See [Protocol note](#protocol-note) for Origin allowlisting, OAuth, and limitati
 
 ### Agent workflows (Panning for Gold)
 
-This repo ships **Panning for Gold** prompts (`resources/prompts/panning-for-gold-core.md` plus meeting vs brain-dump wrappers) so agents with IdeaTub MCP can extract threads from transcripts or dumps, synthesise a gold-found markdown file, then call **`capture_plan`** / **`capture_meeting`** / **`capture_thought`**. Design: `docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md`. Upstream methodology: [OB1 — panning-for-gold](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/panning-for-gold).
+This repo ships **Panning for Gold** prompts (`resources/prompts/panning-for-gold-core.md` plus meeting vs brain-dump wrappers) so agents with IdeaTub MCP can extract threads from transcripts or dumps, synthesise a gold-found markdown file, then call **`capture_plan`** / **`capture_meeting`** / **`capture_thought`**. Design: `docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md`. Upstream methodology: [OB1 — panning-for-gold](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/panning-for-gold). **In-app:** browse or download the prompts from Help → **Panning for Gold** (URL path `/help/panning-for-gold` on your IdeaTub instance; ZIP or individual `.md` files).
 
 ### Agent workflows (Research-to-Decision)
 

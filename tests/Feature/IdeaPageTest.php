@@ -395,6 +395,48 @@ class IdeaPageTest extends TestCase
         $response->assertSee('OB1', false);
     }
 
+    public function test_panning_for_gold_prompts_index_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.panning-for-gold.index'));
+
+        $response->assertOk();
+        $response->assertSee('Panning for Gold prompts', false);
+        $response->assertSee('Core methodology', false);
+        $response->assertSee('Download ZIP', false);
+    }
+
+    public function test_panning_for_gold_prompt_show_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.panning-for-gold.show', 'core'));
+
+        $response->assertOk();
+        $response->assertSee('Core methodology', false);
+        $response->assertSee('Panning for Gold', false);
+    }
+
+    public function test_panning_for_gold_unknown_prompt_returns_404(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.panning-for-gold.show', 'not-a-prompt'));
+
+        $response->assertNotFound();
+    }
+
+    public function test_panning_for_gold_zip_download_succeeds(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.panning-for-gold.zip'));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/zip');
+    }
+
     public function test_help_page_includes_example_prompts(): void
     {
         $user = User::factory()->create();

@@ -242,6 +242,14 @@ Route::middleware('auth')->group(function () {
 
     Route::redirect('/example-prompts', '/help#example-prompts')->name('example-prompts');
     Route::get('/help/third-party/ob1', [HelpController::class, 'thirdPartyOb1'])->name('help.third-party.ob1');
+    Route::get('/help/panning-for-gold/zip', [HelpController::class, 'panningForGoldDownloadZip'])->name('help.panning-for-gold.zip');
+    Route::get('/help/panning-for-gold/{prompt}/download', [HelpController::class, 'panningForGoldDownload'])
+        ->where('prompt', '[a-z0-9-]+')
+        ->name('help.panning-for-gold.download-one');
+    Route::get('/help/panning-for-gold/{prompt}', [HelpController::class, 'panningForGoldShow'])
+        ->where('prompt', '[a-z0-9-]+')
+        ->name('help.panning-for-gold.show');
+    Route::get('/help/panning-for-gold', [HelpController::class, 'panningForGoldIndex'])->name('help.panning-for-gold.index');
     Route::get('/help/research-to-decision/skills/zip', [HelpController::class, 'researchToDecisionSkillsDownloadZip'])->name('help.research-to-decision.skills.zip');
     Route::get('/help/research-to-decision/skills/{skill}/download', [HelpController::class, 'researchToDecisionSkillDownload'])
         ->where('skill', '[a-z0-9-]+')
