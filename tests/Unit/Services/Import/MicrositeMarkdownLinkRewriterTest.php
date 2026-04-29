@@ -115,4 +115,25 @@ class MicrositeMarkdownLinkRewriterTest extends TestCase
         $out = $r->rewrite($md, '00-intro.md', $map);
         $this->assertSame($md, (string) $out['markdown']);
     }
+
+    public function test_rewrites_bare_reports_url_not_in_brackets(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $map = [$r->pathKeyForRelativePath('01-spdd-and-reasons.md') => '01-spdd-and-reasons'];
+        $md = "Microsite sections\n\nSee https://ideatub.com/reports/structured-prompt-driven/01-spdd-and-reasons for intro.";
+        $out = $r->rewrite($md, '00-intro.md', $map);
+        $this->assertStringContainsString('See ?page=01-spdd-and-reasons for intro', (string) $out['markdown']);
+        $this->assertStringNotContainsString('reports/', (string) $out['markdown']);
+    }
+
+    public function test_rewrites_bare_in_app_research_url_when_root_id_passed(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $id = '019dd8c5-3bb5-71d4-a2de-e35863b7559d';
+        $map = [$r->pathKeyForRelativePath('01-other.md') => '01-other'];
+        $md = 'Link: https://ideatub.com/research/'.$id.'/p/01-other.';
+        $out = $r->rewrite($md, '00-intro.md', $map, $id);
+        $this->assertStringContainsString('Link: ?page=01-other.', (string) $out['markdown']);
+        $this->assertStringNotContainsString('/research/', (string) $out['markdown']);
+    }
 }

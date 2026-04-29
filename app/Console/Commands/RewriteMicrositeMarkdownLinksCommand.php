@@ -15,7 +15,7 @@ class RewriteMicrositeMarkdownLinksCommand extends Command
                             {--user= : Only microsites owned by this user ID}
                             {--limit= : Max microsite roots to process}';
 
-    protected $description = 'Re-run microsite markdown link rewriting on stored pages (relative *.md and IdeaTub /reports/… URLs → ?page=…).';
+    protected $description = 'Re-run microsite markdown link rewriting on stored pages (relative *.md, bracket links, and bare https://ideatub.com/… URLs → ?page=…).';
 
     public function __construct(
         private MicrositeMarkdownLinkRewriter $linkRewriter,

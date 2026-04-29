@@ -7,6 +7,9 @@ namespace App\Services\Import;
  * Rewrites absolute IdeaTub `/reports/{slug}/{page}` URLs when `{page}` matches a batch segment (published microsite URLs).
  * When `$rewriteAbsoluteResearchUrlsForRootId` is set (e.g. maintenance command), also rewrites same-host
  * `/research/{thatUuid}/p/{segment}` (canonical in-app URLs) to portable `?page=…`.
+ *
+ * Also rewrites bare absolute URLs (lines/tables with `https://…` not in `[label](url)` brackets),
+ * which GFM renders as links but never passes through the bracket regex.
  */
 final class MicrositeMarkdownLinkRewriter
 {
@@ -83,10 +86,53 @@ final class MicrositeMarkdownLinkRewriter
             $markdown
         );
 
+        $out = $this->rewriteBareIdeatubMicrositeUrls(
+            (string) $out,
+            $pathSegmentByPathKey,
+            $rewriteAbsoluteResearchUrlsForRootId
+        );
+
         return [
             'markdown' => (string) $out,
             'localAssetRefCount' => $localAssets,
         ];
+    }
+
+    /**
+     * Replace standalone IdeaTub /reports/… and /research/{root}/… URLs not wrapped in markdown link brackets.
+     */
+    private function rewriteBareIdeatubMicrositeUrls(
+        string $markdown,
+        array $pathSegmentByPathKey,
+        ?string $rewriteAbsoluteResearchUrlsForRootId,
+    ): string {
+        return (string) preg_replace_callback(
+            '/\b(https?:\/\/(?:www\.)?ideatub\.com[^\s<>`"\')\]]+)/iu',
+            function (array $m) use ($pathSegmentByPathKey, $rewriteAbsoluteResearchUrlsForRootId) {
+                $matched = (string) $m[1];
+                $trail = '';
+                $url = $matched;
+                if (preg_match('/([.,;:!?]+)$/u', $matched, $tm)) {
+                    $trail = $tm[1];
+                    $url = mb_substr($matched, 0, -mb_strlen($trail));
+                }
+
+                $portable = $this->ideatubReportsUrlToPageQuery($url, $pathSegmentByPathKey);
+                if ($portable === null && $rewriteAbsoluteResearchUrlsForRootId !== null) {
+                    $portable = $this->ideatubInAppResearchUrlToPageQuery(
+                        $url,
+                        $pathSegmentByPathKey,
+                        $rewriteAbsoluteResearchUrlsForRootId
+                    );
+                }
+                if ($portable === null) {
+                    return $m[0];
+                }
+
+                return $portable.$trail;
+            },
+            $markdown
+        );
     }
 
     public function countAllLocalAssetRefsInBatch(array $perFileCounts): int
