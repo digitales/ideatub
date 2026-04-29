@@ -58,6 +58,11 @@ return [
         // https://support.claude.com/en/articles/11503834-building-custom-connectors-via-remote-mcp-servers
         'claude.ai',
         'claude.com',
+        // Local MCP clients (e.g. Codex CLI `codex mcp add` / `codex mcp login`) use RFC 8252-style
+        // loopback redirect URIs with dynamic ports during dynamic client registration.
+        'localhost',
+        '127.0.0.1',
+        '[::1]',
     ],
 
 ];
