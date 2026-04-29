@@ -352,6 +352,7 @@ class IdeaPageTest extends TestCase
         $response->assertSee('Research-to-decision skills', false);
         $response->assertSee('Competitive analysis', false);
         $response->assertSee('Download ZIP', false);
+        $response->assertSee('Using with Cursor', false);
     }
 
     public function test_research_to_decision_skill_show_renders(): void
@@ -405,6 +406,7 @@ class IdeaPageTest extends TestCase
         $response->assertSee('Panning for Gold prompts', false);
         $response->assertSee('Core methodology', false);
         $response->assertSee('Download ZIP', false);
+        $response->assertSee('Using with Cursor', false);
     }
 
     public function test_panning_for_gold_prompt_show_renders(): void

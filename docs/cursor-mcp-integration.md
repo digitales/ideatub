@@ -73,6 +73,19 @@ The **capture_plan** tool saves a plan, decision, dev note, support doc, spec, r
   - pass `content` for a new plain-text transcript (optionally `plan_slug`).
 - `process_meeting` returns `meeting_id`, `meeting_run_id`, and `analysis_id` (null until background processing completes).
 
+## Agent bundles (Research-to-Decision, Panning for Gold)
+
+Cursor reads **project rules** from **`.cursor/rules/*.mdc`**, not from `~/.claude/skills/` (that layout is for Claude Code).
+
+In the IdeaTub web app, open **Help** and use:
+
+| Bundle | Help URL path | After download |
+|--------|----------------|----------------|
+| Research-to-Decision OB1 skills | `/help/research-to-decision/skills` | Unzip; align folders with `resources/skills/research-to-decision/<skill>/` and copy **`research-to-decision-ideatub.mdc`** from this repo’s `.cursor/rules/` into your project’s `.cursor/rules/`. |
+| Panning for Gold prompts | `/help/panning-for-gold` | Unzip the three `panning-for-gold-*.md` files into `resources/prompts/` (or change globs in the rule) and copy **`panning-for-gold.mdc`** into `.cursor/rules/`. |
+
+Each page includes **Download ZIP** and a **Using with Cursor** section with step-by-step instructions. MCP must still be configured (**Tools & MCP** → IdeaTub endpoint + key) so agents can call IdeaTub tools.
+
 ## Protocol note
 
 IdeaTub’s **`POST /api/mcp`** uses **JSON-RPC 2.0** for both **legacy** clients (`Accept: application/json` only) and **MCP Streamable HTTP** clients that send **`Accept`** with **both** `application/json` and **`text/event-stream`** (session via `initialize` → **`Mcp-Session-Id`**). See [Protocol note](mcp-integration-guide.md#protocol-note) in the main guide for Origin allowlisting (`MCP_STREAMABLE_ALLOWED_HOSTS`), OAuth, and edge cases. If a Cursor build still cannot complete the handshake (e.g. requires SSE-framed bodies only), use or build an adapter; the [JSON-RPC API reference](mcp-integration-guide.md#json-rpc-api-reference) has the wire format.

@@ -53,6 +53,8 @@
         </table>
     </div>
 
+    @include('partials.help-cursor-agent-instructions', ['variant' => 'pfg'])
+
     <p class="text-xs text-slate-brand/80 mt-8">
         Upstream methodology: <a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/panning-for-gold" class="text-memory-violet hover:underline" target="_blank" rel="noopener noreferrer">OB1 — panning-for-gold</a>. Design: <code class="bg-memory-violet/10 px-1 rounded text-[11px]">docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md</code>.
     </p>

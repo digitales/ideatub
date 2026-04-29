@@ -50,6 +50,8 @@
         </table>
     </div>
 
+    @include('partials.help-cursor-agent-instructions', ['variant' => 'r2d'])
+
     <p class="text-xs text-slate-brand/80 mt-8">
         Third-party terms: <a href="{{ route('help.third-party.ob1') }}" class="text-memory-violet hover:underline">OB1 (FSL-1.1-MIT)</a> (also included in the ZIP). MCP setup: <a href="{{ route('help') }}#mcp" class="text-memory-violet hover:underline">Help → MCP integration</a>.
     </p>
