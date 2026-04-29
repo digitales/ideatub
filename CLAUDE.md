@@ -76,3 +76,17 @@ Panning for Gold turns unstructured text into line-level inventories, evaluated 
 **Cursor:** `.cursor/rules/panning-for-gold.mdc` applies when brainstorming files or panning prompts are in context.
 
 **Design spec:** `docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md`
+
+---
+
+## IdeaTub: Research-to-Decision (OB1 workflow)
+
+The **[OB1 Research-to-Decision recipe](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow)** sequences five skills (install each from [OB1 skills](https://github.com/NateBJones-Projects/OB1/tree/main/skills): competitive-analysis, financial-model-review, research-synthesis, meeting-synthesis, deal-memo-drafting). This repo’s **`resources/prompts/research-to-decision-ideatub.md`** adds IdeaTub **workspace paths** (`docs/research-to-decision/{sources,meetings,models}/`), a single **`plan_slug`** per run, **`search_thoughts` / `browse_recent` / `get_ideas`** for priming, and **`capture_plan`** / **`capture_thought`** for handoff artifacts. Read the adaptation prompt first, then the relevant upstream **`SKILL.md`** for the current step.
+
+**Operator path:** competitive-analysis → research-synthesis → meeting-synthesis. **Investor path:** insert financial-model-review after competitive-analysis; append deal-memo-drafting at the end. Skip steps per upstream README when there is no model, meeting, or memo need.
+
+**Relation to Panning for Gold:** Panning handles unstructured dumps/transcripts; Research-to-Decision handles scoped decision work. Gold-found output can feed research-synthesis; it does not replace competitive or memo skills.
+
+**Cursor:** `.cursor/rules/research-to-decision-ideatub.mdc` when working under `docs/research-to-decision/` or the adaptation prompt.
+
+**Design spec:** `docs/superpowers/specs/2026-04-30-research-to-decision-ideatub-design.md` — **Help (users):** in-app `/help/research-to-decision`.

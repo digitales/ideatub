@@ -17,6 +17,10 @@ See [Protocol note](#protocol-note) for Origin allowlisting, OAuth, and limitati
 
 This repo ships **Panning for Gold** prompts (`resources/prompts/panning-for-gold-core.md` plus meeting vs brain-dump wrappers) so agents with IdeaTub MCP can extract threads from transcripts or dumps, synthesise a gold-found markdown file, then call **`capture_plan`** / **`capture_meeting`** / **`capture_thought`**. Design: `docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md`. Upstream methodology: [OB1 — panning-for-gold](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/panning-for-gold).
 
+### Agent workflows (Research-to-Decision)
+
+The **[OB1 Research-to-Decision Workflow](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow)** chains five upstream skills (competitive analysis, optional financial model review, research synthesis, meeting synthesis, optional deal memo). Install each skill’s `SKILL.md` from [OB1 `skills/`](https://github.com/NateBJones-Projects/OB1/tree/main/skills); this repo adds **`resources/prompts/research-to-decision-ideatub.md`** for `docs/research-to-decision/` paths, **`plan_slug` / `doc_type`**, and using **`search_thoughts`** before a run. It does not vendor the full skill bodies. Workspace layout: `docs/research-to-decision/README.md`. Design: `docs/superpowers/specs/2026-04-30-research-to-decision-ideatub-design.md`. In-app: Help → **Research-to-decision workflow** (`/help/research-to-decision`).
+
 Tools available:
 
 | Tool | Description |

@@ -241,6 +241,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/project-shares/{projectShare}', [ProjectShareController::class, 'destroy'])->name('project-shares.destroy');
 
     Route::redirect('/example-prompts', '/help#example-prompts')->name('example-prompts');
+    Route::get('/help/research-to-decision', [HelpController::class, 'researchToDecision'])->name('help.research-to-decision');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
 
     // MCP key management (obtain / revoke auth key for AI clients)

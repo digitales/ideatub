@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
     <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug mb-2">Help</h1>
-    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts, YouTube video capture, MCP integration, example prompts, and syncing plans into your thinking space.</p>
+    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts, YouTube video capture, MCP integration, example prompts, syncing plans into your thinking space, and the <a href="{{ route('help.research-to-decision') }}" class="text-memory-violet hover:underline font-medium">Research-to-decision workflow</a> (OB1 skills + IdeaTub).</p>
 
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
         <h2 class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>

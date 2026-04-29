@@ -1,0 +1,17 @@
+---
+description: Research-to-Decision — OB1 skill chain with IdeaTub paths and MCP (competitive analysis through optional deal memo)
+globs: "{docs/research-to-decision/**,resources/prompts/research-to-decision-ideatub.md}"
+alwaysApply: false
+---
+
+# Research-to-Decision (IdeaTub)
+
+When the user wants to run the **Research-to-Decision** workflow, **operator / investor diligence**, or points at `docs/research-to-decision/`:
+
+1. Read **`resources/prompts/research-to-decision-ideatub.md`** for IdeaTub MCP fields and paths.
+2. Load the relevant upstream OB1 **`SKILL.md`** for the current step ([recipe index](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow)); skills define behavior, not this rule.
+3. Use **`search_thoughts`** / **`browse_recent`** when priming context; **`capture_plan`** / **`capture_thought`** for durable outputs per `CLAUDE.md`.
+
+Design reference: `docs/superpowers/specs/2026-04-30-research-to-decision-ideatub-design.md`.
+
+Upstream recipe: [OB1 — research-to-decision-workflow](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow).

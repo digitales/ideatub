@@ -329,6 +329,18 @@ class IdeaPageTest extends TestCase
         $this->assertSame(1, Thought::where('user_id', $user->id)->count());
     }
 
+    public function test_research_to_decision_help_page_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.research-to-decision'));
+
+        $response->assertOk();
+        $response->assertSee('Research-to-decision workflow', false);
+        $response->assertSee('OB1', false);
+        $response->assertSee('Panning for Gold', false);
+    }
+
     public function test_help_page_includes_example_prompts(): void
     {
         $user = User::factory()->create();
@@ -347,6 +359,7 @@ class IdeaPageTest extends TestCase
         $response->assertSee('promptkit.natebjones.com');
         $response->assertSee('capture_meeting');
         $response->assertSee('Meetings');
+        $response->assertSee('/help/research-to-decision', false);
     }
 
     public function test_example_prompts_route_redirects_to_help(): void
