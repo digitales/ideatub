@@ -1834,6 +1834,7 @@ class IdeaController extends Controller
             'research_show_root'
         );
         $rootHtml = MicrositeInAppPathHelper::rewriteQueryPageLinksInHtml($thought, $rootHtml);
+        $rootHtml = MicrositeInAppPathHelper::rewritePublishedIdeatubLinksInHtml($thought, $rootHtml);
 
         $onRoot = (string) $active->id === (string) $thought->id;
         $relatedEmail = $onRoot ? $this->resolveResearchRelatedEmailCard($thought) : null;

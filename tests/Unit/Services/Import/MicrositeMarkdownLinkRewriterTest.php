@@ -77,4 +77,42 @@ class MicrositeMarkdownLinkRewriterTest extends TestCase
         $out = $r->rewrite($md, '00-intro.md', $map);
         $this->assertSame($md, (string) $out['markdown']);
     }
+
+    public function test_rewrites_in_app_research_url_when_root_id_matches_and_fourth_arg_set(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $rootId = '019dd8c5-3bb5-71d4-a2de-e35863b7559d';
+        $map = [$r->pathKeyForRelativePath('01-other.md') => '01-other'];
+        $out = $r->rewrite(
+            '[link](https://ideatub.com/research/'.$rootId.'/p/01-other)',
+            '00-intro.md',
+            $map,
+            $rootId
+        );
+        $this->assertStringContainsString('[link](?page=01-other)', (string) $out['markdown']);
+        $this->assertStringNotContainsString('/research/', (string) $out['markdown']);
+    }
+
+    public function test_does_not_rewrite_in_app_research_url_when_root_uuid_differs(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $map = [$r->pathKeyForRelativePath('01-other.md') => '01-other'];
+        $md = '[link](https://ideatub.com/research/019dd8c5-3bb5-71d4-a2de-e35863b7559d/p/01-other)';
+        $out = $r->rewrite(
+            $md,
+            '00-intro.md',
+            $map,
+            'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+        );
+        $this->assertSame($md, (string) $out['markdown']);
+    }
+
+    public function test_import_without_fourth_arg_leaves_in_app_research_urls_unchanged(): void
+    {
+        $r = new MicrositeMarkdownLinkRewriter;
+        $map = [$r->pathKeyForRelativePath('01-other.md') => '01-other'];
+        $md = '[link](https://ideatub.com/research/019dd8c5-3bb5-71d4-a2de-e35863b7559d/p/01-other)';
+        $out = $r->rewrite($md, '00-intro.md', $map);
+        $this->assertSame($md, (string) $out['markdown']);
+    }
 }

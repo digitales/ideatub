@@ -5,6 +5,8 @@ namespace App\Services\Import;
 /**
  * Rewrites in-batch relative .md links to query form (?page=segment) and counts local (non-URL) image refs.
  * Rewrites absolute IdeaTub `/reports/{slug}/{page}` URLs when `{page}` matches a batch segment (published microsite URLs).
+ * When `$rewriteAbsoluteResearchUrlsForRootId` is set (e.g. maintenance command), also rewrites same-host
+ * `/research/{thatUuid}/p/{segment}` (canonical in-app URLs) to portable `?page=…`.
  */
 final class MicrositeMarkdownLinkRewriter
 {
@@ -12,19 +14,21 @@ final class MicrositeMarkdownLinkRewriter
 
     /**
      * @param  array<string, string>  $pathSegmentByPathKey  MicrositeImportService: normalised lowercase path => page_path_segment
+     * @param  ?string  $rewriteAbsoluteResearchUrlsForRootId  Microsite root thought UUID; enables `/research/{uuid}/p/…` → `?page=…` (import omits this — root id unknown until after batch write).
      * @return array{markdown: string, localAssetRefCount: int}
      */
     public function rewrite(
         string $markdown,
         string $fromRelativePath,
         array $pathSegmentByPathKey,
+        ?string $rewriteAbsoluteResearchUrlsForRootId = null,
     ): array {
         $fromRelativePath = str_replace('\\', '/', (string) $fromRelativePath);
         $localAssets = 0;
 
         $out = preg_replace_callback(
             self::BRACKET_LINK,
-            function (array $m) use ($fromRelativePath, $pathSegmentByPathKey, &$localAssets) {
+            function (array $m) use ($fromRelativePath, $pathSegmentByPathKey, &$localAssets, $rewriteAbsoluteResearchUrlsForRootId) {
                 $isImage = str_starts_with($m[0], '!');
                 $label = $m[1];
                 $inner = (string) $m[2];
@@ -43,6 +47,13 @@ final class MicrositeMarkdownLinkRewriter
 
                 if ($this->isRemoteOrSpecial($target)) {
                     $portable = $this->ideatubReportsUrlToPageQuery($target, $pathSegmentByPathKey);
+                    if ($portable === null && $rewriteAbsoluteResearchUrlsForRootId !== null) {
+                        $portable = $this->ideatubInAppResearchUrlToPageQuery(
+                            $target,
+                            $pathSegmentByPathKey,
+                            $rewriteAbsoluteResearchUrlsForRootId
+                        );
+                    }
                     if ($portable !== null) {
                         return '['.$label.']('.$portable.')';
                     }
@@ -152,6 +163,72 @@ final class MicrositeMarkdownLinkRewriter
             : '';
 
         return '?page='.rawurlencode($page).$frag;
+    }
+
+    /**
+     * Canonical logged-in URLs: `/research/{rootThoughtUuid}` or `/research/{rootThoughtUuid}/p/{pageSegment}`.
+     * Rewrites when `{rootThoughtUuid}` matches `$rootId` and the page segment is in this microsite (or root-only URL).
+     */
+    private function ideatubInAppResearchUrlToPageQuery(string $target, array $pathSegmentByPathKey, string $rootId): ?string
+    {
+        $parsed = parse_url($target);
+        if ($parsed === false || ! isset($parsed['scheme'], $parsed['host'])) {
+            return null;
+        }
+        $scheme = mb_strtolower((string) $parsed['scheme']);
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            return null;
+        }
+        if (! $this->hostMatchesIdeatubFrontend(mb_strtolower((string) $parsed['host']))) {
+            return null;
+        }
+        $path = isset($parsed['path']) ? (string) $parsed['path'] : '/';
+        $path = trim(str_replace('\\', '/', $path), '/');
+        if ($path === '') {
+            return null;
+        }
+        $segments = array_values(array_filter(explode('/', $path), fn ($s) => $s !== ''));
+        if ($segments === [] || mb_strtolower($segments[0]) !== 'research') {
+            return null;
+        }
+        $wantRoot = $this->normalizeUuidForComparison($rootId);
+        $urlRoot = isset($segments[1]) ? $this->normalizeUuidForComparison((string) $segments[1]) : '';
+        if ($urlRoot === '' || $urlRoot !== $wantRoot) {
+            return null;
+        }
+
+        $canonicalByLower = [];
+        foreach ($pathSegmentByPathKey as $segment) {
+            $canonicalByLower[mb_strtolower((string) $segment)] = (string) $segment;
+        }
+
+        $frag = isset($parsed['fragment']) && $parsed['fragment'] !== ''
+            ? '#'.$parsed['fragment']
+            : '';
+
+        // /research/{uuid} → microsite root reader (same as empty page query).
+        if (count($segments) === 2) {
+            return '?page='.$frag;
+        }
+
+        // /research/{uuid}/p/{segment}
+        if (count($segments) >= 4 && mb_strtolower($segments[2]) === 'p') {
+            $candidate = rawurldecode((string) $segments[3]);
+            $lookup = mb_strtolower($candidate);
+            if (! isset($canonicalByLower[$lookup])) {
+                return null;
+            }
+            $page = $canonicalByLower[$lookup];
+
+            return '?page='.rawurlencode($page).$frag;
+        }
+
+        return null;
+    }
+
+    private function normalizeUuidForComparison(string $uuid): string
+    {
+        return strtolower(str_replace('-', '', trim($uuid)));
     }
 
     private function hostMatchesIdeatubFrontend(string $host): bool

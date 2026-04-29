@@ -12,13 +12,13 @@ class RewriteMicrositeMarkdownLinksCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_rewrites_reports_urls_and_updates_content(): void
+    public function test_rewrites_in_app_research_and_reports_urls(): void
     {
         $user = User::factory()->create();
         $root = Thought::factory()->create([
             'user_id' => $user->id,
             'parent_id' => null,
-            'content' => 'See [other](https://ideatub.com/reports/structured-prompt-driven/01-other).',
+            'content' => '', // set after create so URL includes root id
             'metadata' => ['type' => 'research'],
             'source_metadata' => [
                 'document_layout' => 'microsite',
@@ -26,6 +26,9 @@ class RewriteMicrositeMarkdownLinksCommandTest extends TestCase
                 'page_path_segment' => '00-intro',
                 'import_order' => 0,
             ],
+        ]);
+        $root->update([
+            'content' => 'See [other](https://ideatub.com/research/'.(string) $root->id.'/p/01-other) and [rep](https://ideatub.com/reports/z/01-other).',
         ]);
 
         Thought::factory()->create([
@@ -48,7 +51,9 @@ class RewriteMicrositeMarkdownLinksCommandTest extends TestCase
 
         $this->assertSame(0, $exit);
         $root->refresh();
-        $this->assertStringContainsString('?page=01-other', (string) $root->content);
+        $this->assertStringContainsString('[other](?page=01-other)', (string) $root->content);
+        $this->assertStringContainsString('[rep](?page=01-other)', (string) $root->content);
+        $this->assertStringNotContainsString('/research/', (string) $root->content);
         $this->assertStringNotContainsString('reports/', (string) $root->content);
     }
 

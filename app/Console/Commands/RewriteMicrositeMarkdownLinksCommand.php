@@ -94,7 +94,8 @@ class RewriteMicrositeMarkdownLinksCommand extends Command
                 $rewritten = $this->linkRewriter->rewrite(
                     (string) $page->content,
                     $filePath,
-                    $map
+                    $map,
+                    (string) $root->id,
                 );
                 $next = (string) $rewritten['markdown'];
                 if ($next === (string) $page->content) {

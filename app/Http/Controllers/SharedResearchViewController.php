@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Support\Comments\ShareContext;
+use App\Support\Research\MicrositeInAppPathHelper;
 use App\Support\Research\MicrositePageLabel;
 use App\Support\Research\MicrositeSharedUrlHelper;
 use App\Support\SafeCommonMarkConverter;
@@ -183,6 +184,7 @@ class SharedResearchViewController extends Controller
         $converter = SafeCommonMarkConverter::make();
         $html = $converter->convert($active->content)->getContent();
         $html = MicrositeSharedUrlHelper::rewriteInAppQueryLinksInHtmlForShare($html, $share->token);
+        $html = MicrositeInAppPathHelper::rewritePublishedIdeatubLinksInHtmlForShare($root, $share->token, $html);
         $pages = collect([$root])->merge($root->micrositePageChildrenInOrder());
         $micrositeNav = $this->buildMicrositeNav($share, $pages, $active);
         $commentFormAction = route('shared-research.comment', $share->token);
