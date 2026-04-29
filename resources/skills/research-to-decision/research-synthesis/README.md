@@ -2,7 +2,7 @@
 
 > Standalone skill pack for turning a source set into clear findings, contradictions, confidence markers, gaps, and next questions.
 
-This folder matches [OB1 `skills/research-synthesis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis). IdeaTub ships **`SKILL.md`** with IdeaTub MCP URLs plus **`README.md`** and **`metadata.json`**.
+This folder matches [OB1 `skills/research-synthesis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis). IdeaTub ships **`SKILL.md`** with IdeaTub MCP URLs plus **`README.md`**.
 
 Workflow context: [Research-to-Decision Workflow](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow).
 
@@ -13,7 +13,7 @@ Workflow context: [Research-to-Decision Workflow](https://github.com/NateBJones-
 
 ## Installation
 
-Copy **`SKILL.md`** to your client skills path. Optional: `README.md`, `metadata.json`.
+Copy **`SKILL.md`** to your client skills path. Optional: **`README.md`**.
 
 **Download:** [Research-to-decision skills](https://ideatub.com/help/research-to-decision/skills).
 
@@ -29,7 +29,6 @@ Copy **`SKILL.md`** to your client skills path. Optional: `README.md`, `metadata
 |------|---------|
 | `SKILL.md` | Prompt / workflow (required) |
 | `README.md` | Install and troubleshooting |
-| `metadata.json` | Skill manifest |
 
 ## Troubleshooting
 

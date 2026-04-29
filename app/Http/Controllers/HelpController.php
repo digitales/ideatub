@@ -105,7 +105,7 @@ class HelpController extends Controller
 
         foreach (self::researchToDecisionSkillCatalog() as $slug => $_label) {
             $dir = self::researchToDecisionSkillsBasePath().'/'.$slug;
-            foreach (['SKILL.md', 'README.md', 'metadata.json'] as $basename) {
+            foreach (['SKILL.md', 'README.md'] as $basename) {
                 $full = $dir.'/'.$basename;
                 if (File::isFile($full)) {
                     $zip->addFile($full, "{$root}/{$slug}/{$basename}");

@@ -2,7 +2,7 @@
 
 > Standalone skill pack for competitor profiling, pricing comparison, market mapping, and strategic recommendations.
 
-This folder matches [OB1 `skills/competitive-analysis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis). **IdeaTub** ships `SKILL.md` with prefilled MCP/Help URLs plus this `README.md` and `metadata.json` (adapted for IdeaTub MCP instead of Open Brain).
+This folder matches [OB1 `skills/competitive-analysis`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis). **IdeaTub** ships **`SKILL.md`** with prefilled MCP/Help URLs plus this **`README.md`** (adapted for IdeaTub MCP instead of Open Brain).
 
 For the full multi-step workflow see the [Research-to-Decision Workflow](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow).
 
@@ -17,7 +17,7 @@ Claude Code, Codex, Cursor, or any client that loads reusable skill/instruction 
 
 ## Installation
 
-1. Copy **`SKILL.md`** (and optionally `README.md`, `metadata.json`) into your client’s skills directory, e.g. `~/.claude/skills/competitive-analysis/`.
+1. Copy **`SKILL.md`** (and optionally **`README.md`**) into your client’s skills directory, e.g. `~/.claude/skills/competitive-analysis/`.
 2. Reload the client.
 
 **From the web app:** Help → [Research-to-decision skills](https://ideatub.com/help/research-to-decision/skills) — view prompts or download the ZIP bundle.
@@ -35,7 +35,6 @@ Claude Code, Codex, Cursor, or any client that loads reusable skill/instruction 
 |------|---------|
 | `SKILL.md` | Prompt / workflow (required) |
 | `README.md` | Human-oriented install and troubleshooting |
-| `metadata.json` | Skill manifest (optional; useful for tooling that reads OB1-style metadata) |
 
 ## Troubleshooting
 

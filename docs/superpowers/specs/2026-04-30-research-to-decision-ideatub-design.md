@@ -8,7 +8,7 @@
 This integration adapts the **Research-to-Decision Workflow** composition recipe from **OB1**.
 
 - **Upstream recipe:** [OB1 — `recipes/research-to-decision-workflow`](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow) (README, `workflow-template.md`, `metadata.json`).
-- **Canonical skills (behavior):** [competitive-analysis](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis), [financial-model-review](https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review), [research-synthesis](https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis), [meeting-synthesis](https://github.com/NateBJones-Projects/OB1/tree/main/skills/meeting-synthesis), [deal-memo-drafting](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting). This repo ships **`resources/skills/research-to-decision/*/SKILL.md`** (IdeaTub MCP and Help URLs prefilled; version `1.0.0-ideatub.*`). Refresh content from upstream OB1 when needed; keep prefilled URLs aligned with production or document self-host substitution.
+- **Canonical skills (behavior):** [competitive-analysis](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis), [financial-model-review](https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review), [research-synthesis](https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis), [meeting-synthesis](https://github.com/NateBJones-Projects/OB1/tree/main/skills/meeting-synthesis), [deal-memo-drafting](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting). This repo ships **`resources/skills/research-to-decision/*/SKILL.md`** and per-skill **`README.md`** (IdeaTub MCP and Help URLs prefilled in `SKILL.md`; version `1.0.0-ideatub.*`). It does **not** ship OB1 `metadata.json`. Refresh from upstream OB1 when needed; keep prefilled URLs aligned with production or document self-host substitution.
 
 IdeaTub’s deliverable is **downstream documentation + agent instructions**: same sequencing and handoffs as OB1, with **IdeaTub MCP** (`search_thoughts`, `browse_recent`, `get_ideas`, `capture_plan`, `capture_meeting`, `capture_thought`) replacing Open Brain search/capture semantics, and repo-local paths under `docs/research-to-decision/`.
 
@@ -41,6 +41,7 @@ OB1 **`SKILL.md`** bodies are vendored under **`resources/skills/research-to-dec
 |------|------|
 | `resources/prompts/research-to-decision-ideatub.md` | Agent adaptation: paths, `plan_slug`, `doc_type`, priming with `search_thoughts`, handoff table. |
 | `resources/skills/research-to-decision/**/SKILL.md` | OB1 skill bodies + IdeaTub prefilled URLs. |
+| `resources/skills/research-to-decision/**/README.md` | Install / troubleshooting (human-oriented). |
 | `docs/research-to-decision/README.md` | Workspace layout, upstream links, quick start. |
 | `docs/research-to-decision/{sources,meetings,models}/` | Placeholder dirs for artifacts (`.gitkeep`). |
 | `.cursor/rules/research-to-decision-ideatub.mdc` | Cursor: when to read the adaptation prompt. |

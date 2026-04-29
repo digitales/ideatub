@@ -4,7 +4,7 @@ This folder holds **local artifacts** for the [OB1 Research-to-Decision Workflow
 
 ## Skills (bundled in this repo)
 
-Prefilled IdeaTub MCP and Help URLs live in **`resources/skills/research-to-decision/`** (one folder per skill; each contains **`SKILL.md`**, **`README.md`**, **`metadata.json`** — OB1-style layout). Copy into your agent’s skills directory (see [`resources/skills/research-to-decision/README.md`](../../resources/skills/research-to-decision/README.md)).
+Prefilled IdeaTub MCP and Help URLs live in **`resources/skills/research-to-decision/`** (one folder per skill; each contains **`SKILL.md`** and **`README.md`**). Copy into your agent’s skills directory (see [`resources/skills/research-to-decision/README.md`](../../resources/skills/research-to-decision/README.md)).
 
 | Skill | Bundled folder | Upstream OB1 |
 |-------|----------------|--------------|

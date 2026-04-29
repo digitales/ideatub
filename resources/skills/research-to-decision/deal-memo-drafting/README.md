@@ -2,7 +2,7 @@
 
 > Standalone skill pack for drafting structured deal, IC, partnership, or acquisition memos from existing diligence materials.
 
-This folder matches [OB1 `skills/deal-memo-drafting`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting). IdeaTub ships **`SKILL.md`** with IdeaTub MCP URLs plus **`README.md`** and **`metadata.json`**.
+This folder matches [OB1 `skills/deal-memo-drafting`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting). IdeaTub ships **`SKILL.md`** with IdeaTub MCP URLs plus **`README.md`**.
 
 Workflow context: [Research-to-Decision Workflow](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow).
 
@@ -13,7 +13,7 @@ Workflow context: [Research-to-Decision Workflow](https://github.com/NateBJones-
 
 ## Installation
 
-Copy **`SKILL.md`** into your skills directory. Optional: `README.md`, `metadata.json`.
+Copy **`SKILL.md`** into your skills directory. Optional: **`README.md`**.
 
 **Download:** [Research-to-decision skills](https://ideatub.com/help/research-to-decision/skills).
 
@@ -28,7 +28,6 @@ Copy **`SKILL.md`** into your skills directory. Optional: `README.md`, `metadata
 |------|---------|
 | `SKILL.md` | Prompt / workflow (required) |
 | `README.md` | Install and troubleshooting |
-| `metadata.json` | Skill manifest |
 
 ## Troubleshooting
 

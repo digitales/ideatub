@@ -2,7 +2,7 @@
 
 > Standalone skill pack for reviewing an existing financial model, forecast, or scenario set before using it in a decision.
 
-This folder matches [OB1 `skills/financial-model-review`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review). IdeaTub ships **`SKILL.md`** with prefilled IdeaTub MCP URLs plus **`README.md`** and **`metadata.json`** adapted for IdeaTub.
+This folder matches [OB1 `skills/financial-model-review`](https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review). IdeaTub ships **`SKILL.md`** with prefilled IdeaTub MCP URLs plus **`README.md`** adapted for IdeaTub.
 
 Workflow context: [Research-to-Decision Workflow](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow).
 
@@ -13,7 +13,7 @@ Workflow context: [Research-to-Decision Workflow](https://github.com/NateBJones-
 
 ## Installation
 
-Copy **`SKILL.md`** into your skills directory (e.g. `~/.claude/skills/financial-model-review/`). Optionally include `README.md` and `metadata.json`.
+Copy **`SKILL.md`** into your skills directory (e.g. `~/.claude/skills/financial-model-review/`). Optionally include **`README.md`**.
 
 **Download bundle:** [Research-to-decision skills](https://ideatub.com/help/research-to-decision/skills) on IdeaTub.
 
@@ -29,7 +29,6 @@ Copy **`SKILL.md`** into your skills directory (e.g. `~/.claude/skills/financial
 |------|---------|
 | `SKILL.md` | Prompt / workflow (required) |
 | `README.md` | Install and troubleshooting |
-| `metadata.json` | OB1-style manifest (`ideatub_mcp` in `requires`) |
 
 ## Troubleshooting
 
