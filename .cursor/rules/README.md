@@ -14,6 +14,12 @@ Project-specific rules for Cursor. They apply when the described files are in co
 
 **What it does:** Tells the AI how to save research to IdeaTub via `capture_plan` with `doc_type` `research`, and to set `project` to the research topic so it’s recorded in `source_metadata`. Use the same `plan_slug` for all sections of one research run so Stream can show them under a tag like `research:<slug>`.
 
+## panning-for-gold.mdc
+
+**When it applies:** Editing or viewing files under `docs/brainstorming/`, or `resources/prompts/panning-for-gold*.md`, or when the user asks to pan for gold / process a brain dump or meeting transcript.
+
+**What it does:** Routes the agent to the meeting or brain-dump wrapper plus shared core (`resources/prompts/panning-for-gold-core.md`), then IdeaTub MCP capture after synthesis. See `docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md`.
+
 ## Using these rules in another project
 
 1. Get the rule file(s): copy from this repo, or **download from the IdeaTub Help page** (Help → MCP section → “Download ideatub-sync-docs.mdc” or “Download ideatub-sync-research.mdc”).

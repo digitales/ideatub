@@ -1,0 +1,21 @@
+---
+description: Panning for Gold — process brain dumps and meeting transcripts into inventory + gold-found markdown and IdeaTub MCP captures
+globs: "{docs/brainstorming/**,resources/prompts/panning-for-gold*.md}"
+alwaysApply: false
+---
+
+# Panning for Gold (IdeaTub)
+
+When the user asks to **pan for gold**, **process a brain dump**, **process meeting notes / a transcript**, or points at raw multi-topic text under `docs/brainstorming/`:
+
+1. **Choose wrapper**
+   - Meeting / stand-up / call / obvious meeting transcript → read `resources/prompts/panning-for-gold-meeting.md`, then `resources/prompts/panning-for-gold-core.md`.
+   - General dump, export, journal, non-meeting markdown → read `resources/prompts/panning-for-gold-brain-dump.md`, then `resources/prompts/panning-for-gold-core.md`.
+
+2. **Execute** the methodology in the core file (phases, checkpoint, IdeaTub MCP). Do not skip the post–Phase 1 user checkpoint.
+
+3. **MCP:** IdeaTub tools cannot read local files; read generated markdown and pass `content`. Follow `CLAUDE.md` for `capture_plan` / `capture_meeting` / `capture_thought` parameter conventions.
+
+Design reference: `docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md`.
+
+Upstream lineage: [OB1 — panning-for-gold](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/panning-for-gold).

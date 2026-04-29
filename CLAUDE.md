@@ -55,3 +55,24 @@ Parameters (for `capture_plan` with `doc_type: meeting`, or for any meeting alia
 **Stream:** Filter by tag, e.g. `/stream?tag=meeting-2026-04-01-standup`, or open **Stream → Meetings**.
 
 **Research agent prompt (ideas):** The in-app “Research this idea” prompt is loaded from `resources/prompts/research.md` (placeholders: `{{idea}}`, `{{existing_research}}`). Override path via `RESEARCH_PROMPT_PATH`. See `docs/superpowers/specs/2026-03-15-research-prompt-from-file-design.md`.
+
+---
+
+## IdeaTub: Panning for Gold (brain dumps and meetings)
+
+Panning for Gold turns unstructured text into line-level inventories, evaluated threads, and a gold-found markdown file, then captures into IdeaTub via MCP. Methodology is adapted from [OB1 — Panning for Gold](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/panning-for-gold) (credit: Jared Irish).
+
+**Prompt files (read wrapper, then core):**
+
+| Mode | Wrapper | Shared core |
+|------|-----------|-------------|
+| Meetings / transcripts | `resources/prompts/panning-for-gold-meeting.md` | `resources/prompts/panning-for-gold-core.md` |
+| Brain dumps / exports | `resources/prompts/panning-for-gold-brain-dump.md` | `resources/prompts/panning-for-gold-core.md` |
+
+**Triggers:** “Pan for gold”, “process this brain dump”, “process this meeting” — pick the wrapper that matches whether the source is meeting-framed or a general dump.
+
+**Outputs:** Default directory `docs/brainstorming/` — inventory and gold-found filenames `YYYY-MM-DD-<slug>-inventory.md` / `YYYY-MM-DD-<slug>-gold-found.md`. Follow Phase 3.5 in the core file for `capture_plan`, `capture_meeting`, and `capture_thought`.
+
+**Cursor:** `.cursor/rules/panning-for-gold.mdc` applies when brainstorming files or panning prompts are in context.
+
+**Design spec:** `docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md`

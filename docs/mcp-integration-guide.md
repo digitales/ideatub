@@ -13,6 +13,10 @@ IdeaTub exposes **`POST /api/mcp`** with **JSON-RPC 2.0** payloads for thought c
 
 See [Protocol note](#protocol-note) for Origin allowlisting, OAuth, and limitations.
 
+### Agent workflows (Panning for Gold)
+
+This repo ships **Panning for Gold** prompts (`resources/prompts/panning-for-gold-core.md` plus meeting vs brain-dump wrappers) so agents with IdeaTub MCP can extract threads from transcripts or dumps, synthesise a gold-found markdown file, then call **`capture_plan`** / **`capture_meeting`** / **`capture_thought`**. Design: `docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md`. Upstream methodology: [OB1 — panning-for-gold](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/panning-for-gold).
+
 Tools available:
 
 | Tool | Description |

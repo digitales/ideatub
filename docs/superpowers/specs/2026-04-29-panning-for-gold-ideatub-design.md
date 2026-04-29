@@ -1,6 +1,6 @@
 # Design: Panning for Gold (IdeaTub agent workflow)
 
-**Status:** Draft (pending implementation)  
+**Status:** Approved — implemented (prompts, Cursor rule, `CLAUDE.md`, `AGENTS.md`)  
 **Date:** 2026-04-29
 
 ## Attribution and source
