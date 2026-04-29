@@ -104,6 +104,13 @@ class OAuthServerController extends Controller
      */
     public function token(Request $request): Response
     {
+        // Match authorize + PKCE: some MCP clients omit `resource` on token exchange; default to MCP audience.
+        if (! $request->filled('resource')) {
+            $request->merge([
+                'resource' => config('oauth-mcp.resource'),
+            ]);
+        }
+
         $grantType = (string) $request->input('grant_type');
 
         if ($grantType === 'authorization_code') {
