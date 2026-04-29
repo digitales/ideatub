@@ -2,7 +2,7 @@
   Research-to-Decision — IdeaTub adaptation (sequencing + MCP + paths).
 
   Upstream recipe: https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow
-  Canonical skill behavior lives in OB1 skills/ (install SKILL.md per upstream README).
+  Skill bodies: resources/skills/research-to-decision/*/SKILL.md (IdeaTub-prefilled); upstream OB1 for parity.
 -->
 
 # Research-to-Decision workflow (IdeaTub)
@@ -11,7 +11,7 @@
 
 Chain OB1 skills—**competitive-analysis → research-synthesis → meeting-synthesis**, with optional **financial-model-review** and **deal-memo-drafting**—so each step produces a **clean artifact for the next**. IdeaTub MCP stores durable outputs and supplies prior context via search.
 
-**Skills are upstream:** Read each step’s OB1 `SKILL.md`. This file only adds **IdeaTub workspace paths**, **`plan_slug` / `doc_type`**, **priming**, and **paths** (operator vs investor).
+**Skills:** Install from **`resources/skills/research-to-decision/<skill-name>/SKILL.md`** (IdeaTub MCP and Help URLs prefilled; **`README`** in that folder; or use upstream [OB1 skills](https://github.com/NateBJones-Projects/OB1/tree/main/skills)). This adaptation file adds **workspace paths**, **`plan_slug` / `doc_type`**, **priming**, and **paths** (operator vs investor).
 
 ## Workspace
 

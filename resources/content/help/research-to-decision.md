@@ -6,14 +6,9 @@ This page explains how to use the **[Research-to-Decision Workflow](https://gith
 
 1. **IdeaTub account** and **[MCP key](/settings/mcp-keys)** — same as [MCP integration](/help#mcp).
 2. **MCP-connected agent** (Cursor, Claude Code, Claude Desktop, ChatGPT with connector, etc.) using your instance endpoint and key.
-3. **OB1 skills** — install the five canonical `SKILL.md` files from GitHub into your agent’s skills directory (see each repo’s README):
-   - [competitive-analysis](https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis)
-   - [financial-model-review](https://github.com/NateBJones-Projects/OB1/tree/main/skills/financial-model-review)
-   - [research-synthesis](https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis)
-   - [meeting-synthesis](https://github.com/NateBJones-Projects/OB1/tree/main/skills/meeting-synthesis)
-   - [deal-memo-drafting](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting)
+3. **Skills** — Use the bundled **`SKILL.md`** files shipped with the IdeaTub project (**`resources/skills/research-to-decision/`**). They match [OB1](https://github.com/NateBJones-Projects/OB1/tree/main/skills) behavior but include **prefilled IdeaTub URLs** (`https://ideatub.com/api/mcp`, Help links, MCP keys page). Copy each file into your agent’s skills directory (instructions in that folder’s **README**). Self-hosted: replace `https://ideatub.com` in those files with your site origin.
 
-The IdeaTub **application repo** (if you use it) adds **`resources/prompts/research-to-decision-ideatub.md`** — read that for paths and `capture_plan` conventions; it does not replace the OB1 skill bodies.
+Also read **`resources/prompts/research-to-decision-ideatub.md`** for workspace paths and `capture_plan` conventions.
 
 ## Workspace folders
 
