@@ -108,7 +108,7 @@ class HelpController extends Controller
             foreach (['SKILL.md', 'README.md'] as $basename) {
                 $full = $dir.'/'.$basename;
                 if (File::isFile($full)) {
-                    $zip->addFile($full, "{$root}/{$slug}/{$basename}");
+                    $zip->addFile($full, "{$root}/resources/skills/research-to-decision/{$slug}/{$basename}");
                 }
             }
         }
@@ -118,9 +118,24 @@ class HelpController extends Controller
             $zip->addFile($readme, "{$root}/README.md");
         }
 
+        $cursorReadme = self::researchToDecisionSkillsBasePath().'/CURSOR-BUNDLE.txt';
+        if (File::isFile($cursorReadme)) {
+            $zip->addFile($cursorReadme, "{$root}/CURSOR-BUNDLE.txt");
+        }
+
         $notice = base_path('THIRD_PARTY_OB1.md');
         if (File::isFile($notice)) {
             $zip->addFile($notice, "{$root}/THIRD_PARTY_OB1.md");
+        }
+
+        $cursorRule = base_path('.cursor/rules/research-to-decision-ideatub.mdc');
+        if (File::isFile($cursorRule)) {
+            $zip->addFile($cursorRule, "{$root}/.cursor/rules/research-to-decision-ideatub.mdc");
+        }
+
+        $adaptPrompt = resource_path('prompts/research-to-decision-ideatub.md');
+        if (File::isFile($adaptPrompt)) {
+            $zip->addFile($adaptPrompt, "{$root}/resources/prompts/research-to-decision-ideatub.md");
         }
 
         $zip->close();
@@ -230,8 +245,18 @@ class HelpController extends Controller
         foreach (self::panningForGoldCatalog() as $_slug => $meta) {
             $full = resource_path('prompts/'.$meta['file']);
             if (File::isFile($full)) {
-                $zip->addFile($full, "{$root}/{$meta['file']}");
+                $zip->addFile($full, "{$root}/resources/prompts/{$meta['file']}");
             }
+        }
+
+        $panningCursorReadme = resource_path('prompts/CURSOR-BUNDLE-PANNING.txt');
+        if (File::isFile($panningCursorReadme)) {
+            $zip->addFile($panningCursorReadme, "{$root}/CURSOR-BUNDLE.txt");
+        }
+
+        $panningRule = base_path('.cursor/rules/panning-for-gold.mdc');
+        if (File::isFile($panningRule)) {
+            $zip->addFile($panningRule, "{$root}/.cursor/rules/panning-for-gold.mdc");
         }
 
         $zip->close();

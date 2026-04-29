@@ -12,6 +12,10 @@ Each skill folder mirrors **[OB1](https://github.com/NateBJones-Projects/OB1)** 
 | [meeting-synthesis](./meeting-synthesis/SKILL.md) | [OB1](https://github.com/NateBJones-Projects/OB1/tree/main/skills/meeting-synthesis) |
 | [deal-memo-drafting](./deal-memo-drafting/SKILL.md) | [OB1](https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting) |
 
+## Cursor (ZIP from Help)
+
+The downloadable ZIP reproduces **`resources/skills/research-to-decision/`**, **`resources/prompts/research-to-decision-ideatub.md`**, and **`.cursor/rules/research-to-decision-ideatub.mdc`**. Unzip at your repository root and merge directories. See **`CURSOR-BUNDLE.txt`** inside the archive.
+
 ## Prefilled URLs
 
 Adaptations use the production host **`https://ideatub.com`** for MCP and Help links. If you self-host, replace that origin with your **`APP_URL`**.

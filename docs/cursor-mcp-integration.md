@@ -81,8 +81,8 @@ In the IdeaTub web app, open **Help** and use:
 
 | Bundle | Help URL path | After download |
 |--------|----------------|----------------|
-| Research-to-Decision OB1 skills | `/help/research-to-decision/skills` | Unzip; align folders with `resources/skills/research-to-decision/<skill>/` and copy **`research-to-decision-ideatub.mdc`** from this repo’s `.cursor/rules/` into your project’s `.cursor/rules/`. |
-| Panning for Gold prompts | `/help/panning-for-gold` | Unzip the three `panning-for-gold-*.md` files into `resources/prompts/` (or change globs in the rule) and copy **`panning-for-gold.mdc`** into `.cursor/rules/`. |
+| Research-to-Decision OB1 skills | `/help/research-to-decision/skills` | Unzip at project root: includes **`.cursor/rules/research-to-decision-ideatub.mdc`**, **`resources/prompts/research-to-decision-ideatub.md`**, **`resources/skills/research-to-decision/<skill>/`**, **`CURSOR-BUNDLE.txt`**, plus bundle README and **`THIRD_PARTY_OB1.md`**. |
+| Panning for Gold prompts | `/help/panning-for-gold` | Unzip at project root: includes **`.cursor/rules/panning-for-gold.mdc`**, **`resources/prompts/panning-for-gold-*.md`**, and **`CURSOR-BUNDLE.txt`**. |
 
 Each page includes **Download ZIP** and a **Using with Cursor** section with step-by-step instructions. MCP must still be configured (**Tools & MCP** → IdeaTub endpoint + key) so agents can call IdeaTub tools.
 

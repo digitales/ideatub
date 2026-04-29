@@ -1,0 +1,14 @@
+Cursor bundle layout (Research-to-Decision)
+===========================================
+
+Unzip this archive at your project repository root so these paths merge with your tree:
+
+  .cursor/rules/research-to-decision-ideatub.mdc   → Cursor project rule (when to load SKILL files + adaptation prompt)
+  resources/prompts/research-to-decision-ideatub.md → Workflow sequencing + IdeaTub MCP fields
+  resources/skills/research-to-decision/<skill>/    → OB1 SKILL.md + README per skill
+
+If your repo already has a .cursor/rules or resources/ folder, merge without overwriting unrelated files.
+
+Then: Cursor Settings → Tools & MCP → add IdeaTub (see Help → MCP integration), reload Cursor.
+
+Self-hosted IdeaTub: replace https://ideatub.com in SKILL.md files with your APP_URL if needed.

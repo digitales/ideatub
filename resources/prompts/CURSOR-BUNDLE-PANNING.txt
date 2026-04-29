@@ -1,0 +1,11 @@
+Cursor bundle layout (Panning for Gold)
+=======================================
+
+Unzip at your project repository root:
+
+  .cursor/rules/panning-for-gold.mdc     → Cursor rule (wrapper + core prompt routing)
+  resources/prompts/panning-for-gold-*.md → Core + meeting + brain-dump prompts
+
+Merge into existing .cursor/rules and resources/prompts/ as needed.
+
+Then: connect IdeaTub MCP in Cursor (Help → MCP integration), reload Cursor.
