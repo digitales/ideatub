@@ -98,7 +98,7 @@ The implementation plan should specify concrete DTOs and routes. At minimum:
 
 1. **Web controllers** for **`/memory`** and **`/memory/insights`** that authenticate and render Blade (or Inertia if that route is already standardized for logged-in idea surfaces).
 2. **Assembler/API extensions** for Phase 3 overlay: response must expose enough structure for the UI to populate **drawer deltas** without scraping markdown (e.g. structured list of incremental highlights + timestamps).
-3. **Insights pipeline:** service + optional queued job to produce cached insights payload; avoid blocking full page on LLM calls when model-assisted path is enabled.
+3. **Insights pipeline:** persist Insights through the **same** `working_memories` / `working_memory_versions` / `working_memory_inputs` tables as other scopes (see **Resolved decisions** below). Optional queued jobs for heavy synthesis; short-lived HTTP cache may speed reads but **must not** replace versioned persistence as the source of truth.
 4. **Settings:** form request validation + persistence for consolidation window override.
 
 Existing **`GET /api/thoughts/working-memory`** remains the contract for agents; optional parallel **`Accept: application/json`** from web stack may reuse the same services.
@@ -121,7 +121,11 @@ Existing **`GET /api/thoughts/working-memory`** remains the contract for agents;
 - Consolidation window is **tunable** at deploy time and **optionally** per user.
 - Phase 3 UX matches **main snapshot + delta drawer** as specified.
 
-## Open questions (implementation plan)
+## Resolved decisions (implementation alignment)
 
-- Exact **Insights** eligibility rules for “research” thoughts (reuse existing type navigation metadata vs explicit allowlist).
-- Whether **Insights** share the same **versioning tables** or a **separate cache row** (plan should pick one for migration simplicity).
+| Topic | Decision |
+|-------|----------|
+| **Insights persistence / versioning** | **Same tables as global and project memory:** `working_memories`, `working_memory_versions`, and `working_memory_inputs`. Insights are **not** stored in a separate snapshot table. Use a dedicated scope discriminator (e.g. `scope_type = insights`, `scope_key = global` per user—exact strings validated in code and API) so builders, freshness, and traceability behave like other scopes. |
+| **Research eligibility (Insights sources)** | Treat a thought as research-oriented when it matches existing **Stream/type conventions**: `ThoughtTypeNavigation` classification to the research bucket **and/or** normalized `metadata.type === research`. No separate ad hoc allowlist unless product later tightens the rule. |
+
+**Follow-up (if implementation still uses cache-only Insights):** refactor the Insights read path to **build/persist** via `WorkingMemoryBuilderService` (or equivalent) into the `insights` scope so UI and API stay aligned with this table-sharing decision.
