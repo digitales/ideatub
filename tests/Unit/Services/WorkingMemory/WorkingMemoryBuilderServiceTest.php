@@ -5,8 +5,9 @@ namespace Tests\Unit\Services\WorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
-use InvalidArgumentException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -109,5 +110,35 @@ class WorkingMemoryBuilderServiceTest extends TestCase
 
         app(WorkingMemoryBuilderService::class)
             ->buildConsolidated($user->id, 'global', 'project-1');
+    }
+
+    #[Test]
+    public function consolidated_build_excludes_thoughts_older_than_consolidation_window(): void
+    {
+        try {
+            Carbon::setTestNow(Carbon::parse('2026-05-05 12:00:00', 'UTC'));
+
+            $user = User::factory()->create();
+
+            $recent = Thought::factory()->create([
+                'user_id' => $user->id,
+                'content' => 'Recent idea within the consolidation window.',
+                'created_at' => Carbon::parse('2026-05-01 10:00:00', 'UTC'),
+            ]);
+
+            Thought::factory()->create([
+                'user_id' => $user->id,
+                'content' => 'Stale idea outside the default 180-day window.',
+                'created_at' => Carbon::parse('2025-06-01 10:00:00', 'UTC'),
+            ]);
+
+            $version = app(WorkingMemoryBuilderService::class)
+                ->buildConsolidated($user->id, 'global', 'global');
+
+            $this->assertSame(1, $version->inputs()->count());
+            $this->assertTrue($version->inputs()->pluck('thought_id')->containsStrict($recent->id));
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 }

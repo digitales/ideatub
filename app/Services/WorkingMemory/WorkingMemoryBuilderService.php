@@ -133,6 +133,7 @@ class WorkingMemoryBuilderService
     {
         $thoughts = Thought::query()
             ->where('user_id', $userId)
+            ->visibleInStream()
             ->with('projects:id')
             ->orderByDesc('created_at')
             ->get();
@@ -160,7 +161,14 @@ class WorkingMemoryBuilderService
         })->values();
 
         if ($buildType === 'consolidated') {
-            return $scoped;
+            $days = max(1, (int) config('working_memory.consolidation_window_days', 180));
+            $cutoff = now()->subDays($days);
+
+            return $scoped
+                ->filter(function (Thought $thought) use ($cutoff): bool {
+                    return $thought->created_at !== null && $thought->created_at->gte($cutoff);
+                })
+                ->values();
         }
 
         $windowed = $scoped
