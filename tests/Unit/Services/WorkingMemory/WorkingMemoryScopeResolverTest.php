@@ -27,6 +27,21 @@ class WorkingMemoryScopeResolverTest extends TestCase
     }
 
     #[Test]
+    public function it_includes_insights_scope_for_research_classified_thoughts(): void
+    {
+        $thought = Thought::factory()->create([
+            'metadata' => ['type' => 'research', 'tags' => ['q1']],
+        ]);
+
+        $scopes = app(WorkingMemoryScopeResolver::class)->forThought($thought);
+
+        $this->assertEquals([
+            ['scope_type' => 'global', 'scope_key' => 'global'],
+            ['scope_type' => 'insights', 'scope_key' => 'global'],
+        ], $scopes);
+    }
+
+    #[Test]
     public function it_includes_normalized_project_scope_from_source_metadata(): void
     {
         $thought = Thought::factory()->create([

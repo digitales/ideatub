@@ -20,7 +20,7 @@
     </div>
 
     <article class="memory-insights-prose rounded-xl border border-memory-violet/15 bg-white/70 backdrop-blur px-6 py-8 shadow-[0_2px_16px_rgba(109,106,247,0.06)] text-deep-indigo">
-        {!! \Illuminate\Support\Str::markdown($markdown) !!}
+        {!! \Illuminate\Support\Str::markdown($payload['summary_markdown'] ?? '', ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
     </article>
 </div>
 @endsection

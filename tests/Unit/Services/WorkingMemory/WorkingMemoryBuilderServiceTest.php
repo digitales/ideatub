@@ -114,6 +114,38 @@ class WorkingMemoryBuilderServiceTest extends TestCase
     }
 
     #[Test]
+    public function it_requires_insights_scope_to_use_global_scope_key(): void
+    {
+        $user = User::factory()->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('global');
+
+        app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'insights', 'other');
+    }
+
+    #[Test]
+    public function it_persists_insights_version_with_research_thoughts(): void
+    {
+        $user = User::factory()->create();
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => "Line one\n\nMore body.",
+            'metadata' => ['type' => 'research', 'tags' => ['alpha', 'beta']],
+        ]);
+
+        $version = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'insights', 'global');
+
+        $this->assertSame('consolidated', $version->build_type);
+        $this->assertStringContainsString('# Memory insights', $version->summary_markdown);
+        $this->assertStringContainsString('## Themes', $version->summary_markdown);
+        $this->assertSame(1, $version->inputs()->count());
+    }
+
+    #[Test]
     public function consolidated_build_excludes_thoughts_older_than_consolidation_window(): void
     {
         try {

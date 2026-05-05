@@ -7,6 +7,10 @@ use Illuminate\Support\Str;
 
 class WorkingMemoryScopeResolver
 {
+    public function __construct(
+        private readonly MemoryInsightsService $memoryInsightsService,
+    ) {}
+
     /**
      * @return array<int, array{scope_type: string, scope_key: string}>
      */
@@ -26,6 +30,10 @@ class WorkingMemoryScopeResolver
 
         foreach ($thought->projects()->pluck('projects.id') as $projectId) {
             $scopes[] = ['scope_type' => 'project', 'scope_key' => (string) $projectId];
+        }
+
+        if ($this->memoryInsightsService->isResearchThought($thought)) {
+            $scopes[] = ['scope_type' => 'insights', 'scope_key' => 'global'];
         }
 
         $deduplicated = [];

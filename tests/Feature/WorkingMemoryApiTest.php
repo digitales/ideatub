@@ -281,4 +281,35 @@ class WorkingMemoryApiTest extends TestCase
         $response->assertStatus(422);
         $response->assertJson(['error' => 'validation_error']);
     }
+
+    #[Test]
+    public function test_working_memory_returns_insights_payload(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Research body line',
+            'metadata' => ['type' => 'research', 'tags' => ['t1']],
+        ]);
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/thoughts/working-memory?scope_type=insights&scope_key=global');
+
+        $response->assertOk();
+        $response->assertJsonPath('scope_type', 'insights');
+        $response->assertJsonPath('scope_key', 'global');
+        $this->assertStringContainsString('# Memory insights', (string) $response->json('summary_markdown'));
+    }
 }

@@ -5,6 +5,7 @@ namespace Tests\Unit\Services\WorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\WorkingMemory;
+use App\Services\WorkingMemory\MemoryInsightsService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use App\Services\WorkingMemory\WorkingMemoryConsolidationWindowResolver;
@@ -57,6 +58,7 @@ class WorkingMemoryFreshnessTest extends TestCase
             $mockAssembler,
             app(WorkingMemoryScopeNormalizer::class),
             app(WorkingMemoryConsolidationWindowResolver::class),
+            app(MemoryInsightsService::class),
         );
 
         $fallbackVersion = $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -98,6 +100,7 @@ class WorkingMemoryFreshnessTest extends TestCase
             $mockAssembler,
             app(WorkingMemoryScopeNormalizer::class),
             app(WorkingMemoryConsolidationWindowResolver::class),
+            app(MemoryInsightsService::class),
         );
 
         $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -138,6 +141,7 @@ class WorkingMemoryFreshnessTest extends TestCase
             $mockAssembler,
             app(WorkingMemoryScopeNormalizer::class),
             app(WorkingMemoryConsolidationWindowResolver::class),
+            app(MemoryInsightsService::class),
         );
 
         try {
@@ -185,6 +189,7 @@ class WorkingMemoryFreshnessTest extends TestCase
             $mockAssembler,
             app(WorkingMemoryScopeNormalizer::class),
             app(WorkingMemoryConsolidationWindowResolver::class),
+            app(MemoryInsightsService::class),
         );
 
         try {

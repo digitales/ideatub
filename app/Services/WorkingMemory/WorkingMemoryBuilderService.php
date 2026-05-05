@@ -16,6 +16,7 @@ class WorkingMemoryBuilderService
         private readonly WorkingMemoryAssembler $assembler,
         private readonly WorkingMemoryScopeNormalizer $scopeNormalizer,
         private readonly WorkingMemoryConsolidationWindowResolver $consolidationWindowResolver,
+        private readonly MemoryInsightsService $memoryInsightsService,
     ) {}
 
     public function buildConsolidated(int $userId, string $scopeType, string $scopeKey): WorkingMemoryVersion
@@ -34,8 +35,20 @@ class WorkingMemoryBuilderService
 
         $thoughts = $this->selectThoughts($userId, $normalizedScopeType, $normalizedScopeKey, $buildType);
         try {
-            $payload = $this->assembler->assemblePayload($thoughts);
-            $summaryMarkdown = $this->assembler->renderSummary($payload);
+            if ($normalizedScopeType === 'insights') {
+                $synthesis = $this->memoryInsightsService->synthesizePersistable($thoughts);
+                $summaryMarkdown = $synthesis['summary_markdown'];
+                $payload = [
+                    'key_concepts' => $synthesis['key_concepts'],
+                    'active_threads' => $synthesis['active_threads'],
+                    'open_questions' => $synthesis['open_questions'],
+                    'next_actions' => $synthesis['next_actions'],
+                    'confidence_score' => $synthesis['confidence_score'],
+                ];
+            } else {
+                $payload = $this->assembler->assemblePayload($thoughts);
+                $summaryMarkdown = $this->assembler->renderSummary($payload);
+            }
         } catch (RuntimeException $e) {
             $fallbackVersion = $this->lastKnownGoodVersion($userId, $normalizedScopeType, $normalizedScopeKey);
             if ($fallbackVersion !== null) {
@@ -72,7 +85,7 @@ class WorkingMemoryBuilderService
                 'active_threads_json' => $payload['active_threads'],
                 'open_questions_json' => $payload['open_questions'],
                 'next_actions_json' => $payload['next_actions'],
-                'confidence_score' => $this->assembler->boundConfidence((float) $payload['confidence_score']),
+                'confidence_score' => $this->assembler->boundConfidence((float) ($payload['confidence_score'] ?? 0)),
                 'source_window_start' => $thoughts->min('created_at'),
                 'source_window_end' => $thoughts->max('created_at'),
             ]);
@@ -132,16 +145,24 @@ class WorkingMemoryBuilderService
      */
     private function selectThoughts(int $userId, string $scopeType, string $scopeKey, string $buildType): Collection
     {
-        $thoughts = Thought::query()
-            ->where('user_id', $userId)
-            ->visibleInStream()
-            ->with('projects:id')
-            ->orderByDesc('created_at')
-            ->get();
+        if ($scopeType === 'insights') {
+            $thoughts = $this->memoryInsightsService->recentThoughtPool($userId);
+        } else {
+            $thoughts = Thought::query()
+                ->where('user_id', $userId)
+                ->visibleInStream()
+                ->with('projects:id')
+                ->orderByDesc('created_at')
+                ->get();
+        }
 
         $scoped = $thoughts->filter(function (Thought $thought) use ($scopeType, $scopeKey): bool {
             if ($scopeType === 'global') {
                 return true;
+            }
+
+            if ($scopeType === 'insights') {
+                return $this->memoryInsightsService->isResearchThought($thought);
             }
 
             if ($scopeType !== 'project') {

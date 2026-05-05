@@ -6,7 +6,6 @@ use App\Models\Thought;
 use App\Services\OpenRouterService;
 use App\Support\ThoughtTypeNavigation;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -14,33 +13,80 @@ class MemoryInsightsService
 {
     private const RECENT_LIMIT = 300;
 
-    private const CACHE_TTL_SECONDS = 900;
-
     public function __construct(
         private readonly OpenRouterService $openRouter,
     ) {}
 
-    public function markdownForUser(int $userId): string
+    /**
+     * Persistable synthesis for versioned insights working memory (same tables as global/project).
+     *
+     * @param  Collection<int, Thought>  $researchThoughts
+     * @return array{
+     *     summary_markdown: string,
+     *     key_concepts: array<int, array{title: string}>,
+     *     active_threads: array<int, array{title: string}>,
+     *     open_questions: array<int, array{question: string}>,
+     *     next_actions: array<int, array{action: string}>,
+     *     confidence_score: float
+     * }
+     */
+    public function synthesizePersistable(Collection $researchThoughts): array
     {
-        $cacheKey = 'memory_insights_markdown:'.$userId;
+        $research = $researchThoughts->values();
+        $tagCounts = $this->countTags($research);
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($userId): string {
-            return $this->buildMarkdownUncached($userId);
-        });
+        $titles = $research
+            ->sortByDesc(fn (Thought $t) => $t->created_at)
+            ->take(8)
+            ->map(fn (Thought $t): string => Str::limit($this->captureTitle($t), 80))
+            ->values()
+            ->all();
+
+        $commentary = $this->maybeCommentary($research, $tagCounts, $titles);
+        $summaryMarkdown = $this->buildInsightsMarkdown($research, $tagCounts, $titles, $commentary);
+
+        $keyConcepts = [];
+        foreach (array_slice($tagCounts, 0, 8, true) as $tag => $count) {
+            $keyConcepts[] = ['title' => sprintf('%s (%d)', $tag, $count)];
+        }
+        if ($keyConcepts === []) {
+            $keyConcepts = [['title' => 'No topic tags in recent research captures']];
+        }
+
+        $activeThreads = [];
+        foreach ($titles as $title) {
+            $activeThreads[] = ['title' => $title];
+        }
+        if ($activeThreads === []) {
+            $activeThreads = [['title' => 'No research captures in the selection window']];
+        }
+
+        $thoughtCount = $research->count();
+
+        return [
+            'summary_markdown' => $summaryMarkdown,
+            'key_concepts' => $keyConcepts,
+            'active_threads' => $activeThreads,
+            'open_questions' => [
+                ['question' => 'Which themes deserve deeper research or validation?'],
+            ],
+            'next_actions' => [
+                ['action' => 'Review notable captures and link supporting thoughts to projects.'],
+            ],
+            'confidence_score' => (float) (25 + ($thoughtCount * 2.5) + (count($tagCounts) * 8)),
+        ];
     }
 
-    private function buildMarkdownUncached(int $userId): string
-    {
-        $thoughts = Thought::query()
-            ->where('user_id', $userId)
-            ->visibleInStream()
-            ->orderByDesc('created_at')
-            ->limit(self::RECENT_LIMIT)
-            ->get();
-
-        $research = $thoughts->filter(fn (Thought $thought): bool => $this->isResearchThought($thought))->values();
-
-        $tagCounts = $this->countTags($research);
+    /**
+     * @param  array<string, int>  $tagCounts
+     * @param  list<string>  $titles
+     */
+    private function buildInsightsMarkdown(
+        Collection $research,
+        array $tagCounts,
+        array $titles,
+        ?string $commentary
+    ): string {
         $themesLines = [];
         if ($tagCounts === []) {
             $themesLines[] = '- No topic tags in recent research captures.';
@@ -50,16 +96,9 @@ class MemoryInsightsService
             }
         }
 
-        $titles = $research
-            ->sortByDesc(fn (Thought $t) => $t->created_at)
-            ->take(8)
-            ->map(fn (Thought $t): string => Str::limit($this->captureTitle($t), 80))
-            ->values()
-            ->all();
-
         $captureLines = [];
         if ($titles === []) {
-            $captureLines[] = '- No research captures in the last '.self::RECENT_LIMIT.' stream-visible thoughts.';
+            $captureLines[] = '- No research captures in the current selection.';
         } else {
             foreach ($titles as $title) {
                 $captureLines[] = '- '.$title;
@@ -78,7 +117,6 @@ class MemoryInsightsService
             implode("\n", $captureLines),
         ];
 
-        $commentary = $this->maybeCommentary($research, $tagCounts, $titles);
         if ($commentary !== null && trim($commentary) !== '') {
             $sections[] = '';
             $sections[] = '## Commentary';
@@ -86,6 +124,32 @@ class MemoryInsightsService
         }
 
         return implode("\n", $sections);
+    }
+
+    public function isResearchThought(Thought $thought): bool
+    {
+        if (ThoughtTypeNavigation::resolveThoughtToTypeKey($thought) === 'research') {
+            return true;
+        }
+        $typeRaw = data_get($thought->metadata, 'type');
+
+        return ThoughtTypeNavigation::normalizeTypeKey(is_string($typeRaw) ? $typeRaw : null) === 'research';
+    }
+
+    /**
+     * Recent stream-visible thoughts for insights sourcing (before research filter / windowing).
+     *
+     * @return Collection<int, Thought>
+     */
+    public function recentThoughtPool(int $userId): Collection
+    {
+        return Thought::query()
+            ->where('user_id', $userId)
+            ->visibleInStream()
+            ->with('projects:id')
+            ->orderByDesc('created_at')
+            ->limit(self::RECENT_LIMIT)
+            ->get();
     }
 
     /**
@@ -125,16 +189,6 @@ PROMPT;
         } catch (Throwable) {
             return null;
         }
-    }
-
-    private function isResearchThought(Thought $thought): bool
-    {
-        if (ThoughtTypeNavigation::resolveThoughtToTypeKey($thought) === 'research') {
-            return true;
-        }
-        $typeRaw = data_get($thought->metadata, 'type');
-
-        return ThoughtTypeNavigation::normalizeTypeKey(is_string($typeRaw) ? $typeRaw : null) === 'research';
     }
 
     /**

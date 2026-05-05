@@ -87,8 +87,9 @@ class WorkingMemoryConsolidationCommandTest extends TestCase
         $this->artisan('working-memory:consolidate', ['--user' => (string) $user->id])
             ->assertSuccessful();
 
-        Queue::assertPushed(ConsolidateWorkingMemory::class, 3);
+        Queue::assertPushed(ConsolidateWorkingMemory::class, 4);
         Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'global', 'global'));
+        Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'insights', 'global'));
         Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'project', 'my-app'));
         Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'project', (string) $project->id));
     }

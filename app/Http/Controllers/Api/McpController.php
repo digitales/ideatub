@@ -554,11 +554,11 @@ class McpController extends Controller
             ],
             [
                 'name' => 'get_working_memory',
-                'description' => 'Return global or project working memory snapshot with freshness and confidence.',
+                'description' => 'Return global, project, or insights working memory snapshot with freshness and confidence.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
-                        'scope_type' => ['type' => 'string', 'enum' => ['global', 'project']],
+                        'scope_type' => ['type' => 'string', 'enum' => ['global', 'project', 'insights']],
                         'scope_key' => ['type' => 'string'],
                     ],
                     'required' => ['scope_type', 'scope_key'],
@@ -795,7 +795,7 @@ class McpController extends Controller
         }
 
         $v = Validator::make($input, [
-            'scope_type' => 'required|string|in:global,project',
+            'scope_type' => 'required|string|in:global,project,insights',
             'scope_key' => 'required|string|max:191',
         ]);
         if ($v->fails()) {

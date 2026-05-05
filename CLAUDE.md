@@ -11,13 +11,14 @@ When you need scoped memory for context assembly, use either interface:
 
 Required scope parameters for both:
 
-- `scope_type`: `global` or `project`
-- `scope_key`: scope identifier
+- `scope_type`: `global`, `project`, or `insights`
+- `scope_key`: scope identifier (`global` for global and insights)
 
 Canonical examples:
 
 - Global scope: `scope_type=global`, `scope_key=global`
 - Project scope: `scope_type=project`, `scope_key=my-app`
+- Insights scope: `scope_type=insights`, `scope_key=global` (research-heavy corpus; versioned like other scopes)
 
 MCP JSON-RPC example:
 

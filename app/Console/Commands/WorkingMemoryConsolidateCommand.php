@@ -89,6 +89,7 @@ class WorkingMemoryConsolidateCommand extends Command
 
         $scopes = collect([
             ['scope_type' => 'global', 'scope_key' => 'global'],
+            ['scope_type' => 'insights', 'scope_key' => 'global'],
         ]);
 
         Thought::query()
@@ -140,8 +141,8 @@ class WorkingMemoryConsolidateCommand extends Command
         $normalizedScopeType = Str::of($scopeType)->trim()->toString();
         $normalizedScopeKey = Str::of($scopeKey)->trim()->toString();
 
-        if (! in_array($normalizedScopeType, ['global', 'project'], true)) {
-            throw new InvalidArgumentException('Invalid --scope_type. Allowed values: global, project.');
+        if (! in_array($normalizedScopeType, ['global', 'project', 'insights'], true)) {
+            throw new InvalidArgumentException('Invalid --scope_type. Allowed values: global, project, insights.');
         }
 
         if ($normalizedScopeKey === '') {
@@ -154,6 +155,14 @@ class WorkingMemoryConsolidateCommand extends Command
             }
 
             return ['global', 'global'];
+        }
+
+        if ($normalizedScopeType === 'insights') {
+            if ($normalizedScopeKey !== 'global') {
+                throw new InvalidArgumentException("Invalid --scope_key for insights scope. --scope_key must be exactly 'global'.");
+            }
+
+            return ['insights', 'global'];
         }
 
         return ['project', Str::of($normalizedScopeKey)->lower()->toString()];

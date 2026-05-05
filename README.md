@@ -127,6 +127,7 @@ Common scopes:
 
 - `scope_type=global`, `scope_key=global`
 - `scope_type=project`, `scope_key=my-app`
+- `scope_type=insights`, `scope_key=global` — versioned research-heavy corpus summary (same persistence tables as other scopes)
 
 REST examples:
 
@@ -138,6 +139,10 @@ curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
 # Project scope
 curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
   "http://localhost:8000/api/thoughts/working-memory?scope_type=project&scope_key=my-app"
+
+# Insights scope (research-classified captures)
+curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
+  "http://localhost:8000/api/thoughts/working-memory?scope_type=insights&scope_key=global"
 ```
 
 MCP JSON-RPC example:

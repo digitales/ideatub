@@ -118,7 +118,7 @@ class ThoughtsApiController extends Controller
         }
 
         $v = Validator::make($input, [
-            'scope_type' => 'required|string|in:global,project',
+            'scope_type' => 'required|string|in:global,project,insights',
             'scope_key' => 'required|string|max:191',
         ]);
         if ($v->fails()) {

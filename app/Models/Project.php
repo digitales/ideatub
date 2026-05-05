@@ -40,6 +40,7 @@ class Project extends Model implements Commentable
     public function thoughts(): BelongsToMany
     {
         return $this->belongsToMany(Thought::class, 'project_thought')
+            ->using(ProjectThought::class)
             ->withPivot('sort_order')
             ->withTimestamps()
             ->orderByPivot('sort_order');

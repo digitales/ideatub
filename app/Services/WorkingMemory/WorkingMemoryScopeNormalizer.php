@@ -15,8 +15,8 @@ class WorkingMemoryScopeNormalizer
     public function normalize(string $scopeType, string $scopeKey): array
     {
         $trimmedScopeType = Str::of($scopeType)->trim()->toString();
-        if (! in_array($trimmedScopeType, ['global', 'project'], true)) {
-            throw new InvalidArgumentException('Invalid scope_type. Allowed values: global, project.');
+        if (! in_array($trimmedScopeType, ['global', 'project', 'insights'], true)) {
+            throw new InvalidArgumentException('Invalid scope_type. Allowed values: global, project, insights.');
         }
 
         $trimmedScopeKey = Str::of($scopeKey)->trim()->toString();
@@ -30,6 +30,14 @@ class WorkingMemoryScopeNormalizer
             }
 
             return ['global', 'global'];
+        }
+
+        if ($trimmedScopeType === 'insights') {
+            if ($trimmedScopeKey !== 'global') {
+                throw new InvalidArgumentException("Invalid scope_key for insights scope. scope_key must be exactly 'global'.");
+            }
+
+            return ['insights', 'global'];
         }
 
         return ['project', Str::of($trimmedScopeKey)->lower()->toString()];
