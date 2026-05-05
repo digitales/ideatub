@@ -47,6 +47,7 @@ class WorkingMemoryFreshnessTest extends TestCase
         /** @var WorkingMemoryAssembler&MockInterface $mockAssembler */
         $mockAssembler = Mockery::mock(WorkingMemoryAssembler::class, [
             app(WorkingMemoryScopeNormalizer::class),
+            app(WorkingMemoryConsolidationWindowResolver::class),
         ])->makePartial();
         $mockAssembler->shouldReceive('assemblePayload')
             ->once()
@@ -87,6 +88,7 @@ class WorkingMemoryFreshnessTest extends TestCase
         /** @var WorkingMemoryAssembler&MockInterface $mockAssembler */
         $mockAssembler = Mockery::mock(WorkingMemoryAssembler::class, [
             app(WorkingMemoryScopeNormalizer::class),
+            app(WorkingMemoryConsolidationWindowResolver::class),
         ])->makePartial();
         $mockAssembler->shouldReceive('assemblePayload')
             ->once()
@@ -126,6 +128,7 @@ class WorkingMemoryFreshnessTest extends TestCase
         /** @var WorkingMemoryAssembler&MockInterface $mockAssembler */
         $mockAssembler = Mockery::mock(WorkingMemoryAssembler::class, [
             app(WorkingMemoryScopeNormalizer::class),
+            app(WorkingMemoryConsolidationWindowResolver::class),
         ])->makePartial();
         $mockAssembler->shouldReceive('assemblePayload')
             ->once()
@@ -172,6 +175,7 @@ class WorkingMemoryFreshnessTest extends TestCase
         /** @var WorkingMemoryAssembler&MockInterface $mockAssembler */
         $mockAssembler = Mockery::mock(WorkingMemoryAssembler::class, [
             app(WorkingMemoryScopeNormalizer::class),
+            app(WorkingMemoryConsolidationWindowResolver::class),
         ])->makePartial();
         $mockAssembler->shouldReceive('assemblePayload')
             ->once()

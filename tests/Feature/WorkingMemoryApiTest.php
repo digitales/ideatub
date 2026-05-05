@@ -56,9 +56,18 @@ class WorkingMemoryApiTest extends TestCase
             'active_threads',
             'open_questions',
             'next_actions',
+            'last_refreshed_at',
+            'effective_consolidation_window_days',
+            'baseline_build_type',
+            'overlay_deltas',
+            'input_count',
         ]);
         $response->assertJsonPath('scope_type', 'global');
         $response->assertJsonPath('scope_key', 'global');
+        $this->assertIsInt($response->json('effective_consolidation_window_days'));
+        $this->assertContains($response->json('baseline_build_type'), ['consolidated', 'incremental']);
+        $this->assertIsArray($response->json('overlay_deltas'));
+        $this->assertIsInt($response->json('input_count'));
     }
 
     #[Test]

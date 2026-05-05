@@ -4,6 +4,7 @@ namespace App\Services\WorkingMemory;
 
 use App\Models\Thought;
 use App\Models\WorkingMemory;
+use App\Models\WorkingMemoryVersion;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -15,8 +16,11 @@ class WorkingMemoryAssembler
 
     private const STALE_WINDOW_HOURS = 24;
 
+    private const OVERLAY_THREAD_LIMIT = 5;
+
     public function __construct(
         private readonly WorkingMemoryScopeNormalizer $scopeNormalizer,
+        private readonly WorkingMemoryConsolidationWindowResolver $consolidationWindowResolver,
     ) {}
 
     /**
@@ -182,7 +186,12 @@ class WorkingMemoryAssembler
      *     key_concepts: array<int, array{title: string}>,
      *     active_threads: array<int, array{title: string}>,
      *     open_questions: array<int, array{question: string}>,
-     *     next_actions: array<int, array{action: string}>
+     *     next_actions: array<int, array{action: string}>,
+     *     last_refreshed_at: string|null,
+     *     effective_consolidation_window_days: int,
+     *     baseline_build_type: string,
+     *     overlay_deltas: array<int, array{label: string, detail: string, since: string|null}>,
+     *     input_count: int
      * }
      */
     public function forScope(int $userId, string $scopeType, string $scopeKey): array
@@ -226,27 +235,104 @@ class WorkingMemoryAssembler
      *     key_concepts: array<int, array{title: string}>,
      *     active_threads: array<int, array{title: string}>,
      *     open_questions: array<int, array{question: string}>,
-     *     next_actions: array<int, array{action: string}>
+     *     next_actions: array<int, array{action: string}>,
+     *     last_refreshed_at: string|null,
+     *     effective_consolidation_window_days: int,
+     *     baseline_build_type: string,
+     *     overlay_deltas: array<int, array{label: string, detail: string, since: string|null}>,
+     *     input_count: int
      * }
      */
     private function payloadFromPersistedMemory(WorkingMemory $memory): array
     {
-        $version = $memory->latestVersion;
-        if ($version === null) {
-            throw new RuntimeException('Working memory is missing a latest version.');
-        }
+        $latestConsolidated = $memory->versions()
+            ->where('build_type', 'consolidated')
+            ->orderByDesc('created_at')
+            ->first();
+
+        $latestIncremental = $memory->versions()
+            ->where('build_type', 'incremental')
+            ->orderByDesc('created_at')
+            ->first();
+
+        $canonical = $this->resolveCanonicalVersion($memory, $latestConsolidated);
 
         return [
             'scope_type' => $memory->scope_type,
             'scope_key' => $memory->scope_key,
             'freshness_state' => $this->resolveFreshnessState($memory),
-            'confidence_score' => (float) $version->confidence_score,
-            'summary_markdown' => $version->summary_markdown,
-            'key_concepts' => $version->key_concepts_json ?? [],
-            'active_threads' => $version->active_threads_json ?? [],
-            'open_questions' => $version->open_questions_json ?? [],
-            'next_actions' => $version->next_actions_json ?? [],
+            'confidence_score' => (float) $canonical->confidence_score,
+            'summary_markdown' => $canonical->summary_markdown,
+            'key_concepts' => $canonical->key_concepts_json ?? [],
+            'active_threads' => $canonical->active_threads_json ?? [],
+            'open_questions' => $canonical->open_questions_json ?? [],
+            'next_actions' => $canonical->next_actions_json ?? [],
+            'last_refreshed_at' => $memory->last_refreshed_at?->toIso8601String(),
+            'effective_consolidation_window_days' => $this->consolidationWindowResolver->effectiveDaysForUserId((int) $memory->user_id),
+            'baseline_build_type' => (string) $canonical->build_type,
+            'overlay_deltas' => $this->buildOverlayDeltas($latestIncremental, $latestConsolidated),
+            'input_count' => $canonical->inputs()->count(),
         ];
+    }
+
+    private function resolveCanonicalVersion(WorkingMemory $memory, ?WorkingMemoryVersion $latestConsolidated): WorkingMemoryVersion
+    {
+        if ($latestConsolidated !== null) {
+            return $latestConsolidated;
+        }
+
+        $latest = $memory->latestVersion;
+        if ($latest === null) {
+            throw new RuntimeException('Working memory is missing a latest version.');
+        }
+
+        return $latest;
+    }
+
+    /**
+     * @return array<int, array{label: string, detail: string, since: string|null}>
+     */
+    private function buildOverlayDeltas(?WorkingMemoryVersion $incremental, ?WorkingMemoryVersion $consolidated): array
+    {
+        if ($incremental === null) {
+            return [];
+        }
+
+        if ($consolidated !== null
+            && $incremental->created_at !== null
+            && $consolidated->created_at !== null
+            && $incremental->created_at->lessThanOrEqualTo($consolidated->created_at)) {
+            return [];
+        }
+
+        $threads = $incremental->active_threads_json ?? [];
+        if (! is_array($threads)) {
+            return [];
+        }
+
+        $since = $incremental->created_at?->toIso8601String();
+
+        $deltas = [];
+        foreach (array_slice($threads, 0, self::OVERLAY_THREAD_LIMIT) as $thread) {
+            if (! is_array($thread)) {
+                continue;
+            }
+
+            $title = trim((string) ($thread['title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+
+            $detailRaw = trim((string) ($thread['detail'] ?? ''));
+
+            $deltas[] = [
+                'label' => Str::limit($title, 120),
+                'detail' => $detailRaw !== '' ? Str::limit($detailRaw, 200) : '',
+                'since' => $since,
+            ];
+        }
+
+        return $deltas;
     }
 
     /**
