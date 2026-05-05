@@ -110,7 +110,14 @@ class ThoughtsApiController extends Controller
      */
     public function workingMemory(Request $request): JsonResponse
     {
-        $v = Validator::make($request->all(), [
+        $input = $request->only(['scope_type', 'scope_key']);
+        foreach (['scope_type', 'scope_key'] as $key) {
+            if (isset($input[$key]) && is_string($input[$key])) {
+                $input[$key] = trim($input[$key]);
+            }
+        }
+
+        $v = Validator::make($input, [
             'scope_type' => 'required|string|in:global,project',
             'scope_key' => 'required|string|max:191',
         ]);

@@ -6,10 +6,14 @@ use App\Models\Thought;
 use App\Models\WorkingMemory;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
+use RuntimeException;
 
 class WorkingMemoryAssembler
 {
+    public function __construct(
+        private readonly WorkingMemoryScopeNormalizer $scopeNormalizer,
+    ) {}
+
     /**
      * @param  Collection<int, Thought>  $thoughts
      * @return array{
@@ -178,7 +182,7 @@ class WorkingMemoryAssembler
      */
     public function forScope(int $userId, string $scopeType, string $scopeKey): array
     {
-        [$normalizedScopeType, $normalizedScopeKey] = $this->normalizeScope($scopeType, $scopeKey);
+        [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);
 
         $memory = WorkingMemory::query()
             ->where('user_id', $userId)
@@ -188,66 +192,55 @@ class WorkingMemoryAssembler
             ->first();
 
         if ($memory !== null && $memory->latestVersion !== null) {
-            $version = $memory->latestVersion;
-
-            return [
-                'scope_type' => $memory->scope_type,
-                'scope_key' => $memory->scope_key,
-                'freshness_state' => $memory->freshness_state,
-                'confidence_score' => (float) $version->confidence_score,
-                'summary_markdown' => $version->summary_markdown,
-                'key_concepts' => $version->key_concepts_json ?? [],
-                'active_threads' => $version->active_threads_json ?? [],
-                'open_questions' => $version->open_questions_json ?? [],
-                'next_actions' => $version->next_actions_json ?? [],
-            ];
+            return $this->payloadFromPersistedMemory($memory);
         }
 
-        $thoughts = collect();
-        $payload = $this->assemblePayload($thoughts);
+        app(WorkingMemoryBuilderService::class)->buildConsolidated(
+            $userId,
+            $normalizedScopeType,
+            $normalizedScopeKey
+        );
 
-        return [
-            'scope_type' => $normalizedScopeType,
-            'scope_key' => $normalizedScopeKey,
-            'freshness_state' => 'stale',
-            'confidence_score' => $payload['confidence_score'],
-            'summary_markdown' => $this->renderSummary([
-                'executive_summary' => $payload['executive_summary'],
-                'key_concepts' => $payload['key_concepts'],
-                'active_threads' => $payload['active_threads'],
-                'open_questions' => $payload['open_questions'],
-                'next_actions' => $payload['next_actions'],
-            ]),
-            'key_concepts' => $payload['key_concepts'],
-            'active_threads' => $payload['active_threads'],
-            'open_questions' => $payload['open_questions'],
-            'next_actions' => $payload['next_actions'],
-        ];
+        $memory = WorkingMemory::query()
+            ->where('user_id', $userId)
+            ->where('scope_type', $normalizedScopeType)
+            ->where('scope_key', $normalizedScopeKey)
+            ->with('latestVersion')
+            ->firstOrFail();
+
+        return $this->payloadFromPersistedMemory($memory);
     }
 
     /**
-     * @return array{0: string, 1: string}
+     * @return array{
+     *     scope_type: string,
+     *     scope_key: string,
+     *     freshness_state: string,
+     *     confidence_score: float,
+     *     summary_markdown: string,
+     *     key_concepts: array<int, array{title: string}>,
+     *     active_threads: array<int, array{title: string}>,
+     *     open_questions: array<int, array{question: string}>,
+     *     next_actions: array<int, array{action: string}>
+     * }
      */
-    private function normalizeScope(string $scopeType, string $scopeKey): array
+    private function payloadFromPersistedMemory(WorkingMemory $memory): array
     {
-        $trimmedScopeType = Str::of($scopeType)->trim()->toString();
-        if (! in_array($trimmedScopeType, ['global', 'project'], true)) {
-            throw new InvalidArgumentException('Invalid scope_type. Allowed values: global, project.');
+        $version = $memory->latestVersion;
+        if ($version === null) {
+            throw new RuntimeException('Working memory is missing a latest version.');
         }
 
-        $trimmedScopeKey = Str::of($scopeKey)->trim()->toString();
-        if ($trimmedScopeKey === '') {
-            throw new InvalidArgumentException('Invalid scope_key. scope_key must not be empty.');
-        }
-
-        if ($trimmedScopeType === 'global') {
-            if ($trimmedScopeKey !== 'global') {
-                throw new InvalidArgumentException("Invalid scope_key for global scope. scope_key must be exactly 'global'.");
-            }
-
-            return ['global', 'global'];
-        }
-
-        return ['project', Str::of($trimmedScopeKey)->lower()->toString()];
+        return [
+            'scope_type' => $memory->scope_type,
+            'scope_key' => $memory->scope_key,
+            'freshness_state' => $memory->freshness_state,
+            'confidence_score' => (float) $version->confidence_score,
+            'summary_markdown' => $version->summary_markdown,
+            'key_concepts' => $version->key_concepts_json ?? [],
+            'active_threads' => $version->active_threads_json ?? [],
+            'open_questions' => $version->open_questions_json ?? [],
+            'next_actions' => $version->next_actions_json ?? [],
+        ];
     }
 }

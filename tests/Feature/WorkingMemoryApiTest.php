@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Thought;
 use App\Models\User;
+use App\Models\WorkingMemory;
 use App\Services\OAuthMcpJwtService;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -55,6 +57,101 @@ class WorkingMemoryApiTest extends TestCase
             'open_questions',
             'next_actions',
         ]);
+        $response->assertJsonPath('scope_type', 'global');
+        $response->assertJsonPath('scope_key', 'global');
+    }
+
+    #[Test]
+    public function test_working_memory_normalizes_project_scope_key_case(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Scoped project note for normalization.',
+            'source_metadata' => ['project' => 'my-app'],
+        ]);
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/thoughts/working-memory?scope_type=project&scope_key=MY-APP');
+
+        $response->assertOk();
+        $response->assertJsonPath('scope_type', 'project');
+        $response->assertJsonPath('scope_key', 'my-app');
+        $response->assertJsonPath('freshness_state', 'fresh');
+    }
+
+    #[Test]
+    public function test_working_memory_persists_snapshot_on_first_read_without_prior_build(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Seed thought so consolidated snapshot has corpus signal.',
+            'metadata' => ['tags' => ['seed']],
+        ]);
+
+        WorkingMemory::query()->where('user_id', $user->id)->delete();
+
+        $this->assertDatabaseCount('working_memory_versions', 0);
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/thoughts/working-memory?scope_type=global&scope_key=global');
+
+        $response->assertOk();
+        $this->assertDatabaseCount('working_memory_versions', 1);
+        $response->assertJsonPath('freshness_state', 'fresh');
+        $this->assertStringContainsString('## Executive summary', (string) $response->json('summary_markdown'));
+    }
+
+    #[Test]
+    public function test_working_memory_trims_scope_query_parameters_before_validation(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $query = http_build_query([
+            'scope_type' => '  global  ',
+            'scope_key' => '  global  ',
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/thoughts/working-memory?'.$query);
+
+        $response->assertOk();
         $response->assertJsonPath('scope_type', 'global');
         $response->assertJsonPath('scope_key', 'global');
     }

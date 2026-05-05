@@ -8,12 +8,12 @@ use App\Models\WorkingMemoryVersion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
 
 class WorkingMemoryBuilderService
 {
     public function __construct(
-        private readonly WorkingMemoryAssembler $assembler
+        private readonly WorkingMemoryAssembler $assembler,
+        private readonly WorkingMemoryScopeNormalizer $scopeNormalizer,
     ) {}
 
     public function buildConsolidated(int $userId, string $scopeType, string $scopeKey): WorkingMemoryVersion
@@ -28,7 +28,7 @@ class WorkingMemoryBuilderService
 
     private function build(int $userId, string $scopeType, string $scopeKey, string $buildType): WorkingMemoryVersion
     {
-        [$normalizedScopeType, $normalizedScopeKey] = $this->validateAndNormalizeScope($scopeType, $scopeKey);
+        [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);
         $thoughts = $this->selectThoughts($userId, $normalizedScopeType, $normalizedScopeKey, $buildType);
 
         $payload = $this->assembler->assemblePayload($thoughts);
@@ -86,32 +86,6 @@ class WorkingMemoryBuilderService
 
             return $version->fresh(['workingMemory', 'inputs']);
         });
-    }
-
-    /**
-     * @return array{0: string, 1: string}
-     */
-    private function validateAndNormalizeScope(string $scopeType, string $scopeKey): array
-    {
-        $trimmedScopeType = Str::of($scopeType)->trim()->toString();
-        if (! in_array($trimmedScopeType, ['global', 'project'], true)) {
-            throw new InvalidArgumentException('Invalid scope_type. Allowed values: global, project.');
-        }
-
-        $trimmedScopeKey = Str::of($scopeKey)->trim()->toString();
-        if ($trimmedScopeKey === '') {
-            throw new InvalidArgumentException('Invalid scope_key. scope_key must not be empty.');
-        }
-
-        if ($trimmedScopeType === 'global') {
-            if ($trimmedScopeKey !== 'global') {
-                throw new InvalidArgumentException("Invalid scope_key for global scope. scope_key must be exactly 'global'.");
-            }
-
-            return ['global', 'global'];
-        }
-
-        return ['project', Str::of($trimmedScopeKey)->lower()->toString()];
     }
 
     /**
