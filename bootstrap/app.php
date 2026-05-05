@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuthenticateOAuthBearer;
 use App\Http\Middleware\CheckOperationLimit;
+use App\Http\Middleware\EnsureWorkingMemoryInsightsEnabled;
 use App\Http\Middleware\EnsureWorkingMemoryUiEnabled;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\SecurityHeaders;
@@ -38,6 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'guest' => RedirectIfAuthenticated::class,
             'postmark.inbound.secret' => ValidatePostmarkInboundSecret::class,
             'working.memory.ui' => EnsureWorkingMemoryUiEnabled::class,
+            'working.memory.insights' => EnsureWorkingMemoryInsightsEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

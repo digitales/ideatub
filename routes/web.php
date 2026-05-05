@@ -23,6 +23,7 @@ use App\Http\Controllers\JiraSettingsController;
 use App\Http\Controllers\McpKeyController;
 use App\Http\Controllers\MeetingSkillSettingsController;
 use App\Http\Controllers\MemoryController;
+use App\Http\Controllers\MemoryInsightsController;
 use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\PostmarkInboundController;
@@ -289,6 +290,10 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware(['auth', 'working.memory.ui'])->group(function () {
         Route::get('/memory', [MemoryController::class, 'show'])->name('memory.show');
+    });
+
+    Route::middleware(['auth', 'working.memory.insights'])->group(function () {
+        Route::get('/memory/insights', [MemoryInsightsController::class, 'show'])->name('memory.insights');
     });
 
     Route::get('/settings/skills', [SkillSettingsController::class, 'index'])->name('settings.skills.index');
