@@ -9,6 +9,7 @@ use App\Models\InboxItem;
 use App\Models\Project;
 use App\Models\Thought;
 use App\Observers\CommentObserver;
+use App\Observers\ThoughtObserver;
 use App\Policies\ImportPolicy;
 use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
@@ -64,6 +65,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ImportBatch::class, ImportPolicy::class);
 
         Comment::observe(CommentObserver::class);
+        Thought::observe(ThoughtObserver::class);
 
         Relation::enforceMorphMap([
             "thought" => Thought::class,
