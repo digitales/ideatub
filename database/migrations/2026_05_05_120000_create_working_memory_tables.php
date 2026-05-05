@@ -40,6 +40,14 @@ return new class extends Migration
             $table->index(['working_memory_id', 'created_at']);
         });
 
+        Schema::table('working_memories', function (Blueprint $table): void {
+            $table->index('latest_version_id', 'working_memories_latest_version_idx');
+            $table->foreign('latest_version_id', 'working_memories_latest_version_fk')
+                ->references('id')
+                ->on('working_memory_versions')
+                ->nullOnDelete();
+        });
+
         Schema::create('working_memory_inputs', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('working_memory_version_id')->constrained('working_memory_versions')->cascadeOnDelete();
@@ -59,6 +67,11 @@ return new class extends Migration
 
     public function down(): void
     {
+        Schema::table('working_memories', function (Blueprint $table): void {
+            $table->dropForeign('working_memories_latest_version_fk');
+            $table->dropIndex('working_memories_latest_version_idx');
+        });
+
         Schema::dropIfExists('working_memory_inputs');
         Schema::dropIfExists('working_memory_versions');
         Schema::dropIfExists('working_memories');
