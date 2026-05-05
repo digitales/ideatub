@@ -44,6 +44,7 @@ use App\Http\Controllers\ThoughtProjectController;
 use App\Http\Controllers\ToolController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\WorkingMemorySettingsController;
 use App\Models\ResearchSkill;
 use Illuminate\Support\Facades\Route;
 
@@ -281,6 +282,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'index'])->name('settings.ideas-revisit.index');
     Route::put('/settings/ideas-revisit', [IdeasRevisitSettingsController::class, 'update'])->name('settings.ideas-revisit.update');
+
+    Route::get('/settings/working-memory', [WorkingMemorySettingsController::class, 'index'])->name('settings.working-memory.index');
+    Route::put('/settings/working-memory', [WorkingMemorySettingsController::class, 'update'])->name('settings.working-memory.update');
 
     Route::get('/settings/skills', [SkillSettingsController::class, 'index'])->name('settings.skills.index');
     Route::put('/settings/skills/preferences', [SkillSettingsController::class, 'updatePreferences'])->name('settings.skills.preferences');

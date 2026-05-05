@@ -154,6 +154,7 @@ class ProfileSettingsTest extends TestCase
         $response->assertSee(route('settings.mcp-keys.index'), false);
         $response->assertSee(route('settings.inbound-emails.index'), false);
         $response->assertSee(route('settings.ideas-revisit.index'), false);
+        $response->assertSee(route('settings.working-memory.index'), false);
 
         if (config('services.mail_sync.enabled', true)) {
             $response->assertSee(route('settings.email-accounts.index'), false);
