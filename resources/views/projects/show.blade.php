@@ -31,6 +31,8 @@
         </div>
     </div>
 
+    @includeWhen(config('features.working_memory_ui'), 'projects.partials.working-memory-module', ['project' => $project])
+
     <section class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-5 mb-8">
         <h2 class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-4">Add thought</h2>
         <form method="POST" action="{{ route('projects.thoughts.store', $project) }}" class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-stretch">

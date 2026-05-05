@@ -79,6 +79,11 @@
                 <a href="{{route('projects.index')}}" class="{{$navLinkClass}}">
                     Projects
                 </a>
+                @if (config('features.working_memory_ui'))
+                    <a href="{{route('memory.show')}}" class="{{$navLinkClass}}">
+                        Memory
+                    </a>
+                @endif
                 <a href="{{route('help')}}" class="{{$navLinkClass}}">
                     Help
                 </a>
@@ -107,6 +112,11 @@
                         <a href="{{route('projects.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
                             Projects
                         </a>
+                        @if (config('features.working_memory_ui'))
+                            <a href="{{route('memory.show')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                                Memory
+                            </a>
+                        @endif
                         <div class="border-t border-memory-violet/10 my-1"></div>
                         <a href="{{route('help')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
                             Help

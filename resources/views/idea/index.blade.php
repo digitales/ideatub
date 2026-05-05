@@ -22,6 +22,8 @@
     <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-1.5">A calm archive for your ideas</h1>
     <p class="text-center text-sm text-slate-brand mb-9">Capture thoughts before they disappear.</p>
 
+    @includeWhen(config('features.working_memory_ui'), 'idea.partials.working_memory_home_strip')
+
     {{-- Capture box (initial content in data attr to avoid @json breaking the x-data attribute) --}}
     @php
         $initialContent = old('youtube_url', old('content', ''));

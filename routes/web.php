@@ -290,6 +290,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware(['auth', 'working.memory.ui'])->group(function () {
         Route::get('/memory', [MemoryController::class, 'show'])->name('memory.show');
+        Route::get('/projects/{project}/memory', [MemoryController::class, 'showProject'])->name('projects.memory.show');
     });
 
     Route::middleware(['auth', 'working.memory.insights'])->group(function () {

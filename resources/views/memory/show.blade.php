@@ -1,6 +1,8 @@
 @extends('layouts.idea')
 
-@section('title', 'Working memory — IdeaTub')
+@section('title', ($isProjectScope ?? false)
+    ? (($scopeTitle ?? 'Project').' — Working memory — IdeaTub')
+    : 'Working memory — IdeaTub')
 
 @section('content')
 @php
@@ -21,13 +23,19 @@
     <div class="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div class="min-w-0">
             <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">Working memory</h1>
-            <p class="text-sm text-slate-brand mt-1">Global scope — synthesized from your captures.</p>
+            <p class="text-sm text-slate-brand mt-1">
+                @if ($isProjectScope ?? false)
+                    {{ $scopeTitle ?? ($project->title ?? 'Project') }} — synthesized from captures linked to this project.
+                @else
+                    Global scope — synthesized from your captures.
+                @endif
+            </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <span class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $freshnessClasses }}">
                 {{ $freshness }}
             </span>
-            @if (config('features.working_memory_insights'))
+            @if (! ($isProjectScope ?? false) && config('features.working_memory_insights'))
                 <a
                     href="{{ route('memory.insights') }}"
                     class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
