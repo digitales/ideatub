@@ -7,6 +7,7 @@ use App\Models\Thought;
 use App\Services\OpenRouterService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
+use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -17,6 +18,7 @@ class ThoughtsApiController extends Controller
         private OpenRouterService $openRouter,
         private ThoughtCaptureService $captureService,
         private ThoughtSearchService $searchService,
+        private WorkingMemoryAssembler $workingMemoryAssembler,
     ) {}
 
     /**
@@ -100,6 +102,32 @@ class ThoughtsApiController extends Controller
             ->count();
 
         return response()->json(['count' => $count]);
+    }
+
+    /**
+     * GET /api/thoughts/working-memory — Scoped working memory snapshot.
+     * Query params: scope_type (required, global|project), scope_key (required, max 191).
+     */
+    public function workingMemory(Request $request): JsonResponse
+    {
+        $v = Validator::make($request->all(), [
+            'scope_type' => 'required|string|in:global,project',
+            'scope_key' => 'required|string|max:191',
+        ]);
+        if ($v->fails()) {
+            return response()->json(['error' => 'validation_error', 'message' => $v->errors()->first()], 422);
+        }
+
+        /** @var array{scope_type: string, scope_key: string} $validated */
+        $validated = $v->validated();
+
+        try {
+            $payload = $this->workingMemoryAssembler->forScope((int) auth()->id(), $validated['scope_type'], $validated['scope_key']);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => 'validation_error', 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($payload);
     }
 
     /**

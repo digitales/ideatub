@@ -3,8 +3,10 @@
 namespace App\Services\WorkingMemory;
 
 use App\Models\Thought;
+use App\Models\WorkingMemory;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class WorkingMemoryAssembler
 {
@@ -157,5 +159,95 @@ class WorkingMemoryAssembler
         $topConcept = $keyConcepts[0]['title'] ?? 'unclassified topics';
 
         return "First-pass synthesis across {$thoughtCount} thoughts highlights {$topConcept} as the strongest signal.";
+    }
+
+    /**
+     * Assemble the canonical API payload for a user's working memory at the given scope.
+     *
+     * @return array{
+     *     scope_type: string,
+     *     scope_key: string,
+     *     freshness_state: string,
+     *     confidence_score: float,
+     *     summary_markdown: string,
+     *     key_concepts: array<int, array{title: string}>,
+     *     active_threads: array<int, array{title: string}>,
+     *     open_questions: array<int, array{question: string}>,
+     *     next_actions: array<int, array{action: string}>
+     * }
+     */
+    public function forScope(int $userId, string $scopeType, string $scopeKey): array
+    {
+        [$normalizedScopeType, $normalizedScopeKey] = $this->normalizeScope($scopeType, $scopeKey);
+
+        $memory = WorkingMemory::query()
+            ->where('user_id', $userId)
+            ->where('scope_type', $normalizedScopeType)
+            ->where('scope_key', $normalizedScopeKey)
+            ->with('latestVersion')
+            ->first();
+
+        if ($memory !== null && $memory->latestVersion !== null) {
+            $version = $memory->latestVersion;
+
+            return [
+                'scope_type' => $memory->scope_type,
+                'scope_key' => $memory->scope_key,
+                'freshness_state' => $memory->freshness_state,
+                'confidence_score' => (float) $version->confidence_score,
+                'summary_markdown' => $version->summary_markdown,
+                'key_concepts' => $version->key_concepts_json ?? [],
+                'active_threads' => $version->active_threads_json ?? [],
+                'open_questions' => $version->open_questions_json ?? [],
+                'next_actions' => $version->next_actions_json ?? [],
+            ];
+        }
+
+        $thoughts = collect();
+        $payload = $this->assemblePayload($thoughts);
+
+        return [
+            'scope_type' => $normalizedScopeType,
+            'scope_key' => $normalizedScopeKey,
+            'freshness_state' => 'stale',
+            'confidence_score' => $payload['confidence_score'],
+            'summary_markdown' => $this->renderSummary([
+                'executive_summary' => $payload['executive_summary'],
+                'key_concepts' => $payload['key_concepts'],
+                'active_threads' => $payload['active_threads'],
+                'open_questions' => $payload['open_questions'],
+                'next_actions' => $payload['next_actions'],
+            ]),
+            'key_concepts' => $payload['key_concepts'],
+            'active_threads' => $payload['active_threads'],
+            'open_questions' => $payload['open_questions'],
+            'next_actions' => $payload['next_actions'],
+        ];
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function normalizeScope(string $scopeType, string $scopeKey): array
+    {
+        $trimmedScopeType = Str::of($scopeType)->trim()->toString();
+        if (! in_array($trimmedScopeType, ['global', 'project'], true)) {
+            throw new InvalidArgumentException('Invalid scope_type. Allowed values: global, project.');
+        }
+
+        $trimmedScopeKey = Str::of($scopeKey)->trim()->toString();
+        if ($trimmedScopeKey === '') {
+            throw new InvalidArgumentException('Invalid scope_key. scope_key must not be empty.');
+        }
+
+        if ($trimmedScopeType === 'global') {
+            if ($trimmedScopeKey !== 'global') {
+                throw new InvalidArgumentException("Invalid scope_key for global scope. scope_key must be exactly 'global'.");
+            }
+
+            return ['global', 'global'];
+        }
+
+        return ['project', Str::of($trimmedScopeKey)->lower()->toString()];
     }
 }
