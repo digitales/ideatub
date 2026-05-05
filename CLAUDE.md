@@ -2,6 +2,44 @@
 
 When the project is opened in Claude Desktop or Claude Code, this file is read automatically.
 
+## IdeaTub: Read working memory
+
+When you need scoped memory for context assembly, use either interface:
+
+- **MCP method:** `get_working_memory`
+- **REST endpoint:** `GET /api/thoughts/working-memory`
+
+Required scope parameters for both:
+
+- `scope_type`: `global` or `project`
+- `scope_key`: scope identifier
+
+Canonical examples:
+
+- Global scope: `scope_type=global`, `scope_key=global`
+- Project scope: `scope_type=project`, `scope_key=my-app`
+
+MCP JSON-RPC example:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 10,
+  "method": "get_working_memory",
+  "params": {
+    "scope_type": "project",
+    "scope_key": "my-app"
+  }
+}
+```
+
+REST example:
+
+```bash
+curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
+  "http://localhost:8000/api/thoughts/working-memory?scope_type=global&scope_key=global"
+```
+
 ## IdeaTub: Sync docs via capture_plan
 
 When the user wants to sync this document (or other plan/decision/dev/support/spec markdown) to IdeaTub, use the MCP tool **capture_plan** with:

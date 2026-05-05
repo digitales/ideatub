@@ -99,6 +99,45 @@ Thoughts can be mirrored to Evernote as notes. Set `EVERNOTE_ACCESS_TOKEN` (and 
 
 **Connecting your AI client:** For step-by-step setup in Claude Desktop, ChatGPT, Cursor, Claude Code, and others, see **[docs/mcp-integration-guide.md](docs/mcp-integration-guide.md)**.
 
+## Working memory retrieval
+
+Use working memory when you need a current global or project-scoped summary with freshness and confidence metadata.
+
+- **MCP method:** `get_working_memory`
+- **REST endpoint:** `GET /api/thoughts/working-memory`
+- **Required scope params:** `scope_type` and `scope_key`
+
+Common scopes:
+
+- `scope_type=global`, `scope_key=global`
+- `scope_type=project`, `scope_key=my-app`
+
+REST examples:
+
+```bash
+# Global scope
+curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
+  "http://localhost:8000/api/thoughts/working-memory?scope_type=global&scope_key=global"
+
+# Project scope
+curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
+  "http://localhost:8000/api/thoughts/working-memory?scope_type=project&scope_key=my-app"
+```
+
+MCP JSON-RPC example:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 10,
+  "method": "get_working_memory",
+  "params": {
+    "scope_type": "global",
+    "scope_key": "global"
+  }
+}
+```
+
 ### Cursor rule: sync plans and docs to IdeaTub
 
 This repo includes a Cursor rule so that when you work with plan, decision, dev, support, or spec markdown files, the AI knows how to sync them to IdeaTub via **capture_plan** (correct `doc_type`, `file_path`, `plan_slug`). The rule lives in [.cursor/rules/ideatub-sync-docs.mdc](.cursor/rules/ideatub-sync-docs.mdc). To use it in another project, copy that `.mdc` file into that project’s `.cursor/rules/` and ensure IdeaTub MCP is configured there. See [.cursor/rules/README.md](.cursor/rules/README.md) for details. You can also **download the rule** from the in-app **Help** page (MCP section).
