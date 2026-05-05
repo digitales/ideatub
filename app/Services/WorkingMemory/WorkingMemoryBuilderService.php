@@ -15,6 +15,7 @@ class WorkingMemoryBuilderService
     public function __construct(
         private readonly WorkingMemoryAssembler $assembler,
         private readonly WorkingMemoryScopeNormalizer $scopeNormalizer,
+        private readonly WorkingMemoryConsolidationWindowResolver $consolidationWindowResolver,
     ) {}
 
     public function buildConsolidated(int $userId, string $scopeType, string $scopeKey): WorkingMemoryVersion
@@ -161,7 +162,7 @@ class WorkingMemoryBuilderService
         })->values();
 
         if ($buildType === 'consolidated') {
-            $days = max(1, (int) config('working_memory.consolidation_window_days', 180));
+            $days = $this->consolidationWindowResolver->effectiveDaysForUserId($userId);
             $cutoff = now()->subDays($days);
 
             return $scoped

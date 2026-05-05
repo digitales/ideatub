@@ -4,6 +4,7 @@ namespace Tests\Unit\Services\WorkingMemory;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Models\UserPreference;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -130,6 +131,39 @@ class WorkingMemoryBuilderServiceTest extends TestCase
                 'user_id' => $user->id,
                 'content' => 'Stale idea outside the default 180-day window.',
                 'created_at' => Carbon::parse('2025-06-01 10:00:00', 'UTC'),
+            ]);
+
+            $version = app(WorkingMemoryBuilderService::class)
+                ->buildConsolidated($user->id, 'global', 'global');
+
+            $this->assertSame(1, $version->inputs()->count());
+            $this->assertTrue($version->inputs()->pluck('thought_id')->containsStrict($recent->id));
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    #[Test]
+    public function consolidated_build_respects_user_consolidation_window_preference(): void
+    {
+        try {
+            Carbon::setTestNow(Carbon::parse('2026-05-05 12:00:00', 'UTC'));
+
+            config(['working_memory.consolidation_window_days' => 180]);
+
+            $user = User::factory()->create();
+            UserPreference::set($user, UserPreference::KEY_WORKING_MEMORY_CONSOLIDATION_WINDOW_DAYS, 30);
+
+            $recent = Thought::factory()->create([
+                'user_id' => $user->id,
+                'content' => 'Recent thought within the 30-day user window.',
+                'created_at' => Carbon::parse('2026-04-30 10:00:00', 'UTC'),
+            ]);
+
+            Thought::factory()->create([
+                'user_id' => $user->id,
+                'content' => 'Older thought outside the 30-day user window.',
+                'created_at' => Carbon::parse('2026-03-27 10:00:00', 'UTC'),
             ]);
 
             $version = app(WorkingMemoryBuilderService::class)

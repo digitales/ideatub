@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\WorkingMemory;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
+use App\Services\WorkingMemory\WorkingMemoryConsolidationWindowResolver;
 use App\Services\WorkingMemory\WorkingMemoryScopeNormalizer;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -53,7 +54,8 @@ class WorkingMemoryFreshnessTest extends TestCase
 
         $failingBuilder = new WorkingMemoryBuilderService(
             $mockAssembler,
-            app(WorkingMemoryScopeNormalizer::class)
+            app(WorkingMemoryScopeNormalizer::class),
+            app(WorkingMemoryConsolidationWindowResolver::class),
         );
 
         $fallbackVersion = $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -92,7 +94,8 @@ class WorkingMemoryFreshnessTest extends TestCase
 
         $failingBuilder = new WorkingMemoryBuilderService(
             $mockAssembler,
-            app(WorkingMemoryScopeNormalizer::class)
+            app(WorkingMemoryScopeNormalizer::class),
+            app(WorkingMemoryConsolidationWindowResolver::class),
         );
 
         $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -130,7 +133,8 @@ class WorkingMemoryFreshnessTest extends TestCase
 
         $failingBuilder = new WorkingMemoryBuilderService(
             $mockAssembler,
-            app(WorkingMemoryScopeNormalizer::class)
+            app(WorkingMemoryScopeNormalizer::class),
+            app(WorkingMemoryConsolidationWindowResolver::class),
         );
 
         try {
@@ -175,7 +179,8 @@ class WorkingMemoryFreshnessTest extends TestCase
 
         $failingBuilder = new WorkingMemoryBuilderService(
             $mockAssembler,
-            app(WorkingMemoryScopeNormalizer::class)
+            app(WorkingMemoryScopeNormalizer::class),
+            app(WorkingMemoryConsolidationWindowResolver::class),
         );
 
         try {
