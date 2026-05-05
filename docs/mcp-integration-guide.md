@@ -32,7 +32,7 @@ Tools available:
 | `capture_plan` | Save a plan or plan section with source=plan; use tags and optional parent_id for long-form linking |
 | `capture_meeting` / `add_meeting` / `add_meeting_notes` | Meeting aliases for `capture_plan` with `doc_type=meeting` |
 | `process_meeting` | Queue meeting summarization + categorization (from existing meeting thought or raw transcript content) |
-| `get_working_memory` | Return a global or project scoped working memory snapshot (`scope_type`, `scope_key`; same payload shape as `GET /api/thoughts/working-memory`) |
+| `get_working_memory` | Return a global or project scoped working memory snapshot (`scope_type`, `scope_key`; same payload shape as `GET /api/thoughts/working-memory`, including assembler metadata fields in [Get working memory response shape](#get-working-memory-response-shape)) |
 
 Authentication is either **per-user MCP key** (`x-ideatub-key` header; query `?key=` is discouraged—prefer header) or **OAuth** (`Authorization: Bearer` after connector login). The MCP key identifies **your user account**, not the app.
 
@@ -264,6 +264,18 @@ Example calls:
 {"jsonrpc":"2.0","method":"process_meeting","params":{"content":"Speaker A: ...","plan_slug":"2026-04-15-weekly-sync"},"id":9}
 {"jsonrpc":"2.0","method":"get_working_memory","params":{"scope_type":"global","scope_key":"global"},"id":10}
 ```
+
+#### Get working memory response shape
+
+Successful `get_working_memory` and **`GET /api/thoughts/working-memory`** return the same JSON object. Beyond legacy fields (markdown body, scope, timestamps, confidence, etc.), the assembler adds non-breaking keys for clients and UI:
+
+| Field | Description |
+|-------|-------------|
+| `last_refreshed_at` | ISO 8601 timestamp when the snapshot was last refreshed (or `null`). |
+| `effective_consolidation_window_days` | Resolved window (user preference capped to valid range, else config default). |
+| `baseline_build_type` | How the canonical consolidated baseline was produced (string). |
+| `overlay_deltas` | Structured list of incremental changes since consolidation (each item typically includes `label`, `detail`, `since`). |
+| `input_count` | Number of inputs contributing to the canonical baseline. |
 
 For more on `capture_thought` and comments, see [MCP capture_thought](mcp-capture-thought.md).
 

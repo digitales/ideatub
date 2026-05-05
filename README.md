@@ -107,6 +107,22 @@ Use working memory when you need a current global or project-scoped summary with
 - **REST endpoint:** `GET /api/thoughts/working-memory`
 - **Required scope params:** `scope_type` and `scope_key`
 
+### Web UI and feature flags
+
+When enabled, authenticated pages expose the same snapshot in the browser (baseline + incremental overlay details). Defaults are **off** until you set env vars on the server.
+
+| Env variable | Config key | Default | Purpose |
+|--------------|------------|---------|---------|
+| `FEATURE_WORKING_MEMORY_UI` | `features.working_memory_ui` | `false` | Enables Memory nav, `/memory`, project memory module, and related UI. |
+| `FEATURE_WORKING_MEMORY_INSIGHTS` | `features.working_memory_insights` | `false` | Enables `/memory/insights` (corpus research-heavy signals). |
+| `WORKING_MEMORY_INSIGHTS_MODEL_ENABLED` | `working_memory.insights_model_enabled` | `false` | Allows optional LLM-backed insights paths when Insights is on (deployment choice). |
+
+**Routes** (paths on your IdeaTub base URL):
+
+- `/memory` — global working memory viewer
+- `/memory/insights` — insights page (requires both UI and Insights flags where applicable)
+- `/settings/working-memory` — per-user consolidation window override
+
 Common scopes:
 
 - `scope_type=global`, `scope_key=global`
