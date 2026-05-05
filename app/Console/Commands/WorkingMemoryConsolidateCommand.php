@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\ConsolidateWorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
-use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -16,7 +16,7 @@ class WorkingMemoryConsolidateCommand extends Command
 
     protected $description = 'Consolidate working memory snapshots for users and scopes.';
 
-    public function handle(WorkingMemoryBuilderService $builderService): int
+    public function handle(): int
     {
         $scopeTypeOption = $this->option('scope_type');
         $scopeKeyOption = $this->option('scope_key');
@@ -27,13 +27,22 @@ class WorkingMemoryConsolidateCommand extends Command
             return self::FAILURE;
         }
 
-        $userOption = $this->option('user');
-        $userIds = $this->resolveUserIds($userOption);
+        try {
+            $userIds = $this->resolveUserIds($this->option('user'));
 
-        foreach ($userIds as $userId) {
-            foreach ($this->resolveScopesForUser($userId, $scopeTypeOption, $scopeKeyOption) as $scope) {
-                $builderService->buildConsolidated($userId, $scope['scope_type'], $scope['scope_key']);
+            foreach ($userIds as $userId) {
+                foreach ($this->resolveScopesForUser($userId, $scopeTypeOption, $scopeKeyOption) as $scope) {
+                    ConsolidateWorkingMemory::dispatch(
+                        $userId,
+                        $scope['scope_type'],
+                        $scope['scope_key']
+                    );
+                }
             }
+        } catch (InvalidArgumentException $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
         }
 
         $this->info('Working memory consolidation complete.');
@@ -46,8 +55,17 @@ class WorkingMemoryConsolidateCommand extends Command
      */
     private function resolveUserIds(mixed $userOption): array
     {
-        if (is_string($userOption) && trim($userOption) !== '') {
-            return [(int) $userOption];
+        if ($userOption !== null) {
+            if (! is_string($userOption) || trim($userOption) === '' || ! ctype_digit(trim($userOption))) {
+                throw new InvalidArgumentException('The --user option must be a numeric user id.');
+            }
+
+            $userId = (int) trim($userOption);
+            if (! User::query()->whereKey($userId)->exists()) {
+                throw new InvalidArgumentException("User {$userId} does not exist.");
+            }
+
+            return [$userId];
         }
 
         return User::query()
