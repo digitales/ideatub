@@ -22,6 +22,7 @@ use App\Http\Controllers\InboxController;
 use App\Http\Controllers\JiraSettingsController;
 use App\Http\Controllers\McpKeyController;
 use App\Http\Controllers\MeetingSkillSettingsController;
+use App\Http\Controllers\MemoryController;
 use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\PostmarkInboundController;
@@ -285,6 +286,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/working-memory', [WorkingMemorySettingsController::class, 'index'])->name('settings.working-memory.index');
     Route::put('/settings/working-memory', [WorkingMemorySettingsController::class, 'update'])->name('settings.working-memory.update');
+
+    Route::middleware(['auth', 'working.memory.ui'])->group(function () {
+        Route::get('/memory', [MemoryController::class, 'show'])->name('memory.show');
+    });
 
     Route::get('/settings/skills', [SkillSettingsController::class, 'index'])->name('settings.skills.index');
     Route::put('/settings/skills/preferences', [SkillSettingsController::class, 'updatePreferences'])->name('settings.skills.preferences');
