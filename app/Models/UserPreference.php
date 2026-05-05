@@ -13,6 +13,8 @@ class UserPreference extends Model
     /** Global toggle: allow meeting processing to auto-run when eligible default skills exist. Stored as JSON boolean. */
     public const KEY_MEETING_AUTO_RUN_ENABLED = 'meeting_auto_run_enabled';
 
+    public const KEY_WORKING_MEMORY_CONSOLIDATION_WINDOW_DAYS = 'working_memory_consolidation_window_days';
+
     /**
      * The attributes that are mass assignable.
      *
