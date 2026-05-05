@@ -5,6 +5,7 @@ namespace Tests\Unit\Services\WorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
+use InvalidArgumentException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -72,5 +73,41 @@ class WorkingMemoryBuilderServiceTest extends TestCase
 
         $this->assertGreaterThanOrEqual(0.0, $score);
         $this->assertLessThanOrEqual(100.0, $score);
+    }
+
+    #[Test]
+    public function it_rejects_unknown_scope_type(): void
+    {
+        $user = User::factory()->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid scope_type');
+
+        app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'team', 'my-app');
+    }
+
+    #[Test]
+    public function it_rejects_empty_scope_key(): void
+    {
+        $user = User::factory()->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('scope_key');
+
+        app(WorkingMemoryBuilderService::class)
+            ->buildIncremental($user->id, 'project', '   ');
+    }
+
+    #[Test]
+    public function it_requires_global_scope_to_use_global_scope_key(): void
+    {
+        $user = User::factory()->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('global');
+
+        app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'project-1');
     }
 }
