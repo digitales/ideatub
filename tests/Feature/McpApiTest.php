@@ -13,6 +13,7 @@ use App\Models\UserMcpKey;
 use App\Models\UserPreference;
 use App\Services\Meetings\MeetingSkillManager;
 use App\Services\OpenRouterService;
+use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
@@ -974,5 +975,61 @@ class McpApiTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('result.count', 1);
+    }
+
+    public function test_get_mcp_returns_get_working_memory_method(): void
+    {
+        $response = $this->getJson('/api/mcp');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('methods.13', 'get_working_memory');
+    }
+
+    public function test_get_working_memory_returns_scoped_payload(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+
+        app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_working_memory',
+            'params' => ['scope_type' => 'global', 'scope_key' => 'global'],
+        ]);
+
+        $response->assertStatus(200)->assertJsonStructure([
+            'result' => ['summary_markdown', 'freshness_state'],
+        ]);
+    }
+
+    public function test_get_working_memory_rejects_invalid_scope_type(): void
+    {
+        $key = $this->validKey();
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_working_memory',
+            'params' => ['scope_type' => 'team', 'scope_key' => 'global'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('error.code', -32602);
+    }
+
+    public function test_get_working_memory_requires_scope_key(): void
+    {
+        $key = $this->validKey();
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_working_memory',
+            'params' => ['scope_type' => 'global'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('error.code', -32602);
     }
 }
