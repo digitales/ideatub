@@ -4,12 +4,17 @@ namespace App\Services\WorkingMemory;
 
 use App\Models\Thought;
 use App\Models\WorkingMemory;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use RuntimeException;
 
 class WorkingMemoryAssembler
 {
+    private const FRESH_WINDOW_HOURS = 4;
+
+    private const STALE_WINDOW_HOURS = 24;
+
     public function __construct(
         private readonly WorkingMemoryScopeNormalizer $scopeNormalizer,
     ) {}
@@ -234,7 +239,7 @@ class WorkingMemoryAssembler
         return [
             'scope_type' => $memory->scope_type,
             'scope_key' => $memory->scope_key,
-            'freshness_state' => $memory->freshness_state,
+            'freshness_state' => $this->resolveFreshnessState($memory),
             'confidence_score' => (float) $version->confidence_score,
             'summary_markdown' => $version->summary_markdown,
             'key_concepts' => $version->key_concepts_json ?? [],
@@ -242,5 +247,50 @@ class WorkingMemoryAssembler
             'open_questions' => $version->open_questions_json ?? [],
             'next_actions' => $version->next_actions_json ?? [],
         ];
+    }
+
+    /**
+     * Age-based freshness: fresh if refreshed in <4 hours, degraded from 4-<24 hours, stale at >=24 hours or if never refreshed.
+     */
+    public function freshnessFromAge(?Carbon $lastRefreshedAt): string
+    {
+        if ($lastRefreshedAt === null) {
+            return 'stale';
+        }
+
+        if ($lastRefreshedAt->lessThanOrEqualTo(now()->subHours(self::STALE_WINDOW_HOURS))) {
+            return 'stale';
+        }
+
+        if ($lastRefreshedAt->lessThanOrEqualTo(now()->subHours(self::FRESH_WINDOW_HOURS))) {
+            return 'degraded';
+        }
+
+        return 'fresh';
+    }
+
+    private function resolveFreshnessState(WorkingMemory $memory): string
+    {
+        $fromAge = $this->freshnessFromAge($memory->last_refreshed_at);
+
+        if (($memory->freshness_state ?? '') === 'degraded') {
+            return $this->worstFreshness($fromAge, 'degraded');
+        }
+
+        return $fromAge;
+    }
+
+    private function worstFreshness(string $fromAge, string $fromDb): string
+    {
+        $rank = [
+            'fresh' => 1,
+            'degraded' => 2,
+            'stale' => 3,
+        ];
+
+        $rankA = $rank[$fromAge] ?? 2;
+        $rankB = $rank[$fromDb] ?? 2;
+
+        return $rankA >= $rankB ? $fromAge : $fromDb;
     }
 }
