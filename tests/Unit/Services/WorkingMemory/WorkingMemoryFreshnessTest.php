@@ -105,6 +105,91 @@ class WorkingMemoryFreshnessTest extends TestCase
     }
 
     #[Test]
+    public function it_bubbles_non_runtime_failures_instead_of_falling_back(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-05 12:00:00', 'UTC'));
+
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Thread content.',
+            'metadata' => ['tags' => ['infra']],
+        ]);
+
+        app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
+        $memory = WorkingMemory::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertSame('fresh', $memory->freshness_state);
+
+        /** @var WorkingMemoryAssembler&MockInterface $mockAssembler */
+        $mockAssembler = Mockery::mock(WorkingMemoryAssembler::class, [
+            app(WorkingMemoryScopeNormalizer::class),
+        ])->makePartial();
+        $mockAssembler->shouldReceive('assemblePayload')
+            ->once()
+            ->andThrow(new \Error('db connection dropped'));
+
+        $failingBuilder = new WorkingMemoryBuilderService(
+            $mockAssembler,
+            app(WorkingMemoryScopeNormalizer::class)
+        );
+
+        try {
+            $failingBuilder->buildIncremental($user->id, 'global', 'global');
+            $this->fail('Expected Error');
+        } catch (\Error $e) {
+            $this->assertSame('db connection dropped', $e->getMessage());
+        }
+
+        $memory->refresh();
+        $this->assertSame('fresh', $memory->freshness_state);
+    }
+
+    #[Test]
+    public function it_does_not_mark_degraded_when_latest_version_pointer_is_missing(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-05 12:00:00', 'UTC'));
+
+        $user = User::factory()->create();
+
+        Thought::factory()->count(2)->create([
+            'user_id' => $user->id,
+            'content' => 'Working thread about rollout.',
+            'metadata' => ['tags' => ['rollout']],
+        ]);
+
+        app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
+
+        $memory = WorkingMemory::query()->where('user_id', $user->id)->firstOrFail();
+        $memory->forceFill([
+            'latest_version_id' => null,
+            'freshness_state' => 'fresh',
+        ])->save();
+
+        /** @var WorkingMemoryAssembler&MockInterface $mockAssembler */
+        $mockAssembler = Mockery::mock(WorkingMemoryAssembler::class, [
+            app(WorkingMemoryScopeNormalizer::class),
+        ])->makePartial();
+        $mockAssembler->shouldReceive('assemblePayload')
+            ->once()
+            ->andThrow(new RuntimeException('synthesis failed'));
+
+        $failingBuilder = new WorkingMemoryBuilderService(
+            $mockAssembler,
+            app(WorkingMemoryScopeNormalizer::class)
+        );
+
+        try {
+            $failingBuilder->buildIncremental($user->id, 'global', 'global');
+            $this->fail('Expected RuntimeException');
+        } catch (RuntimeException $e) {
+            $this->assertSame('synthesis failed', $e->getMessage());
+        }
+
+        $memory->refresh();
+        $this->assertSame('fresh', $memory->freshness_state);
+    }
+
+    #[Test]
     public function it_marks_memory_stale_when_no_refresh_within_24_hours(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-05 10:00:00', 'UTC'));
