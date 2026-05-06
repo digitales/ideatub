@@ -101,7 +101,7 @@ Thoughts can be mirrored to Evernote as notes. Set `EVERNOTE_ACCESS_TOKEN` (and 
 
 ## Working memory retrieval
 
-Use working memory when you need a current global or project-scoped summary with freshness and confidence metadata.
+Use working memory when you need a current global, project, insights, or tag-scoped summary with freshness and confidence metadata.
 
 - **MCP method:** `get_working_memory`
 - **REST endpoint:** `GET /api/thoughts/working-memory`
@@ -128,6 +128,7 @@ Common scopes:
 - `scope_type=global`, `scope_key=global`
 - `scope_type=project`, `scope_key=my-app`
 - `scope_type=insights`, `scope_key=global` — versioned research-heavy corpus summary (same persistence tables as other scopes)
+- `scope_type=tag`, `scope_key=ai` — normalized tag scope (trimmed, lowercase key)
 
 REST examples:
 
@@ -143,6 +144,10 @@ curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
 # Insights scope (research-classified captures)
 curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
   "http://localhost:8000/api/thoughts/working-memory?scope_type=insights&scope_key=global"
+
+# Tag scope (normalized tag key)
+curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
+  "http://localhost:8000/api/thoughts/working-memory?scope_type=tag&scope_key=ai"
 ```
 
 MCP JSON-RPC example:

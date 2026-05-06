@@ -137,6 +137,11 @@ class McpApiTest extends TestCase
         $this->assertIsString($researchNow);
         $this->assertStringContainsString('queues video research', $researchNow);
         $this->assertStringContainsString('after the transcript reaches a terminal state', $researchNow);
+        $workingMemory = collect($response->json('result.tools'))->firstWhere('name', 'get_working_memory');
+        $this->assertIsArray($workingMemory);
+        $scopeTypeEnum = data_get($workingMemory, 'inputSchema.properties.scope_type.enum', []);
+        $this->assertIsArray($scopeTypeEnum);
+        $this->assertContains('tag', $scopeTypeEnum);
     }
 
     public function test_post_without_key_returns_401(): void
@@ -1001,6 +1006,29 @@ class McpApiTest extends TestCase
         $response->assertStatus(200)->assertJsonStructure([
             'result' => ['summary_markdown', 'freshness_state'],
         ]);
+    }
+
+    public function test_get_working_memory_accepts_tag_scope(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Tag scoped thought',
+            'metadata' => ['tags' => ['ai']],
+        ]);
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'get_working_memory',
+            'params' => ['scope_type' => 'tag', 'scope_key' => 'ai'],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('result.scope_type', 'tag');
+        $response->assertJsonPath('result.scope_key', 'ai');
+        $this->assertGreaterThanOrEqual(1, (int) $response->json('result.input_count'));
     }
 
     public function test_get_working_memory_rejects_invalid_scope_type(): void

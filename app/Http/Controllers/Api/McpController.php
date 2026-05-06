@@ -558,7 +558,7 @@ class McpController extends Controller
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
-                        'scope_type' => ['type' => 'string', 'enum' => ['global', 'project', 'insights']],
+                        'scope_type' => ['type' => 'string', 'enum' => ['global', 'project', 'insights', 'tag']],
                         'scope_key' => ['type' => 'string'],
                     ],
                     'required' => ['scope_type', 'scope_key'],
@@ -795,7 +795,7 @@ class McpController extends Controller
         }
 
         $v = Validator::make($input, [
-            'scope_type' => 'required|string|in:global,project,insights',
+            'scope_type' => 'required|string|in:global,project,insights,tag',
             'scope_key' => 'required|string|max:191',
         ]);
         if ($v->fails()) {

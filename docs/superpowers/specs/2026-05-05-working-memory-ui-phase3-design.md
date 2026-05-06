@@ -91,6 +91,8 @@ Backend persistence (`working_memories`, versions, inputs), hybrid refresh jobs,
 - **Settings** UI: nullable integer field **“Working memory consolidation window (days)”** with validation (e.g. minimum **1**, maximum **3650** or a sane upper bound).
 - **Persistence:** store on **`users`** as a nullable column (e.g. `working_memory_consolidation_window_days`) **or** an existing user-preferences JSON column if the codebase standard prefers that — implementation plan picks one pattern.
 - **Resolution order:** if user override **is set**, builder uses it; else **`config('working_memory.consolidation_window_days')`**.
+- Add a **Forced tags** control in the same settings area (chips or newline list): user-managed normalized tags that should always produce tag-scoped working memory during processing, even below normal thresholds.
+- Forced-tag updates should trigger scoped refresh/consolidation for affected tag scopes so user intent is reflected quickly.
 
 ## Backend / API extensions (high level)
 

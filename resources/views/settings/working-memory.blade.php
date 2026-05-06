@@ -41,6 +41,21 @@
                         <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                     @enderror
                 </div>
+
+                <div>
+                    <label for="working_memory_forced_tags" class="block text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-1.5">Forced tags (optional)</label>
+                    <textarea
+                        name="working_memory_forced_tags"
+                        id="working_memory_forced_tags"
+                        rows="5"
+                        placeholder="ai, product-notes&#10;customer-research"
+                        class="w-full rounded-lg border border-memory-violet/20 bg-white/80 px-3 py-2 text-sm text-deep-indigo placeholder-slate-brand/40 focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50"
+                    >{{ old('working_memory_forced_tags', $forcedTagsValue) }}</textarea>
+                    <p class="mt-1 text-[11px] text-slate-brand/50">Enter tags separated by commas or new lines. Tags are normalized (trimmed, lowercased, deduplicated) before saving. Clear the field to remove forced tags.</p>
+                    @error('working_memory_forced_tags')
+                        <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                    @enderror
+                </div>
             </div>
 
             <div class="mt-6 flex items-center gap-3">
@@ -53,6 +68,17 @@
                 </button>
                 <a href="{{ route('settings.profile.index') }}" class="text-xs font-medium text-slate-brand hover:text-memory-violet">Back to profile</a>
             </div>
+        </form>
+
+        <form method="POST" action="{{ route('settings.working-memory.build-now') }}" class="mt-3">
+            @csrf
+            <button
+                type="submit"
+                class="text-xs font-medium text-memory-violet px-4 py-2 rounded-lg border border-memory-violet/25 hover:bg-memory-violet/5 transition-colors"
+            >
+                Build now (forced tags)
+            </button>
+            <p class="mt-1 text-[11px] text-slate-brand/50">Queues consolidation jobs for your currently saved forced tags.</p>
         </form>
     </div>
 </div>

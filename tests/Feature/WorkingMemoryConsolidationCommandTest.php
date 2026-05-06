@@ -7,6 +7,7 @@ use App\Jobs\RefreshWorkingMemoryIncremental;
 use App\Models\Project;
 use App\Models\Thought;
 use App\Models\User;
+use App\Models\UserPreference;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -83,15 +84,18 @@ class WorkingMemoryConsolidationCommandTest extends TestCase
             'source_metadata' => ['project' => 'My-App'],
         ]);
         $thought->projects()->attach($project->id, ['sort_order' => 1]);
+        UserPreference::set($user, UserPreference::KEY_WORKING_MEMORY_FORCED_TAGS, ['AI', 'ml']);
 
         $this->artisan('working-memory:consolidate', ['--user' => (string) $user->id])
             ->assertSuccessful();
 
-        Queue::assertPushed(ConsolidateWorkingMemory::class, 4);
+        Queue::assertPushed(ConsolidateWorkingMemory::class, 6);
         Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'global', 'global'));
         Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'insights', 'global'));
         Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'project', 'my-app'));
         Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'project', (string) $project->id));
+        Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'tag', 'ai'));
+        Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'tag', 'ml'));
     }
 
     #[Test]
@@ -109,6 +113,23 @@ class WorkingMemoryConsolidationCommandTest extends TestCase
 
         Queue::assertPushed(ConsolidateWorkingMemory::class, 1);
         Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'project', 'my-app'));
+    }
+
+    #[Test]
+    public function it_supports_tag_scope_type_for_targeted_consolidation_jobs(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+
+        $this->artisan('working-memory:consolidate', [
+            '--user' => (string) $user->id,
+            '--scope_type' => 'tag',
+            '--scope_key' => 'AI',
+        ])->assertSuccessful();
+
+        Queue::assertPushed(ConsolidateWorkingMemory::class, 1);
+        Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'tag', 'ai'));
     }
 
     #[Test]

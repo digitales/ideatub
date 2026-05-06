@@ -9,6 +9,7 @@ class WorkingMemoryScopeResolver
 {
     public function __construct(
         private readonly MemoryInsightsService $memoryInsightsService,
+        private readonly ForcedTagResolver $forcedTagResolver,
     ) {}
 
     /**
@@ -30,6 +31,18 @@ class WorkingMemoryScopeResolver
 
         foreach ($thought->projects()->pluck('projects.id') as $projectId) {
             $scopes[] = ['scope_type' => 'project', 'scope_key' => (string) $projectId];
+        }
+
+        $thoughtTags = $this->forcedTagResolver->normalizeTags(data_get($thought->metadata, 'tags'));
+        foreach ($thoughtTags as $tag) {
+            $scopes[] = ['scope_type' => 'tag', 'scope_key' => $tag];
+        }
+
+        $forcedTags = is_int($thought->user_id)
+            ? $this->forcedTagResolver->forUserId($thought->user_id)
+            : [];
+        foreach (array_intersect($thoughtTags, $forcedTags) as $forcedTag) {
+            $scopes[] = ['scope_type' => 'tag', 'scope_key' => $forcedTag];
         }
 
         if ($this->memoryInsightsService->isResearchThought($thought)) {

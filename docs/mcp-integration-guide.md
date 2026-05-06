@@ -32,7 +32,7 @@ Tools available:
 | `capture_plan` | Save a plan or plan section with source=plan; use tags and optional parent_id for long-form linking |
 | `capture_meeting` / `add_meeting` / `add_meeting_notes` | Meeting aliases for `capture_plan` with `doc_type=meeting` |
 | `process_meeting` | Queue meeting summarization + categorization (from existing meeting thought or raw transcript content) |
-| `get_working_memory` | Return a global, project, or **insights** scoped working memory snapshot (`scope_type`, `scope_key`; same payload shape as `GET /api/thoughts/working-memory`, including assembler metadata fields in [Get working memory response shape](#get-working-memory-response-shape)) |
+| `get_working_memory` | Return a global, project, **insights**, or **tag** scoped working memory snapshot (`scope_type`, `scope_key`; same payload shape as `GET /api/thoughts/working-memory`, including assembler metadata fields in [Get working memory response shape](#get-working-memory-response-shape)) |
 
 Authentication is either **per-user MCP key** (`x-ideatub-key` header; query `?key=` is discouraged—prefer header) or **OAuth** (`Authorization: Bearer` after connector login). The MCP key identifies **your user account**, not the app.
 
@@ -248,7 +248,7 @@ Use this if you are scripting against IdeaTub or building a bridge.
 | `capture_plan` | `content` (string) | `doc_type` (plan \| decision \| dev \| support \| spec \| research \| meeting); `file_path`, `plan_slug`, `parent_id` (UUID), `section_title`, `project`, `tags` (array) |
 | `capture_meeting`, `add_meeting`, `add_meeting_notes` | `content` (string) | Same optional params as `capture_plan` **except** `doc_type` is omitted and always `meeting`. These three names are **aliases** of one implementation (any `doc_type` in params is ignored). |
 | `process_meeting` | One of `thought_id` (UUID) or `content` (string) | `plan_slug` (when `content` is provided), `meeting_skill_id` (int), `force_rerun` (bool) |
-| `get_working_memory` | `scope_type` (`global` \| `project` \| `insights`), `scope_key` (string, required; `global` for global and insights scopes, or project id / normalized project slug for project scope) | — |
+| `get_working_memory` | `scope_type` (`global` \| `project` \| `insights` \| `tag`), `scope_key` (string, required; `global` for global and insights scopes, project id / normalized project slug for project scope, or normalized tag key for tag scope) | — |
 
 Example calls:
 
@@ -263,6 +263,7 @@ Example calls:
 {"jsonrpc":"2.0","method":"process_meeting","params":{"thought_id":"uuid-of-existing-meeting"},"id":8}
 {"jsonrpc":"2.0","method":"process_meeting","params":{"content":"Speaker A: ...","plan_slug":"2026-04-15-weekly-sync"},"id":9}
 {"jsonrpc":"2.0","method":"get_working_memory","params":{"scope_type":"global","scope_key":"global"},"id":10}
+{"jsonrpc":"2.0","method":"get_working_memory","params":{"scope_type":"tag","scope_key":"ai"},"id":11}
 ```
 
 #### Get working memory response shape

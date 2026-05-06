@@ -1,4 +1,4 @@
-# Working Memory in IdeaTub (Global + Project)
+# Working Memory in IdeaTub (Global + Project + Insights)
 
 ## Overview
 
@@ -80,6 +80,7 @@ Working memory scopes:
 
 - `global`: one memory per user.
 - `project`: one memory per project context per user.
+- `insights`: one cross-corpus, research-heavy memory per user (`scope_key=global`).
 
 Project partitioning strategy:
 
@@ -87,6 +88,29 @@ Project partitioning strategy:
 - v2: introduce optional first-class `projects` entities and map scope keys to project IDs.
 
 The API contract should remain stable while the backing identifier transitions from metadata value to project entity ID.
+
+### Tag scope (v1.1 add-on)
+
+Given that thoughts are tagged at capture time, add a future scope:
+
+- `tag`: one memory per normalized tag per user (`scope_key=<tag>`).
+
+Guardrails for first rollout:
+
+- Normalize tags to lowercase/trimmed keys for stable scope mapping.
+- Build only tags with sufficient signal (for example, at least 5 thoughts in the consolidation window).
+- Cap per-user active tag scopes per run (for example top 25 by recent frequency) to avoid scope explosion.
+- Trigger incremental refresh only for tags newly added/removed/changed on the thought.
+- Support a user-managed **forced tag list** that bypasses threshold and top-N caps.
+
+Forced tag behavior:
+
+- If a tag is in the user's forced list, always include `scope_type=tag`, `scope_key=<tag>` in consolidation processing even when frequency is below threshold.
+- Forced tags are included in incremental processing when the thought carries that tag.
+- Forced tags participate in the same freshness/versioning model as all scopes.
+- Removing a tag from the forced list does not delete historical versions; it only stops automatic refresh unless the tag still qualifies naturally.
+
+This keeps global/project/insights stable while enabling topic-level memory where tags are high quality.
 
 ## Data Model
 
@@ -97,8 +121,8 @@ Canonical memory record per user + scope.
 Suggested fields:
 - `id`
 - `user_id`
-- `scope_type` (`global` | `project`)
-- `scope_key` (`global` or project identifier)
+- `scope_type` (`global` | `project` | `insights` | `tag`)
+- `scope_key` (`global`, project identifier, or normalized tag key)
 - `latest_version_id` (nullable)
 - `freshness_state` (`fresh` | `degraded` | `stale`)
 - `last_refreshed_at`
@@ -142,6 +166,9 @@ Trigger on new thought capture or meaningful thought updates:
 1. Determine affected scopes:
    - Always user `global`.
    - User `project` scope when thought has project metadata.
+   - User `insights` scope when thought is research-classified.
+   - User `tag` scopes for tags on the thought (v1.1).
+   - Include matching user-forced tag scopes even if they are low frequency.
 2. Retrieve recent candidate thoughts for scope.
 3. Build incremental delta memory artifact.
 4. Persist new version (`build_type=incremental`) and update freshness timestamps.
@@ -154,6 +181,7 @@ Run on schedule (for example nightly):
 2. Recluster concepts and threads.
 3. Generate consolidated memory sections with stable schema.
 4. Persist new version (`build_type=consolidated`) and mark as latest stable base.
+5. Ensure all user-forced tags are included in this run even if they miss standard tag thresholds.
 
 ### Read-time assembly
 
@@ -192,6 +220,7 @@ To keep memory trustworthy, provide controls:
 - Demote or exclude noisy concepts.
 - Trigger force rebuild for a scope.
 - Merge/split project scopes when metadata partitioning is imperfect.
+- Add/remove **forced tags** that must always maintain tag-scoped working memory.
 
 ## Testing Strategy
 
@@ -263,6 +292,12 @@ To keep memory trustworthy, provide controls:
 
 - Introduce project model and mapping migration.
 - Preserve API contract and scope semantics.
+
+### Phase 5: Tag scope (optional, recommended after v1 stability)
+
+- Add tag scope resolution and normalization (`scope_type=tag`).
+- Add thresholds/caps so only high-signal tags are persisted.
+- Expose tag-scoped read surface in API/MCP and optional UI entry points.
 
 ## Resolved decisions
 

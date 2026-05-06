@@ -287,6 +287,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/settings/working-memory', [WorkingMemorySettingsController::class, 'index'])->name('settings.working-memory.index');
     Route::put('/settings/working-memory', [WorkingMemorySettingsController::class, 'update'])->name('settings.working-memory.update');
+    Route::post('/settings/working-memory/build-now', [WorkingMemorySettingsController::class, 'buildNow'])->name('settings.working-memory.build-now');
 
     Route::middleware(['auth', 'working.memory.ui'])->group(function () {
         Route::get('/memory', [MemoryController::class, 'show'])->name('memory.show');
