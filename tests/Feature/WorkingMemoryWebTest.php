@@ -86,78 +86,91 @@ class WorkingMemoryWebTest extends TestCase
 
     public function test_working_memory_shows_details_and_recent_updates_when_overlay_deltas_exist(): void
     {
-        config(['features.working_memory_ui' => true]);
-        Carbon::setTestNow(Carbon::parse('2026-05-06 09:00:00', 'UTC'));
-
-        $user = User::factory()->create();
-
-        Thought::factory()->create([
-            'user_id' => $user->id,
-            'content' => 'Baseline memory context for canonical summary.',
-            'metadata' => ['tags' => ['baseline']],
-        ]);
-
-        $builder = app(WorkingMemoryBuilderService::class);
-        $builder->buildConsolidated($user->id, 'global', 'global');
-
-        Carbon::setTestNow(Carbon::parse('2026-05-06 10:00:00', 'UTC'));
-
-        Thought::factory()->create([
-            'user_id' => $user->id,
-            'content' => 'Incremental overlay signal for recent updates card.',
-            'metadata' => ['tags' => ['overlay']],
-        ]);
-
-        $builder->buildIncremental($user->id, 'global', 'global');
+        $this->enableWorkingMemoryUi();
+        $user = $this->createUserWithConsolidatedMemory('Baseline memory context for canonical summary.');
+        $this->appendIncrementalOverlay($user, 'Incremental overlay signal for recent updates card.');
 
         $response = $this->actingAs($user)->get(route('memory.show'));
+        $html = (string) $response->getContent();
 
         $response->assertOk();
         $response->assertSee('Details', false);
-        $response->assertSee('Recent updates</h2>', false);
+        $response->assertSeeText('Incremental overlay signal for recent updates card.');
+        $this->assertGreaterThanOrEqual(1, $this->recentUpdatesHeadingCount($html));
     }
 
     public function test_working_memory_hides_recent_updates_block_when_overlay_deltas_are_empty(): void
     {
-        config(['features.working_memory_ui' => true]);
-        Carbon::setTestNow(Carbon::parse('2026-05-06 09:00:00', 'UTC'));
-
-        $user = User::factory()->create();
-
-        Thought::factory()->create([
-            'user_id' => $user->id,
-            'content' => 'Only consolidated context for empty overlay check.',
-            'metadata' => ['tags' => ['solo']],
-        ]);
-
-        app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
+        $this->enableWorkingMemoryUi();
+        $user = $this->createUserWithConsolidatedMemory('Only consolidated context for empty overlay check.');
 
         $response = $this->actingAs($user)->get(route('memory.show'));
+        $html = (string) $response->getContent();
 
         $response->assertOk();
         $response->assertSee('Details', false);
-        $response->assertDontSee('Recent updates</h2>', false);
+        $this->assertSame(0, $this->recentUpdatesHeadingCount($html));
     }
 
     public function test_working_memory_does_not_render_legacy_mobile_drawer_trigger_affordance(): void
     {
+        $this->enableWorkingMemoryUi();
+        $user = $this->createUserWithConsolidatedMemory('Baseline detail for drawer regression guard.');
+        $this->appendIncrementalOverlay($user, 'Overlay detail to surface recent updates region.');
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+        $html = (string) $response->getContent();
+
+        $response->assertOk();
+        $this->assertSame(0, $this->recentUpdatesButtonCount($html));
+    }
+
+    private function enableWorkingMemoryUi(): void
+    {
         config(['features.working_memory_ui' => true]);
+    }
+
+    private function createUserWithConsolidatedMemory(string $content): User
+    {
         Carbon::setTestNow(Carbon::parse('2026-05-06 09:00:00', 'UTC'));
 
         $user = User::factory()->create();
 
         Thought::factory()->create([
             'user_id' => $user->id,
-            'content' => 'Baseline detail for drawer regression guard.',
+            'content' => $content,
             'metadata' => ['tags' => ['baseline']],
         ]);
 
         app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
 
-        $response = $this->actingAs($user)->get(route('memory.show'));
+        return $user;
+    }
 
-        $response->assertOk();
-        $response->assertDontSee('drawerOpen', false);
-        $response->assertDontSee('@click="drawerOpen = true"', false);
+    private function appendIncrementalOverlay(User $user, string $content): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-06 10:00:00', 'UTC'));
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => $content,
+            'metadata' => ['tags' => ['overlay']],
+        ]);
+
+        app(WorkingMemoryBuilderService::class)->buildIncremental($user->id, 'global', 'global');
+    }
+
+    private function recentUpdatesHeadingCount(string $html): int
+    {
+        preg_match_all('/<h[1-6][^>]*>\s*Recent updates\s*<\/h[1-6]>/i', $html, $matches);
+
+        return count($matches[0] ?? []);
+    }
+
+    private function recentUpdatesButtonCount(string $html): int
+    {
+        preg_match_all('/<button\b[^>]*>\s*Recent updates\s*<\/button>/i', $html, $matches);
+
+        return count($matches[0] ?? []);
     }
 }
