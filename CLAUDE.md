@@ -129,3 +129,13 @@ The **[OB1 Research-to-Decision recipe](https://github.com/NateBJones-Projects/O
 **Cursor:** `.cursor/rules/research-to-decision-ideatub.mdc` when working under `docs/research-to-decision/` or the adaptation prompt.
 
 **Design spec:** `docs/superpowers/specs/2026-04-30-research-to-decision-ideatub-design.md` — **Help (users):** in-app `/help/research-to-decision`.
+
+---
+
+## IdeaTub: Repo Learning Coach
+
+**Repo Learning Coach** adapts the upstream OB1 recipe [repo-learning-coach](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/repo-learning-coach) into IdeaTub: a **`learning_*`** domain, **`php artisan learning:sync {project_slug} --user={id}`** to import markdown from a `content_root` (`research/*.md`, `curriculum/lessons/*.md`), and authenticated **web UI** at **`/learn`** (projects, research, lessons, capture into thoughts, quizzes/progress when enabled).
+
+**Help (users):** in-app `/help/repo-learning-coach` (folder layout, sync command, phase overview).
+
+**Design spec:** `docs/superpowers/specs/2026-05-06-repo-learning-coach-ideatub-two-phase-design.md`

@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
     <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug mb-2">Help</h1>
-    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts, YouTube video capture, MCP integration, example prompts, syncing plans into your thinking space, and the <a href="{{ route('help.research-to-decision') }}" class="text-memory-violet hover:underline font-medium">Research-to-decision workflow</a> (OB1 skills + IdeaTub).</p>
+    <p class="text-sm text-slate-brand mb-8">Keyboard shortcuts, YouTube video capture, MCP integration, example prompts, syncing plans into your thinking space, the <a href="{{ route('help.research-to-decision') }}" class="text-memory-violet hover:underline font-medium">Research-to-decision workflow</a> (OB1 skills + IdeaTub), and <a href="{{ route('help.repo-learning-coach') }}" class="text-memory-violet hover:underline font-medium">Repo Learning Coach</a> (markdown curriculum under <code class="bg-memory-violet/10 px-1 rounded text-[11px]">/learn</code>).</p>
 
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
         <h2 class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>
@@ -79,7 +79,7 @@
                     <tr><td class="py-2 font-mono text-xs">sync_jira</td><td class="py-2 text-slate-brand">Refresh Jira activity into thoughts (shown only when Jira is enabled for your workspace)</td></tr>
                 </tbody>
             </table>
-            <p class="text-sm text-slate-brand mt-4"><strong class="text-deep-indigo">Agent prompt bundles</strong> — View or download Markdown prompts in the app: <a href="{{ route('help.panning-for-gold.index') }}" class="text-memory-violet hover:underline">Panning for Gold</a> · <a href="{{ route('help.research-to-decision.skills.index') }}" class="text-memory-violet hover:underline">Research-to-decision skills</a>.</p>
+            <p class="text-sm text-slate-brand mt-4"><strong class="text-deep-indigo">Agent prompt bundles</strong> — View or download Markdown prompts in the app: <a href="{{ route('help.panning-for-gold.index') }}" class="text-memory-violet hover:underline">Panning for Gold</a> · <a href="{{ route('help.research-to-decision.skills.index') }}" class="text-memory-violet hover:underline">Research-to-decision skills</a>. <strong class="text-deep-indigo">Repo Learning Coach</strong> (markdown sync + <code class="bg-memory-violet/10 px-1 rounded text-[11px]">/learn</code>): <a href="{{ route('help.repo-learning-coach') }}" class="text-memory-violet hover:underline">help page</a>.</p>
         </div>
 
         <div id="plans" class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">

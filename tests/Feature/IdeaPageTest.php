@@ -342,6 +342,18 @@ class IdeaPageTest extends TestCase
         $response->assertSee('Open skills', false);
     }
 
+    public function test_repo_learning_coach_help_page_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.repo-learning-coach'));
+
+        $response->assertOk();
+        $response->assertSee('Repo Learning Coach', false);
+        $response->assertSee('learning:sync', false);
+        $response->assertSee('Go to Learn', false);
+    }
+
     public function test_research_to_decision_skills_index_renders(): void
     {
         $user = User::factory()->create();

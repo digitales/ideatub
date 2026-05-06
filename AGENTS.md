@@ -21,3 +21,8 @@ Design: `docs/superpowers/specs/2026-04-29-panning-for-gold-ideatub-design.md`
 - **Upstream recipe:** [research-to-decision-workflow](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow) — parity with [OB1 `skills/`](https://github.com/NateBJones-Projects/OB1/tree/main/skills).
 
 MCP usage matches **`CLAUDE.md`**. Design: `docs/superpowers/specs/2026-04-30-research-to-decision-ideatub-design.md`. Help page: `/help/research-to-decision`.
+
+## Repo Learning Coach (markdown + `/learn`)
+
+- **Help (users):** `/help/repo-learning-coach` — content layout, `learning:sync`, phases (read/capture vs quiz/progress).
+- **Agents:** sync and capture behavior are summarized in **`CLAUDE.md`** (Repo Learning Coach section). Design: `docs/superpowers/specs/2026-05-06-repo-learning-coach-ideatub-two-phase-design.md`.

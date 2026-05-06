@@ -288,6 +288,7 @@ Route::middleware('auth')->group(function () {
         ->name('help.research-to-decision.skills.show');
     Route::get('/help/research-to-decision/skills', [HelpController::class, 'researchToDecisionSkillsIndex'])->name('help.research-to-decision.skills.index');
     Route::get('/help/research-to-decision', [HelpController::class, 'researchToDecision'])->name('help.research-to-decision');
+    Route::get('/help/repo-learning-coach', [HelpController::class, 'repoLearningCoach'])->name('help.repo-learning-coach');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
 
     // MCP key management (obtain / revoke auth key for AI clients)
