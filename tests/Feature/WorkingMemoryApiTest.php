@@ -102,6 +102,37 @@ class WorkingMemoryApiTest extends TestCase
     }
 
     #[Test]
+    public function test_working_memory_returns_tag_payload_for_matching_tagged_thought(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Tagged thought for AI scope.',
+            'metadata' => ['tags' => ['ai']],
+        ]);
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/thoughts/working-memory?scope_type=tag&scope_key=ai');
+
+        $response->assertOk();
+        $response->assertJsonPath('scope_type', 'tag');
+        $response->assertJsonPath('scope_key', 'ai');
+        $this->assertGreaterThanOrEqual(1, (int) $response->json('input_count'));
+    }
+
+    #[Test]
     public function test_working_memory_persists_snapshot_on_first_read_without_prior_build(): void
     {
         $user = User::factory()->create();
