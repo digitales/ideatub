@@ -3,13 +3,22 @@
 namespace Tests\Feature;
 
 use App\Models\Project;
+use App\Models\Thought;
 use App\Models\User;
+use App\Services\WorkingMemory\WorkingMemoryBuilderService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class WorkingMemoryWebTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow(null);
+        parent::tearDown();
+    }
 
     protected function setUp(): void
     {
@@ -73,5 +82,82 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertSee('Working memory', false);
         $response->assertSee('Alpha Research', false);
         $response->assertSee('Details', false);
+    }
+
+    public function test_working_memory_shows_details_and_recent_updates_when_overlay_deltas_exist(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        Carbon::setTestNow(Carbon::parse('2026-05-06 09:00:00', 'UTC'));
+
+        $user = User::factory()->create();
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Baseline memory context for canonical summary.',
+            'metadata' => ['tags' => ['baseline']],
+        ]);
+
+        $builder = app(WorkingMemoryBuilderService::class);
+        $builder->buildConsolidated($user->id, 'global', 'global');
+
+        Carbon::setTestNow(Carbon::parse('2026-05-06 10:00:00', 'UTC'));
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Incremental overlay signal for recent updates card.',
+            'metadata' => ['tags' => ['overlay']],
+        ]);
+
+        $builder->buildIncremental($user->id, 'global', 'global');
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('Details', false);
+        $response->assertSee('Recent updates</h2>', false);
+    }
+
+    public function test_working_memory_hides_recent_updates_block_when_overlay_deltas_are_empty(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        Carbon::setTestNow(Carbon::parse('2026-05-06 09:00:00', 'UTC'));
+
+        $user = User::factory()->create();
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Only consolidated context for empty overlay check.',
+            'metadata' => ['tags' => ['solo']],
+        ]);
+
+        app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('Details', false);
+        $response->assertDontSee('Recent updates</h2>', false);
+    }
+
+    public function test_working_memory_does_not_render_legacy_mobile_drawer_trigger_affordance(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        Carbon::setTestNow(Carbon::parse('2026-05-06 09:00:00', 'UTC'));
+
+        $user = User::factory()->create();
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Baseline detail for drawer regression guard.',
+            'metadata' => ['tags' => ['baseline']],
+        ]);
+
+        app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertDontSee('drawerOpen', false);
+        $response->assertDontSee('@click="drawerOpen = true"', false);
     }
 }
