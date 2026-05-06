@@ -99,4 +99,21 @@ class LinkSummaryFetcherTest extends TestCase
 
         $fetcher->fetch('https://safe.example/start');
     }
+
+    #[Test]
+    public function fetch_rejects_content_length_above_cap_without_buffering_body(): void
+    {
+        Http::fake([
+            'example.com/*' => Http::response('<html></html>', 200, [
+                'Content-Length' => (string) (3 * 1024 * 1024),
+            ]),
+        ]);
+
+        $fetcher = new LinkSummaryFetcher;
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Content-Length exceeds cap');
+
+        $fetcher->fetch('https://example.com/huge');
+    }
 }

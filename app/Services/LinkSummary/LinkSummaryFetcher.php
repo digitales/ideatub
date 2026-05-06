@@ -13,6 +13,9 @@ class LinkSummaryFetcher
 {
     private const MAX_REDIRECTS = 5;
 
+    /** Maximum response body size for HTML fetch (prevents queue OOM on huge/binary URLs). */
+    private const MAX_BODY_BYTES = 2_097_152;
+
     /**
      * Fetch a URL and extract lightweight text signals for summarization.
      *
@@ -27,12 +30,13 @@ class LinkSummaryFetcher
      * `normalized_url` is the effective URL after redirects when the client reports one; otherwise the requested URL.
      *
      * @throws ConnectionException When the HTTP client cannot complete the request (network, DNS, timeout).
+     * @throws \InvalidArgumentException When the response body exceeds {@see self::MAX_BODY_BYTES}.
      */
     public function fetch(string $url): array
     {
         [$response, $normalizedUrl] = $this->fetchFollowingSafeRedirects($url);
 
-        $html = $response->body();
+        $html = $this->readBodyCapped($response);
         $title = $this->extractTitle($html);
         $visibleText = $this->extractVisibleText($html);
         $fingerprint = hash('sha256', $visibleText);
@@ -62,7 +66,10 @@ class LinkSummaryFetcher
             ])
                 ->timeout(30)
                 ->connectTimeout(10)
-                ->withOptions(['allow_redirects' => false])
+                ->withOptions([
+                    'allow_redirects' => false,
+                    'stream' => true,
+                ])
                 ->get($currentUrl);
 
             if (! $response->redirect()) {
@@ -146,6 +153,48 @@ class LinkSummaryFetcher
         $resolved = UriResolver::resolve(new Uri($baseUrl), new Uri($location));
 
         return (string) $resolved;
+    }
+
+    private function readBodyCapped(Response $response): string
+    {
+        $declared = $this->firstContentLengthHeader($response);
+        if ($declared !== null && $declared > self::MAX_BODY_BYTES) {
+            throw new \InvalidArgumentException(
+                'Response body is too large for link summarization (Content-Length exceeds cap).'
+            );
+        }
+
+        $stream = $response->toPsrResponse()->getBody();
+        $buffer = '';
+        while (! $stream->eof()) {
+            $chunk = $stream->read(65_536);
+            if ($chunk === '') {
+                break;
+            }
+            $buffer .= $chunk;
+            if (strlen($buffer) > self::MAX_BODY_BYTES) {
+                throw new \InvalidArgumentException(
+                    'Response body is too large for link summarization (stream exceeded cap).'
+                );
+            }
+        }
+
+        return $buffer;
+    }
+
+    private function firstContentLengthHeader(Response $response): ?int
+    {
+        $raw = $response->header('Content-Length');
+        if ($raw === '' || $raw === null) {
+            return null;
+        }
+
+        $value = is_array($raw) ? ($raw[0] ?? '') : $raw;
+        if (! is_string($value) || ! ctype_digit($value)) {
+            return null;
+        }
+
+        return (int) $value;
     }
 
     private function extractTitle(string $html): string
