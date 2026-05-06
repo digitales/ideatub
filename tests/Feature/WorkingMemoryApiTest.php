@@ -56,6 +56,9 @@ class WorkingMemoryApiTest extends TestCase
             'active_threads',
             'open_questions',
             'next_actions',
+            'structured_sections',
+            'references',
+            'citation_coverage',
             'last_refreshed_at',
             'effective_consolidation_window_days',
             'baseline_build_type',
@@ -68,6 +71,13 @@ class WorkingMemoryApiTest extends TestCase
         $this->assertContains($response->json('baseline_build_type'), ['consolidated', 'incremental']);
         $this->assertIsArray($response->json('overlay_deltas'));
         $this->assertIsInt($response->json('input_count'));
+        $this->assertIsArray($response->json('structured_sections'));
+        $this->assertIsArray($response->json('references'));
+        $citationCoverage = $response->json('citation_coverage');
+        $this->assertTrue($citationCoverage === null || is_float($citationCoverage));
+        if (! empty($response->json('references'))) {
+            $this->assertNotNull($citationCoverage);
+        }
     }
 
     #[Test]

@@ -24,6 +24,11 @@ class WorkingMemoryVersion extends Model
         'active_threads_json',
         'open_questions_json',
         'next_actions_json',
+        'structured_sections_json',
+        'references_json',
+        'citation_coverage',
+        'authoring_status',
+        'validation_error',
         'confidence_score',
         'source_window_start',
         'source_window_end',
@@ -39,6 +44,9 @@ class WorkingMemoryVersion extends Model
             'active_threads_json' => 'array',
             'open_questions_json' => 'array',
             'next_actions_json' => 'array',
+            'structured_sections_json' => 'array',
+            'references_json' => 'array',
+            'citation_coverage' => 'decimal:2',
             'confidence_score' => 'decimal:2',
             'source_window_start' => 'datetime',
             'source_window_end' => 'datetime',
@@ -52,6 +60,6 @@ class WorkingMemoryVersion extends Model
 
     public function inputs(): HasMany
     {
-        return $this->hasMany(\App\Models\WorkingMemoryInput::class);
+        return $this->hasMany(WorkingMemoryInput::class);
     }
 }

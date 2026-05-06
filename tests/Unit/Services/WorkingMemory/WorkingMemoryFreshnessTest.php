@@ -6,9 +6,12 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Models\WorkingMemory;
 use App\Services\WorkingMemory\MemoryInsightsService;
+use App\Services\WorkingMemory\WorkingMemoryAiAuthorService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use App\Services\WorkingMemory\WorkingMemoryConsolidationWindowResolver;
+use App\Services\WorkingMemory\WorkingMemoryEvidencePackBuilder;
+use App\Services\WorkingMemory\WorkingMemoryOutputValidator;
 use App\Services\WorkingMemory\WorkingMemoryScopeNormalizer;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,6 +35,11 @@ class WorkingMemoryFreshnessTest extends TestCase
     #[Test]
     public function it_returns_last_known_good_version_when_latest_build_fails(): void
     {
+        config([
+            'features.working_memory_ai_authored' => false,
+            'working_memory.authoring_enabled' => false,
+        ]);
+
         Carbon::setTestNow(Carbon::parse('2026-05-05 12:00:00', 'UTC'));
 
         $user = User::factory()->create();
@@ -59,6 +67,9 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryScopeNormalizer::class),
             app(WorkingMemoryConsolidationWindowResolver::class),
             app(MemoryInsightsService::class),
+            app(WorkingMemoryEvidencePackBuilder::class),
+            app(WorkingMemoryAiAuthorService::class),
+            app(WorkingMemoryOutputValidator::class),
         );
 
         $fallbackVersion = $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -72,6 +83,11 @@ class WorkingMemoryFreshnessTest extends TestCase
     #[Test]
     public function it_keeps_confidence_and_freshness_in_payload_after_fallback(): void
     {
+        config([
+            'features.working_memory_ai_authored' => false,
+            'working_memory.authoring_enabled' => false,
+        ]);
+
         Carbon::setTestNow(Carbon::parse('2026-05-05 12:00:00', 'UTC'));
 
         $user = User::factory()->create();
@@ -101,6 +117,9 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryScopeNormalizer::class),
             app(WorkingMemoryConsolidationWindowResolver::class),
             app(MemoryInsightsService::class),
+            app(WorkingMemoryEvidencePackBuilder::class),
+            app(WorkingMemoryAiAuthorService::class),
+            app(WorkingMemoryOutputValidator::class),
         );
 
         $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -115,6 +134,11 @@ class WorkingMemoryFreshnessTest extends TestCase
     #[Test]
     public function it_bubbles_non_runtime_failures_instead_of_falling_back(): void
     {
+        config([
+            'features.working_memory_ai_authored' => false,
+            'working_memory.authoring_enabled' => false,
+        ]);
+
         Carbon::setTestNow(Carbon::parse('2026-05-05 12:00:00', 'UTC'));
 
         $user = User::factory()->create();
@@ -142,6 +166,9 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryScopeNormalizer::class),
             app(WorkingMemoryConsolidationWindowResolver::class),
             app(MemoryInsightsService::class),
+            app(WorkingMemoryEvidencePackBuilder::class),
+            app(WorkingMemoryAiAuthorService::class),
+            app(WorkingMemoryOutputValidator::class),
         );
 
         try {
@@ -158,6 +185,11 @@ class WorkingMemoryFreshnessTest extends TestCase
     #[Test]
     public function it_does_not_mark_degraded_when_latest_version_pointer_is_missing(): void
     {
+        config([
+            'features.working_memory_ai_authored' => false,
+            'working_memory.authoring_enabled' => false,
+        ]);
+
         Carbon::setTestNow(Carbon::parse('2026-05-05 12:00:00', 'UTC'));
 
         $user = User::factory()->create();
@@ -190,6 +222,9 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryScopeNormalizer::class),
             app(WorkingMemoryConsolidationWindowResolver::class),
             app(MemoryInsightsService::class),
+            app(WorkingMemoryEvidencePackBuilder::class),
+            app(WorkingMemoryAiAuthorService::class),
+            app(WorkingMemoryOutputValidator::class),
         );
 
         try {

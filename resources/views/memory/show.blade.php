@@ -13,6 +13,30 @@
         default => 'bg-slate-100 text-slate-600 border-slate-200',
     };
     $overlayDeltas = $overlay_deltas ?? [];
+    $structuredSections = is_array($structured_sections ?? null) ? $structured_sections : [];
+    $authoringStatus = $authoring_status ?? null;
+    $renderStructuredSections = $structuredSections !== []
+        && ($authoringStatus === null || $authoringStatus === 'validated');
+    $references = is_array($references ?? null) ? $references : [];
+    $isSafeReferenceUrl = static function (string $url): bool {
+        if ($url === '') {
+            return false;
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false) {
+            return false;
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        if ($scheme !== '') {
+            return in_array($scheme, ['http', 'https'], true)
+                && filter_var($url, FILTER_VALIDATE_URL) !== false;
+        }
+
+        return str_starts_with($url, '/')
+            && ! str_starts_with($url, '//');
+    };
 @endphp
 
 @component('idea.partials.detail_layout_shell', ['twoColumn' => true])
@@ -46,8 +70,48 @@
 
     @slot('main')
         <article class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 md:p-8 shadow-[0_4px_24px_rgba(109,106,247,0.08)] prose prose-slate prose-headings:text-deep-indigo prose-a:text-memory-violet max-w-none">
-            {!! \Illuminate\Support\Str::markdown($summary_markdown ?? '', ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
+            @if ($renderStructuredSections)
+                @foreach ($structuredSections as $sectionTitle => $sectionItems)
+                    @php
+                        $title = trim((string) $sectionTitle);
+                        $items = is_array($sectionItems) ? $sectionItems : [$sectionItems];
+                    @endphp
+                    @continue($title === '')
+
+                    <h2>{{ $title }}</h2>
+                    <ul>
+                        @foreach ($items as $item)
+                            @php
+                                $itemText = trim((string) $item);
+                            @endphp
+                            @continue($itemText === '')
+                            <li>{{ $itemText }}</li>
+                        @endforeach
+                    </ul>
+                @endforeach
+            @else
+                {!! \Illuminate\Support\Str::markdown($summary_markdown ?? '', ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
+            @endif
         </article>
+
+        @if ($references !== [])
+            <div class="mt-3 flex flex-wrap gap-2">
+                @foreach ($references as $reference)
+                    @php
+                        $url = trim((string) data_get($reference, 'url', ''));
+                        $label = trim((string) data_get($reference, 'label', ''));
+                    @endphp
+                    @continue($url === '' || $label === '' || ! $isSafeReferenceUrl($url))
+
+                    <a
+                        href="{{ $url }}"
+                        class="inline-flex items-center rounded-full border border-memory-violet/20 px-2.5 py-1 text-xs text-memory-violet hover:bg-memory-violet/5 transition-colors"
+                    >
+                        {{ $label }}
+                    </a>
+                @endforeach
+            </div>
+        @endif
     @endslot
 
     @slot('sidebar')

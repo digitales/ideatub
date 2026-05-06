@@ -5,16 +5,125 @@ namespace Tests\Unit\Services\WorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserPreference;
+use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
+use App\Services\WorkingMemory\WorkingMemoryConsolidationWindowResolver;
+use App\Services\WorkingMemory\WorkingMemoryScopeNormalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 class WorkingMemoryBuilderServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    #[Test]
+    public function it_persists_authored_sections_and_references_for_global_scope(): void
+    {
+        config([
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+            'working_memory.citation_min_coverage' => 0.75,
+        ]);
+
+        $user = User::factory()->create();
+
+        Thought::factory()->count(3)->create([
+            'user_id' => $user->id,
+            'content' => 'Plan API cleanup and finalize deployment checklist.',
+            'metadata' => ['tags' => ['api', 'cleanup']],
+        ]);
+
+        $version = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'global');
+
+        $this->assertSame('validated', $version->authoring_status);
+        $this->assertNull($version->validation_error);
+        $this->assertIsArray($version->structured_sections_json);
+        $this->assertArrayHasKey('Current Focus', $version->structured_sections_json);
+        $this->assertIsArray($version->references_json);
+        $this->assertNotEmpty($version->references_json);
+        $this->assertGreaterThan(0, (float) ($version->citation_coverage ?? 0));
+        $this->assertStringContainsString('# Working memory synthesis', $version->summary_markdown);
+    }
+
+    #[Test]
+    public function it_persists_structured_output_for_project_tag_and_insights_scopes(): void
+    {
+        config([
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+            'working_memory.citation_min_coverage' => 0.75,
+        ]);
+
+        $user = User::factory()->create();
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Project scope signal for my-app.',
+            'source_metadata' => ['project' => 'my-app'],
+            'metadata' => ['tags' => ['project', 'delivery']],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Tag scope signal for ai improvements.',
+            'metadata' => ['tags' => ['ai', 'memory']],
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Insights scope research note with pending question?',
+            'metadata' => ['type' => 'research', 'tags' => ['insights', 'research']],
+        ]);
+
+        $projectVersion = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'project', 'my-app');
+        $tagVersion = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'tag', 'ai');
+        $insightsVersion = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'insights', 'global');
+
+        foreach ([$projectVersion, $tagVersion, $insightsVersion] as $version) {
+            $this->assertSame('validated', $version->authoring_status);
+            $this->assertIsArray($version->structured_sections_json);
+            $this->assertArrayHasKey('Current Focus', $version->structured_sections_json);
+            $this->assertIsArray($version->references_json);
+            $this->assertNotEmpty($version->references_json);
+        }
+    }
+
+    #[Test]
+    public function soft_validation_failure_falls_back_to_legacy_summary_and_tracks_validation_error(): void
+    {
+        config([
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+            'working_memory.citation_min_coverage' => 1.01,
+        ]);
+
+        $user = User::factory()->create();
+
+        Thought::factory()->count(3)->create([
+            'user_id' => $user->id,
+            'content' => 'Plan API cleanup and finalize deployment checklist.',
+            'metadata' => ['tags' => ['api', 'cleanup']],
+        ]);
+
+        $version = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'global');
+
+        $this->assertSame('fallback', $version->authoring_status);
+        $this->assertNotNull($version->validation_error);
+        $this->assertStringContainsString('Citation coverage', (string) $version->validation_error);
+        $this->assertIsArray($version->structured_sections_json);
+        $this->assertIsArray($version->references_json);
+        $this->assertStringContainsString('## Executive summary', $version->summary_markdown);
+    }
 
     #[Test]
     public function it_creates_a_consolidated_version_with_required_sections(): void
@@ -259,5 +368,118 @@ class WorkingMemoryBuilderServiceTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    #[Test]
+    public function ai_hard_failure_returns_last_known_good_version_when_available(): void
+    {
+        config([
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+            'working_memory.citation_min_coverage' => 0.75,
+        ]);
+
+        $user = User::factory()->create();
+
+        Thought::withoutEvents(function () use ($user): void {
+            Thought::factory()->count(3)->create([
+                'user_id' => $user->id,
+                'content' => 'Baseline signal used to seed a known good version.',
+                'metadata' => ['tags' => ['baseline', 'working-memory']],
+            ]);
+        });
+
+        $baselineVersion = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'global');
+        $versionCountBeforeFailure = $baselineVersion->workingMemory->versions()->count();
+
+        Thought::query()->where('user_id', $user->id)->delete();
+
+        Thought::withoutEvents(function () use ($user): void {
+            Thought::factory()->create([
+                'user_id' => $user->id,
+                'content' => 'Introduce invalid citation [999] so validator hard-fails.',
+                'metadata' => ['tags' => ['baseline', 'working-memory']],
+            ]);
+        });
+
+        $fallbackVersion = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'global');
+
+        $this->assertSame($baselineVersion->id, $fallbackVersion->id);
+        $this->assertSame(
+            $baselineVersion->id,
+            $baselineVersion->workingMemory->fresh()->latest_version_id
+        );
+        $this->assertSame($versionCountBeforeFailure, $baselineVersion->workingMemory->versions()->count());
+        $this->assertSame('degraded', $fallbackVersion->workingMemory->fresh()->freshness_state);
+    }
+
+    #[Test]
+    public function ai_hard_failure_bubbles_when_no_prior_version_exists(): void
+    {
+        config([
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+            'working_memory.citation_min_coverage' => 0.75,
+        ]);
+
+        $user = User::factory()->create();
+
+        Thought::withoutEvents(function () use ($user): void {
+            Thought::factory()->create([
+                'user_id' => $user->id,
+                'content' => 'First build is invalid because it includes [999].',
+                'metadata' => ['tags' => ['working-memory']],
+            ]);
+        });
+
+        try {
+            app(WorkingMemoryBuilderService::class)
+                ->buildConsolidated($user->id, 'global', 'global');
+            $this->fail('Expected RuntimeException');
+        } catch (RuntimeException $e) {
+            $this->assertSame('Unresolvable references detected in major bullets.', $e->getMessage());
+        }
+    }
+
+    #[Test]
+    public function validation_runtime_failure_uses_validator_style_semantics_and_keeps_last_known_good_version_as_fallback(): void
+    {
+        $user = User::factory()->create();
+
+        Thought::factory()->count(3)->create([
+            'user_id' => $user->id,
+            'content' => 'Baseline signal used to seed a known good version.',
+            'metadata' => ['tags' => ['baseline', 'working-memory']],
+        ]);
+
+        $baselineVersion = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'global');
+        $versionCountBeforeFailure = $baselineVersion->workingMemory->versions()->count();
+
+        $failingAssembler = new class(app(WorkingMemoryScopeNormalizer::class), app(WorkingMemoryConsolidationWindowResolver::class)) extends WorkingMemoryAssembler
+        {
+            /**
+             * @param  Collection<int, Thought>  $thoughts
+             */
+            public function assemblePayload(Collection $thoughts): array
+            {
+                throw new RuntimeException('Output validator rejected AI-authored payload.');
+            }
+        };
+
+        $this->app->instance(WorkingMemoryAssembler::class, $failingAssembler);
+
+        $fallbackVersion = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'global');
+
+        $this->assertSame($baselineVersion->id, $fallbackVersion->id);
+        $this->assertSame(
+            $baselineVersion->id,
+            $baselineVersion->workingMemory->fresh()->latest_version_id
+        );
+        $this->assertSame($versionCountBeforeFailure, $baselineVersion->workingMemory->versions()->count());
+        $this->assertSame('degraded', $fallbackVersion->workingMemory->fresh()->freshness_state);
     }
 }
