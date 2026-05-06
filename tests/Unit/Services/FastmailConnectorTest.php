@@ -9,6 +9,7 @@ use App\Services\Fastmail\FastmailConnector;
 use App\Services\Fastmail\FastmailHttpClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -236,34 +237,39 @@ class FastmailConnectorTest extends TestCase
     public function fetch_incremental_batch_returns_normalized_messages_and_next_checkpoint(): void
     {
         Http::fake([
-            'https://api.fastmail.com/jmap/api/' => Http::response([
-                'methodResponses' => [
-                    ['Email/queryChanges', [
-                        'removed' => [],
-                        'added' => [
-                            ['id' => 'msg-2'],
-                        ],
-                        'newQueryState' => 'state-2',
-                    ], 'c1'],
-                    ['Email/get', [
-                        'list' => [
-                            [
-                                'id' => 'msg-2',
-                                'threadId' => 'thread-2',
-                                'mailboxIds' => ['mb-sent' => true],
-                                'keywords' => ['$draft' => false],
-                                'subject' => 'Sent hello',
-                                'from' => [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
-                                'to' => [['email' => 'friend@example.com', 'name' => 'Friend']],
-                                'cc' => [],
-                                'sentAt' => '2026-03-20T11:00:00Z',
-                                'receivedAt' => '2026-03-20T11:00:01Z',
-                                'textBody' => [['partId' => '1', 'type' => 'text/plain', 'value' => 'Sent body']],
+            'https://api.fastmail.com/jmap/api/' => Http::sequence()
+                ->push([
+                    'methodResponses' => [
+                        ['Email/queryChanges', [
+                            'removed' => [],
+                            'added' => [
+                                ['id' => 'msg-2'],
                             ],
-                        ],
-                    ], 'g1'],
-                ],
-            ], 200),
+                            'newQueryState' => 'state-2',
+                        ], 'c1'],
+                    ],
+                ], 200)
+                ->push([
+                    'methodResponses' => [
+                        ['Email/get', [
+                            'list' => [
+                                [
+                                    'id' => 'msg-2',
+                                    'threadId' => 'thread-2',
+                                    'mailboxIds' => ['mb-sent' => true],
+                                    'keywords' => ['$draft' => false],
+                                    'subject' => 'Sent hello',
+                                    'from' => [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+                                    'to' => [['email' => 'friend@example.com', 'name' => 'Friend']],
+                                    'cc' => [],
+                                    'sentAt' => '2026-03-20T11:00:00Z',
+                                    'receivedAt' => '2026-03-20T11:00:01Z',
+                                    'textBody' => [['partId' => '1', 'type' => 'text/plain', 'value' => 'Sent body']],
+                                ],
+                            ],
+                        ], 'g1'],
+                    ],
+                ], 200),
         ]);
 
         $account = MailAccount::factory()->create([
@@ -281,22 +287,118 @@ class FastmailConnectorTest extends TestCase
         $this->assertSame('Sent body', $result['messages'][0]->bodyText);
         $this->assertSame('state-2', $result['next_checkpoint']['query_state']);
         $this->assertSame('mb-sent', $result['next_checkpoint']['mailbox_id']);
-        Http::assertSent(function ($request) {
-            if ($request->url() !== 'https://api.fastmail.com/jmap/api/') {
-                return false;
-            }
+        Http::assertSentCount(2);
+        Http::assertSentInOrder([
+            function (Request $request): bool {
+                if ($request->url() !== 'https://api.fastmail.com/jmap/api/') {
+                    return false;
+                }
+                $calls = $request['methodCalls'] ?? [];
 
-            $emailGet = $this->emailGetArgumentsFromJmapRequest($request);
-            if ($emailGet === null) {
-                return false;
-            }
+                return count($calls) === 1 && ($calls[0][0] ?? null) === 'Email/queryChanges';
+            },
+            function (Request $request): bool {
+                if ($request->url() !== 'https://api.fastmail.com/jmap/api/') {
+                    return false;
+                }
+                $emailGet = $this->emailGetArgumentsFromJmapRequest($request);
+                if ($emailGet === null) {
+                    return false;
+                }
+                $this->assertEmailGetRequestsExplicitJmapBodyValues($emailGet);
 
-            $this->assertEmailGetRequestsExplicitJmapBodyValues($emailGet);
+                return ($emailGet['ids'] ?? null) === ['msg-2'];
+            },
+        ]);
+    }
 
-            return ($emailGet['#ids']['resultOf'] ?? null) === 'c1'
-                && ($emailGet['#ids']['name'] ?? null) === 'Email/queryChanges'
-                && ($emailGet['#ids']['path'] ?? null) === '/added/*/id';
-        });
+    #[Test]
+    public function fetch_incremental_batch_chunks_added_ids_and_uses_pending_checkpoint_until_drained(): void
+    {
+        Config::set('services.mail_sync.incremental_batch_size', 1);
+
+        Http::fake([
+            'https://api.fastmail.com/jmap/api/' => Http::sequence()
+                ->push([
+                    'methodResponses' => [
+                        ['Email/queryChanges', [
+                            'removed' => [],
+                            'added' => [
+                                ['id' => 'msg-a'],
+                                ['id' => 'msg-b'],
+                            ],
+                            'newQueryState' => 'state-final',
+                        ], 'c1'],
+                    ],
+                ], 200)
+                ->push([
+                    'methodResponses' => [
+                        ['Email/get', [
+                            'list' => [
+                                [
+                                    'id' => 'msg-a',
+                                    'threadId' => 't-a',
+                                    'mailboxIds' => ['mb-inbox' => true],
+                                    'subject' => 'A',
+                                    'from' => [['email' => 'a@example.com', 'name' => 'A']],
+                                    'to' => [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+                                    'cc' => [],
+                                    'sentAt' => '2026-03-20T10:00:00Z',
+                                    'receivedAt' => '2026-03-20T10:00:01Z',
+                                    'textBody' => [['partId' => '1', 'type' => 'text/plain', 'value' => 'body a']],
+                                ],
+                            ],
+                        ], 'g1'],
+                    ],
+                ], 200)
+                ->push([
+                    'methodResponses' => [
+                        ['Email/get', [
+                            'list' => [
+                                [
+                                    'id' => 'msg-b',
+                                    'threadId' => 't-b',
+                                    'mailboxIds' => ['mb-inbox' => true],
+                                    'subject' => 'B',
+                                    'from' => [['email' => 'b@example.com', 'name' => 'B']],
+                                    'to' => [['email' => 'owner@fastmail.fm', 'name' => 'Owner']],
+                                    'cc' => [],
+                                    'sentAt' => '2026-03-20T10:01:00Z',
+                                    'receivedAt' => '2026-03-20T10:01:01Z',
+                                    'textBody' => [['partId' => '1', 'type' => 'text/plain', 'value' => 'body b']],
+                                ],
+                            ],
+                        ], 'g1'],
+                    ],
+                ], 200),
+        ]);
+
+        $account = MailAccount::factory()->create([
+            'provider_checkpoint_json' => [
+                'query_state' => 'state-1',
+                'mailbox_id' => 'mb-inbox',
+            ],
+        ]);
+        $connector = app(FastmailConnector::class);
+
+        $first = $connector->fetchIncrementalBatch($account);
+        $this->assertCount(1, $first['messages']);
+        $this->assertSame('msg-a', $first['messages'][0]->providerMessageId);
+        $this->assertSame('state-1', $first['next_checkpoint']['query_state']);
+        $this->assertArrayHasKey('pending_incremental_fetch', $first['next_checkpoint']);
+        $this->assertSame(['msg-b'], $first['next_checkpoint']['pending_incremental_fetch']['remaining_provider_message_ids']);
+        $this->assertSame('state-final', $first['next_checkpoint']['pending_incremental_fetch']['target_query_state']);
+
+        $account->provider_checkpoint_json = $first['next_checkpoint'];
+        $account->save();
+
+        $second = $connector->fetchIncrementalBatch($account);
+        $this->assertCount(1, $second['messages']);
+        $this->assertSame('msg-b', $second['messages'][0]->providerMessageId);
+        $this->assertSame('state-final', $second['next_checkpoint']['query_state']);
+        $this->assertArrayNotHasKey('pending_incremental_fetch', $second['next_checkpoint']);
+
+        Http::assertSentCount(3);
     }
 
     #[Test]

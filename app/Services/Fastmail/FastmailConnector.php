@@ -129,8 +129,22 @@ class FastmailConnector
     {
         $checkpoint = $account->provider_checkpoint_json ?? [];
         $mailboxId = $checkpoint['mailbox_id'] ?? null;
+        $batchSize = max(1, (int) config('services.mail_sync.incremental_batch_size', 25));
+        $credentials = $this->credentialsFor($account);
 
-        $response = $this->requestWithCredentialHandling($this->credentialsFor($account), [
+        $pending = $checkpoint['pending_incremental_fetch'] ?? null;
+        if (is_array($pending) && ($pending['remaining_provider_message_ids'] ?? []) !== []) {
+            return $this->fetchIncrementalContinuePending(
+                $account,
+                $credentials,
+                $mailboxId,
+                (string) ($checkpoint['query_state'] ?? ''),
+                $pending,
+                $batchSize
+            );
+        }
+
+        $response = $this->requestWithCredentialHandling($credentials, [
             'using' => [
                 'urn:ietf:params:jmap:core',
                 'urn:ietf:params:jmap:mail',
@@ -141,16 +155,53 @@ class FastmailConnector
                     'sinceQueryState' => $checkpoint['query_state'] ?? '',
                     'filter' => $mailboxId ? ['inMailbox' => $mailboxId] : null,
                 ], static fn ($value) => $value !== null), 'c1'],
-                ['Email/get', $this->emailGetArguments($account, [
-                    'resultOf' => 'c1',
-                    'name' => 'Email/queryChanges',
-                    'path' => '/added/*/id',
+            ],
+        ]);
+
+        $queryChangesData = $this->responseData($response, 'Email/queryChanges');
+        $newQueryState = (string) ($queryChangesData['newQueryState'] ?? '');
+        $addedIds = $this->emailIdsFromQueryChangesAdded($queryChangesData);
+
+        if ($addedIds === []) {
+            return [
+                'messages' => [],
+                'next_checkpoint' => [
+                    'query_state' => $newQueryState,
+                    'mailbox_id' => $mailboxId,
+                ],
+            ];
+        }
+
+        $idsThisRound = array_slice($addedIds, 0, $batchSize);
+        $remainingAfterRound = array_slice($addedIds, $batchSize);
+
+        $getResponse = $this->requestWithCredentialHandling($credentials, [
+            'using' => [
+                'urn:ietf:params:jmap:core',
+                'urn:ietf:params:jmap:mail',
+            ],
+            'methodCalls' => [
+                ['Email/get', array_merge($this->emailGetBaseArguments($account), [
+                    'ids' => $idsThisRound,
                 ]), 'g1'],
             ],
         ]);
 
-        $messages = $this->normalizeMessages($account, $this->responseData($response, 'Email/get')['list'] ?? []);
-        $newQueryState = (string) ($this->responseData($response, 'Email/queryChanges')['newQueryState'] ?? '');
+        $messages = $this->normalizeMessages($account, $this->responseData($getResponse, 'Email/get')['list'] ?? []);
+
+        if ($remainingAfterRound !== []) {
+            return [
+                'messages' => $messages,
+                'next_checkpoint' => [
+                    'query_state' => (string) ($checkpoint['query_state'] ?? ''),
+                    'mailbox_id' => $mailboxId,
+                    'pending_incremental_fetch' => [
+                        'target_query_state' => $newQueryState,
+                        'remaining_provider_message_ids' => array_values($remainingAfterRound),
+                    ],
+                ],
+            ];
+        }
 
         return [
             'messages' => $messages,
@@ -159,6 +210,81 @@ class FastmailConnector
                 'mailbox_id' => $mailboxId,
             ],
         ];
+    }
+
+    /**
+     * @param  array{credential: string, api_url?: string}  $credentials
+     * @param  array<string, mixed>  $pending
+     * @return array{messages: array<int, NormalizedEmailMessage>, next_checkpoint: array<string, mixed>}
+     */
+    private function fetchIncrementalContinuePending(
+        MailAccount $account,
+        array $credentials,
+        ?string $mailboxId,
+        string $queryStateHeld,
+        array $pending,
+        int $batchSize
+    ): array {
+        $remaining = $pending['remaining_provider_message_ids'] ?? [];
+        $remaining = is_array($remaining) ? $remaining : [];
+        $targetQueryState = (string) ($pending['target_query_state'] ?? '');
+
+        $idsThisRound = array_slice($remaining, 0, $batchSize);
+        $newRemaining = array_slice($remaining, $batchSize);
+
+        $getResponse = $this->requestWithCredentialHandling($credentials, [
+            'using' => [
+                'urn:ietf:params:jmap:core',
+                'urn:ietf:params:jmap:mail',
+            ],
+            'methodCalls' => [
+                ['Email/get', array_merge($this->emailGetBaseArguments($account), [
+                    'ids' => $idsThisRound,
+                ]), 'g1'],
+            ],
+        ]);
+
+        $messages = $this->normalizeMessages($account, $this->responseData($getResponse, 'Email/get')['list'] ?? []);
+
+        if ($newRemaining !== []) {
+            return [
+                'messages' => $messages,
+                'next_checkpoint' => [
+                    'query_state' => $queryStateHeld,
+                    'mailbox_id' => $mailboxId,
+                    'pending_incremental_fetch' => [
+                        'target_query_state' => $targetQueryState,
+                        'remaining_provider_message_ids' => array_values($newRemaining),
+                    ],
+                ],
+            ];
+        }
+
+        return [
+            'messages' => $messages,
+            'next_checkpoint' => [
+                'query_state' => $targetQueryState,
+                'mailbox_id' => $mailboxId,
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $queryChangesData
+     * @return array<int, string>
+     */
+    private function emailIdsFromQueryChangesAdded(array $queryChangesData): array
+    {
+        $ids = [];
+        foreach ($queryChangesData['added'] ?? [] as $row) {
+            if (is_array($row) && isset($row['id'])) {
+                $ids[] = (string) $row['id'];
+            } elseif (is_string($row)) {
+                $ids[] = $row;
+            }
+        }
+
+        return $ids;
     }
 
     public function fetchMessageById(MailAccount $account, string $providerMessageId): ?NormalizedEmailMessage

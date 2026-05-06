@@ -44,6 +44,9 @@ return [
         'enabled' => filter_var(env('MAIL_SYNC_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         'backfill_batch_size' => (int) env('MAIL_SYNC_BACKFILL_BATCH_SIZE', 50),
         'incremental_batch_size' => (int) env('MAIL_SYNC_INCREMENTAL_BATCH_SIZE', 25),
+        /** Seconds for Fastmail JMAP HTTP reads (large Email/get payloads need more than Laravel's 30s default). */
+        'jmap_timeout_seconds' => (int) env('MAIL_SYNC_JMAP_TIMEOUT', 600),
+        'jmap_connect_timeout_seconds' => (int) env('MAIL_SYNC_JMAP_CONNECT_TIMEOUT', 30),
     ],
 
     'email_sender_policy' => [
