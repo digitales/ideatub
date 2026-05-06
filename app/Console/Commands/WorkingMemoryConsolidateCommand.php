@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\ConsolidateWorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\WorkingMemory\ForcedTagResolver;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -15,6 +16,12 @@ class WorkingMemoryConsolidateCommand extends Command
     protected $signature = 'working-memory:consolidate {--user=} {--scope_type=} {--scope_key=}';
 
     protected $description = 'Consolidate working memory snapshots for users and scopes.';
+
+    public function __construct(
+        private readonly ForcedTagResolver $forcedTagResolver,
+    ) {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -118,6 +125,13 @@ class WorkingMemoryConsolidateCommand extends Command
                 }
             });
 
+        foreach ($this->forcedTagResolver->forUserId($userId) as $forcedTag) {
+            $scopes->push([
+                'scope_type' => 'tag',
+                'scope_key' => $forcedTag,
+            ]);
+        }
+
         return $this->uniqueScopes($scopes);
     }
 
@@ -141,8 +155,8 @@ class WorkingMemoryConsolidateCommand extends Command
         $normalizedScopeType = Str::of($scopeType)->trim()->toString();
         $normalizedScopeKey = Str::of($scopeKey)->trim()->toString();
 
-        if (! in_array($normalizedScopeType, ['global', 'project', 'insights'], true)) {
-            throw new InvalidArgumentException('Invalid --scope_type. Allowed values: global, project, insights.');
+        if (! in_array($normalizedScopeType, ['global', 'project', 'insights', 'tag'], true)) {
+            throw new InvalidArgumentException('Invalid --scope_type. Allowed values: global, project, insights, tag.');
         }
 
         if ($normalizedScopeKey === '') {
@@ -165,6 +179,6 @@ class WorkingMemoryConsolidateCommand extends Command
             return ['insights', 'global'];
         }
 
-        return ['project', Str::of($normalizedScopeKey)->lower()->toString()];
+        return [$normalizedScopeType, Str::of($normalizedScopeKey)->lower()->toString()];
     }
 }
