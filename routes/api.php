@@ -13,5 +13,6 @@ Route::middleware('auth.oauth.bearer')->prefix('thoughts')->group(function (): v
     Route::get('/search', [ThoughtsApiController::class, 'search']);
     Route::get('/recent', [ThoughtsApiController::class, 'recent']);
     Route::get('/stats', [ThoughtsApiController::class, 'stats']);
+    Route::get('/working-memory', [ThoughtsApiController::class, 'workingMemory']);
     Route::post('/', [ThoughtsApiController::class, 'store']);
 });

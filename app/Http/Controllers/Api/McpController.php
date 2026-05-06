@@ -17,6 +17,7 @@ use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Services\Video\VideoCaptureService;
+use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Support\BearerTokenExtractor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,7 +38,8 @@ class McpController extends Controller
         private ThoughtSearchService $searchService,
         private VideoCaptureService $videoCaptureService,
         private McpSessionService $mcpSessions,
-        private OAuthMcpJwtService $oauthJwt
+        private OAuthMcpJwtService $oauthJwt,
+        private WorkingMemoryAssembler $workingMemoryAssembler,
     ) {}
 
     /**
@@ -111,6 +113,7 @@ class McpController extends Controller
             'research_idea',
             'process_meeting',
             'capture_video',
+            'get_working_memory',
         ];
         if (config('services.jira.enabled', true)) {
             $base[] = 'sync_jira';
@@ -549,6 +552,18 @@ class McpController extends Controller
                     'required' => ['url'],
                 ],
             ],
+            [
+                'name' => 'get_working_memory',
+                'description' => 'Return global, project, or insights working memory snapshot with freshness and confidence.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'scope_type' => ['type' => 'string', 'enum' => ['global', 'project', 'insights']],
+                        'scope_key' => ['type' => 'string'],
+                    ],
+                    'required' => ['scope_type', 'scope_key'],
+                ],
+            ],
         ];
         if (config('services.jira.enabled', true)) {
             $tools[] = [
@@ -758,9 +773,43 @@ class McpController extends Controller
             'research_idea' => $this->researchIdea($params),
             'process_meeting' => $this->processMeeting($params),
             'capture_video' => $this->captureVideo($params),
+            'get_working_memory' => $this->getWorkingMemory($params),
             'sync_jira' => $this->syncJira($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
+    }
+
+    /**
+     * get_working_memory: Return scoped working memory via {@see WorkingMemoryAssembler::forScope}.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    private function getWorkingMemory(array $params): array
+    {
+        $input = $params;
+        foreach (['scope_type', 'scope_key'] as $key) {
+            if (isset($input[$key]) && is_string($input[$key])) {
+                $input[$key] = trim($input[$key]);
+            }
+        }
+
+        $v = Validator::make($input, [
+            'scope_type' => 'required|string|in:global,project,insights',
+            'scope_key' => 'required|string|max:191',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        /** @var array{scope_type: string, scope_key: string} $validated */
+        $validated = $v->validated();
+
+        return $this->workingMemoryAssembler->forScope(
+            (int) auth()->id(),
+            $validated['scope_type'],
+            $validated['scope_key']
+        );
     }
 
     /**

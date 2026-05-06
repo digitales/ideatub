@@ -1,5 +1,13 @@
 <?php
 
+use App\Http\Middleware\AuthenticateOAuthBearer;
+use App\Http\Middleware\CheckOperationLimit;
+use App\Http\Middleware\EnsureWorkingMemoryInsightsEnabled;
+use App\Http\Middleware\EnsureWorkingMemoryUiEnabled;
+use App\Http\Middleware\RedirectIfAuthenticated;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\ValidatePostmarkInboundSecret;
+use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,15 +29,17 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->web(append: [
-            \App\Http\Middleware\CheckOperationLimit::class,
-            \App\Http\Middleware\SecurityHeaders::class,
+            CheckOperationLimit::class,
+            SecurityHeaders::class,
         ]);
 
         $middleware->alias([
-            'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
-            'auth.oauth.bearer' => \App\Http\Middleware\AuthenticateOAuthBearer::class,
-            'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
-            'postmark.inbound.secret' => \App\Http\Middleware\ValidatePostmarkInboundSecret::class,
+            'auth' => Authenticate::class,
+            'auth.oauth.bearer' => AuthenticateOAuthBearer::class,
+            'guest' => RedirectIfAuthenticated::class,
+            'postmark.inbound.secret' => ValidatePostmarkInboundSecret::class,
+            'working.memory.ui' => EnsureWorkingMemoryUiEnabled::class,
+            'working.memory.insights' => EnsureWorkingMemoryInsightsEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

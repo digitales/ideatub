@@ -123,6 +123,7 @@
             <a href="{{ route('settings.connected-apps.index') }}" class="text-slate-brand hover:text-memory-violet">Connected apps</a>
             <a href="{{ route('settings.inbound-emails.index') }}" class="text-slate-brand hover:text-memory-violet">Inbound email</a>
             <a href="{{ route('settings.ideas-revisit.index') }}" class="text-slate-brand hover:text-memory-violet">Ideas to revisit settings</a>
+            <a href="{{ route('settings.working-memory.index') }}" class="text-slate-brand hover:text-memory-violet">Working memory</a>
             @if(config('services.mail_sync.enabled', true))
                 <a href="{{ route('settings.email-accounts.index') }}" class="text-slate-brand hover:text-memory-violet">Email Accounts</a>
             @endif

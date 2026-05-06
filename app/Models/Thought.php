@@ -373,6 +373,7 @@ class Thought extends Model implements Commentable
     public function projects(): BelongsToMany
     {
         return $this->belongsToMany(Project::class, 'project_thought')
+            ->using(ProjectThought::class)
             ->withPivot('sort_order')
             ->withTimestamps()
             ->orderByPivot('sort_order');

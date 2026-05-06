@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Config;
 
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class FeaturesConfigTest extends TestCase
@@ -21,5 +22,12 @@ class FeaturesConfigTest extends TestCase
 
         config()->set('features.file_upload', false);
         $this->assertFalse(config('features.file_upload'));
+    }
+
+    #[Test]
+    public function working_memory_feature_keys_exist(): void
+    {
+        $this->assertIsBool(config('features.working_memory_ui'));
+        $this->assertIsBool(config('features.working_memory_insights'));
     }
 }
