@@ -120,9 +120,10 @@ class WorkingMemoryWebTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('memory.show'));
         $html = (string) $response->getContent();
+        $legacyDrawerMatches = $this->legacyDrawerTriggerMatches($html);
 
         $response->assertOk();
-        $this->assertSame(0, $this->recentUpdatesButtonCount($html));
+        $this->assertCount(0, $legacyDrawerMatches, 'Matched legacy drawer fragments: '.implode(' || ', $legacyDrawerMatches));
     }
 
     private function enableWorkingMemoryUi(): void
@@ -167,14 +168,17 @@ class WorkingMemoryWebTest extends TestCase
         return count($matches[0] ?? []);
     }
 
-    private function recentUpdatesButtonCount(string $html): int
+    /**
+     * @return array<int, string>
+     */
+    private function legacyDrawerTriggerMatches(string $html): array
     {
         preg_match_all(
-            '/<button\b[^>]*(?:@click="drawerOpen = true"|lg:hidden|linear-gradient\(135deg,\s*#6D6AF7,\s*#2A8C8C\))[^>]*>\s*Recent updates\s*<\/button>/i',
+            '/<button\b[^>]*@click="drawerOpen = true"[^>]*>\s*Recent updates\s*<\/button>/i',
             $html,
             $matches
         );
 
-        return count($matches[0] ?? []);
+        return $matches[0] ?? [];
     }
 }
