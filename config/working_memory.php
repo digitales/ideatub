@@ -18,7 +18,17 @@ return [
     'insights_model_enabled' => env('WORKING_MEMORY_INSIGHTS_MODEL_ENABLED', false),
 
     'authoring_enabled' => env('WORKING_MEMORY_AUTHORING_ENABLED', false),
-    'citation_min_coverage' => (float) env('WORKING_MEMORY_CITATION_MIN_COVERAGE', 0.90),
+    'citation_min_coverage' => (float) env('WORKING_MEMORY_CITATION_MIN_COVERAGE', 1.00),
+    'citation_required_sections' => [
+        'Current Focus',
+        'Active Priorities',
+        'Recent Changes',
+        'Open Questions',
+        'Risks / Blockers',
+        'Next Actions',
+        'Latest Signals',
+        'Source Notes',
+    ],
     'authoring_model' => env('WORKING_MEMORY_AUTHORING_MODEL', 'openrouter/auto'),
 
 ];

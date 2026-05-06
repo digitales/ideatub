@@ -230,6 +230,93 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertDontSee('Unsafe Data');
     }
 
+    public function test_working_memory_renders_item_level_citations_and_source_bundle_badge(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = User::factory()->create();
+
+        $this->mock(WorkingMemoryAssembler::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('forScope')
+                ->once()
+                ->andReturn([
+                    'authoring_status' => 'validated',
+                    'structured_sections' => [
+                        'Current Focus' => [
+                            [
+                                'text' => 'Operational detail with traceable citations.',
+                                'fallback_mode' => 'direct',
+                                'citations' => [
+                                    ['url' => '/thoughts/777', 'label' => 'Thought chip', 'type' => 'thought'],
+                                    ['url' => 'https://example.org/source', 'label' => 'External source', 'type' => 'source'],
+                                    ['url' => 'javascript:alert(1)', 'label' => 'Unsafe citation', 'type' => 'thought'],
+                                ],
+                            ],
+                            [
+                                'text' => 'Fallback narrative tied to section-level bundle.',
+                                'fallback_mode' => 'section_bundle',
+                                'citations' => [
+                                    ['url' => '/thoughts/bundle-root', 'label' => 'Bundle anchor', 'type' => 'bundle'],
+                                ],
+                            ],
+                        ],
+                    ],
+                    'references' => [],
+                ]);
+        });
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('Operational detail with traceable citations.', false);
+        $response->assertSee('href="/thoughts/777"', false);
+        $response->assertSee('Thought chip', false);
+        $response->assertSee('href="https://example.org/source"', false);
+        $response->assertSee('External source', false);
+        $response->assertDontSee('href="javascript:alert(1)"', false);
+        $response->assertDontSee('Unsafe citation', false);
+
+        $response->assertSee('Fallback narrative tied to section-level bundle.', false);
+        $response->assertSee('Source bundle', false);
+        $response->assertSee('href="/thoughts/bundle-root"', false);
+        $response->assertSee('Bundle anchor', false);
+    }
+
+    public function test_working_memory_renders_repo_relative_citation_labels_without_unsafe_hrefs(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = User::factory()->create();
+
+        $this->mock(WorkingMemoryAssembler::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('forScope')
+                ->once()
+                ->andReturn([
+                    'authoring_status' => 'validated',
+                    'structured_sections' => [
+                        'Current Focus' => [
+                            [
+                                'text' => 'Repo-relative citation should remain visible without clickable href.',
+                                'fallback_mode' => 'direct',
+                                'citations' => [
+                                    [
+                                        'url' => 'docs/superpowers/specs/example.md',
+                                        'label' => 'example.md',
+                                        'type' => 'source',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                    'references' => [],
+                ]);
+        });
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('example.md', false);
+        $response->assertDontSee('href="docs/', false);
+    }
+
     private function enableWorkingMemoryUi(): void
     {
         config(['features.working_memory_ui' => true]);

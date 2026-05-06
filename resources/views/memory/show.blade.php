@@ -97,13 +97,10 @@
 
                     <h2>{{ $title }}</h2>
                     <ul>
-                        @foreach ($items as $item)
-                            @php
-                                $itemText = trim((string) $item);
-                            @endphp
-                            @continue($itemText === '')
-                            <li>{{ $itemText }}</li>
-                        @endforeach
+                        @include('memory.partials.structured_section_items', [
+                            'items' => $items,
+                            'isSafeCitationUrl' => $isSafeReferenceUrl,
+                        ])
                     </ul>
                 @endforeach
             @else

@@ -59,6 +59,7 @@ class WorkingMemoryApiTest extends TestCase
             'structured_sections',
             'references',
             'citation_coverage',
+            'build_diagnostics',
             'last_refreshed_at',
             'effective_consolidation_window_days',
             'baseline_build_type',
@@ -75,6 +76,16 @@ class WorkingMemoryApiTest extends TestCase
         $this->assertIsArray($response->json('references'));
         $citationCoverage = $response->json('citation_coverage');
         $this->assertTrue($citationCoverage === null || is_float($citationCoverage));
+        $buildDiagnostics = $response->json('build_diagnostics');
+        $this->assertTrue($buildDiagnostics === null || is_array($buildDiagnostics));
+        if (is_array($buildDiagnostics)) {
+            $this->assertArrayHasKey('required_items', $buildDiagnostics);
+            $this->assertArrayHasKey('cited_items', $buildDiagnostics);
+            $this->assertArrayHasKey('reason_codes', $buildDiagnostics);
+            $this->assertIsInt($buildDiagnostics['required_items']);
+            $this->assertIsInt($buildDiagnostics['cited_items']);
+            $this->assertIsArray($buildDiagnostics['reason_codes']);
+        }
         if (! empty($response->json('references'))) {
             $this->assertNotNull($citationCoverage);
         }

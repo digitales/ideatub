@@ -148,4 +148,91 @@ class MemoryInsightsWebTest extends TestCase
         $response->assertDontSee('Unsafe Script');
         $response->assertDontSee('Unsafe Data');
     }
+
+    public function test_insights_renders_item_level_citations_and_source_bundle_badge(): void
+    {
+        config(['features.working_memory_insights' => true]);
+        $user = User::factory()->create();
+
+        $this->mock(WorkingMemoryAssembler::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('forScope')
+                ->once()
+                ->andReturn([
+                    'authoring_status' => 'validated',
+                    'structured_sections' => [
+                        'Latest Signals' => [
+                            [
+                                'text' => 'Insight bullet with item citations rendered inline.',
+                                'fallback_mode' => 'direct',
+                                'citations' => [
+                                    ['url' => '/thoughts/888', 'label' => 'Signal thought', 'type' => 'thought'],
+                                    ['url' => 'https://example.net/paper', 'label' => 'Research PDF', 'type' => 'source'],
+                                    ['url' => 'javascript:void(0)', 'label' => 'Blocked citation', 'type' => 'source'],
+                                ],
+                            ],
+                            [
+                                'text' => 'Bundled provenance for this insight line.',
+                                'fallback_mode' => 'section_bundle',
+                                'citations' => [
+                                    ['url' => '/thoughts/insights-bundle', 'label' => 'Section sources', 'type' => 'bundle'],
+                                ],
+                            ],
+                        ],
+                    ],
+                    'references' => [],
+                ]);
+        });
+
+        $response = $this->actingAs($user)->get(route('memory.insights'));
+
+        $response->assertOk();
+        $response->assertSee('Insight bullet with item citations rendered inline.', false);
+        $response->assertSee('href="/thoughts/888"', false);
+        $response->assertSee('Signal thought', false);
+        $response->assertSee('href="https://example.net/paper"', false);
+        $response->assertSee('Research PDF', false);
+        $response->assertDontSee('href="javascript:void(0)"', false);
+        $response->assertDontSee('Blocked citation', false);
+
+        $response->assertSee('Bundled provenance for this insight line.', false);
+        $response->assertSee('Source bundle', false);
+        $response->assertSee('href="/thoughts/insights-bundle"', false);
+        $response->assertSee('Section sources', false);
+    }
+
+    public function test_insights_renders_repo_relative_citation_labels_without_unsafe_hrefs(): void
+    {
+        config(['features.working_memory_insights' => true]);
+        $user = User::factory()->create();
+
+        $this->mock(WorkingMemoryAssembler::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('forScope')
+                ->once()
+                ->andReturn([
+                    'authoring_status' => 'validated',
+                    'structured_sections' => [
+                        'Current Focus' => [
+                            [
+                                'text' => 'Repo-relative citation labels remain readable without unsafe anchors.',
+                                'fallback_mode' => 'direct',
+                                'citations' => [
+                                    [
+                                        'url' => 'docs/research-to-decision/sources/paper.md',
+                                        'label' => 'paper.md',
+                                        'type' => 'source',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                    'references' => [],
+                ]);
+        });
+
+        $response = $this->actingAs($user)->get(route('memory.insights'));
+
+        $response->assertOk();
+        $response->assertSee('paper.md', false);
+        $response->assertDontSee('href="docs/', false);
+    }
 }

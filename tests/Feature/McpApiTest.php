@@ -987,7 +987,9 @@ class McpApiTest extends TestCase
         $response = $this->getJson('/api/mcp');
 
         $response->assertStatus(200);
-        $response->assertJsonPath('methods.13', 'get_working_memory');
+        $methods = $response->json('methods');
+        $this->assertIsArray($methods);
+        $this->assertContains('get_working_memory', $methods);
     }
 
     public function test_get_working_memory_returns_scoped_payload(): void
@@ -1010,12 +1012,20 @@ class McpApiTest extends TestCase
                 'structured_sections',
                 'references',
                 'citation_coverage',
+                'build_diagnostics',
             ],
         ]);
         $this->assertIsArray($response->json('result.structured_sections'));
         $this->assertIsArray($response->json('result.references'));
         $citationCoverage = $response->json('result.citation_coverage');
         $this->assertTrue($citationCoverage === null || is_float($citationCoverage));
+        $buildDiagnostics = $response->json('result.build_diagnostics');
+        $this->assertTrue($buildDiagnostics === null || is_array($buildDiagnostics));
+        if (is_array($buildDiagnostics)) {
+            $this->assertArrayHasKey('required_items', $buildDiagnostics);
+            $this->assertArrayHasKey('cited_items', $buildDiagnostics);
+            $this->assertArrayHasKey('reason_codes', $buildDiagnostics);
+        }
     }
 
     public function test_get_working_memory_accepts_tag_scope(): void

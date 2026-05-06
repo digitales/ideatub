@@ -10,6 +10,17 @@ final class WorkingMemoryEvidencePackBuilder
 {
     private const MAX_SIGNALS = 60;
 
+    /** @var list<string> */
+    private const SECTION_NAMES = [
+        'Current Focus',
+        'Active Priorities',
+        'Recent Changes',
+        'Open Questions',
+        'Risks / Blockers',
+        'Next Actions',
+        'Latest Signals',
+    ];
+
     /**
      * @param  Collection<int, Thought>  $thoughts
      * @return array{
@@ -21,7 +32,9 @@ final class WorkingMemoryEvidencePackBuilder
      *         content: string,
      *         created_at: string|null,
      *         references: array<int, array{type: string, url: string, label: string}>
-     *     }>
+     *     }>,
+     *     section_candidates: array<string, array<int, string>>,
+     *     section_bundles: array<string, array<int, array{type: string, url: string, label: string}>>
      * }
      */
     public function build(int $userId, string $scopeType, string $scopeKey, Collection $thoughts): array
@@ -33,7 +46,9 @@ final class WorkingMemoryEvidencePackBuilder
             ->filter(fn (Thought $thought): bool => $thought->user_id === $userId)
             ->values();
 
-        $signals = $this->selectSignals($userScopedThoughts, $normalizedScopeType, $normalizedScopeKey)
+        $selectedThoughts = $this->selectSignals($userScopedThoughts, $normalizedScopeType, $normalizedScopeKey);
+
+        $signals = $selectedThoughts
             ->map(function (Thought $thought): array {
                 $thoughtId = Str::of((string) ($thought->id ?? ''))->trim()->toString();
 
@@ -51,6 +66,8 @@ final class WorkingMemoryEvidencePackBuilder
             'scope_key' => $normalizedScopeKey,
             'generated_at' => now()->toIso8601String(),
             'signals' => $signals,
+            'section_candidates' => $this->buildSectionCandidates($selectedThoughts),
+            'section_bundles' => $this->buildSectionBundles($selectedThoughts),
         ];
     }
 
@@ -114,14 +131,112 @@ final class WorkingMemoryEvidencePackBuilder
      */
     private function referencesForThought(Thought $thought): array
     {
+        $references = [];
         $internal = $this->internalThoughtReference($thought);
         if ($internal !== null) {
-            return [$internal];
+            $references[] = $internal;
         }
 
         $fallback = $this->sourceFallbackReference($thought);
+        if ($fallback !== null) {
+            $references[] = $fallback;
+        }
 
-        return $fallback !== null ? [$fallback] : [];
+        return $references;
+    }
+
+    /**
+     * @param  Collection<int, Thought>  $thoughts
+     * @return array<string, array<int, string>>
+     */
+    private function buildSectionCandidates(Collection $thoughts): array
+    {
+        $lines = $thoughts
+            ->map(function (Thought $thought): string {
+                return Str::of((string) $thought->content)->trim()->toString();
+            })
+            ->filter(fn (string $line): bool => $line !== '')
+            ->flatMap(function (string $content): array {
+                $chunks = preg_split('/\r\n|\r|\n/', $content) ?: [];
+
+                return collect($chunks)
+                    ->map(fn (string $chunk): string => Str::of($chunk)->trim()->toString())
+                    ->filter(fn (string $chunk): bool => $chunk !== '')
+                    ->take(3)
+                    ->values()
+                    ->all();
+            })
+            ->unique(fn (string $line): string => Str::lower($line))
+            ->take(12)
+            ->values()
+            ->all();
+
+        if ($lines === []) {
+            $lines = ['No stream-visible captures yet for this scope.'];
+        }
+
+        $candidates = [];
+        foreach (self::SECTION_NAMES as $sectionName) {
+            $candidates[$sectionName] = $lines;
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * Per-section deduped source refs (by URL) for citation fallback.
+     *
+     * @param  Collection<int, Thought>  $thoughts
+     * @return array<string, array<int, array{type: string, url: string, label: string}>>
+     */
+    private function buildSectionBundles(Collection $thoughts): array
+    {
+        /** @var array<string, array<string, array{type: string, url: string, label: string}>> */
+        $bundleRefsByUrl = [];
+        foreach (self::SECTION_NAMES as $name) {
+            $bundleRefsByUrl[$name] = [];
+        }
+
+        foreach ($thoughts as $thought) {
+            $sourceRef = $this->sourceFallbackReference($thought);
+            if ($sourceRef === null) {
+                continue;
+            }
+
+            $sectionTitle = Str::of((string) data_get($thought->source_metadata ?? [], 'section_title', ''))->trim()->toString();
+            $targetSection = $this->resolveSectionForSourceMetadata($sectionTitle);
+            if ($targetSection === null) {
+                continue;
+            }
+
+            $url = $sourceRef['url'];
+            if (! isset($bundleRefsByUrl[$targetSection][$url])) {
+                $bundleRefsByUrl[$targetSection][$url] = $sourceRef;
+            }
+        }
+
+        $out = [];
+        foreach (self::SECTION_NAMES as $name) {
+            $out[$name] = array_values($bundleRefsByUrl[$name]);
+        }
+
+        return $out;
+    }
+
+    private function resolveSectionForSourceMetadata(string $sectionTitle): ?string
+    {
+        if ($sectionTitle === '') {
+            return null;
+        }
+
+        $needle = Str::lower($sectionTitle);
+        foreach (self::SECTION_NAMES as $canonical) {
+            if (Str::lower($canonical) === $needle) {
+                return $canonical;
+            }
+        }
+
+        return null;
     }
 
     /**

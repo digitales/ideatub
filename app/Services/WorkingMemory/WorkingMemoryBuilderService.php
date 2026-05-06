@@ -42,6 +42,7 @@ class WorkingMemoryBuilderService
         $citationCoverage = null;
         $authoringStatus = 'disabled';
         $validationError = null;
+        $buildDiagnostics = null;
 
         try {
             if ($this->authoringEnabled()) {
@@ -58,18 +59,23 @@ class WorkingMemoryBuilderService
                     (float) config('working_memory.citation_min_coverage', 0.90)
                 );
 
+                $buildDiagnostics = $validation['diagnostics'] ?? null;
+
                 $structuredSections = $this->normalizeStructuredSections($authoredOutput['structured_sections'] ?? null);
                 $references = $this->normalizeReferences($authoredOutput['references'] ?? null);
                 $citationCoverage = $validation['coveragePercent'] ?? null;
 
                 if (($validation['ok'] ?? false) === true) {
                     $summaryMarkdown = (string) ($authoredOutput['summary_markdown'] ?? '');
-                    $payload = $this->payloadFromStructuredSections($structuredSections, $citationCoverage);
+                    $payload = $this->payloadFromStructuredSections($structuredSections, $thoughts);
                     $authoringStatus = 'validated';
                 } elseif (($validation['failure_type'] ?? null) === 'soft') {
                     [$payload, $summaryMarkdown] = $this->legacyPayloadAndSummary($normalizedScopeType, $thoughts);
                     $authoringStatus = 'fallback';
                     $validationError = (string) ($validation['message'] ?? 'AI-authored output failed validation.');
+                    $structuredSections = null;
+                    $references = [];
+                    $citationCoverage = null;
                 } else {
                     throw new RuntimeException((string) ($validation['message'] ?? 'AI-authored output failed hard validation.'));
                 }
@@ -97,7 +103,8 @@ class WorkingMemoryBuilderService
             $references,
             $citationCoverage,
             $authoringStatus,
-            $validationError
+            $validationError,
+            $buildDiagnostics,
         ): WorkingMemoryVersion {
             $memory = WorkingMemory::query()->firstOrCreate(
                 [
@@ -119,6 +126,7 @@ class WorkingMemoryBuilderService
                 'next_actions_json' => $payload['next_actions'],
                 'structured_sections_json' => $structuredSections,
                 'references_json' => $references,
+                'build_diagnostics_json' => $buildDiagnostics,
                 'citation_coverage' => $citationCoverage,
                 'authoring_status' => $authoringStatus,
                 'validation_error' => $validationError,
@@ -201,7 +209,7 @@ class WorkingMemoryBuilderService
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, array<string, mixed>>>
      */
     private function normalizeStructuredSections(mixed $sections): array
     {
@@ -216,14 +224,160 @@ class WorkingMemoryBuilderService
                 continue;
             }
 
-            $normalized[$sectionName] = collect(is_array($bullets) ? $bullets : [$bullets])
-                ->map(fn ($bullet): string => trim((string) $bullet))
-                ->filter(fn (string $bullet): bool => $bullet !== '')
-                ->values()
-                ->all();
+            $items = [];
+            foreach (is_array($bullets) ? $bullets : [$bullets] as $entry) {
+                $item = $this->normalizeStructuredSectionItem($entry);
+                if ($item !== null) {
+                    $items[] = $item;
+                }
+            }
+
+            if ($items !== []) {
+                $normalized[$sectionName] = array_values($items);
+            }
         }
 
         return $normalized;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function normalizeStructuredSectionItem(mixed $entry): ?array
+    {
+        if (is_string($entry)) {
+            $text = trim($entry);
+            if ($text === '') {
+                return null;
+            }
+
+            return [
+                'id' => (string) Str::uuid(),
+                'text' => $text,
+                'importance' => 0,
+                'fallback_mode' => 'direct',
+                'citations' => [],
+            ];
+        }
+
+        if (! is_array($entry)) {
+            return null;
+        }
+
+        $text = trim((string) ($entry['text'] ?? ''));
+        if ($text === '') {
+            return null;
+        }
+
+        $id = trim((string) ($entry['id'] ?? ''));
+        if ($id === '') {
+            $id = (string) Str::uuid();
+        }
+
+        $rawMode = $entry['fallback_mode'] ?? 'direct';
+        $fallbackMode = $rawMode === 'section_bundle' ? 'section_bundle' : 'direct';
+
+        return [
+            'id' => $id,
+            'text' => $text,
+            'importance' => (int) ($entry['importance'] ?? 0),
+            'fallback_mode' => $fallbackMode,
+            'citations' => $this->normalizeCitationEntries($entry['citations'] ?? null),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeCitationEntries(mixed $citations): array
+    {
+        if (! is_array($citations)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($citations as $citation) {
+            if (! is_array($citation)) {
+                continue;
+            }
+
+            $entry = $this->normalizedCitationRow($citation);
+            if ($entry !== null) {
+                $normalized[] = $entry;
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function normalizedCitationRow(array $citation): ?array
+    {
+        $url = trim((string) ($citation['url'] ?? ''));
+        $label = trim((string) ($citation['label'] ?? ''));
+        if ($url === '' || $label === '') {
+            return null;
+        }
+
+        $type = trim((string) ($citation['type'] ?? ''));
+        $row = [
+            'type' => $type !== '' ? $type : 'source',
+            'url' => $url,
+            'label' => $label,
+        ];
+
+        if (array_key_exists('thought_id', $citation)) {
+            $thoughtId = $citation['thought_id'];
+            if ($thoughtId !== null && $thoughtId !== '') {
+                $row['thought_id'] = is_string($thoughtId) ? $thoughtId : (string) $thoughtId;
+            }
+        }
+
+        if (array_key_exists('source_ref', $citation)) {
+            $sourceRef = $citation['source_ref'];
+            if ($sourceRef !== null && $sourceRef !== '') {
+                $row['source_ref'] = is_string($sourceRef) ? $sourceRef : (string) $sourceRef;
+            }
+        }
+
+        if (array_key_exists('confidence', $citation) && is_numeric($citation['confidence'])) {
+            $row['confidence'] = (float) $citation['confidence'];
+        }
+
+        return $row;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function sectionTextsForPayload(mixed $entries): array
+    {
+        if (! is_array($entries)) {
+            return [];
+        }
+
+        $texts = [];
+        foreach ($entries as $entry) {
+            if (is_string($entry)) {
+                $text = trim($entry);
+                if ($text !== '') {
+                    $texts[] = $text;
+                }
+
+                continue;
+            }
+
+            if (is_array($entry)) {
+                $text = trim((string) ($entry['text'] ?? ''));
+                if ($text !== '') {
+                    $texts[] = $text;
+                }
+            }
+        }
+
+        return $texts;
     }
 
     /**
@@ -250,7 +404,8 @@ class WorkingMemoryBuilderService
     }
 
     /**
-     * @param  array<string, array<int, string>>  $sections
+     * @param  array<string, array<int, array<string, mixed>>>  $sections
+     * @param  Collection<int, Thought>  $thoughts
      * @return array{
      *     key_concepts: array<int, array{title: string}>,
      *     active_threads: array<int, array{title: string}>,
@@ -259,27 +414,29 @@ class WorkingMemoryBuilderService
      *     confidence_score: float
      * }
      */
-    private function payloadFromStructuredSections(array $sections, ?float $citationCoverage): array
+    private function payloadFromStructuredSections(array $sections, Collection $thoughts): array
     {
-        $keyConcepts = collect($sections['Active Priorities'] ?? [])
+        $legacyConfidence = $this->assembler->assemblePayload($thoughts)['confidence_score'];
+
+        $keyConcepts = collect($this->sectionTextsForPayload($sections['Active Priorities'] ?? []))
             ->take(8)
             ->map(fn (string $entry): array => ['title' => $entry])
             ->values()
             ->all();
 
-        $activeThreads = collect($sections['Recent Changes'] ?? [])
+        $activeThreads = collect($this->sectionTextsForPayload($sections['Recent Changes'] ?? []))
             ->take(8)
             ->map(fn (string $entry): array => ['title' => $entry])
             ->values()
             ->all();
 
-        $openQuestions = collect($sections['Open Questions'] ?? [])
+        $openQuestions = collect($this->sectionTextsForPayload($sections['Open Questions'] ?? []))
             ->take(8)
             ->map(fn (string $entry): array => ['question' => $entry])
             ->values()
             ->all();
 
-        $nextActions = collect($sections['Next Actions'] ?? [])
+        $nextActions = collect($this->sectionTextsForPayload($sections['Next Actions'] ?? []))
             ->take(8)
             ->map(fn (string $entry): array => ['action' => $entry])
             ->values()
@@ -290,7 +447,7 @@ class WorkingMemoryBuilderService
             'active_threads' => $activeThreads,
             'open_questions' => $openQuestions,
             'next_actions' => $nextActions,
-            'confidence_score' => (float) ($citationCoverage ?? 0.0),
+            'confidence_score' => (float) $legacyConfidence,
         ];
     }
 

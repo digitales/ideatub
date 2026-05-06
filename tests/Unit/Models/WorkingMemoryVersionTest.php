@@ -63,4 +63,33 @@ class WorkingMemoryVersionTest extends TestCase
 
         $this->assertSame('0.80', $version->citation_coverage);
     }
+
+    public function test_build_diagnostics_round_trip_as_array_with_reason_codes(): void
+    {
+        $user = User::factory()->create();
+        $memory = WorkingMemory::create([
+            'user_id' => $user->id,
+            'scope_type' => 'global',
+            'scope_key' => 'global',
+            'freshness_state' => 'fresh',
+        ]);
+
+        $version = WorkingMemoryVersion::create([
+            'working_memory_id' => $memory->id,
+            'build_type' => 'incremental',
+            'summary_markdown' => 'Summary',
+            'build_diagnostics_json' => [
+                'reason_codes' => ['missing_required_sections', 'low_citation_coverage'],
+                'missing_sections' => ['Latest Signals'],
+            ],
+        ])->refresh();
+
+        $this->assertSame(
+            [
+                'reason_codes' => ['missing_required_sections', 'low_citation_coverage'],
+                'missing_sections' => ['Latest Signals'],
+            ],
+            $version->build_diagnostics_json
+        );
+    }
 }

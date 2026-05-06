@@ -8,12 +8,14 @@ use App\Models\UserPreference;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use App\Services\WorkingMemory\WorkingMemoryConsolidationWindowResolver;
+use App\Services\WorkingMemory\WorkingMemoryOutputValidator;
 use App\Services\WorkingMemory\WorkingMemoryScopeNormalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionMethod;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -45,9 +47,36 @@ class WorkingMemoryBuilderServiceTest extends TestCase
         $this->assertNull($version->validation_error);
         $this->assertIsArray($version->structured_sections_json);
         $this->assertArrayHasKey('Current Focus', $version->structured_sections_json);
+        $focusItem = $version->structured_sections_json['Current Focus'][0];
+        $this->assertIsArray($focusItem);
+        foreach (['id', 'text', 'importance', 'fallback_mode', 'citations'] as $key) {
+            $this->assertArrayHasKey($key, $focusItem);
+        }
+        $this->assertContains($focusItem['fallback_mode'], ['direct', 'section_bundle']);
+        $this->assertIsArray($focusItem['citations']);
         $this->assertIsArray($version->references_json);
         $this->assertNotEmpty($version->references_json);
         $this->assertGreaterThan(0, (float) ($version->citation_coverage ?? 0));
+        $this->assertIsArray($version->build_diagnostics_json);
+        $this->assertArrayHasKey('required_items', $version->build_diagnostics_json);
+        $this->assertArrayHasKey('cited_items', $version->build_diagnostics_json);
+        $this->assertArrayHasKey('reason_codes', $version->build_diagnostics_json);
+        $this->assertSame([], $version->build_diagnostics_json['reason_codes']);
+
+        $thoughts = Thought::query()
+            ->where('user_id', $user->id)
+            ->visibleInStream()
+            ->with('projects:id')
+            ->orderByDesc('created_at')
+            ->get();
+        $expectedConfidence = app(WorkingMemoryAssembler::class)->assemblePayload($thoughts)['confidence_score'];
+        $this->assertEqualsWithDelta($expectedConfidence, (float) $version->confidence_score, 0.01);
+        $this->assertNotEquals(
+            round((float) $version->citation_coverage, 2),
+            round((float) $version->confidence_score, 2),
+            'confidence_score must track legacy heuristic, not citation coverage percent'
+        );
+
         $this->assertStringContainsString('# Working memory synthesis', $version->summary_markdown);
     }
 
@@ -120,9 +149,102 @@ class WorkingMemoryBuilderServiceTest extends TestCase
         $this->assertSame('fallback', $version->authoring_status);
         $this->assertNotNull($version->validation_error);
         $this->assertStringContainsString('Citation coverage', (string) $version->validation_error);
-        $this->assertIsArray($version->structured_sections_json);
-        $this->assertIsArray($version->references_json);
+        $this->assertNull($version->structured_sections_json);
+        $this->assertSame([], $version->references_json ?? []);
+        $this->assertNull($version->citation_coverage);
+        $this->assertIsArray($version->build_diagnostics_json);
+        $this->assertContains(
+            'coverage_below_threshold',
+            $version->build_diagnostics_json['reason_codes'] ?? []
+        );
         $this->assertStringContainsString('## Executive summary', $version->summary_markdown);
+    }
+
+    #[Test]
+    public function it_preserves_optional_citation_metadata_when_normalizing(): void
+    {
+        $builder = app(WorkingMemoryBuilderService::class);
+        $method = new ReflectionMethod(WorkingMemoryBuilderService::class, 'normalizedCitationRow');
+        $method->setAccessible(true);
+
+        /** @var array<string, mixed>|null $row */
+        $row = $method->invoke($builder, [
+            'type' => 'thought',
+            'url' => 'https://example.com/doc',
+            'label' => 'Primary source',
+            'thought_id' => '019ae6f3-1111-7000-8000-000000000001',
+            'source_ref' => 'bundle:risk',
+            'confidence' => 0.82,
+        ]);
+
+        $this->assertNotNull($row);
+        $this->assertSame('thought', $row['type']);
+        $this->assertSame('bundle:risk', $row['source_ref']);
+        $this->assertSame(0.82, $row['confidence']);
+        $this->assertSame('019ae6f3-1111-7000-8000-000000000001', $row['thought_id']);
+    }
+
+    #[Test]
+    public function validator_hard_validation_failure_preserves_last_known_good_and_degraded_freshness(): void
+    {
+        config([
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+            'working_memory.citation_min_coverage' => 0.75,
+        ]);
+
+        $user = User::factory()->create();
+
+        Thought::factory()->count(3)->create([
+            'user_id' => $user->id,
+            'content' => 'Baseline corpus for working memory build.',
+            'metadata' => ['tags' => ['wm', 'baseline']],
+        ]);
+
+        $this->mock(WorkingMemoryOutputValidator::class, function ($mock): void {
+            $mock->shouldReceive('validate')
+                ->twice()
+                ->andReturn(
+                    [
+                        'ok' => true,
+                        'message' => null,
+                        'coveragePercent' => 100.0,
+                        'failure_type' => null,
+                        'diagnostics' => [
+                            'required_items' => 8,
+                            'cited_items' => 8,
+                            'reason_codes' => [],
+                        ],
+                    ],
+                    [
+                        'ok' => false,
+                        'message' => 'Simulated hard validation failure.',
+                        'coveragePercent' => null,
+                        'failure_type' => 'hard',
+                        'diagnostics' => [
+                            'required_items' => 2,
+                            'cited_items' => 0,
+                            'reason_codes' => ['missing_citation'],
+                        ],
+                    ],
+                );
+        });
+
+        $baselineVersion = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'global');
+
+        $versionCountBefore = $baselineVersion->workingMemory->versions()->count();
+
+        $fallbackVersion = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'global');
+
+        $this->assertSame($baselineVersion->id, $fallbackVersion->id);
+        $this->assertSame(
+            $baselineVersion->id,
+            $baselineVersion->workingMemory->fresh()->latest_version_id
+        );
+        $this->assertSame($versionCountBefore, $baselineVersion->workingMemory->versions()->count());
+        $this->assertSame('degraded', $fallbackVersion->workingMemory->fresh()->freshness_state);
     }
 
     #[Test]
@@ -439,7 +561,10 @@ class WorkingMemoryBuilderServiceTest extends TestCase
                 ->buildConsolidated($user->id, 'global', 'global');
             $this->fail('Expected RuntimeException');
         } catch (RuntimeException $e) {
-            $this->assertSame('Unresolvable references detected in major bullets.', $e->getMessage());
+            $this->assertSame(
+                'Required section items must include resolvable citations.',
+                $e->getMessage()
+            );
         }
     }
 

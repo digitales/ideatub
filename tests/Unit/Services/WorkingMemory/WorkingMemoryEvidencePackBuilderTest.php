@@ -54,6 +54,79 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
     }
 
     #[Test]
+    public function evidence_pack_signal_references_include_thought_and_source_when_both_exist(): void
+    {
+        $user = User::factory()->create();
+
+        $dualLinkedThought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Operational update backed by doc source.',
+            'source_metadata' => [
+                'file_path' => 'docs/superpowers/specs/dual-link.md',
+                'doc_type' => 'spec',
+            ],
+            'created_at' => Carbon::parse('2026-05-05 16:00:00', 'UTC'),
+        ]);
+
+        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+            $user->id,
+            'global',
+            'global',
+            collect([$dualLinkedThought])
+        );
+
+        $references = $pack['signals'][0]['references'] ?? [];
+
+        $this->assertCount(2, $references);
+        $this->assertSame('thought', $references[0]['type']);
+        $this->assertSame((string) $dualLinkedThought->id, $references[0]['label']);
+        $this->assertSame('source', $references[1]['type']);
+        $this->assertSame('docs/superpowers/specs/dual-link.md', $references[1]['url']);
+    }
+
+    #[Test]
+    public function evidence_pack_includes_section_candidates_and_section_bundle_fallback_references(): void
+    {
+        $user = User::factory()->create();
+
+        $signal = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Latest integration signal from imported note.',
+            'metadata' => ['tags' => ['ai']],
+            'source_metadata' => [
+                'file_path' => 'docs/superpowers/specs/latest-signals.md',
+                'doc_type' => 'spec',
+                'section_title' => 'Latest Signals',
+            ],
+            'created_at' => Carbon::parse('2026-05-05 17:00:00', 'UTC'),
+        ]);
+
+        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+            $user->id,
+            'tag',
+            'ai',
+            collect([$signal])
+        );
+
+        foreach ([
+            'Current Focus',
+            'Active Priorities',
+            'Recent Changes',
+            'Open Questions',
+            'Risks / Blockers',
+            'Next Actions',
+            'Latest Signals',
+        ] as $sectionName) {
+            $this->assertArrayHasKey($sectionName, $pack['section_candidates']);
+        }
+
+        $this->assertArrayHasKey('section_bundles', $pack);
+        $this->assertArrayHasKey('Latest Signals', $pack['section_bundles']);
+        $this->assertNotEmpty($pack['section_bundles']['Latest Signals']);
+        $this->assertSame('source', $pack['section_bundles']['Latest Signals'][0]['type']);
+    }
+
+    #[Test]
     public function it_builds_scope_specific_signal_set_for_tag_scope(): void
     {
         $user = User::factory()->create();

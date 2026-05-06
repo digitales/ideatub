@@ -177,6 +177,10 @@ class WorkingMemoryAssembler
     /**
      * Assemble the canonical API payload for a user's working memory at the given scope.
      *
+     * structured_sections maps section titles to lists of structured bullets (id, text,
+     * importance, fallback_mode, citations). Each citation includes required type, url, and
+     * label, plus optional thought_id, source_ref, and confidence when persisted.
+     *
      * @return array{
      *     scope_type: string,
      *     scope_key: string,
@@ -187,11 +191,12 @@ class WorkingMemoryAssembler
      *     active_threads: array<int, array{title: string}>,
      *     open_questions: array<int, array{question: string}>,
      *     next_actions: array<int, array{action: string}>,
-     *     structured_sections: array<string, array<int, string>>,
+     *     structured_sections: array<string, array<int, array<string, mixed>>>,
      *     references: array<int, array{type: string, url: string, label: string}>,
      *     citation_coverage: float|null,
      *     authoring_status: string|null,
      *     validation_error: string|null,
+     *     build_diagnostics: array{required_items: int, cited_items: int, reason_codes: array<int, string>}|null,
      *     last_refreshed_at: string|null,
      *     effective_consolidation_window_days: int,
      *     baseline_build_type: string,
@@ -241,11 +246,12 @@ class WorkingMemoryAssembler
      *     active_threads: array<int, array{title: string}>,
      *     open_questions: array<int, array{question: string}>,
      *     next_actions: array<int, array{action: string}>,
-     *     structured_sections: array<string, array<int, string>>,
+     *     structured_sections: array<string, array<int, array<string, mixed>>>,
      *     references: array<int, array{type: string, url: string, label: string}>,
      *     citation_coverage: float|null,
      *     authoring_status: string|null,
      *     validation_error: string|null,
+     *     build_diagnostics: array{required_items: int, cited_items: int, reason_codes: array<int, string>}|null,
      *     last_refreshed_at: string|null,
      *     effective_consolidation_window_days: int,
      *     baseline_build_type: string,
@@ -284,6 +290,7 @@ class WorkingMemoryAssembler
                 : null,
             'authoring_status' => $canonical->authoring_status,
             'validation_error' => $canonical->validation_error,
+            'build_diagnostics' => $canonical->build_diagnostics_json ?? null,
             'last_refreshed_at' => $memory->last_refreshed_at?->toIso8601String(),
             'effective_consolidation_window_days' => $this->consolidationWindowResolver->effectiveDaysForUserId((int) $memory->user_id),
             'baseline_build_type' => (string) $canonical->build_type,
