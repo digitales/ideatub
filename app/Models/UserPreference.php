@@ -15,6 +15,8 @@ class UserPreference extends Model
 
     public const KEY_WORKING_MEMORY_CONSOLIDATION_WINDOW_DAYS = 'working_memory_consolidation_window_days';
 
+    public const KEY_WORKING_MEMORY_FORCED_TAGS = 'working_memory_forced_tags';
+
     /**
      * The attributes that are mass assignable.
      *
