@@ -55,7 +55,7 @@
             'confidence_score' => $confidence_score ?? null,
             'last_refreshed_at' => $last_refreshed_at ?? null,
             'effective_consolidation_window_days' => $effective_consolidation_window_days ?? null,
-            'input_count' => $input_count ?? 0,
+            'input_count' => $input_count ?? null,
             'baseline_build_type' => $baseline_build_type ?? null,
             'overlay_deltas' => $overlayDeltas,
         ])
