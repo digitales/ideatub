@@ -1,0 +1,15 @@
+# Secrets and credentials - never send to AI
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets/
+
+# Client data
+data/
+*.csv
+*.sql
+
+# IDE and personal config
+.cursor/mcp.json
