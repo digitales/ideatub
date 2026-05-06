@@ -69,6 +69,17 @@
                 <a href="{{ route('settings.profile.index') }}" class="text-xs font-medium text-slate-brand hover:text-memory-violet">Back to profile</a>
             </div>
         </form>
+
+        <form method="POST" action="{{ route('settings.working-memory.build-now') }}" class="mt-3">
+            @csrf
+            <button
+                type="submit"
+                class="text-xs font-medium text-memory-violet px-4 py-2 rounded-lg border border-memory-violet/25 hover:bg-memory-violet/5 transition-colors"
+            >
+                Build now (forced tags)
+            </button>
+            <p class="mt-1 text-[11px] text-slate-brand/50">Queues consolidation jobs for your currently saved forced tags.</p>
+        </form>
     </div>
 </div>
 @endsection

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ConsolidateWorkingMemory;
 use App\Models\UserPreference;
 use App\Services\WorkingMemory\ForcedTagResolver;
 use App\Services\WorkingMemory\WorkingMemoryConsolidationWindowResolver;
@@ -63,5 +64,30 @@ class WorkingMemorySettingsController extends Controller
         }
 
         return redirect()->route('settings.working-memory.index')->with('success', 'Working memory settings saved.');
+    }
+
+    public function buildNow(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $forcedTagResolver = app(ForcedTagResolver::class);
+        $forcedTags = $forcedTagResolver->forUserId((int) $user->id);
+
+        if ($forcedTags === []) {
+            return redirect()
+                ->route('settings.working-memory.index')
+                ->with('error', 'No forced tags saved yet. Add tags and save preferences first.');
+        }
+
+        foreach ($forcedTags as $tag) {
+            ConsolidateWorkingMemory::dispatch(
+                (int) $user->id,
+                'tag',
+                $tag
+            );
+        }
+
+        return redirect()
+            ->route('settings.working-memory.index')
+            ->with('success', 'Queued working memory build for '.count($forcedTags).' forced tag'.(count($forcedTags) === 1 ? '' : 's').'.');
     }
 }

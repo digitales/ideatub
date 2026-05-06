@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ConsolidateWorkingMemory;
 use App\Models\User;
 use App\Models\UserPreference;
 use App\Services\WorkingMemory\WorkingMemoryConsolidationWindowResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use ReflectionClass;
 use Tests\TestCase;
 
 class WorkingMemorySettingsTest extends TestCase
@@ -128,5 +131,44 @@ class WorkingMemorySettingsTest extends TestCase
                 ->where('key', UserPreference::KEY_WORKING_MEMORY_FORCED_TAGS)
                 ->exists()
         );
+    }
+
+    public function test_build_now_queues_consolidation_for_saved_forced_tags(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        UserPreference::set($user, UserPreference::KEY_WORKING_MEMORY_FORCED_TAGS, ['ai', 'ml']);
+
+        $response = $this->actingAs($user)
+            ->post(route('settings.working-memory.build-now'));
+
+        $response->assertRedirect(route('settings.working-memory.index'));
+        $response->assertSessionHas('success', 'Queued working memory build for 2 forced tags.');
+
+        Queue::assertPushed(ConsolidateWorkingMemory::class, 2);
+        Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'tag', 'ai'));
+        Queue::assertPushed(ConsolidateWorkingMemory::class, fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'tag', 'ml'));
+    }
+
+    public function test_build_now_with_no_forced_tags_sets_error_message(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->post(route('settings.working-memory.build-now'));
+
+        $response->assertRedirect(route('settings.working-memory.index'));
+        $response->assertSessionHas('error', 'No forced tags saved yet. Add tags and save preferences first.');
+        Queue::assertNotPushed(ConsolidateWorkingMemory::class);
+    }
+
+    private function matchesJobScope(ConsolidateWorkingMemory $job, int $userId, string $scopeType, string $scopeKey): bool
+    {
+        $reflection = new ReflectionClass($job);
+
+        return $reflection->getProperty('userId')->getValue($job) === $userId
+            && $reflection->getProperty('scopeType')->getValue($job) === $scopeType
+            && $reflection->getProperty('scopeKey')->getValue($job) === $scopeKey;
     }
 }
