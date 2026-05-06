@@ -27,6 +27,11 @@ it('creates working memory tables', function () {
             'working_memory_id',
             'build_type',
             'summary_markdown',
+            'structured_sections_json',
+            'references_json',
+            'citation_coverage',
+            'authoring_status',
+            'validation_error',
         ]))->toBeTrue()
         ->and(Schema::hasColumns('working_memory_inputs', [
             'working_memory_version_id',

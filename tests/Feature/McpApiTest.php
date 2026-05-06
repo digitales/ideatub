@@ -1004,8 +1004,18 @@ class McpApiTest extends TestCase
         ]);
 
         $response->assertStatus(200)->assertJsonStructure([
-            'result' => ['summary_markdown', 'freshness_state'],
+            'result' => [
+                'summary_markdown',
+                'freshness_state',
+                'structured_sections',
+                'references',
+                'citation_coverage',
+            ],
         ]);
+        $this->assertIsArray($response->json('result.structured_sections'));
+        $this->assertIsArray($response->json('result.references'));
+        $citationCoverage = $response->json('result.citation_coverage');
+        $this->assertTrue($citationCoverage === null || is_float($citationCoverage));
     }
 
     public function test_get_working_memory_accepts_tag_scope(): void

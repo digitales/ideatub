@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\Project;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class WorkingMemoryWebTest extends TestCase
@@ -124,6 +126,83 @@ class WorkingMemoryWebTest extends TestCase
 
         $response->assertOk();
         $this->assertCount(0, $legacyDrawerMatches, 'Matched legacy drawer fragments: '.implode(' || ', $legacyDrawerMatches));
+    }
+
+    public function test_working_memory_renders_structured_sections_and_reference_chips_when_available(): void
+    {
+        config([
+            'features.working_memory_ui' => true,
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+            'working_memory.citation_min_coverage' => 0.75,
+        ]);
+
+        $user = $this->createUserWithConsolidatedMemory('Structured section evidence for working memory page.');
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('Current Focus', false);
+        $response->assertSee('Active Priorities', false);
+        $response->assertSee('/thoughts/', false);
+    }
+
+    public function test_working_memory_prefers_markdown_fallback_when_authoring_status_is_fallback(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = User::factory()->create();
+
+        $this->mock(WorkingMemoryAssembler::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('forScope')
+                ->once()
+                ->andReturn([
+                    'authoring_status' => 'fallback',
+                    'summary_markdown' => "## Markdown fallback heading\n\n- Fallback summary bullet",
+                    'structured_sections' => [
+                        'Current Focus' => ['Structured section bullet should not render'],
+                    ],
+                ]);
+        });
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('Markdown fallback heading', false);
+        $response->assertSee('Fallback summary bullet', false);
+        $response->assertDontSee('Current Focus', false);
+        $response->assertDontSee('Structured section bullet should not render', false);
+    }
+
+    public function test_working_memory_skips_unsafe_reference_urls(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = User::factory()->create();
+
+        $this->mock(WorkingMemoryAssembler::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('forScope')
+                ->once()
+                ->andReturn([
+                    'structured_sections' => [
+                        'Current Focus' => ['Improve reference safety checks'],
+                    ],
+                    'references' => [
+                        ['url' => 'https://example.com/reference', 'label' => 'Safe External'],
+                        ['url' => '/thoughts/123', 'label' => 'Safe Internal'],
+                        ['url' => 'javascript:alert(1)', 'label' => 'Unsafe Script'],
+                        ['url' => 'data:text/html;base64,PHNjcmlwdA==', 'label' => 'Unsafe Data'],
+                    ],
+                ]);
+        });
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('href="https://example.com/reference"', false);
+        $response->assertSee('href="/thoughts/123"', false);
+        $response->assertDontSee('href="javascript:alert(1)"', false);
+        $response->assertDontSee('href="data:text/html;base64,PHNjcmlwdA=="', false);
+        $response->assertDontSee('Unsafe Script');
+        $response->assertDontSee('Unsafe Data');
     }
 
     private function enableWorkingMemoryUi(): void
