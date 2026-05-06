@@ -169,7 +169,11 @@ class WorkingMemoryWebTest extends TestCase
 
     private function recentUpdatesButtonCount(string $html): int
     {
-        preg_match_all('/<button\b[^>]*>\s*Recent updates\s*<\/button>/i', $html, $matches);
+        preg_match_all(
+            '/<button\b[^>]*(?:@click="drawerOpen = true"|lg:hidden|linear-gradient\(135deg,\s*#6D6AF7,\s*#2A8C8C\))[^>]*>\s*Recent updates\s*<\/button>/i',
+            $html,
+            $matches
+        );
 
         return count($matches[0] ?? []);
     }
