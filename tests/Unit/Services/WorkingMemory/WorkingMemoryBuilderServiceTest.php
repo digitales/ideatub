@@ -102,6 +102,18 @@ class WorkingMemoryBuilderServiceTest extends TestCase
     }
 
     #[Test]
+    public function it_rejects_empty_tag_scope_key(): void
+    {
+        $user = User::factory()->create();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('scope_key');
+
+        app(WorkingMemoryBuilderService::class)
+            ->buildIncremental($user->id, 'tag', '   ');
+    }
+
+    #[Test]
     public function it_requires_global_scope_to_use_global_scope_key(): void
     {
         $user = User::factory()->create();
@@ -203,6 +215,47 @@ class WorkingMemoryBuilderServiceTest extends TestCase
 
             $this->assertSame(1, $version->inputs()->count());
             $this->assertTrue($version->inputs()->pluck('thought_id')->containsStrict($recent->id));
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    #[Test]
+    public function consolidated_tag_scope_selects_only_matching_tagged_thoughts(): void
+    {
+        try {
+            Carbon::setTestNow(Carbon::parse('2026-05-05 12:00:00', 'UTC'));
+
+            $user = User::factory()->create();
+
+            $matching = Thought::factory()->create([
+                'user_id' => $user->id,
+                'content' => 'Ship AI summary improvements in working memory.',
+                'metadata' => ['tags' => [' AI ', 'memory']],
+                'created_at' => Carbon::parse('2026-05-03 10:00:00', 'UTC'),
+            ]);
+
+            Thought::factory()->create([
+                'user_id' => $user->id,
+                'content' => 'Project roadmap update for dashboards.',
+                'metadata' => ['tags' => ['roadmap', 'dashboard']],
+                'created_at' => Carbon::parse('2026-05-02 10:00:00', 'UTC'),
+            ]);
+
+            Thought::factory()->create([
+                'user_id' => $user->id,
+                'content' => 'No tags here.',
+                'metadata' => [],
+                'created_at' => Carbon::parse('2026-05-01 10:00:00', 'UTC'),
+            ]);
+
+            $version = app(WorkingMemoryBuilderService::class)
+                ->buildConsolidated($user->id, 'tag', '  AI  ');
+
+            $this->assertSame('tag', $version->workingMemory->scope_type);
+            $this->assertSame('ai', $version->workingMemory->scope_key);
+            $this->assertSame(1, $version->inputs()->count());
+            $this->assertTrue($version->inputs()->pluck('thought_id')->containsStrict($matching->id));
         } finally {
             Carbon::setTestNow();
         }

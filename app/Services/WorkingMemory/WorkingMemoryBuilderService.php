@@ -165,6 +165,15 @@ class WorkingMemoryBuilderService
                 return $this->memoryInsightsService->isResearchThought($thought);
             }
 
+            if ($scopeType === 'tag') {
+                $tags = collect(data_get($thought->metadata, 'tags', []))
+                    ->map(fn ($tag): string => Str::of((string) $tag)->trim()->lower()->toString())
+                    ->filter(fn (string $tag): bool => $tag !== '')
+                    ->values();
+
+                return $tags->containsStrict($scopeKey);
+            }
+
             if ($scopeType !== 'project') {
                 return false;
             }
