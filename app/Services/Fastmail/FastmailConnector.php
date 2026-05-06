@@ -6,6 +6,7 @@ use App\Exceptions\InvalidMailAccountCredentialsException;
 use App\Models\MailAccount;
 use App\Services\Email\NormalizedEmailMessage;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\RequestException;
 use Throwable;
 
 class FastmailConnector
@@ -60,7 +61,7 @@ class FastmailConnector
      */
     public function listMailboxes(MailAccount $account): array
     {
-        $response = $this->httpClient->request($this->credentialsFor($account), [
+        $response = $this->requestWithCredentialHandling($this->credentialsFor($account), [
             'using' => [
                 'urn:ietf:params:jmap:core',
                 'urn:ietf:params:jmap:mail',
@@ -89,7 +90,7 @@ class FastmailConnector
         $limit = (int) ($options['limit'] ?? config('services.mail_sync.backfill_batch_size', 50));
         $mailboxId = $options['mailbox_id'] ?? null;
 
-        $response = $this->httpClient->request($this->credentialsFor($account), [
+        $response = $this->requestWithCredentialHandling($this->credentialsFor($account), [
             'using' => [
                 'urn:ietf:params:jmap:core',
                 'urn:ietf:params:jmap:mail',
@@ -129,7 +130,7 @@ class FastmailConnector
         $checkpoint = $account->provider_checkpoint_json ?? [];
         $mailboxId = $checkpoint['mailbox_id'] ?? null;
 
-        $response = $this->httpClient->request($this->credentialsFor($account), [
+        $response = $this->requestWithCredentialHandling($this->credentialsFor($account), [
             'using' => [
                 'urn:ietf:params:jmap:core',
                 'urn:ietf:params:jmap:mail',
@@ -162,7 +163,7 @@ class FastmailConnector
 
     public function fetchMessageById(MailAccount $account, string $providerMessageId): ?NormalizedEmailMessage
     {
-        $response = $this->httpClient->request($this->credentialsFor($account), [
+        $response = $this->requestWithCredentialHandling($this->credentialsFor($account), [
             'using' => [
                 'urn:ietf:params:jmap:core',
                 'urn:ietf:params:jmap:mail',
@@ -365,5 +366,25 @@ class FastmailConnector
     private function accountIdFor(MailAccount $account): string
     {
         return (string) ($account->credentials_json['account_id'] ?? '');
+    }
+
+    /**
+     * @param  array{credential: string, api_url?: string}  $credentials
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function requestWithCredentialHandling(array $credentials, array $payload): array
+    {
+        try {
+            return $this->httpClient->request($credentials, $payload);
+        } catch (RequestException $exception) {
+            $status = $exception->response?->status();
+
+            if ($status === 401 || $status === 403) {
+                throw new InvalidMailAccountCredentialsException('Fastmail credentials are invalid or expired.', 0, $exception);
+            }
+
+            throw $exception;
+        }
     }
 }

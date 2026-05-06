@@ -300,6 +300,27 @@ class FastmailConnectorTest extends TestCase
     }
 
     #[Test]
+    public function fetch_incremental_batch_throws_invalid_credentials_exception_on_unauthorized_response(): void
+    {
+        Http::fake([
+            'https://api.fastmail.com/jmap/api/' => Http::response([], 401),
+        ]);
+
+        $account = MailAccount::factory()->create([
+            'provider_checkpoint_json' => [
+                'query_state' => 'state-1',
+                'mailbox_id' => 'mb-sent',
+            ],
+        ]);
+        $connector = app(FastmailConnector::class);
+
+        $this->expectException(InvalidMailAccountCredentialsException::class);
+        $this->expectExceptionMessage('Fastmail credentials are invalid or expired.');
+
+        $connector->fetchIncrementalBatch($account);
+    }
+
+    #[Test]
     public function normalization_assembles_text_body_from_body_values_using_text_body_part_ids(): void
     {
         Http::fake([

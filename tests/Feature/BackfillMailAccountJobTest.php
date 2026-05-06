@@ -18,6 +18,7 @@ use App\Services\ThoughtCaptureService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
@@ -434,6 +435,38 @@ class BackfillMailAccountJobTest extends TestCase
             'run_type' => 'incremental',
             'status' => 'failed',
             'error_summary' => 'Token revoked',
+        ]);
+    }
+
+    #[Test]
+    public function incremental_http_unauthorized_moves_account_to_needs_reauth_without_retrying(): void
+    {
+        Http::fake([
+            'https://api.fastmail.com/jmap/api/' => Http::response([], 401),
+        ]);
+
+        $account = MailAccount::factory()->create([
+            'account_email' => 'owner@fastmail.fm',
+            'status' => 'active',
+            'provider_checkpoint_json' => [
+                'query_state' => 'state-1',
+                'mailbox_id' => 'mb-inbox',
+            ],
+        ]);
+
+        (new SyncMailAccountIncremental($account->id))->handle(app(FastmailConnector::class), app(EmailImportService::class));
+
+        $this->assertDatabaseHas('mail_accounts', [
+            'id' => $account->id,
+            'status' => 'needs_reauth',
+        ]);
+        $this->assertNotNull($account->fresh()->last_synced_at);
+        $this->assertNull($account->fresh()->last_successful_sync_at);
+        $this->assertDatabaseHas('mail_sync_runs', [
+            'mail_account_id' => $account->id,
+            'run_type' => 'incremental',
+            'status' => 'failed',
+            'error_summary' => 'Fastmail credentials are invalid or expired.',
         ]);
     }
 
