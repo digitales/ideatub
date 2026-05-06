@@ -11,34 +11,33 @@
     $emailBodyText = $thoughtDetail->emailBodyText();
 @endphp
 
-<div class="max-w-6xl mx-auto px-6 md:px-8 pt-16 pb-24 space-y-6">
-    @if (session('success'))
-        <div class="rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    @include('idea.partials.thought_detail_header', [
-        'thought' => $thought,
-        'thoughtDetail' => $thoughtDetail,
-        'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
-        'projectsToAttachToThought' => $projectsToAttachToThought,
-        'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
-        'thoughtIncomingLinks' => $thoughtIncomingLinks,
-        'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
-        'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
-    ])
-
-    @include('idea.partials.thought_detail_projects_and_links', [
-        'thought' => $thought,
-        'thoughtProjectsForDetail' => $thoughtProjectsForDetail,
-        'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
-    ])
-
-    <div class="{{ $useThoughtDetailTwoColumn ? 'grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start' : '' }}">
-        @if ($useThoughtDetailTwoColumn)
-            <div class="space-y-6 min-w-0" data-thought-detail-main>
+@component('idea.partials.detail_layout_shell', ['twoColumn' => $useThoughtDetailTwoColumn])
+    @slot('header')
+        @if (session('success'))
+            <div class="rounded-xl bg-neural-teal/10 border border-neural-teal/25 px-4 py-3 text-sm text-neural-teal">
+                {{ session('success') }}
+            </div>
         @endif
+
+        @include('idea.partials.thought_detail_header', [
+            'thought' => $thought,
+            'thoughtDetail' => $thoughtDetail,
+            'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
+            'projectsToAttachToThought' => $projectsToAttachToThought,
+            'thoughtOutgoingLinks' => $thoughtOutgoingLinks,
+            'thoughtIncomingLinks' => $thoughtIncomingLinks,
+            'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
+            'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
+        ])
+
+        @include('idea.partials.thought_detail_projects_and_links', [
+            'thought' => $thought,
+            'thoughtProjectsForDetail' => $thoughtProjectsForDetail,
+            'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
+        ])
+    @endslot
+
+    @slot('main')
         <article class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 md:p-8 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
             <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-4">
                 {{ $isEmailThought ? 'Email body' : 'Content' }}
@@ -91,37 +90,39 @@
                 'researchContentComments' => $researchContentComments,
             ])
         @endif
+    @endslot
 
-        @if ($useThoughtDetailTwoColumn)
-            </div>
-            @if ($isEmailThought)
-                @include('idea.partials.thought_detail_email_sidebar', [
-                    'thought' => $thought,
-                    'emailMetadata' => $thoughtDetail->emailMetadata(),
-                    'senderRuleContext' => $thoughtDetail->senderRuleContext(),
-                    'newsletterResearchStatus' => $thoughtDetail->newsletterResearchStatus(),
-                ])
-            @endif
-            @if ($isVideoThought)
-                @include('idea.partials.thought_detail_video_sidebar', [
-                    'thought' => $thought,
-                    'thoughtDetail' => $thoughtDetail,
-                    'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
-                    'videoCaptureReturnThoughtId' => $thought->id,
-                ])
-            @endif
+    @slot('sidebar')
+        @if ($isEmailThought)
+            @include('idea.partials.thought_detail_email_sidebar', [
+                'thought' => $thought,
+                'emailMetadata' => $thoughtDetail->emailMetadata(),
+                'senderRuleContext' => $thoughtDetail->senderRuleContext(),
+                'newsletterResearchStatus' => $thoughtDetail->newsletterResearchStatus(),
+            ])
         @endif
-    </div>
 
-    @include('comments._thread', [
-        'rows' => $detailCommentsPresenter->pageLevelRows(),
-        'formAction' => route('comments.store'),
-        'commentableType' => 'thought',
-        'commentableId' => $thoughtDetail->thought()->id,
-        'mode' => 'owner',
-        'disabledMessage' => $detailCommentsPresenter->canCommentOnPage() ? null : 'Comments are disabled.',
-        'title' => 'Comments',
-        'showControls' => true,
-    ])
-</div>
+        @if ($isVideoThought)
+            @include('idea.partials.thought_detail_video_sidebar', [
+                'thought' => $thought,
+                'thoughtDetail' => $thoughtDetail,
+                'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
+                'videoCaptureReturnThoughtId' => $thought->id,
+            ])
+        @endif
+    @endslot
+
+    @slot('footer')
+        @include('comments._thread', [
+            'rows' => $detailCommentsPresenter->pageLevelRows(),
+            'formAction' => route('comments.store'),
+            'commentableType' => 'thought',
+            'commentableId' => $thoughtDetail->thought()->id,
+            'mode' => 'owner',
+            'disabledMessage' => $detailCommentsPresenter->canCommentOnPage() ? null : 'Comments are disabled.',
+            'title' => 'Comments',
+            'showControls' => true,
+        ])
+    @endslot
+@endcomponent
 @endsection

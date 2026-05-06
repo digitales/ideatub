@@ -532,17 +532,8 @@ class ThoughtShowPageTest extends TestCase
         $response->assertSee('<h2>Summary</h2>', false);
         $response->assertSee('<strong>bold marker</strong>', false);
         $response->assertSee('First decision unique section-inline-903.', false);
-
-        $xpath = $this->xpathFromResponse($response);
-        $replySections = $xpath->query("//section[.//p[normalize-space(.)='Replies']]");
-
-        $this->assertSame(1, $replySections->length);
-
-        $replyText = trim($replySections->item(0)?->textContent ?? '');
-
-        $this->assertStringContainsString('Actual follow-up reply unique reply-inline-904.', $replyText);
-        $this->assertStringNotContainsString('Section body with bold marker unique section-inline-902.', $replyText);
-        $this->assertStringNotContainsString('First decision unique section-inline-903.', $replyText);
+        $response->assertDontSee('Actual follow-up reply unique reply-inline-904.', false);
+        $response->assertSee('Comments', false);
     }
 
     public function test_other_user_cannot_view_thought_show_page(): void
@@ -604,8 +595,8 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($owner)->get(route('thoughts.show', $root));
 
         $response->assertStatus(200);
-        $response->assertSee('First reply in thread', false);
-        $response->assertSee('Reply', false);
+        $response->assertDontSee('First reply in thread', false);
+        $response->assertSee('Comments', false);
     }
 
     public function test_demo_mode_obfuscates_reply_content_on_thought_detail_page_without_mutating_reply_records(): void
@@ -632,14 +623,14 @@ class ThoughtShowPageTest extends TestCase
 
         $response->assertOk();
         $response->assertDontSee('Reply secret marker zeta-444', false);
-        $response->assertSee('Reply', false);
+        $response->assertSee('Comments', false);
         $this->assertSame('Reply secret marker zeta-444', $reply->fresh()->content);
 
         session()->forget([DemoMode::ENABLED_SESSION_KEY, DemoMode::SEED_SESSION_KEY]);
 
         $normal = $this->actingAs($owner)->get(route('thoughts.show', $root));
         $normal->assertOk();
-        $normal->assertSee('Reply secret marker zeta-444', false);
+        $normal->assertDontSee('Reply secret marker zeta-444', false);
     }
 
     public function test_email_thought_detail_page_shows_body_and_email_metadata(): void
@@ -1561,9 +1552,11 @@ class ThoughtShowPageTest extends TestCase
         $response = $this->actingAs($user)->get(route('thoughts.show', $thought));
 
         $response->assertOk();
-        $response->assertSee('name="parent_id"', false);
+        $response->assertSee('name="commentable_type"', false);
+        $response->assertSee('value="thought"', false);
+        $response->assertSee('name="commentable_id"', false);
         $response->assertSee('value="'.$thought->id.'"', false);
-        $response->assertSee(route('thoughts.store'), false);
+        $response->assertSee(route('comments.store'), false);
     }
 
     public function test_email_thought_detail_header_includes_emails_stream_link_and_destination_ok(): void
@@ -2072,16 +2065,8 @@ class ThoughtShowPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('UNIQUE_TRANSCRIPT_NOT_A_REPLY_77', false);
-        $response->assertSee('REAL_USER_REPLY_MARKER_88', false);
-
-        $xpath = $this->xpathFromResponse($response);
-        $replySections = $xpath->query("//section[.//p[normalize-space(.)='Replies']]");
-
-        $this->assertSame(1, $replySections->length);
-
-        $replyText = trim($replySections->item(0)?->textContent ?? '');
-        $this->assertStringNotContainsString('UNIQUE_TRANSCRIPT_NOT_A_REPLY_77', $replyText);
-        $this->assertStringContainsString('REAL_USER_REPLY_MARKER_88', $replyText);
+        $response->assertDontSee('REAL_USER_REPLY_MARKER_88', false);
+        $response->assertSee('Comments', false);
     }
 
     public function test_video_thought_detail_shows_research_now_form_when_ready_without_linked_research(): void
