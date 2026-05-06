@@ -6,6 +6,10 @@
 
 @section('content')
 @php
+    $isProject = $isProjectScope ?? false;
+    $refreshAction = $isProject
+        ? route('working-memory.refresh.project', $project)
+        : route('working-memory.refresh.global');
     $freshness = $freshness_state ?? 'stale';
     $freshnessClasses = match ($freshness) {
         'fresh' => 'bg-neural-teal/15 text-neural-teal border-neural-teal/30',
@@ -45,7 +49,7 @@
             <div class="min-w-0">
                 <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">Working memory</h1>
                 <p class="text-sm text-slate-brand mt-1">
-                    @if ($isProjectScope ?? false)
+                    @if ($isProject)
                         {{ $scopeTitle ?? ($project->title ?? 'Project') }} — synthesized from captures linked to this project.
                     @else
                         Global scope — synthesized from your captures.
@@ -56,7 +60,20 @@
                 <span class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $freshnessClasses }}">
                     {{ $freshness }}
                 </span>
-                @if (! ($isProjectScope ?? false) && config('features.working_memory_insights'))
+                <form
+                    method="POST"
+                    action="{{ $refreshAction }}"
+                    onsubmit="const button=this.querySelector('button[type=submit]'); if(!button||button.disabled){return false;} button.disabled=true; button.setAttribute('aria-busy','true'); return true;"
+                >
+                    @csrf
+                    <button
+                        type="submit"
+                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
+                    >
+                        Refresh working memory
+                    </button>
+                </form>
+                @if (! $isProject && config('features.working_memory_insights'))
                     <a
                         href="{{ route('memory.insights') }}"
                         class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"

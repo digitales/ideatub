@@ -46,6 +46,7 @@ use App\Http\Controllers\ThoughtProjectController;
 use App\Http\Controllers\ToolController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\WorkingMemoryRefreshController;
 use App\Http\Controllers\WorkingMemorySettingsController;
 use App\Models\ResearchSkill;
 use Illuminate\Support\Facades\Route;
@@ -288,6 +289,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/working-memory', [WorkingMemorySettingsController::class, 'index'])->name('settings.working-memory.index');
     Route::put('/settings/working-memory', [WorkingMemorySettingsController::class, 'update'])->name('settings.working-memory.update');
     Route::post('/settings/working-memory/build-now', [WorkingMemorySettingsController::class, 'buildNow'])->name('settings.working-memory.build-now');
+    Route::middleware('working.memory.ui')->group(function () {
+        Route::post('/memory/refresh', [WorkingMemoryRefreshController::class, 'refreshGlobal'])->name('working-memory.refresh.global');
+        Route::post('/projects/{project}/memory/refresh', [WorkingMemoryRefreshController::class, 'refreshProject'])->name('working-memory.refresh.project');
+        Route::post('/stream/tag/memory/refresh', [WorkingMemoryRefreshController::class, 'refreshTag'])
+            ->middleware('signed')
+            ->name('working-memory.refresh.tag');
+    });
 
     Route::middleware(['auth', 'working.memory.ui'])->group(function () {
         Route::get('/memory', [MemoryController::class, 'show'])->name('memory.show');

@@ -60,6 +60,18 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertSee('Details', false);
     }
 
+    public function test_global_memory_page_shows_refresh_button_with_global_refresh_action(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('Refresh working memory', false);
+        $response->assertSee('action="'.route('working-memory.refresh.global').'"', false);
+    }
+
     public function test_project_memory_other_user_returns_403(): void
     {
         config(['features.working_memory_ui' => true]);
@@ -84,6 +96,19 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertSee('Working memory', false);
         $response->assertSee('Alpha Research', false);
         $response->assertSee('Details', false);
+    }
+
+    public function test_project_memory_page_shows_refresh_button_with_project_refresh_action(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = User::factory()->create();
+        $project = Project::factory()->for($user)->create(['title' => 'Alpha Research']);
+
+        $response = $this->actingAs($user)->get(route('projects.memory.show', $project));
+
+        $response->assertOk();
+        $response->assertSee('Refresh working memory', false);
+        $response->assertSee('action="'.route('working-memory.refresh.project', $project).'"', false);
     }
 
     public function test_working_memory_shows_details_and_recent_updates_when_overlay_deltas_exist(): void

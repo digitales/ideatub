@@ -25,11 +25,22 @@
             @endif
 
             @if($tag)
-                <p class="text-center mb-4">
+                @php
+                    $refreshTagValue = $tagSlug ?: $tag;
+                    $refreshTagAction = \Illuminate\Support\Facades\URL::signedRoute('working-memory.refresh.tag', ['tag' => $refreshTagValue]);
+                @endphp
+                <div class="mb-4 flex items-center justify-center gap-3">
                     <a href="{{ route('idea.stream') }}" class="text-[12px] font-medium text-memory-violet hover:underline">
                         All thoughts
                     </a>
-                </p>
+                    <form method="POST" action="{{ $refreshTagAction }}" onsubmit="if (this.dataset.submitting === '1') { return false; } this.dataset.submitting = '1'; var submitButton = this.querySelector('button[type=submit]'); if (submitButton) { submitButton.disabled = true; submitButton.setAttribute('aria-disabled', 'true'); }">
+                        @csrf
+                        <input type="hidden" name="tag" value="{{ $refreshTagValue }}">
+                        <button type="submit" class="inline-flex items-center rounded-full border border-memory-violet/40 px-3 py-1 text-[12px] font-medium text-memory-violet transition hover:bg-memory-violet/5">
+                            Refresh working memory
+                        </button>
+                    </form>
+                </div>
             @endif
 
             @if($thoughts->isEmpty())
