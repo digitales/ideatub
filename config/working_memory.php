@@ -17,4 +17,8 @@ return [
 
     'insights_model_enabled' => env('WORKING_MEMORY_INSIGHTS_MODEL_ENABLED', false),
 
+    'authoring_enabled' => env('WORKING_MEMORY_AUTHORING_ENABLED', false),
+    'citation_min_coverage' => (float) env('WORKING_MEMORY_CITATION_MIN_COVERAGE', 0.90),
+    'authoring_model' => env('WORKING_MEMORY_AUTHORING_MODEL', 'openrouter/auto'),
+
 ];

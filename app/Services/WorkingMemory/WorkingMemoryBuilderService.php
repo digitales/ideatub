@@ -17,6 +17,9 @@ class WorkingMemoryBuilderService
         private readonly WorkingMemoryScopeNormalizer $scopeNormalizer,
         private readonly WorkingMemoryConsolidationWindowResolver $consolidationWindowResolver,
         private readonly MemoryInsightsService $memoryInsightsService,
+        private readonly WorkingMemoryEvidencePackBuilder $evidencePackBuilder,
+        private readonly WorkingMemoryAiAuthorService $aiAuthorService,
+        private readonly WorkingMemoryOutputValidator $outputValidator,
     ) {}
 
     public function buildConsolidated(int $userId, string $scopeType, string $scopeKey): WorkingMemoryVersion
@@ -34,20 +37,44 @@ class WorkingMemoryBuilderService
         [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);
 
         $thoughts = $this->selectThoughts($userId, $normalizedScopeType, $normalizedScopeKey, $buildType);
+        $structuredSections = null;
+        $references = null;
+        $citationCoverage = null;
+        $authoringStatus = 'disabled';
+        $validationError = null;
+
         try {
-            if ($normalizedScopeType === 'insights') {
-                $synthesis = $this->memoryInsightsService->synthesizePersistable($thoughts);
-                $summaryMarkdown = $synthesis['summary_markdown'];
-                $payload = [
-                    'key_concepts' => $synthesis['key_concepts'],
-                    'active_threads' => $synthesis['active_threads'],
-                    'open_questions' => $synthesis['open_questions'],
-                    'next_actions' => $synthesis['next_actions'],
-                    'confidence_score' => $synthesis['confidence_score'],
-                ];
+            if ($this->authoringEnabled()) {
+                $evidencePack = $this->evidencePackBuilder->build(
+                    $userId,
+                    $normalizedScopeType,
+                    $normalizedScopeKey,
+                    $thoughts
+                );
+
+                $authoredOutput = $this->aiAuthorService->authorFromEvidence($evidencePack);
+                $validation = $this->outputValidator->validate(
+                    $authoredOutput,
+                    (float) config('working_memory.citation_min_coverage', 0.90)
+                );
+
+                $structuredSections = $this->normalizeStructuredSections($authoredOutput['structured_sections'] ?? null);
+                $references = $this->normalizeReferences($authoredOutput['references'] ?? null);
+                $citationCoverage = $validation['coveragePercent'] ?? null;
+
+                if (($validation['ok'] ?? false) === true) {
+                    $summaryMarkdown = (string) ($authoredOutput['summary_markdown'] ?? '');
+                    $payload = $this->payloadFromStructuredSections($structuredSections, $citationCoverage);
+                    $authoringStatus = 'validated';
+                } elseif (($validation['failure_type'] ?? null) === 'soft') {
+                    [$payload, $summaryMarkdown] = $this->legacyPayloadAndSummary($normalizedScopeType, $thoughts);
+                    $authoringStatus = 'fallback';
+                    $validationError = (string) ($validation['message'] ?? 'AI-authored output failed validation.');
+                } else {
+                    throw new RuntimeException((string) ($validation['message'] ?? 'AI-authored output failed hard validation.'));
+                }
             } else {
-                $payload = $this->assembler->assemblePayload($thoughts);
-                $summaryMarkdown = $this->assembler->renderSummary($payload);
+                [$payload, $summaryMarkdown] = $this->legacyPayloadAndSummary($normalizedScopeType, $thoughts);
             }
         } catch (RuntimeException $e) {
             $fallbackVersion = $this->lastKnownGoodVersion($userId, $normalizedScopeType, $normalizedScopeKey);
@@ -65,7 +92,12 @@ class WorkingMemoryBuilderService
             $buildType,
             $thoughts,
             $payload,
-            $summaryMarkdown
+            $summaryMarkdown,
+            $structuredSections,
+            $references,
+            $citationCoverage,
+            $authoringStatus,
+            $validationError
         ): WorkingMemoryVersion {
             $memory = WorkingMemory::query()->firstOrCreate(
                 [
@@ -85,6 +117,11 @@ class WorkingMemoryBuilderService
                 'active_threads_json' => $payload['active_threads'],
                 'open_questions_json' => $payload['open_questions'],
                 'next_actions_json' => $payload['next_actions'],
+                'structured_sections_json' => $structuredSections,
+                'references_json' => $references,
+                'citation_coverage' => $citationCoverage,
+                'authoring_status' => $authoringStatus,
+                'validation_error' => $validationError,
                 'confidence_score' => $this->assembler->boundConfidence((float) ($payload['confidence_score'] ?? 0)),
                 'source_window_start' => $thoughts->min('created_at'),
                 'source_window_end' => $thoughts->max('created_at'),
@@ -138,6 +175,129 @@ class WorkingMemoryBuilderService
         ])->save();
 
         return $fallbackVersion;
+    }
+
+    /**
+     * @param  Collection<int, Thought>  $thoughts
+     * @return array{0: array<string, mixed>, 1: string}
+     */
+    private function legacyPayloadAndSummary(string $scopeType, Collection $thoughts): array
+    {
+        if ($scopeType === 'insights') {
+            $synthesis = $this->memoryInsightsService->synthesizePersistable($thoughts);
+
+            return [[
+                'key_concepts' => $synthesis['key_concepts'],
+                'active_threads' => $synthesis['active_threads'],
+                'open_questions' => $synthesis['open_questions'],
+                'next_actions' => $synthesis['next_actions'],
+                'confidence_score' => $synthesis['confidence_score'],
+            ], $synthesis['summary_markdown']];
+        }
+
+        $payload = $this->assembler->assemblePayload($thoughts);
+
+        return [$payload, $this->assembler->renderSummary($payload)];
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function normalizeStructuredSections(mixed $sections): array
+    {
+        if (! is_array($sections)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($sections as $section => $bullets) {
+            $sectionName = trim((string) $section);
+            if ($sectionName === '') {
+                continue;
+            }
+
+            $normalized[$sectionName] = collect(is_array($bullets) ? $bullets : [$bullets])
+                ->map(fn ($bullet): string => trim((string) $bullet))
+                ->filter(fn (string $bullet): bool => $bullet !== '')
+                ->values()
+                ->all();
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @return array<int, array{type: string, url: string, label: string}>
+     */
+    private function normalizeReferences(mixed $references): array
+    {
+        if (! is_array($references)) {
+            return [];
+        }
+
+        return collect($references)
+            ->filter(fn ($reference): bool => is_array($reference))
+            ->map(function (array $reference): array {
+                return [
+                    'type' => trim((string) ($reference['type'] ?? 'source')) ?: 'source',
+                    'url' => trim((string) ($reference['url'] ?? '')),
+                    'label' => trim((string) ($reference['label'] ?? '')),
+                ];
+            })
+            ->filter(fn (array $reference): bool => $reference['url'] !== '' && $reference['label'] !== '')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, array<int, string>>  $sections
+     * @return array{
+     *     key_concepts: array<int, array{title: string}>,
+     *     active_threads: array<int, array{title: string}>,
+     *     open_questions: array<int, array{question: string}>,
+     *     next_actions: array<int, array{action: string}>,
+     *     confidence_score: float
+     * }
+     */
+    private function payloadFromStructuredSections(array $sections, ?float $citationCoverage): array
+    {
+        $keyConcepts = collect($sections['Active Priorities'] ?? [])
+            ->take(8)
+            ->map(fn (string $entry): array => ['title' => $entry])
+            ->values()
+            ->all();
+
+        $activeThreads = collect($sections['Recent Changes'] ?? [])
+            ->take(8)
+            ->map(fn (string $entry): array => ['title' => $entry])
+            ->values()
+            ->all();
+
+        $openQuestions = collect($sections['Open Questions'] ?? [])
+            ->take(8)
+            ->map(fn (string $entry): array => ['question' => $entry])
+            ->values()
+            ->all();
+
+        $nextActions = collect($sections['Next Actions'] ?? [])
+            ->take(8)
+            ->map(fn (string $entry): array => ['action' => $entry])
+            ->values()
+            ->all();
+
+        return [
+            'key_concepts' => $keyConcepts,
+            'active_threads' => $activeThreads,
+            'open_questions' => $openQuestions,
+            'next_actions' => $nextActions,
+            'confidence_score' => (float) ($citationCoverage ?? 0.0),
+        ];
+    }
+
+    private function authoringEnabled(): bool
+    {
+        return (bool) config('features.working_memory_ai_authored')
+            && (bool) config('working_memory.authoring_enabled');
     }
 
     /**
