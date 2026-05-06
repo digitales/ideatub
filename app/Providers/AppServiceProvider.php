@@ -6,11 +6,13 @@ use App\Contracts\EvernoteApiGateway;
 use App\Models\Comment;
 use App\Models\ImportBatch;
 use App\Models\InboxItem;
+use App\Models\LearningProject;
 use App\Models\Project;
 use App\Models\Thought;
 use App\Observers\CommentObserver;
 use App\Observers\ThoughtObserver;
 use App\Policies\ImportPolicy;
+use App\Policies\LearningProjectPolicy;
 use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
@@ -33,7 +35,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton("files", fn () => new Filesystem());
+        $this->app->singleton('files', fn () => new Filesystem);
 
         $this->app->bind(
             EvernoteApiGateway::class,
@@ -43,12 +45,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(
             TranscriptListFetcher::class,
             function (): TranscriptListFetcher {
-                $httpFactory = new HttpFactory();
+                $httpFactory = new HttpFactory;
 
                 return new TranscriptListFetcher(
                     new Client([
-                        "timeout" => 30,
-                        "connect_timeout" => 10,
+                        'timeout' => 30,
+                        'connect_timeout' => 10,
                     ]),
                     $httpFactory,
                     $httpFactory
@@ -63,37 +65,38 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(ImportBatch::class, ImportPolicy::class);
+        Gate::policy(LearningProject::class, LearningProjectPolicy::class);
 
         Comment::observe(CommentObserver::class);
         Thought::observe(ThoughtObserver::class);
 
         Relation::enforceMorphMap([
-            "thought" => Thought::class,
-            "project" => Project::class,
+            'thought' => Thought::class,
+            'project' => Project::class,
         ]);
 
-        RateLimiter::for("login", function (Request $request) {
+        RateLimiter::for('login', function (Request $request) {
             return [
                 Limit::perMinute(5)->by($request->ip()),
-                Limit::perMinute(10)->by($request->input("email")),
+                Limit::perMinute(10)->by($request->input('email')),
             ];
         });
 
-        RateLimiter::for("import-upload", function (Request $request) {
+        RateLimiter::for('import-upload', function (Request $request) {
             return Limit::perHour(200)->by(
                 $request->user()?->id ?? $request->ip()
             );
         });
 
-        RateLimiter::for("shared-research-password", function (
+        RateLimiter::for('shared-research-password', function (
             Request $request
         ) {
-            $token = $request->route("token") ?? "unknown";
+            $token = $request->route('token') ?? 'unknown';
 
-            return Limit::perMinutes(15, 10)->by($token . ":" . $request->ip());
+            return Limit::perMinutes(15, 10)->by($token.':'.$request->ip());
         });
 
-        RateLimiter::for("shared-research-comment", function (
+        RateLimiter::for('shared-research-comment', function (
             Request $request
         ) {
             return [
@@ -102,20 +105,20 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
-        RateLimiter::for("project-share-password", function (Request $request) {
-            $token = $request->route("token") ?? "unknown";
+        RateLimiter::for('project-share-password', function (Request $request) {
+            $token = $request->route('token') ?? 'unknown';
 
-            return Limit::perMinutes(15, 10)->by($token . ":" . $request->ip());
+            return Limit::perMinutes(15, 10)->by($token.':'.$request->ip());
         });
 
-        Broadcast::routes(["middleware" => ["web", "auth"]]);
+        Broadcast::routes(['middleware' => ['web', 'auth']]);
 
-        $channelsPath = base_path("routes/channels.php");
+        $channelsPath = base_path('routes/channels.php');
         if (file_exists($channelsPath)) {
             require $channelsPath;
         }
 
-        View::composer("layouts.idea", function ($view): void {
+        View::composer('layouts.idea', function ($view): void {
             $count = 0;
 
             if (auth()->check()) {
@@ -125,8 +128,8 @@ class AppServiceProvider extends ServiceProvider
                     ->count();
             }
 
-            $view->with("inboxActionableCount", $count);
-            $view->with("demoModeEnabled", app(DemoMode::class)->enabled());
+            $view->with('inboxActionableCount', $count);
+            $view->with('demoModeEnabled', app(DemoMode::class)->enabled());
         });
     }
 }

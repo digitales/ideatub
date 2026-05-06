@@ -20,6 +20,13 @@ use App\Http\Controllers\ImportController;
 use App\Http\Controllers\InboundEmailController;
 use App\Http\Controllers\InboxController;
 use App\Http\Controllers\JiraSettingsController;
+use App\Http\Controllers\Learning\LearningCaptureController;
+use App\Http\Controllers\Learning\LearningLessonController;
+use App\Http\Controllers\Learning\LearningLessonNoteController;
+use App\Http\Controllers\Learning\LearningLessonProgressController;
+use App\Http\Controllers\Learning\LearningProjectController;
+use App\Http\Controllers\Learning\LearningQuizAttemptController;
+use App\Http\Controllers\Learning\LearningResearchController;
 use App\Http\Controllers\McpKeyController;
 use App\Http\Controllers\MeetingSkillSettingsController;
 use App\Http\Controllers\MemoryController;
@@ -221,6 +228,24 @@ Route::middleware('auth')->group(function () {
     Route::delete('/projects/{project}/thoughts/{thought}', [ProjectThoughtController::class, 'destroy'])->name('projects.thoughts.destroy');
     Route::get('/projects/{project}/graph', [ProjectGraphController::class, 'show'])->name('projects.graph');
     Route::get('/projects/{project}/graph/data', [ProjectGraphController::class, 'data'])->name('projects.graph.data');
+
+    Route::prefix('learn')->name('learn.')->group(function () {
+        Route::get('projects', [LearningProjectController::class, 'index'])->name('projects.index');
+        Route::get('projects/{learning_project}', [LearningProjectController::class, 'show'])->name('projects.show');
+
+        Route::get('projects/{learning_project}/research', [LearningResearchController::class, 'index'])->name('research.index');
+        Route::get('projects/{learning_project}/research/{slug}', [LearningResearchController::class, 'show'])->name('research.show');
+
+        Route::get('projects/{learning_project}/lessons/{slug}', [LearningLessonController::class, 'show'])->name('lessons.show');
+        Route::post('projects/{learning_project}/lessons/{slug}/capture', [LearningCaptureController::class, 'store'])
+            ->name('lessons.capture');
+        Route::post('projects/{learning_project}/lessons/{slug}/quiz', [LearningQuizAttemptController::class, 'store'])
+            ->name('lessons.quiz.store');
+        Route::post('projects/{learning_project}/lessons/{slug}/progress', [LearningLessonProgressController::class, 'update'])
+            ->name('lessons.progress.update');
+        Route::post('projects/{learning_project}/lessons/{slug}/notes', [LearningLessonNoteController::class, 'store'])
+            ->name('lessons.notes.store');
+    });
     if (config('features.file_upload')) {
         Route::prefix('imports')->name('imports.')->group(function () {
             Route::post('/quick', [ImportController::class, 'quick'])
