@@ -88,4 +88,45 @@ class WorkingMemorySettingsTest extends TestCase
             app(WorkingMemoryConsolidationWindowResolver::class)->effectiveDaysForUserId((int) $user->id)
         );
     }
+
+    public function test_put_sets_forced_tags_preference(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->from(route('settings.working-memory.index'))
+            ->put(route('settings.working-memory.update'), [
+                'working_memory_forced_tags' => " AI,\nml,AI ",
+            ]);
+
+        $response->assertRedirect(route('settings.working-memory.index'));
+        $response->assertSessionHas('success', 'Working memory settings saved.');
+
+        $this->assertSame(
+            ['ai', 'ml'],
+            UserPreference::get($user, UserPreference::KEY_WORKING_MEMORY_FORCED_TAGS)
+        );
+    }
+
+    public function test_put_with_empty_forced_tags_clears_preference(): void
+    {
+        $user = User::factory()->create();
+        UserPreference::set($user, UserPreference::KEY_WORKING_MEMORY_FORCED_TAGS, ['ai', 'ml']);
+
+        $response = $this->actingAs($user)
+            ->from(route('settings.working-memory.index'))
+            ->put(route('settings.working-memory.update'), [
+                'working_memory_forced_tags' => '',
+            ]);
+
+        $response->assertRedirect(route('settings.working-memory.index'));
+        $response->assertSessionHas('success', 'Working memory settings saved.');
+
+        $this->assertFalse(
+            UserPreference::query()
+                ->where('user_id', $user->id)
+                ->where('key', UserPreference::KEY_WORKING_MEMORY_FORCED_TAGS)
+                ->exists()
+        );
+    }
 }
