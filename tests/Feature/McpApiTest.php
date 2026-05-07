@@ -382,6 +382,7 @@ class McpApiTest extends TestCase
 
     public function test_capture_plan_with_doc_type_meeting_sets_source_metadata_type_and_tag(): void
     {
+        Queue::fake();
         [$key, $user] = $this->validKeyAndUser();
         $fakeEmbedding = array_fill(0, 1536, 0.01);
         $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
@@ -415,6 +416,7 @@ class McpApiTest extends TestCase
 
     public function test_add_meeting_notes_aliases_capture_plan_with_doc_type_meeting(): void
     {
+        Queue::fake();
         [$key, $user] = $this->validKeyAndUser();
         $fakeEmbedding = array_fill(0, 1536, 0.01);
         $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
