@@ -309,6 +309,41 @@ class OpenRouterServiceTest extends TestCase
     }
 
     #[Test]
+    public function research_from_prompt_uses_per_call_model_override_over_research_model_config(): void
+    {
+        Config::set('services.openrouter.research_model', 'openai/gpt-4.1-mini');
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => 'OK']]],
+            ], 200),
+        ]);
+
+        $result = $this->service->researchFromPrompt('Prompt body', 'anthropic/claude-3-haiku', 0.42);
+
+        $this->assertSame('OK', $result);
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://openrouter.ai/api/v1/chat/completions'
+                && $request['model'] === 'anthropic/claude-3-haiku'
+                && $request['temperature'] === 0.42;
+        });
+    }
+
+    #[Test]
+    public function research_from_prompt_omits_temperature_when_no_override_is_provided(): void
+    {
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => 'OK']]],
+            ], 200),
+        ]);
+
+        $this->service->researchFromPrompt('Prompt body');
+
+        Http::assertSent(fn ($request) => ! array_key_exists('temperature', $request->data()));
+    }
+
+    #[Test]
     public function summarize_link_truncates_multibyte_text_without_breaking_utf8(): void
     {
         $json = json_encode([

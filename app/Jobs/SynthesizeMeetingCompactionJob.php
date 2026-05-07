@@ -51,7 +51,13 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
 
         try {
             $prompt = $promptBuilder->build($meeting);
-            $raw = $openRouter->researchFromPrompt($prompt);
+            $model = (string) config('working_memory.authoring_meeting_compaction_model', '');
+            $temperature = config('working_memory.authoring_meeting_compaction_temperature');
+            $raw = $openRouter->researchFromPrompt(
+                $prompt,
+                $model !== '' ? $model : null,
+                is_numeric($temperature) ? (float) $temperature : null,
+            );
             $decoded = $this->decodeJson($raw);
 
             if ($decoded === null) {

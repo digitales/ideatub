@@ -18,7 +18,7 @@ final class WorkingMemoryAiAuthorServiceTest extends TestCase
         $openRouter = Mockery::mock(OpenRouterService::class);
         $openRouter->shouldReceive('researchFromPrompt')
             ->once()
-            ->with(Mockery::on(fn ($prompt) => str_contains((string) $prompt, '## Working memory composition task')))
+            ->withArgs(fn (string $prompt, ?string $model = null, ?float $temperature = null): bool => str_contains($prompt, '## Working memory composition task'))
             ->andReturn(json_encode([
                 'summary_markdown' => "# Working memory\n## Current Focus\n- Ship DEZ-2819 fix.",
                 'structured_sections' => [
@@ -78,6 +78,72 @@ final class WorkingMemoryAiAuthorServiceTest extends TestCase
         $this->assertSame([], $result['references']);
         $this->assertArrayHasKey('Current Focus', $result['structured_sections']);
         $this->assertSame([], $result['structured_sections']['Current Focus']);
+    }
+
+    #[Test]
+    public function it_threads_authoring_composer_model_and_temperature_overrides_to_open_router(): void
+    {
+        config([
+            'working_memory.authoring_composer_model' => 'openai/gpt-4o-mini-test',
+            'working_memory.authoring_composer_temperature' => 0.42,
+        ]);
+
+        $promptBuilder = new WorkingMemoryComposerPromptBuilder;
+        $openRouter = Mockery::mock(OpenRouterService::class);
+        $openRouter->shouldReceive('researchFromPrompt')
+            ->once()
+            ->withArgs(function (string $prompt, ?string $model, ?float $temperature): bool {
+                return $model === 'openai/gpt-4o-mini-test' && $temperature === 0.42;
+            })
+            ->andReturn(json_encode([
+                'summary_markdown' => '',
+                'structured_sections' => [],
+                'references' => [],
+            ]));
+
+        $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
+
+        $service->authorFromEvidence([
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+            'generated_at' => '2026-05-07T10:00:00Z',
+            'signals' => [],
+            'compactions' => [],
+            'section_candidates' => [],
+            'section_bundles' => [],
+        ]);
+    }
+
+    #[Test]
+    public function it_passes_null_overrides_when_authoring_composer_config_is_blank(): void
+    {
+        config([
+            'working_memory.authoring_composer_model' => '',
+            'working_memory.authoring_composer_temperature' => null,
+        ]);
+
+        $promptBuilder = new WorkingMemoryComposerPromptBuilder;
+        $openRouter = Mockery::mock(OpenRouterService::class);
+        $openRouter->shouldReceive('researchFromPrompt')
+            ->once()
+            ->withArgs(fn (string $prompt, ?string $model, ?float $temperature): bool => $model === null && $temperature === null)
+            ->andReturn(json_encode([
+                'summary_markdown' => '',
+                'structured_sections' => [],
+                'references' => [],
+            ]));
+
+        $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
+
+        $service->authorFromEvidence([
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+            'generated_at' => '2026-05-07T10:00:00Z',
+            'signals' => [],
+            'compactions' => [],
+            'section_candidates' => [],
+            'section_bundles' => [],
+        ]);
     }
 
     #[Test]

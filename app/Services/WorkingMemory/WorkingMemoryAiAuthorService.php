@@ -47,7 +47,13 @@ final class WorkingMemoryAiAuthorService
     {
         try {
             $prompt = $this->promptBuilder->build($evidencePack);
-            $raw = $this->openRouter->researchFromPrompt($prompt);
+            $model = (string) config('working_memory.authoring_composer_model', '');
+            $temperature = config('working_memory.authoring_composer_temperature');
+            $raw = $this->openRouter->researchFromPrompt(
+                $prompt,
+                $model !== '' ? $model : null,
+                is_numeric($temperature) ? (float) $temperature : null,
+            );
             $decoded = $this->decodeJson($raw);
 
             if ($decoded === null) {
