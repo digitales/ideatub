@@ -41,6 +41,9 @@ final class SynthesizeMeetingCompactionJobTest extends TestCase
             'user_id' => $user->id,
             'content' => 'Weekly check-in 2026-05-07. Decided to ship DEZ-2819 fix.',
             'metadata' => ['type' => 'meeting', 'tags' => ['scope:project', 'project:dezeen']],
+            // Realistic capture_plan flow: project is captured into source_metadata,
+            // which WorkingMemoryScopeResolver promotes to a project scope.
+            'source_metadata' => ['project' => 'dezeen'],
         ]);
 
         SynthesizeMeetingCompactionJob::dispatchSync($meeting->id);
@@ -53,6 +56,44 @@ final class SynthesizeMeetingCompactionJobTest extends TestCase
         $this->assertStringContainsString('PHP upgrade scope', (string) $version->summary_markdown);
         $this->assertSame('project', $version->workingMemory->scope_type);
         $this->assertSame('dezeen', $version->workingMemory->scope_key);
+    }
+
+    #[Test]
+    public function it_lands_on_a_tag_scope_when_resolver_emits_no_project_scope(): void
+    {
+        $openRouter = Mockery::mock(OpenRouterService::class);
+        $openRouter->shouldReceive('researchFromPrompt')->twice()->andReturn(json_encode([
+            'summary_markdown' => "## Summary\nDesign sync notes.",
+            'structured_sections' => [
+                'Summary' => [['text' => 'Design sync notes.', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []]],
+                'Decisions' => [],
+                'Action Items' => [],
+                'Risks / Blockers' => [],
+                'Open Questions' => [],
+            ],
+            'references' => [],
+        ]));
+        $this->app->instance(OpenRouterService::class, $openRouter);
+
+        $user = User::factory()->create();
+        // No source_metadata.project, no project pivot. Only a tag.
+        // The resolver emits global + tag/design-sync; the job should land on the tag scope
+        // so the canonical refresh visits the same working memory and can cite the compaction.
+        $meeting = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Design sync notes 2026-05-07.',
+            'metadata' => ['type' => 'meeting', 'tags' => ['design-sync']],
+        ]);
+
+        SynthesizeMeetingCompactionJob::dispatchSync($meeting->id);
+
+        $version = WorkingMemoryVersion::query()
+            ->where('build_type', 'compaction:meeting')
+            ->first();
+
+        $this->assertNotNull($version);
+        $this->assertSame('tag', $version->workingMemory->scope_type);
+        $this->assertSame('design-sync', $version->workingMemory->scope_key);
     }
 
     #[Test]

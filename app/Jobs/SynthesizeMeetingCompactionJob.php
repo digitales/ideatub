@@ -6,6 +6,7 @@ use App\Models\Thought;
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use App\Services\WorkingMemory\Compactions\MeetingCompactionPromptBuilder;
+use App\Services\WorkingMemory\WorkingMemoryScopeResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -31,6 +32,7 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
         MeetingCompactionPromptBuilder $promptBuilder,
         OpenRouterService $openRouter,
         CompactionVersionWriter $writer,
+        WorkingMemoryScopeResolver $scopeResolver,
     ): void {
         $meeting = Thought::query()->find($this->thoughtId);
         if ($meeting === null) {
@@ -47,7 +49,7 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
             return;
         }
 
-        [$scopeType, $scopeKey] = $this->resolveScope($meeting);
+        [$scopeType, $scopeKey] = $this->resolveScope($scopeResolver, $meeting);
 
         try {
             $prompt = $promptBuilder->build($meeting);
@@ -89,23 +91,33 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
     }
 
     /**
+     * Pick the most specific scope the refresh-side resolver will visit for this thought.
+     *
+     * Coherence requirement: a compaction is only useful if the canonical refresh path
+     * later visits the same scope and can cite it. We delegate scope discovery to
+     * WorkingMemoryScopeResolver so the job and refresh stay in lockstep.
+     *
+     * Preference order (matching the resolver's emission order):
+     *   1. First `project` scope (typically derived from source_metadata.project)
+     *   2. First `tag` scope (from metadata.tags or forced tags)
+     *   3. global/global fallback
+     *
      * @return array{0: string, 1: string}
      */
-    private function resolveScope(Thought $meeting): array
+    private function resolveScope(WorkingMemoryScopeResolver $resolver, Thought $meeting): array
     {
-        $tags = collect(data_get($meeting->metadata, 'tags', []))
-            ->map(fn ($t): string => trim((string) $t))
-            ->filter()
-            ->values();
+        $scopes = $resolver->forThought($meeting);
 
-        $project = $tags->first(fn (string $t): bool => str_starts_with($t, 'project:'));
-        if ($project !== null) {
-            return ['project', substr($project, strlen('project:'))];
+        foreach ($scopes as $scope) {
+            if ($scope['scope_type'] === 'project') {
+                return ['project', $scope['scope_key']];
+            }
         }
 
-        $client = $tags->first(fn (string $t): bool => str_starts_with($t, 'client:'));
-        if ($client !== null) {
-            return ['project', substr($client, strlen('client:'))];
+        foreach ($scopes as $scope) {
+            if ($scope['scope_type'] === 'tag') {
+                return ['tag', $scope['scope_key']];
+            }
         }
 
         return ['global', 'global'];
