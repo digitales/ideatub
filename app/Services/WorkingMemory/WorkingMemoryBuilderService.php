@@ -76,6 +76,11 @@ class WorkingMemoryBuilderService
                     $summaryMarkdown = (string) ($authoredOutput['summary_markdown'] ?? '');
                     $payload = $this->payloadFromStructuredSections($structuredSections, $thoughts);
                     $authoringStatus = 'validated';
+                    $buildDiagnostics = $this->mergeCompactionDiagnostics(
+                        $buildDiagnostics,
+                        $evidencePack,
+                        $authoredOutput,
+                    );
                 } elseif (($validation['failure_type'] ?? null) === 'soft') {
                     [$payload, $summaryMarkdown] = $this->legacyPayloadAndSummary($normalizedScopeType, $thoughts);
                     $authoringStatus = 'fallback';
@@ -672,5 +677,67 @@ class WorkingMemoryBuilderService
         }
 
         return $scoped->take(20)->values();
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $diagnostics
+     * @param  array<string, mixed>  $evidencePack
+     * @param  array<string, mixed>  $authoredOutput
+     * @return array<string, mixed>
+     */
+    private function mergeCompactionDiagnostics(
+        ?array $diagnostics,
+        array $evidencePack,
+        array $authoredOutput,
+    ): array {
+        $compactions = is_array($evidencePack['compactions'] ?? null) ? $evidencePack['compactions'] : [];
+        $signals = is_array($evidencePack['signals'] ?? null) ? $evidencePack['signals'] : [];
+
+        $subtypes = [];
+        foreach ($compactions as $compaction) {
+            $subtype = (string) ($compaction['subtype'] ?? '');
+            if ($subtype !== '' && ! in_array($subtype, $subtypes, true)) {
+                $subtypes[] = $subtype;
+            }
+        }
+
+        $sections = is_array($authoredOutput['structured_sections'] ?? null)
+            ? $authoredOutput['structured_sections']
+            : [];
+
+        $totalCited = 0;
+        $compactionCited = 0;
+        foreach ($sections as $items) {
+            if (! is_array($items)) {
+                continue;
+            }
+            foreach ($items as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+                $citations = is_array($item['citations'] ?? null) ? $item['citations'] : [];
+                if ($citations === []) {
+                    continue;
+                }
+                $totalCited++;
+                foreach ($citations as $citation) {
+                    if (is_array($citation) && ($citation['type'] ?? null) === 'compaction') {
+                        $compactionCited++;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $coverageRatio = $totalCited > 0
+            ? round($compactionCited / $totalCited, 4)
+            : 0.0;
+
+        return array_merge($diagnostics ?? [], [
+            'compaction_inputs_count' => count($compactions),
+            'compaction_subtypes_used' => $subtypes,
+            'raw_thought_inputs_count' => count($signals),
+            'compaction_coverage_ratio' => $coverageRatio,
+        ]);
     }
 }
