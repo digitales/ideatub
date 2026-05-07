@@ -62,4 +62,11 @@ return [
 
     'meeting_refresh_delay_seconds' => (int) env('WORKING_MEMORY_MEETING_REFRESH_DELAY_SECONDS', 60),
 
+    'compaction_retention' => [
+        'meeting' => (int) env('WORKING_MEMORY_RETAIN_MEETING', 50),
+        'weekly-digest' => (int) env('WORKING_MEMORY_RETAIN_WEEKLY_DIGEST', 12),
+        'topic-digest' => (int) env('WORKING_MEMORY_RETAIN_TOPIC_DIGEST', 24),
+        'research-synth' => (int) env('WORKING_MEMORY_RETAIN_RESEARCH_SYNTH', 12),
+    ],
+
 ];

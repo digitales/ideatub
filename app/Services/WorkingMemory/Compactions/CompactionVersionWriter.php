@@ -9,6 +9,10 @@ use InvalidArgumentException;
 
 class CompactionVersionWriter
 {
+    public function __construct(
+        private readonly CompactionRetentionService $retention,
+    ) {}
+
     /**
      * @param  array<string, array<int, array<string, mixed>>>  $structuredSections
      * @param  array<int, array{type: string, url: string, label: string}>  $references
@@ -68,6 +72,8 @@ class CompactionVersionWriter
                     'weight' => 1.0,
                 ]);
             }
+
+            $this->retention->trim($memory, $buildType);
 
             return $version;
         });
