@@ -8,6 +8,7 @@ use App\Jobs\SyncUserJiraActivity;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
+use App\Models\WorkingMemoryVersion;
 use App\Services\IdeasToRevisitService;
 use App\Services\McpSessionService;
 use App\Services\Meetings\MeetingService;
@@ -114,6 +115,7 @@ class McpController extends Controller
             'process_meeting',
             'capture_video',
             'get_working_memory',
+            'get_compaction',
         ];
         if (config('services.jira.enabled', true)) {
             $base[] = 'sync_jira';
@@ -564,6 +566,19 @@ class McpController extends Controller
                     'required' => ['scope_type', 'scope_key'],
                 ],
             ],
+            [
+                'name' => 'get_compaction',
+                'description' => 'Read a single working-memory compaction version by id (build_type starts with `compaction:`). Returns markdown + structured sections + references for that compaction.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'required' => ['scope_type', 'scope_key', 'version_id'],
+                    'properties' => [
+                        'scope_type' => ['type' => 'string'],
+                        'scope_key' => ['type' => 'string'],
+                        'version_id' => ['type' => 'string'],
+                    ],
+                ],
+            ],
         ];
         if (config('services.jira.enabled', true)) {
             $tools[] = [
@@ -774,6 +789,7 @@ class McpController extends Controller
             'process_meeting' => $this->processMeeting($params),
             'capture_video' => $this->captureVideo($params),
             'get_working_memory' => $this->getWorkingMemory($params),
+            'get_compaction' => $this->getCompaction($params),
             'sync_jira' => $this->syncJira($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
@@ -810,6 +826,49 @@ class McpController extends Controller
             $validated['scope_type'],
             $validated['scope_key']
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    private function getCompaction(array $params): array
+    {
+        $scopeType = trim((string) ($params['scope_type'] ?? ''));
+        $scopeKey = trim((string) ($params['scope_key'] ?? ''));
+        $versionId = trim((string) ($params['version_id'] ?? ''));
+
+        if ($scopeType === '' || $scopeKey === '' || $versionId === '') {
+            throw new \InvalidArgumentException('scope_type, scope_key, and version_id are required.');
+        }
+
+        $userId = (int) auth()->id();
+
+        $version = WorkingMemoryVersion::query()
+            ->whereHas('workingMemory', function ($query) use ($userId, $scopeType, $scopeKey): void {
+                $query->where('user_id', $userId)
+                    ->where('scope_type', $scopeType)
+                    ->where('scope_key', $scopeKey);
+            })
+            ->where('id', $versionId)
+            ->where('build_type', 'like', 'compaction:%')
+            ->first();
+
+        if ($version === null) {
+            throw new \InvalidArgumentException('Compaction not found.');
+        }
+
+        return [
+            'version_id' => $version->id,
+            'scope_type' => $scopeType,
+            'scope_key' => $scopeKey,
+            'build_type' => $version->build_type,
+            'summary_markdown' => (string) $version->summary_markdown,
+            'structured_sections' => $version->structured_sections_json ?? [],
+            'references' => $version->references_json ?? [],
+            'authoring_status' => (string) $version->authoring_status,
+            'created_at' => $version->created_at?->toIso8601String(),
+        ];
     }
 
     /**

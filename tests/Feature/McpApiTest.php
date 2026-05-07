@@ -11,6 +11,8 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
 use App\Models\UserPreference;
+use App\Models\WorkingMemory;
+use App\Models\WorkingMemoryVersion;
 use App\Services\Meetings\MeetingSkillManager;
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
@@ -1128,5 +1130,47 @@ class McpApiTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJsonPath('error.code', -32602);
+    }
+
+    public function test_get_compaction_returns_payload_for_owner(): void
+    {
+        [$key, $user] = $this->validKeyAndUser();
+
+        $memory = WorkingMemory::factory()->create([
+            'user_id' => $user->id,
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+        ]);
+        $version = WorkingMemoryVersion::factory()->create([
+            'working_memory_id' => $memory->id,
+            'build_type' => 'compaction:meeting',
+            'summary_markdown' => "## Summary\nWeekly check-in.",
+            'references_json' => [['type' => 'thought', 'url' => '/thoughts/t1', 'label' => 'standup']],
+        ]);
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => 'get_compaction',
+                'arguments' => [
+                    'scope_type' => 'project',
+                    'scope_key' => 'dezeen',
+                    'version_id' => $version->id,
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+
+        $body = $response->json();
+        $payload = $body['result']['content'][0]['text'] ?? null;
+        $this->assertNotNull($payload);
+        $decoded = json_decode((string) $payload, true);
+        $this->assertSame('compaction:meeting', $decoded['build_type']);
+        $this->assertSame('project', $decoded['scope_type']);
+        $this->assertSame('dezeen', $decoded['scope_key']);
+        $this->assertStringContainsString('Weekly check-in', $decoded['summary_markdown']);
     }
 }
