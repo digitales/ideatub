@@ -273,6 +273,45 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     }
 
     #[Test]
+    public function diagnostics_expose_compaction_cited_items_resolving_bracket_markers(): void
+    {
+        $thoughtUrl = 'https://ideatub.test/thoughts/abc-123';
+        $compactionUrl = '/memory/project/dezeen/compactions/v-1';
+
+        $payload = [
+            'summary_markdown' => '# WM',
+            'structured_sections' => array_fill_keys(
+                ['Current Focus', 'Active Priorities', 'Recent Changes', 'Open Questions', 'Risks / Blockers', 'Next Actions', 'Latest Signals', 'Source Notes'],
+                [
+                    [
+                        'text' => 'Resolved via bracket marker [1].',
+                        'importance' => 1,
+                        'fallback_mode' => 'direct',
+                    ],
+                    [
+                        'text' => 'Resolved via thought citation.',
+                        'importance' => 1,
+                        'fallback_mode' => 'direct',
+                        'citations' => [['type' => 'thought', 'url' => $thoughtUrl, 'label' => 'abc-123']],
+                    ],
+                ],
+            ),
+            'references' => [
+                ['type' => 'compaction', 'url' => $compactionUrl, 'label' => 'compaction:meeting'],
+                ['type' => 'thought', 'url' => $thoughtUrl, 'label' => 'abc-123'],
+            ],
+        ];
+
+        $validator = new WorkingMemoryOutputValidator;
+
+        $result = $validator->validate($payload, null, compactionCountInScope: 1);
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame(16, $result['diagnostics']['cited_items']);
+        $this->assertSame(8, $result['diagnostics']['compaction_cited_items']);
+    }
+
+    #[Test]
     public function it_passes_when_compactions_exist_and_payload_uses_bracket_markers(): void
     {
         $compactionUrl = '/memory/project/dezeen/compactions/v-1';

@@ -27,6 +27,7 @@ class WorkingMemoryOutputValidator
      *     diagnostics: array{
      *         required_items: int,
      *         cited_items: int,
+     *         compaction_cited_items: int,
      *         reason_codes: array<int, string>
      *     }
      * }
@@ -84,6 +85,7 @@ class WorkingMemoryOutputValidator
 
         $requiredItems = 0;
         $citedItems = 0;
+        $compactionCitedItems = 0;
         $hasCompactionCitation = false;
         $reasonCodes = [];
         $missingSections = [];
@@ -128,6 +130,7 @@ class WorkingMemoryOutputValidator
                 $citedItems++;
                 if ($this->containsCompactionType($citations)) {
                     $hasCompactionCitation = true;
+                    $compactionCitedItems++;
                 }
             }
         }
@@ -137,7 +140,8 @@ class WorkingMemoryOutputValidator
                 'Missing required sections: '.implode(', ', $missingSections),
                 $requiredItems,
                 $citedItems,
-                ['empty_required_section', ...$reasonCodes]
+                ['empty_required_section', ...$reasonCodes],
+                $compactionCitedItems
             );
         }
 
@@ -147,7 +151,8 @@ class WorkingMemoryOutputValidator
                 'Required section items must include resolvable citations.',
                 $requiredItems,
                 $citedItems,
-                $uniqueReasonCodes
+                $uniqueReasonCodes,
+                $compactionCitedItems
             );
         }
 
@@ -168,7 +173,8 @@ class WorkingMemoryOutputValidator
                 'diagnostics' => $this->diagnosticsPayload(
                     $requiredItems,
                     $citedItems,
-                    ['coverage_below_threshold']
+                    ['coverage_below_threshold'],
+                    $compactionCitedItems
                 ),
             ];
         }
@@ -182,7 +188,8 @@ class WorkingMemoryOutputValidator
                 'diagnostics' => $this->diagnosticsPayload(
                     $requiredItems,
                     $citedItems,
-                    ['unused_compaction']
+                    ['unused_compaction'],
+                    $compactionCitedItems
                 ),
             ];
         }
@@ -192,7 +199,7 @@ class WorkingMemoryOutputValidator
             'message' => null,
             'coveragePercent' => $coveragePercent,
             'failure_type' => null,
-            'diagnostics' => $this->diagnosticsPayload($requiredItems, $citedItems, []),
+            'diagnostics' => $this->diagnosticsPayload($requiredItems, $citedItems, [], $compactionCitedItems),
         ];
     }
 
@@ -473,14 +480,16 @@ class WorkingMemoryOutputValidator
      * @return array{
      *     required_items: int,
      *     cited_items: int,
+     *     compaction_cited_items: int,
      *     reason_codes: array<int, string>
      * }
      */
-    private function diagnosticsPayload(int $requiredItems, int $citedItems, array $reasonCodes): array
+    private function diagnosticsPayload(int $requiredItems, int $citedItems, array $reasonCodes, int $compactionCitedItems = 0): array
     {
         return [
             'required_items' => $requiredItems,
             'cited_items' => $citedItems,
+            'compaction_cited_items' => $compactionCitedItems,
             'reason_codes' => array_values(array_unique($reasonCodes)),
         ];
     }
@@ -494,18 +503,19 @@ class WorkingMemoryOutputValidator
      *     diagnostics: array{
      *         required_items: int,
      *         cited_items: int,
+     *         compaction_cited_items: int,
      *         reason_codes: array<int, string>
      *     }
      * }
      */
-    private function hardFail(string $message, int $requiredItems = 0, int $citedItems = 0, array $reasonCodes = []): array
+    private function hardFail(string $message, int $requiredItems = 0, int $citedItems = 0, array $reasonCodes = [], int $compactionCitedItems = 0): array
     {
         return [
             'ok' => false,
             'message' => $message,
             'coveragePercent' => null,
             'failure_type' => 'hard',
-            'diagnostics' => $this->diagnosticsPayload($requiredItems, $citedItems, $reasonCodes),
+            'diagnostics' => $this->diagnosticsPayload($requiredItems, $citedItems, $reasonCodes, $compactionCitedItems),
         ];
     }
 

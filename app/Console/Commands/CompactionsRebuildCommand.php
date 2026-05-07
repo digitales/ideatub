@@ -7,6 +7,7 @@ use App\Jobs\SynthesizeMeetingCompactionJob;
 use App\Jobs\SynthesizeResearchCompactionJob;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\WorkingMemory\Compactions\MeetingPrimaryScopeResolver;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 
@@ -17,6 +18,12 @@ class CompactionsRebuildCommand extends Command
     protected $description = 'Manually rebuild a single compaction subtype for a scope.';
 
     private const ALLOWED_TYPES = ['meeting', 'weekly-digest', 'research-synth'];
+
+    public function __construct(
+        private readonly MeetingPrimaryScopeResolver $primaryScopeResolver,
+    ) {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -36,7 +43,13 @@ class CompactionsRebuildCommand extends Command
                     ->where('user_id', $userId)
                     ->whereJsonContains('metadata->type', 'meeting')
                     ->orderBy('created_at')
-                    ->get();
+                    ->get()
+                    ->filter(function (Thought $meeting) use ($scopeType, $scopeKey): bool {
+                        [$mType, $mKey] = $this->primaryScopeResolver->forThought($meeting);
+
+                        return $mType === $scopeType && $mKey === $scopeKey;
+                    })
+                    ->values();
                 foreach ($meetings as $meeting) {
                     SynthesizeMeetingCompactionJob::dispatchSync((string) $meeting->id);
                 }

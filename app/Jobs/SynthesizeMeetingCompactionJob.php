@@ -6,7 +6,7 @@ use App\Models\Thought;
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use App\Services\WorkingMemory\Compactions\MeetingCompactionPromptBuilder;
-use App\Services\WorkingMemory\WorkingMemoryScopeResolver;
+use App\Services\WorkingMemory\Compactions\MeetingPrimaryScopeResolver;
 use App\Support\Json\LlmJsonDecoder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -33,7 +33,7 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
         MeetingCompactionPromptBuilder $promptBuilder,
         OpenRouterService $openRouter,
         CompactionVersionWriter $writer,
-        WorkingMemoryScopeResolver $scopeResolver,
+        MeetingPrimaryScopeResolver $primaryScopeResolver,
     ): void {
         $meeting = Thought::query()->find($this->thoughtId);
         if ($meeting === null) {
@@ -50,7 +50,7 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
             return;
         }
 
-        [$scopeType, $scopeKey] = $this->resolveScope($scopeResolver, $meeting);
+        [$scopeType, $scopeKey] = $primaryScopeResolver->forThought($meeting);
 
         try {
             $prompt = $promptBuilder->build($meeting);
@@ -89,39 +89,6 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
 
             throw $e;
         }
-    }
-
-    /**
-     * Pick the most specific scope the refresh-side resolver will visit for this thought.
-     *
-     * Coherence requirement: a compaction is only useful if the canonical refresh path
-     * later visits the same scope and can cite it. We delegate scope discovery to
-     * WorkingMemoryScopeResolver so the job and refresh stay in lockstep.
-     *
-     * Preference order (matching the resolver's emission order):
-     *   1. First `project` scope (typically derived from source_metadata.project)
-     *   2. First `tag` scope (from metadata.tags or forced tags)
-     *   3. global/global fallback
-     *
-     * @return array{0: string, 1: string}
-     */
-    private function resolveScope(WorkingMemoryScopeResolver $resolver, Thought $meeting): array
-    {
-        $scopes = $resolver->forThought($meeting);
-
-        foreach ($scopes as $scope) {
-            if ($scope['scope_type'] === 'project') {
-                return ['project', $scope['scope_key']];
-            }
-        }
-
-        foreach ($scopes as $scope) {
-            if ($scope['scope_type'] === 'tag') {
-                return ['tag', $scope['scope_key']];
-            }
-        }
-
-        return ['global', 'global'];
     }
 
 }

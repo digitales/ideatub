@@ -80,7 +80,6 @@ class WorkingMemoryBuilderService
                     $buildDiagnostics = $this->mergeCompactionDiagnostics(
                         $buildDiagnostics,
                         $evidencePack,
-                        $authoredOutput,
                     );
                 } elseif (($validation['failure_type'] ?? null) === 'soft') {
                     [$payload, $summaryMarkdown] = $this->legacyPayloadAndSummary($normalizedScopeType, $thoughts);
@@ -681,15 +680,22 @@ class WorkingMemoryBuilderService
     }
 
     /**
-     * @param  array<string, mixed>|null  $diagnostics
+     * Merge evidence-pack composition stats and the validator's normalized
+     * citation counts into the build diagnostics payload.
+     *
+     * The coverage ratio reuses the validator's `cited_items` /
+     * `compaction_cited_items`, which already account for bracket-marker
+     * resolution and default-reference fallback. Walking raw
+     * `structured_sections[].citations` here would underreport coverage when
+     * the model uses `[n]` markers instead of explicit citation arrays.
+     *
+     * @param  array<string, mixed>|null  $diagnostics  validator-emitted diagnostics
      * @param  array<string, mixed>  $evidencePack
-     * @param  array<string, mixed>  $authoredOutput
      * @return array<string, mixed>
      */
     private function mergeCompactionDiagnostics(
         ?array $diagnostics,
         array $evidencePack,
-        array $authoredOutput,
     ): array {
         $compactions = is_array($evidencePack['compactions'] ?? null) ? $evidencePack['compactions'] : [];
         $signals = is_array($evidencePack['signals'] ?? null) ? $evidencePack['signals'] : [];
@@ -702,36 +708,10 @@ class WorkingMemoryBuilderService
             }
         }
 
-        $sections = is_array($authoredOutput['structured_sections'] ?? null)
-            ? $authoredOutput['structured_sections']
-            : [];
-
-        $totalCited = 0;
-        $compactionCited = 0;
-        foreach ($sections as $items) {
-            if (! is_array($items)) {
-                continue;
-            }
-            foreach ($items as $item) {
-                if (! is_array($item)) {
-                    continue;
-                }
-                $citations = is_array($item['citations'] ?? null) ? $item['citations'] : [];
-                if ($citations === []) {
-                    continue;
-                }
-                $totalCited++;
-                foreach ($citations as $citation) {
-                    if (is_array($citation) && ($citation['type'] ?? null) === 'compaction') {
-                        $compactionCited++;
-                        break;
-                    }
-                }
-            }
-        }
-
-        $coverageRatio = $totalCited > 0
-            ? round($compactionCited / $totalCited, 4)
+        $citedItems = (int) ($diagnostics['cited_items'] ?? 0);
+        $compactionCitedItems = (int) ($diagnostics['compaction_cited_items'] ?? 0);
+        $coverageRatio = $citedItems > 0
+            ? round($compactionCitedItems / $citedItems, 4)
             : 0.0;
 
         return array_merge($diagnostics ?? [], [

@@ -67,6 +67,43 @@ final class CompactionsRebuildCommandTest extends TestCase
     }
 
     #[Test]
+    public function it_only_dispatches_meeting_jobs_for_meetings_whose_primary_scope_matches(): void
+    {
+        Bus::fake();
+
+        $user = User::factory()->create();
+
+        $inScope = Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'meeting', 'tags' => ['project:dezeen']],
+            'source_metadata' => ['project' => 'dezeen'],
+        ]);
+        $outOfScope = Thought::factory()->create([
+            'user_id' => $user->id,
+            'metadata' => ['type' => 'meeting', 'tags' => ['project:foo']],
+            'source_metadata' => ['project' => 'foo'],
+        ]);
+
+        $exit = $this->artisan('compactions:rebuild', [
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+            '--user' => (string) $user->id,
+            '--type' => 'meeting',
+        ])->run();
+
+        $this->assertSame(0, $exit);
+        Bus::assertDispatchedSyncTimes(SynthesizeMeetingCompactionJob::class, 1);
+        Bus::assertDispatchedSync(
+            SynthesizeMeetingCompactionJob::class,
+            fn (SynthesizeMeetingCompactionJob $job): bool => $job->thoughtId === (string) $inScope->id,
+        );
+        Bus::assertNotDispatchedSync(
+            SynthesizeMeetingCompactionJob::class,
+            fn (SynthesizeMeetingCompactionJob $job): bool => $job->thoughtId === (string) $outOfScope->id,
+        );
+    }
+
+    #[Test]
     public function it_dispatches_research_synth_when_requested(): void
     {
         Bus::fake();

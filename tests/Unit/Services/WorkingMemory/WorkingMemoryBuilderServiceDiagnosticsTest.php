@@ -82,6 +82,13 @@ final class WorkingMemoryBuilderServiceDiagnosticsTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $diagnostics['raw_thought_inputs_count']);
         $this->assertGreaterThan(0.0, $diagnostics['compaction_coverage_ratio']);
         $this->assertLessThanOrEqual(1.0, $diagnostics['compaction_coverage_ratio']);
+
+        // Reuse contract: the builder's coverage ratio must be derived from the
+        // validator's already-normalized counts (cited_items /
+        // compaction_cited_items) so the two cannot drift out of agreement.
+        $this->assertSame(8, $diagnostics['cited_items']);
+        $this->assertSame(8, $diagnostics['compaction_cited_items']);
+        $this->assertEquals(1.0, $diagnostics['compaction_coverage_ratio']);
     }
 
     protected function tearDown(): void

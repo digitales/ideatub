@@ -8,6 +8,7 @@ use App\Jobs\SynthesizeMeetingCompactionJob;
 use App\Jobs\SynthesizeResearchCompactionJob;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\WorkingMemory\Compactions\MeetingPrimaryScopeResolver;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 
@@ -16,6 +17,12 @@ class WorkingMemoryBootstrapCommand extends Command
     protected $signature = 'working-memory:bootstrap {scope_type} {scope_key} {--user=}';
 
     protected $description = 'Backfill all compactions for a scope, then trigger a consolidated authoring pass.';
+
+    public function __construct(
+        private readonly MeetingPrimaryScopeResolver $primaryScopeResolver,
+    ) {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -32,7 +39,13 @@ class WorkingMemoryBootstrapCommand extends Command
             ->where('user_id', $userId)
             ->whereJsonContains('metadata->type', 'meeting')
             ->orderBy('created_at')
-            ->get();
+            ->get()
+            ->filter(function (Thought $meeting) use ($scopeType, $scopeKey): bool {
+                [$mType, $mKey] = $this->primaryScopeResolver->forThought($meeting);
+
+                return $mType === $scopeType && $mKey === $scopeKey;
+            })
+            ->values();
 
         $this->info(sprintf('Bootstrapping %d meeting compaction(s) for %s/%s...', $meetings->count(), $scopeType, $scopeKey));
         foreach ($meetings as $meeting) {
