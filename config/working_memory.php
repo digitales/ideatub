@@ -31,4 +31,10 @@ return [
     ],
     'authoring_model' => env('WORKING_MEMORY_AUTHORING_MODEL', 'openrouter/auto'),
 
+    'authoring_composer_model' => env('WORKING_MEMORY_COMPOSER_MODEL', env('WORKING_MEMORY_AUTHORING_MODEL', env('OPENROUTER_METADATA_MODEL', 'openai/gpt-4o-mini'))),
+    'authoring_composer_temperature' => (float) env('WORKING_MEMORY_COMPOSER_TEMPERATURE', 0.2),
+    'authoring_meeting_compaction_model' => env('WORKING_MEMORY_MEETING_COMPACTION_MODEL', env('OPENROUTER_METADATA_MODEL', 'openai/gpt-4o-mini')),
+    'authoring_meeting_compaction_temperature' => (float) env('WORKING_MEMORY_MEETING_COMPACTION_TEMPERATURE', 0.2),
+    'authoring_max_prompt_input_chars' => (int) env('WORKING_MEMORY_MAX_PROMPT_INPUT_CHARS', 60000),
+
 ];
