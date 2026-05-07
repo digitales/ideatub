@@ -481,7 +481,7 @@ final class WorkingMemoryComposerPromptBuilderTest extends TestCase
     #[Test]
     public function it_truncates_input_to_configured_max_chars(): void
     {
-        config(['working_memory.authoring.max_prompt_input_chars' => 500]);
+        config(['working_memory.authoring_max_prompt_input_chars' => 500]);
         $builder = new WorkingMemoryComposerPromptBuilder();
 
         $longContent = str_repeat('A', 5000);
@@ -559,7 +559,7 @@ TEXT;
      */
     public function build(array $evidencePack): string
     {
-        $maxChars = (int) config('working_memory.authoring.max_prompt_input_chars', 60000);
+        $maxChars = (int) config('working_memory.authoring_max_prompt_input_chars', 60000);
         $sections = implode(', ', self::REQUIRED_SECTIONS);
 
         $compactionBlock = $this->renderCompactions($evidencePack['compactions'] ?? []);
@@ -1234,7 +1234,7 @@ class MeetingCompactionPromptBuilder
 {
     public function build(Thought $meeting): string
     {
-        $maxChars = (int) config('working_memory.authoring.max_prompt_input_chars', 60000);
+        $maxChars = (int) config('working_memory.authoring_max_prompt_input_chars', 60000);
         $tags = collect(data_get($meeting->metadata, 'tags', []))
             ->map(fn ($t): string => trim((string) $t))
             ->filter()
