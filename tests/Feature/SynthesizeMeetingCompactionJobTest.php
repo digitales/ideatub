@@ -19,6 +19,9 @@ final class SynthesizeMeetingCompactionJobTest extends TestCase
     #[Test]
     public function it_creates_a_compaction_version_for_a_meeting_thought(): void
     {
+        // OpenRouter is mocked before the meeting thought is created so the observer's
+        // synchronous SynthesizeMeetingCompactionJob dispatch hits the mock; the explicit
+        // dispatchSync below exercises the same handler a second time, hence twice().
         $openRouter = Mockery::mock(OpenRouterService::class);
         $openRouter->shouldReceive('researchFromPrompt')->twice()->andReturn(json_encode([
             'summary_markdown' => "## Summary\nWeekly check-in agreed PHP upgrade scope.\n## Decisions\n- Ship DEZ-2819.",
