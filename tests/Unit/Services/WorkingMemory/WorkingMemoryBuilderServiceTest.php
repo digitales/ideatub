@@ -56,6 +56,35 @@ class WorkingMemoryBuilderServiceTest extends TestCase
         $this->assertIsArray($focusItem['citations']);
         $this->assertIsArray($version->references_json);
         $this->assertNotEmpty($version->references_json);
+        $this->assertIsArray($version->section_references_json);
+        $this->assertArrayHasKey('Current Focus', $version->section_references_json);
+        $this->assertNotEmpty($version->section_references_json['Current Focus']);
+        $sectionReference = $version->section_references_json['Current Focus'][0];
+        $this->assertIsArray($sectionReference);
+        $this->assertArrayHasKey('type', $sectionReference);
+        $this->assertArrayHasKey('url', $sectionReference);
+        $this->assertArrayHasKey('label', $sectionReference);
+        $this->assertSame('stream_filter', $sectionReference['type']);
+        $this->assertStringContainsString('/stream?', (string) $sectionReference['url']);
+        $this->assertStringContainsString('section=', (string) $sectionReference['url']);
+        $this->assertStringContainsString(rawurlencode('Current Focus'), (string) $sectionReference['url']);
+        $streamFilterUrls = collect($version->section_references_json)
+            ->map(function (array $references): ?string {
+                $first = $references[0] ?? null;
+                if (! is_array($first) || ($first['type'] ?? null) !== 'stream_filter') {
+                    return null;
+                }
+
+                return (string) ($first['url'] ?? '');
+            })
+            ->filter()
+            ->values();
+        $this->assertNotEmpty($streamFilterUrls);
+        $this->assertCount(
+            $streamFilterUrls->count(),
+            $streamFilterUrls->unique()->values(),
+            'Each section should have its own stream filter URL.'
+        );
         $this->assertGreaterThan(0, (float) ($version->citation_coverage ?? 0));
         $this->assertIsArray($version->build_diagnostics_json);
         $this->assertArrayHasKey('required_items', $version->build_diagnostics_json);
@@ -123,6 +152,8 @@ class WorkingMemoryBuilderServiceTest extends TestCase
             $this->assertArrayHasKey('Current Focus', $version->structured_sections_json);
             $this->assertIsArray($version->references_json);
             $this->assertNotEmpty($version->references_json);
+            $this->assertIsArray($version->section_references_json);
+            $this->assertArrayHasKey('Current Focus', $version->section_references_json);
         }
     }
 
@@ -151,6 +182,7 @@ class WorkingMemoryBuilderServiceTest extends TestCase
         $this->assertStringContainsString('Citation coverage', (string) $version->validation_error);
         $this->assertNull($version->structured_sections_json);
         $this->assertSame([], $version->references_json ?? []);
+        $this->assertSame([], $version->section_references_json ?? []);
         $this->assertNull($version->citation_coverage);
         $this->assertIsArray($version->build_diagnostics_json);
         $this->assertContains(
@@ -182,6 +214,109 @@ class WorkingMemoryBuilderServiceTest extends TestCase
         $this->assertSame('bundle:risk', $row['source_ref']);
         $this->assertSame(0.82, $row['confidence']);
         $this->assertSame('019ae6f3-1111-7000-8000-000000000001', $row['thought_id']);
+    }
+
+    #[Test]
+    public function it_builds_section_references_with_section_specific_urls_and_deduped_valid_links(): void
+    {
+        $builder = app(WorkingMemoryBuilderService::class);
+        $method = new ReflectionMethod(WorkingMemoryBuilderService::class, 'buildSectionReferences');
+        $method->setAccessible(true);
+
+        /** @var array<string, array<int, array<string, mixed>>> $sectionReferences */
+        $sectionReferences = $method->invoke(
+            $builder,
+            [
+                'Current Focus' => [[
+                    'id' => 'focus-1',
+                    'text' => 'Focus item',
+                    'importance' => 0,
+                    'fallback_mode' => 'direct',
+                    'citations' => [
+                        ['type' => 'source', 'url' => 'https://example.com/a', 'label' => 'A'],
+                        ['type' => 'source', 'url' => 'https://example.com/a', 'label' => 'A'],
+                        ['type' => 'source', 'url' => 'javascript:alert(1)', 'label' => 'Bad'],
+                    ],
+                ]],
+                'Next Actions' => [[
+                    'id' => 'next-1',
+                    'text' => 'Do thing',
+                    'importance' => 0,
+                    'fallback_mode' => 'direct',
+                    'citations' => [],
+                ]],
+            ],
+            [
+                ['type' => 'source', 'url' => 'https://fallback.test/doc', 'label' => 'Fallback'],
+                ['type' => 'source', 'url' => 'https://fallback.test/doc', 'label' => 'Fallback'],
+                ['type' => 'source', 'url' => 'javascript:alert(2)', 'label' => 'Bad fallback'],
+            ],
+            'project',
+            'my-app'
+        );
+
+        $this->assertArrayHasKey('Current Focus', $sectionReferences);
+        $this->assertArrayHasKey('Next Actions', $sectionReferences);
+
+        $currentFocus = $sectionReferences['Current Focus'];
+        $nextActions = $sectionReferences['Next Actions'];
+
+        $this->assertSame('stream_filter', $currentFocus[0]['type']);
+        $this->assertSame('stream_filter', $nextActions[0]['type']);
+        $this->assertNotSame($currentFocus[0]['url'], $nextActions[0]['url']);
+        $this->assertStringContainsString('section='.rawurlencode('Current Focus'), (string) $currentFocus[0]['url']);
+        $this->assertStringContainsString('section='.rawurlencode('Next Actions'), (string) $nextActions[0]['url']);
+
+        $this->assertCount(2, $currentFocus);
+        $this->assertCount(2, $nextActions);
+        $this->assertSame('https://example.com/a', $currentFocus[1]['url']);
+        $this->assertSame('https://fallback.test/doc', $nextActions[1]['url']);
+
+        foreach ($sectionReferences as $references) {
+            $urls = collect($references)->pluck('url')->all();
+            $this->assertCount(count(array_unique($urls)), $urls);
+            foreach ($urls as $url) {
+                $this->assertStringNotContainsString('javascript:', (string) $url);
+            }
+        }
+    }
+
+    #[Test]
+    public function it_validates_section_references_urls_for_safe_relative_paths(): void
+    {
+        $builder = app(WorkingMemoryBuilderService::class);
+        $method = new ReflectionMethod(WorkingMemoryBuilderService::class, 'buildSectionReferences');
+        $method->setAccessible(true);
+
+        /** @var array<string, array<int, array<string, mixed>>> $sectionReferences */
+        $sectionReferences = $method->invoke(
+            $builder,
+            [
+                'Current Focus' => [[
+                    'id' => 'focus-1',
+                    'text' => 'Focus item',
+                    'importance' => 0,
+                    'fallback_mode' => 'direct',
+                    'citations' => [
+                        ['type' => 'source', 'url' => 'docs/superpowers/specs/example.md', 'label' => 'Local spec'],
+                        ['type' => 'source', 'url' => '../.env', 'label' => 'Traversal'],
+                        ['type' => 'source', 'url' => 'javascript:alert(1)', 'label' => 'Script'],
+                    ],
+                ]],
+            ],
+            [],
+            'global',
+            'global'
+        );
+
+        $this->assertArrayHasKey('Current Focus', $sectionReferences);
+        $currentFocus = $sectionReferences['Current Focus'];
+        $this->assertNotEmpty($currentFocus);
+        $this->assertSame('stream_filter', $currentFocus[0]['type']);
+        $urls = collect($currentFocus)->pluck('url')->all();
+        $this->assertContains('docs/superpowers/specs/example.md', $urls);
+        $this->assertNotContains('../.env', $urls);
+        $this->assertNotContains('javascript:alert(1)', $urls);
     }
 
     #[Test]

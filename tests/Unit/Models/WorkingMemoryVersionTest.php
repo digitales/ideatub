@@ -32,6 +32,12 @@ class WorkingMemoryVersionTest extends TestCase
             'references_json' => [
                 ['thought_id' => 'abc-123', 'excerpt' => 'Support text'],
             ],
+            'section_references_json' => [
+                [
+                    'section_title' => 'Overview',
+                    'references' => [['thought_id' => 'abc-123', 'excerpt' => 'Support text']],
+                ],
+            ],
         ])->refresh();
 
         $this->assertSame(
@@ -41,6 +47,15 @@ class WorkingMemoryVersionTest extends TestCase
         $this->assertSame(
             [['thought_id' => 'abc-123', 'excerpt' => 'Support text']],
             $version->references_json
+        );
+        $this->assertSame(
+            [
+                [
+                    'section_title' => 'Overview',
+                    'references' => [['thought_id' => 'abc-123', 'excerpt' => 'Support text']],
+                ],
+            ],
+            $version->section_references_json
         );
     }
 

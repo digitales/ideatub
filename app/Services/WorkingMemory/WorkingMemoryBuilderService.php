@@ -39,6 +39,7 @@ class WorkingMemoryBuilderService
         $thoughts = $this->selectThoughts($userId, $normalizedScopeType, $normalizedScopeKey, $buildType);
         $structuredSections = null;
         $references = null;
+        $sectionReferences = [];
         $citationCoverage = null;
         $authoringStatus = 'disabled';
         $validationError = null;
@@ -63,6 +64,12 @@ class WorkingMemoryBuilderService
 
                 $structuredSections = $this->normalizeStructuredSections($authoredOutput['structured_sections'] ?? null);
                 $references = $this->normalizeReferences($authoredOutput['references'] ?? null);
+                $sectionReferences = $this->buildSectionReferences(
+                    $structuredSections,
+                    $references,
+                    $normalizedScopeType,
+                    $normalizedScopeKey
+                );
                 $citationCoverage = $validation['coveragePercent'] ?? null;
 
                 if (($validation['ok'] ?? false) === true) {
@@ -75,6 +82,7 @@ class WorkingMemoryBuilderService
                     $validationError = (string) ($validation['message'] ?? 'AI-authored output failed validation.');
                     $structuredSections = null;
                     $references = [];
+                    $sectionReferences = [];
                     $citationCoverage = null;
                 } else {
                     throw new RuntimeException((string) ($validation['message'] ?? 'AI-authored output failed hard validation.'));
@@ -101,6 +109,7 @@ class WorkingMemoryBuilderService
             $summaryMarkdown,
             $structuredSections,
             $references,
+            $sectionReferences,
             $citationCoverage,
             $authoringStatus,
             $validationError,
@@ -126,6 +135,7 @@ class WorkingMemoryBuilderService
                 'next_actions_json' => $payload['next_actions'],
                 'structured_sections_json' => $structuredSections,
                 'references_json' => $references,
+                'section_references_json' => $sectionReferences,
                 'build_diagnostics_json' => $buildDiagnostics,
                 'citation_coverage' => $citationCoverage,
                 'authoring_status' => $authoringStatus,
@@ -401,6 +411,140 @@ class WorkingMemoryBuilderService
             ->filter(fn (array $reference): bool => $reference['url'] !== '' && $reference['label'] !== '')
             ->values()
             ->all();
+    }
+
+    /**
+     * @param  array<string, array<int, array<string, mixed>>>  $sections
+     * @param  array<int, array<string, mixed>>  $references
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    private function buildSectionReferences(array $sections, array $references, string $scopeType, string $scopeKey): array
+    {
+        if ($sections === []) {
+            return [];
+        }
+
+        return collect($sections)
+            ->mapWithKeys(function (mixed $items, mixed $section) use ($references, $scopeType, $scopeKey): array {
+                $sectionName = trim((string) $section);
+                if ($sectionName === '') {
+                    return [];
+                }
+
+                $sectionReferences = [];
+                $seen = [];
+
+                foreach (is_array($items) ? $items : [] as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+
+                    foreach ($this->normalizeCitationEntries($item['citations'] ?? null) as $citation) {
+                        $this->pushUniqueValidReference($sectionReferences, $seen, $citation);
+                    }
+                }
+
+                if ($sectionReferences === []) {
+                    foreach (array_slice($references, 0, 3) as $reference) {
+                        $this->pushUniqueValidReference($sectionReferences, $seen, $reference);
+                    }
+                }
+
+                array_unshift($sectionReferences, [
+                    'type' => 'stream_filter',
+                    'url' => $this->sectionStreamFilterUrl($scopeType, $scopeKey, $sectionName),
+                    'label' => $sectionName.' evidence',
+                ]);
+
+                return [$sectionName => array_values($sectionReferences)];
+            })
+            ->all();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $references
+     * @param  array<string, true>  $seen
+     * @param  array<string, mixed>  $candidate
+     */
+    private function pushUniqueValidReference(array &$references, array &$seen, array $candidate): void
+    {
+        $signature = $this->referenceSignature($candidate);
+        if ($signature === null || isset($seen[$signature])) {
+            return;
+        }
+
+        $seen[$signature] = true;
+        $references[] = $candidate;
+    }
+
+    private function referenceSignature(array $reference): ?string
+    {
+        $type = trim((string) ($reference['type'] ?? ''));
+        $url = trim((string) ($reference['url'] ?? ''));
+        $label = trim((string) ($reference['label'] ?? ''));
+        if ($url === '' || $label === '' || ! $this->isSupportedSectionReferenceUrl($url)) {
+            return null;
+        }
+
+        return $type.'|'.$url.'|'.$label;
+    }
+
+    private function isSupportedSectionReferenceUrl(string $url): bool
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return false;
+        }
+
+        if ($this->containsParentTraversalSegments($url)) {
+            return false;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return ! str_starts_with($url, '//');
+        }
+
+        $parts = parse_url($url);
+        if (! is_array($parts)) {
+            return false;
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        if (! in_array($scheme, ['http', 'https'], true)) {
+            return $scheme === '';
+        }
+
+        return trim((string) ($parts['host'] ?? '')) !== '';
+    }
+
+    private function containsParentTraversalSegments(string $url): bool
+    {
+        $parts = parse_url($url);
+        if ($parts === false) {
+            return true;
+        }
+
+        $path = is_array($parts) ? (string) ($parts['path'] ?? '') : '';
+        if ($path === '') {
+            return false;
+        }
+
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '..') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function sectionStreamFilterUrl(string $scopeType, string $scopeKey, string $sectionName): string
+    {
+        return '/stream?'.http_build_query([
+            'scope_type' => $scopeType,
+            'scope_key' => $scopeKey,
+            'section' => $sectionName,
+        ], '', '&', PHP_QUERY_RFC3986);
     }
 
     /**
