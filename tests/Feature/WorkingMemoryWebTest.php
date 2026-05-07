@@ -5,10 +5,13 @@ namespace Tests\Feature;
 use App\Models\Project;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use Mockery;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -19,6 +22,7 @@ class WorkingMemoryWebTest extends TestCase
     protected function tearDown(): void
     {
         Carbon::setTestNow(null);
+        Mockery::close();
         parent::tearDown();
     }
 
@@ -185,6 +189,33 @@ class WorkingMemoryWebTest extends TestCase
             'working_memory.authoring_enabled' => true,
             'working_memory.citation_min_coverage' => 0.75,
         ]);
+
+        Queue::fake();
+
+        $ref = ['type' => 'thought', 'url' => '/thoughts/t-feature-ui', 'label' => 'Feature'];
+        $item = static fn (string $text): array => [
+            'text' => $text,
+            'importance' => 1,
+            'fallback_mode' => 'direct',
+            'citations' => [$ref],
+        ];
+        $payload = [
+            'summary_markdown' => "# Working memory synthesis\n\n## Current Focus\n- Focus for UI.",
+            'structured_sections' => [
+                'Current Focus' => [$item('Focus for UI.')],
+                'Active Priorities' => [$item('Priority line.')],
+                'Recent Changes' => [$item('Changes line.')],
+                'Open Questions' => [$item('Questions?')],
+                'Risks / Blockers' => [$item('Risks line.')],
+                'Next Actions' => [$item('Next line.')],
+                'Latest Signals' => [$item('Signals line.')],
+                'Source Notes' => [$item('Notes line.')],
+            ],
+            'references' => [$ref],
+        ];
+        $mock = Mockery::mock(OpenRouterService::class);
+        $mock->shouldReceive('researchFromPrompt')->andReturn(json_encode($payload));
+        $this->app->instance(OpenRouterService::class, $mock);
 
         $user = $this->createUserWithConsolidatedMemory('Structured section evidence for working memory page.');
 

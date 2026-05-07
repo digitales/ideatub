@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use Mockery;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -18,6 +21,12 @@ class MemoryInsightsWebTest extends TestCase
         parent::setUp();
 
         $this->withoutVite();
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 
     public function test_guest_get_memory_insights_redirects_to_login(): void
@@ -71,6 +80,34 @@ class MemoryInsightsWebTest extends TestCase
             'working_memory.authoring_enabled' => true,
             'working_memory.citation_min_coverage' => 0.75,
         ]);
+
+        Queue::fake();
+
+        $ref = ['type' => 'thought', 'url' => '/thoughts/t-insights-ui', 'label' => 'Insights'];
+        $item = static fn (string $text): array => [
+            'text' => $text,
+            'importance' => 1,
+            'fallback_mode' => 'direct',
+            'citations' => [$ref],
+        ];
+        $payload = [
+            'summary_markdown' => "# Working memory synthesis\n\n## Current Focus\n- Insights focus.",
+            'structured_sections' => [
+                'Current Focus' => [$item('Insights focus.')],
+                'Active Priorities' => [$item('Priority.')],
+                'Recent Changes' => [$item('Changes.')],
+                'Open Questions' => [$item('Questions?')],
+                'Risks / Blockers' => [$item('Risks.')],
+                'Next Actions' => [$item('Next.')],
+                'Latest Signals' => [$item('Latest signals line.')],
+                'Source Notes' => [$item('Notes.')],
+            ],
+            'references' => [$ref],
+        ];
+        $mock = Mockery::mock(OpenRouterService::class);
+        $mock->shouldReceive('researchFromPrompt')->andReturn(json_encode($payload));
+        $this->app->instance(OpenRouterService::class, $mock);
+
         $user = User::factory()->create();
 
         Thought::factory()

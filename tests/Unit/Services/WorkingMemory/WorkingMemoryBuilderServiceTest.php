@@ -5,6 +5,7 @@ namespace Tests\Unit\Services\WorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserPreference;
+use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use App\Services\WorkingMemory\WorkingMemoryConsolidationWindowResolver;
@@ -13,7 +14,9 @@ use App\Services\WorkingMemory\WorkingMemoryScopeNormalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Queue;
 use InvalidArgumentException;
+use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionMethod;
 use RuntimeException;
@@ -23,6 +26,13 @@ class WorkingMemoryBuilderServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Queue::fake();
+    }
+
     #[Test]
     public function it_persists_authored_sections_and_references_for_global_scope(): void
     {
@@ -31,6 +41,8 @@ class WorkingMemoryBuilderServiceTest extends TestCase
             'working_memory.authoring_enabled' => true,
             'working_memory.citation_min_coverage' => 0.75,
         ]);
+
+        $this->bindValidatedComposerOpenRouter();
 
         $user = User::factory()->create();
 
@@ -118,6 +130,8 @@ class WorkingMemoryBuilderServiceTest extends TestCase
             'working_memory.citation_min_coverage' => 0.75,
         ]);
 
+        $this->bindValidatedComposerOpenRouter(3);
+
         $user = User::factory()->create();
 
         Thought::factory()->create([
@@ -165,6 +179,8 @@ class WorkingMemoryBuilderServiceTest extends TestCase
             'working_memory.authoring_enabled' => true,
             'working_memory.citation_min_coverage' => 1.01,
         ]);
+
+        $this->bindValidatedComposerOpenRouter();
 
         $user = User::factory()->create();
 
@@ -327,6 +343,8 @@ class WorkingMemoryBuilderServiceTest extends TestCase
             'working_memory.authoring_enabled' => true,
             'working_memory.citation_min_coverage' => 0.75,
         ]);
+
+        $this->bindValidatedComposerOpenRouter(2);
 
         $user = User::factory()->create();
 
@@ -636,6 +654,8 @@ class WorkingMemoryBuilderServiceTest extends TestCase
             'working_memory.citation_min_coverage' => 0.75,
         ]);
 
+        $this->bindValidatedThenInvalidComposerOpenRouter();
+
         $user = User::factory()->create();
 
         Thought::withoutEvents(function () use ($user): void {
@@ -680,6 +700,8 @@ class WorkingMemoryBuilderServiceTest extends TestCase
             'working_memory.authoring_enabled' => true,
             'working_memory.citation_min_coverage' => 0.75,
         ]);
+
+        $this->bindInvalidCitationsComposerOpenRouter();
 
         $user = User::factory()->create();
 
@@ -741,5 +763,91 @@ class WorkingMemoryBuilderServiceTest extends TestCase
         );
         $this->assertSame($versionCountBeforeFailure, $baselineVersion->workingMemory->versions()->count());
         $this->assertSame('degraded', $fallbackVersion->workingMemory->fresh()->freshness_state);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
+    protected function bindValidatedComposerOpenRouter(int $times = 1): void
+    {
+        $json = json_encode($this->validatedComposerModelPayloadForBuild());
+        $mock = Mockery::mock(OpenRouterService::class);
+        $mock->shouldReceive('researchFromPrompt')->times($times)->andReturn($json);
+        $this->app->instance(OpenRouterService::class, $mock);
+    }
+
+    protected function bindValidatedThenInvalidComposerOpenRouter(): void
+    {
+        $good = json_encode($this->validatedComposerModelPayloadForBuild());
+        $bad = json_encode($this->composerPayloadWithInvalidSectionCitations());
+        $mock = Mockery::mock(OpenRouterService::class);
+        $mock->shouldReceive('researchFromPrompt')->twice()->andReturn($good, $bad);
+        $this->app->instance(OpenRouterService::class, $mock);
+    }
+
+    protected function bindInvalidCitationsComposerOpenRouter(): void
+    {
+        $json = json_encode($this->composerPayloadWithInvalidSectionCitations());
+        $mock = Mockery::mock(OpenRouterService::class);
+        $mock->shouldReceive('researchFromPrompt')->once()->andReturn($json);
+        $this->app->instance(OpenRouterService::class, $mock);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function validatedComposerModelPayloadForBuild(): array
+    {
+        $ref = ['type' => 'thought', 'url' => '/thoughts/t-build', 'label' => 'BuildRef'];
+        $item = static fn (string $text): array => [
+            'text' => $text,
+            'importance' => 1,
+            'fallback_mode' => 'direct',
+            'citations' => [$ref],
+        ];
+
+        return [
+            'summary_markdown' => "# Working memory synthesis\n\n## Current Focus\n- Focus line.",
+            'structured_sections' => [
+                'Current Focus' => [$item('Focus line for global scope.')],
+                'Active Priorities' => [$item('Priorities line.')],
+                'Recent Changes' => [$item('Changes line.')],
+                'Open Questions' => [$item('Questions line?')],
+                'Risks / Blockers' => [$item('Risks line.')],
+                'Next Actions' => [$item('Actions line.')],
+                'Latest Signals' => [$item('Signals line.')],
+                'Source Notes' => [$item('Source notes line.')],
+            ],
+            'references' => [$ref],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function composerPayloadWithInvalidSectionCitations(): array
+    {
+        $bad = ['type' => 'source', 'url' => 'javascript:alert(1)', 'label' => 'bad'];
+        $item = [
+            'text' => 'Row with invalid citation URL.',
+            'importance' => 1,
+            'fallback_mode' => 'direct',
+            'citations' => [$bad],
+        ];
+        $sections = [];
+        foreach (WorkingMemoryOutputValidator::REQUIRED_SECTION_KEYS as $key) {
+            $sections[$key] = [$item];
+        }
+
+        return [
+            'summary_markdown' => 'invalid inner citations',
+            'structured_sections' => $sections,
+            'references' => [
+                ['type' => 'thought', 'url' => '/thoughts/ok', 'label' => 'ok'],
+            ],
+        ];
     }
 }
