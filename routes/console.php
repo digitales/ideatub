@@ -17,3 +17,4 @@ Schedule::command('mail:sync-all')->hourly()->when(fn () => config('services.mai
 Schedule::command('imports:prune-expired-batches')->dailyAt('03:00');
 Schedule::command('working-memory:consolidate')->dailyAt('02:45');
 Schedule::command('compactions:digest')->hourly();
+Schedule::command('compactions:research')->dailyAt('04:15');
