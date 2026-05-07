@@ -35,6 +35,10 @@ return [
     'authoring_composer_temperature' => (float) env('WORKING_MEMORY_COMPOSER_TEMPERATURE', 0.2),
     'authoring_meeting_compaction_model' => env('WORKING_MEMORY_MEETING_COMPACTION_MODEL', env('OPENROUTER_METADATA_MODEL', 'openai/gpt-4o-mini')),
     'authoring_meeting_compaction_temperature' => (float) env('WORKING_MEMORY_MEETING_COMPACTION_TEMPERATURE', 0.2),
+    'digest_window_days' => (int) env('WORKING_MEMORY_DIGEST_WINDOW_DAYS', 7),
+    'digest_min_thoughts' => (int) env('WORKING_MEMORY_DIGEST_MIN_THOUGHTS', 3),
+    'authoring_digest_model' => env('WORKING_MEMORY_DIGEST_MODEL', env('OPENROUTER_METADATA_MODEL', 'openai/gpt-4o-mini')),
+    'authoring_digest_temperature' => (float) env('WORKING_MEMORY_DIGEST_TEMPERATURE', 0.2),
     'authoring_max_prompt_input_chars' => (int) env('WORKING_MEMORY_MAX_PROMPT_INPUT_CHARS', 60000),
 
     /*
