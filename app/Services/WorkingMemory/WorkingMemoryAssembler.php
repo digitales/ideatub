@@ -193,6 +193,7 @@ class WorkingMemoryAssembler
      *     next_actions: array<int, array{action: string}>,
      *     structured_sections: array<string, array<int, array<string, mixed>>>,
      *     references: array<int, array{type: string, url: string, label: string}>,
+     *     section_references: array<string, array<int, array<string, mixed>>>,
      *     citation_coverage: float|null,
      *     authoring_status: string|null,
      *     validation_error: string|null,
@@ -248,6 +249,7 @@ class WorkingMemoryAssembler
      *     next_actions: array<int, array{action: string}>,
      *     structured_sections: array<string, array<int, array<string, mixed>>>,
      *     references: array<int, array{type: string, url: string, label: string}>,
+     *     section_references: array<string, array<int, array<string, mixed>>>,
      *     citation_coverage: float|null,
      *     authoring_status: string|null,
      *     validation_error: string|null,
@@ -285,6 +287,7 @@ class WorkingMemoryAssembler
             'next_actions' => $canonical->next_actions_json ?? [],
             'structured_sections' => $canonical->structured_sections_json ?? [],
             'references' => $canonical->references_json ?? [],
+            'section_references' => $canonical->section_references_json ?? [],
             'citation_coverage' => $canonical->citation_coverage !== null
                 ? (float) $canonical->citation_coverage
                 : null,

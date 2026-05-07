@@ -415,6 +415,10 @@ class WorkingMemoryOutputValidator
             return false;
         }
 
+        if (preg_match('/[\x00-\x1F\x7F]/', $trimmedUrl) === 1 || preg_match('/\s/', $trimmedUrl) === 1) {
+            return false;
+        }
+
         $parts = parse_url($trimmedUrl);
         if ($parts === false) {
             return false;

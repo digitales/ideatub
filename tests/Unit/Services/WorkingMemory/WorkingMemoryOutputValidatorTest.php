@@ -100,6 +100,19 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     }
 
     #[Test]
+    public function invalid_reference_url_hard_fails_validation(): void
+    {
+        $payload = $this->validStructuredPayload();
+        $payload['references'][0]['url'] = 'javascript:alert(1)';
+
+        $result = app(WorkingMemoryOutputValidator::class)->validate($payload, 1.0);
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('hard', $result['failure_type']);
+        $this->assertContains('invalid_link', $result['diagnostics']['reason_codes'] ?? []);
+    }
+
+    #[Test]
     public function low_coverage_returns_soft_failure(): void
     {
         $payload = $this->validStructuredPayload();
@@ -149,7 +162,7 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     }
 
     #[Test]
-    public function missing_item_citation_in_required_section_fails_hard(): void
+    public function required_item_without_citation_is_counted_and_rejected(): void
     {
         $payload = $this->validStructuredPayload();
         $payload['structured_sections']['Next Actions'][0]['citations'] = [];
@@ -159,6 +172,8 @@ class WorkingMemoryOutputValidatorTest extends TestCase
         $this->assertFalse($result['ok']);
         $this->assertSame('hard', $result['failure_type']);
         $this->assertContains('missing_citation', $result['diagnostics']['reason_codes'] ?? []);
+        $this->assertSame(8, $result['diagnostics']['required_items'] ?? null);
+        $this->assertSame(7, $result['diagnostics']['cited_items'] ?? null);
     }
 
     #[Test]

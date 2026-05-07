@@ -554,7 +554,7 @@ class McpController extends Controller
             ],
             [
                 'name' => 'get_working_memory',
-                'description' => 'Return global, project, or insights working memory snapshot with freshness and confidence.',
+                'description' => 'Return global, project, insights, or tag working memory snapshot with canonical sections, references, section_references, and diagnostics. Section/reference URLs may be IdeaTub-relative routes (for example /stream?...) or safe source URLs.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [

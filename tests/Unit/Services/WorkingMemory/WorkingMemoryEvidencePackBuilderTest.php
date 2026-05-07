@@ -15,13 +15,17 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function it_prefers_internal_thought_links_and_falls_back_to_source_refs(): void
+    public function evidence_pack_signal_references_prioritize_internal_thought_permalink(): void
     {
         $user = User::factory()->create();
 
         $linkedThought = Thought::factory()->create([
             'user_id' => $user->id,
             'content' => 'Connected thought with internal route.',
+            'source_metadata' => [
+                'file_path' => 'docs/superpowers/specs/canonical-source.md',
+                'doc_type' => 'spec',
+            ],
             'created_at' => Carbon::parse('2026-05-05 12:00:00', 'UTC'),
         ]);
 
@@ -42,12 +46,18 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
             collect([$linkedThought, $fallbackOnlyThought])
         );
 
-        $linkedSignalRef = $pack['signals'][0]['references'][0] ?? null;
-        $fallbackSignalRef = $pack['signals'][1]['references'][0] ?? null;
+        $this->assertCount(2, $pack['signals']);
+        $linkedSignalRefs = $pack['signals'][0]['references'] ?? [];
+        $fallbackSignalRefs = $pack['signals'][1]['references'] ?? [];
 
-        $this->assertNotNull($linkedSignalRef);
-        $this->assertSame('thought', $linkedSignalRef['type']);
-        $this->assertStringContainsString('/thoughts/', $linkedSignalRef['url']);
+        $this->assertCount(2, $linkedSignalRefs);
+        $this->assertSame('thought', $linkedSignalRefs[0]['type']);
+        $this->assertStringContainsString('/thoughts/', $linkedSignalRefs[0]['url']);
+        $this->assertSame((string) $linkedThought->id, $linkedSignalRefs[0]['label']);
+        $this->assertSame('source', $linkedSignalRefs[1]['type']);
+        $this->assertSame('docs/superpowers/specs/canonical-source.md', $linkedSignalRefs[1]['url']);
+        $this->assertCount(1, $fallbackSignalRefs);
+        $fallbackSignalRef = $fallbackSignalRefs[0] ?? null;
         $this->assertNotNull($fallbackSignalRef);
         $this->assertSame('source', $fallbackSignalRef['type']);
         $this->assertSame('docs/superpowers/specs/example.md', $fallbackSignalRef['url']);
@@ -75,6 +85,7 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
             collect([$dualLinkedThought])
         );
 
+        $this->assertCount(1, $pack['signals']);
         $references = $pack['signals'][0]['references'] ?? [];
 
         $this->assertCount(2, $references);
@@ -85,11 +96,42 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
     }
 
     #[Test]
+    public function evidence_pack_signal_references_fall_back_to_url_only_source_metadata(): void
+    {
+        $user = User::factory()->create();
+
+        $urlOnlyThought = Thought::make([
+            'user_id' => $user->id,
+            'content' => 'Imported note with URL-only metadata.',
+            'source_metadata' => [
+                'source_doc_url' => 'https://example.com/source-doc',
+                'section_title' => 'Latest Signals',
+            ],
+            'created_at' => Carbon::parse('2026-05-05 18:00:00', 'UTC'),
+        ]);
+
+        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+            $user->id,
+            'global',
+            'global',
+            collect([$urlOnlyThought])
+        );
+
+        $this->assertCount(1, $pack['signals']);
+        $references = $pack['signals'][0]['references'] ?? [];
+
+        $this->assertCount(1, $references);
+        $this->assertSame('source', $references[0]['type']);
+        $this->assertSame('https://example.com/source-doc', $references[0]['url']);
+        $this->assertSame('Latest Signals', $references[0]['label']);
+    }
+
+    #[Test]
     public function evidence_pack_includes_section_candidates_and_section_bundle_fallback_references(): void
     {
         $user = User::factory()->create();
 
-        $signal = Thought::factory()->create([
+        $latestSignal = Thought::factory()->create([
             'user_id' => $user->id,
             'content' => 'Latest integration signal from imported note.',
             'metadata' => ['tags' => ['ai']],
@@ -101,11 +143,23 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
             'created_at' => Carbon::parse('2026-05-05 17:00:00', 'UTC'),
         ]);
 
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Second latest signal reusing same source should dedupe.',
+            'metadata' => ['tags' => ['ai']],
+            'source_metadata' => [
+                'file_path' => 'docs/superpowers/specs/latest-signals.md',
+                'doc_type' => 'spec',
+                'section_title' => 'Latest Signals',
+            ],
+            'created_at' => Carbon::parse('2026-05-05 17:01:00', 'UTC'),
+        ]);
+
         $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
             $user->id,
             'tag',
             'ai',
-            collect([$signal])
+            Thought::query()->where('user_id', $user->id)->get()
         );
 
         foreach ([
@@ -123,7 +177,17 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
         $this->assertArrayHasKey('section_bundles', $pack);
         $this->assertArrayHasKey('Latest Signals', $pack['section_bundles']);
         $this->assertNotEmpty($pack['section_bundles']['Latest Signals']);
+        $this->assertCount(1, $pack['section_bundles']['Latest Signals']);
         $this->assertSame('source', $pack['section_bundles']['Latest Signals'][0]['type']);
+        $this->assertSame('docs/superpowers/specs/latest-signals.md', $pack['section_bundles']['Latest Signals'][0]['url']);
+        $this->assertSame('latest-signals.md', $pack['section_bundles']['Latest Signals'][0]['label']);
+
+        $latestSignalPayload = collect($pack['signals'])
+            ->firstWhere('thought_id', (string) $latestSignal->id);
+        $latestSignalRefs = is_array($latestSignalPayload) ? ($latestSignalPayload['references'] ?? []) : [];
+        $this->assertCount(2, $latestSignalRefs);
+        $this->assertSame('thought', $latestSignalRefs[0]['type']);
+        $this->assertSame('source', $latestSignalRefs[1]['type']);
     }
 
     #[Test]

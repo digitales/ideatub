@@ -58,6 +58,7 @@ class WorkingMemoryApiTest extends TestCase
             'next_actions',
             'structured_sections',
             'references',
+            'section_references',
             'citation_coverage',
             'build_diagnostics',
             'last_refreshed_at',
@@ -74,6 +75,51 @@ class WorkingMemoryApiTest extends TestCase
         $this->assertIsInt($response->json('input_count'));
         $this->assertIsArray($response->json('structured_sections'));
         $this->assertIsArray($response->json('references'));
+        $this->assertIsArray($response->json('section_references'));
+        $isSupportedReferenceUrl = static function (string $candidate): bool {
+            $parts = parse_url($candidate);
+            if ($parts === false) {
+                return false;
+            }
+
+            $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+            if ($scheme !== '') {
+                if (! in_array($scheme, ['http', 'https'], true)) {
+                    return false;
+                }
+
+                return trim((string) ($parts['host'] ?? '')) !== '';
+            }
+
+            if (str_starts_with($candidate, '//')) {
+                return false;
+            }
+
+            $path = (string) ($parts['path'] ?? '');
+            foreach (explode('/', $path) as $segment) {
+                if ($segment === '..') {
+                    return false;
+                }
+            }
+
+            return true;
+        };
+        $sectionReferences = $response->json('section_references');
+        foreach ($sectionReferences as $section => $references) {
+            $this->assertIsArray($references);
+            foreach ($references as $reference) {
+                $this->assertIsArray($reference);
+                $url = (string) ($reference['url'] ?? '');
+                $this->assertNotSame('', $url);
+                if (($reference['type'] ?? null) === 'stream_filter') {
+                    $this->assertStringContainsString('section=', $url);
+                    $this->assertStringContainsString(rawurlencode((string) $section), $url);
+                } else {
+                    $this->assertTrue($isSupportedReferenceUrl($url));
+                }
+                $this->assertStringNotContainsString('javascript:', strtolower($url));
+            }
+        }
         $citationCoverage = $response->json('citation_coverage');
         $this->assertTrue($citationCoverage === null || is_float($citationCoverage));
         $buildDiagnostics = $response->json('build_diagnostics');

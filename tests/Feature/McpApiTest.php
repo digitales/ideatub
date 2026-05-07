@@ -1011,12 +1011,61 @@ class McpApiTest extends TestCase
                 'freshness_state',
                 'structured_sections',
                 'references',
+                'section_references',
                 'citation_coverage',
                 'build_diagnostics',
             ],
         ]);
         $this->assertIsArray($response->json('result.structured_sections'));
         $this->assertIsArray($response->json('result.references'));
+        $this->assertIsArray($response->json('result.section_references'));
+        $isSupportedReferenceUrl = static function (string $candidate): bool {
+            $parts = parse_url($candidate);
+            if ($parts === false) {
+                return false;
+            }
+
+            $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+            if ($scheme !== '') {
+                if (! in_array($scheme, ['http', 'https'], true)) {
+                    return false;
+                }
+
+                return trim((string) ($parts['host'] ?? '')) !== '';
+            }
+
+            if (str_starts_with($candidate, '//')) {
+                return false;
+            }
+
+            $path = (string) ($parts['path'] ?? '');
+            foreach (explode('/', $path) as $segment) {
+                if ($segment === '..') {
+                    return false;
+                }
+            }
+
+            return true;
+        };
+        foreach ($response->json('result.section_references') as $sectionName => $sectionReferences) {
+            $this->assertIsString((string) $sectionName);
+            $this->assertIsArray($sectionReferences);
+            foreach ($sectionReferences as $reference) {
+                $this->assertIsArray($reference);
+                $this->assertArrayHasKey('type', $reference);
+                $this->assertArrayHasKey('url', $reference);
+                $this->assertArrayHasKey('label', $reference);
+                $this->assertIsString($reference['type']);
+                $this->assertIsString($reference['url']);
+                $this->assertIsString($reference['label']);
+                $this->assertNotSame('', trim($reference['type']));
+                $this->assertNotSame('', trim($reference['url']));
+                $this->assertNotSame('', trim($reference['label']));
+                if ($reference['type'] !== 'stream_filter') {
+                    $this->assertTrue($isSupportedReferenceUrl($reference['url']));
+                }
+            }
+        }
         $citationCoverage = $response->json('result.citation_coverage');
         $this->assertTrue($citationCoverage === null || is_float($citationCoverage));
         $buildDiagnostics = $response->json('result.build_diagnostics');
