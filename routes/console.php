@@ -16,3 +16,4 @@ Schedule::command('jira:sync-all')->hourly()->when(fn () => config('services.jir
 Schedule::command('mail:sync-all')->hourly()->when(fn () => config('services.mail_sync.enabled', true));
 Schedule::command('imports:prune-expired-batches')->dailyAt('03:00');
 Schedule::command('working-memory:consolidate')->dailyAt('02:45');
+Schedule::command('compactions:digest')->hourly();
