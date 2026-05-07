@@ -29,15 +29,27 @@ class OpenRouterService
         }
 
         $model = config('services.openrouter.embedding_model', 'openai/text-embedding-3-small');
+        $input = $this->truncateEmbeddingInput($text, $model);
 
         $response = Http::withToken($apiKey)
             ->timeout(30)
             ->post(self::EMBEDDINGS_URL, [
-                'input' => $text,
+                'input' => $input,
                 'model' => $model,
             ]);
 
         $response->throw();
+
+        $providerError = $response->json('error.message');
+        if (is_string($providerError) && trim($providerError) !== '') {
+            Log::error('OpenRouter embeddings response contained error payload.', [
+                'status' => $response->status(),
+                'model' => $model,
+                'error_message' => $providerError,
+                'body_preview' => Str::limit($response->body(), 800),
+            ]);
+            throw new \RuntimeException('OpenRouter embeddings request failed: '.$providerError);
+        }
 
         $embedding = $response->json('data.0.embedding');
         if (! is_array($embedding)) {
@@ -50,6 +62,24 @@ class OpenRouterService
         }
 
         return $embedding;
+    }
+
+    private function truncateEmbeddingInput(string $text, string $model): string
+    {
+        $maxChars = (int) config('services.openrouter.embedding_max_input_chars', 24_000);
+        if ($maxChars <= 0 || mb_strlen($text) <= $maxChars) {
+            return $text;
+        }
+
+        $truncated = mb_substr($text, 0, $maxChars);
+        Log::warning('OpenRouter embedding input truncated to configured character limit.', [
+            'model' => $model,
+            'max_chars' => $maxChars,
+            'original_chars' => mb_strlen($text),
+            'truncated_chars' => mb_strlen($truncated),
+        ]);
+
+        return $truncated;
     }
 
     /**

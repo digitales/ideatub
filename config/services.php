@@ -7,6 +7,7 @@ return [
     'openrouter' => [
         'api_key' => env('OPENROUTER_API_KEY'),
         'embedding_model' => env('OPENROUTER_EMBEDDING_MODEL', 'openai/text-embedding-3-small'),
+        'embedding_max_input_chars' => (int) env('OPENROUTER_EMBEDDING_MAX_INPUT_CHARS', 24000),
         'metadata_model' => env('OPENROUTER_METADATA_MODEL', 'openai/gpt-4o-mini'),
     ],
     'google' => [

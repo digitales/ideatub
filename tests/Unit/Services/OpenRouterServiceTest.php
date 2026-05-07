@@ -18,6 +18,7 @@ class OpenRouterServiceTest extends TestCase
         parent::setUp();
         Config::set('services.openrouter.api_key', 'test-api-key');
         Config::set('services.openrouter.embedding_model', 'openai/text-embedding-3-small');
+        Config::set('services.openrouter.embedding_max_input_chars', 24000);
         Config::set('services.openrouter.metadata_model', 'openai/gpt-4o-mini');
         $this->service = new OpenRouterService;
     }
@@ -82,6 +83,48 @@ class OpenRouterServiceTest extends TestCase
         $this->expectExceptionMessage('embedding');
 
         $this->service->embed('text');
+    }
+
+    #[Test]
+    public function embed_truncates_oversized_input_before_sending_request(): void
+    {
+        Config::set('services.openrouter.embedding_max_input_chars', 10);
+        $vector = array_fill(0, 3, 0.5);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/embeddings' => Http::response([
+                'data' => [
+                    ['embedding' => $vector],
+                ],
+            ], 200),
+        ]);
+
+        $result = $this->service->embed('0123456789EXTRA');
+
+        $this->assertSame($vector, $result);
+        Http::assertSent(function ($request) {
+            return $request->url() === 'https://openrouter.ai/api/v1/embeddings'
+                && $request['input'] === '0123456789'
+                && $request['model'] === 'openai/text-embedding-3-small';
+        });
+    }
+
+    #[Test]
+    public function embed_throws_clear_exception_when_response_contains_error_payload(): void
+    {
+        Http::fake([
+            'https://openrouter.ai/api/v1/embeddings' => Http::response([
+                'error' => [
+                    'message' => "HTTP 400: Invalid 'input': maximum context length is 8192 tokens.",
+                    'code' => 400,
+                ],
+            ], 200),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("OpenRouter embeddings request failed: HTTP 400: Invalid 'input': maximum context length is 8192 tokens.");
+
+        $this->service->embed(str_repeat('x', 20000));
     }
 
     #[Test]

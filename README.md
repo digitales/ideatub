@@ -74,12 +74,17 @@ See `.env.example` for all variables. Key ones:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENROUTER_API_KEY` | Yes | OpenRouter API key for embeddings and metadata extraction. Server-only; never exposed to the client. |
+| `OPENROUTER_EMBEDDING_MAX_INPUT_CHARS` | No | Max characters sent per embeddings request before truncation (default `24000`). Prevents oversized embedding inputs from failing with context-limit errors. |
 | `MCP_ACCESS_KEY` | No (legacy) | Optional single shared key for MCP; prefer per-user keys from `ideatub:create-mcp-keys`. |
 | `DB_CONNECTION` | Yes | e.g. `pgsql` (default). |
 | `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` | Yes (for pgsql) | PostgreSQL connection. |
 | `QUEUE_CONNECTION` | No | `sync` for no queue; `redis` (or similar) when using queued jobs (e.g. Evernote sync). |
 | `EVERNOTE_ACCESS_TOKEN` | No | Evernote API token; if set, thoughts are mirrored to Evernote (see [Evernote mirror](docs/evernote-mirror.md)). |
 | `EVERNOTE_NOTEBOOK_GUID_*` | No | Notebook GUIDs for mapping (e.g. `_DEFAULT`, `_IDEA`, `_TASK`). See [Evernote mirror](docs/evernote-mirror.md). |
+
+### Troubleshooting embeddings
+
+If logs show upstream errors like **maximum context length is 8192 tokens** (or OpenRouter wrapping that as `invalid_request_error`), the embedding input exceeded the model limit. IdeaTub truncates embedding requests to **`OPENROUTER_EMBEDDING_MAX_INPUT_CHARS`** characters (default `24000`) before sending to OpenRouter; tune that value if you still hit limits on very dense Unicode text or need a smaller prefix.
 
 ## Evernote mirror
 

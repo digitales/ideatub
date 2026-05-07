@@ -1,6 +1,6 @@
 # Secrets and credentials - never send to AI
 .env
-.env.*
+!.env.*
 *.pem
 *.key
 credentials.json
