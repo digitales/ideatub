@@ -39,6 +39,10 @@ return [
     'digest_min_thoughts' => (int) env('WORKING_MEMORY_DIGEST_MIN_THOUGHTS', 3),
     'authoring_digest_model' => env('WORKING_MEMORY_DIGEST_MODEL', env('OPENROUTER_METADATA_MODEL', 'openai/gpt-4o-mini')),
     'authoring_digest_temperature' => (float) env('WORKING_MEMORY_DIGEST_TEMPERATURE', 0.2),
+    'research_synth_min_thoughts' => (int) env('WORKING_MEMORY_RESEARCH_SYNTH_MIN_THOUGHTS', 8),
+    'research_synth_freshness_hours' => (int) env('WORKING_MEMORY_RESEARCH_SYNTH_FRESHNESS_HOURS', 168),
+    'authoring_research_model' => env('WORKING_MEMORY_RESEARCH_MODEL', env('OPENROUTER_METADATA_MODEL', 'openai/gpt-4o-mini')),
+    'authoring_research_temperature' => (float) env('WORKING_MEMORY_RESEARCH_TEMPERATURE', 0.2),
     'authoring_max_prompt_input_chars' => (int) env('WORKING_MEMORY_MAX_PROMPT_INPUT_CHARS', 60000),
 
     /*
