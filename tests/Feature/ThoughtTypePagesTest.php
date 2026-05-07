@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\OpenRouterService;
 use App\Support\ThoughtTypeNavigation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -223,6 +224,8 @@ class ThoughtTypePagesTest extends TestCase
 
     public function test_meetings_type_page_lists_only_meeting_metadata_thoughts(): void
     {
+        Queue::fake();
+
         $user = User::factory()->create();
         Thought::factory()->create([
             'user_id' => $user->id,
@@ -411,6 +414,8 @@ class ThoughtTypePagesTest extends TestCase
 
     public function test_meetings_stream_thought_type_label_links_to_meetings_stream_and_destination_ok(): void
     {
+        Queue::fake();
+
         $user = User::factory()->create();
         Thought::factory()->create([
             'user_id' => $user->id,
@@ -449,6 +454,8 @@ class ThoughtTypePagesTest extends TestCase
 
     public function test_idea_index_meeting_thought_type_label_links_to_meetings_stream_and_destination_ok(): void
     {
+        Queue::fake();
+
         $user = User::factory()->create();
         Thought::factory()->create([
             'user_id' => $user->id,

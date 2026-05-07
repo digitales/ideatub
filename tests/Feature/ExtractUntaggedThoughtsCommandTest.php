@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Thought;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class ExtractUntaggedThoughtsCommandTest extends TestCase
@@ -13,6 +14,8 @@ class ExtractUntaggedThoughtsCommandTest extends TestCase
 
     public function test_without_tags_scope_excludes_thoughts_that_have_tags(): void
     {
+        Queue::fake();
+
         $user = User::factory()->create();
 
         Thought::factory()->create([

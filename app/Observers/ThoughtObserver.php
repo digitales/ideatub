@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Jobs\RefreshWorkingMemoryIncremental;
+use App\Jobs\SynthesizeMeetingCompactionJob;
 use App\Models\Thought;
 
 class ThoughtObserver
@@ -11,6 +12,10 @@ class ThoughtObserver
     {
         if ($thought->user_id === null) {
             return;
+        }
+
+        if ($this->isMeetingThought($thought)) {
+            SynthesizeMeetingCompactionJob::dispatch($thought->id);
         }
 
         RefreshWorkingMemoryIncremental::dispatch($thought->id);
@@ -34,6 +39,15 @@ class ThoughtObserver
             return;
         }
 
+        if ($this->isMeetingThought($thought) && $thought->wasChanged(['content', 'metadata'])) {
+            SynthesizeMeetingCompactionJob::dispatch($thought->id);
+        }
+
         RefreshWorkingMemoryIncremental::dispatch($thought->id);
+    }
+
+    private function isMeetingThought(Thought $thought): bool
+    {
+        return data_get($thought->metadata, 'type') === 'meeting';
     }
 }

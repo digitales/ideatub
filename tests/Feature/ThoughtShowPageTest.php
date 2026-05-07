@@ -14,6 +14,7 @@ use App\Services\ThoughtCaptureService;
 use App\Services\Video\VideoCaptureService;
 use App\View\Presenters\Thoughts\ThoughtDetailPresenter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -1645,6 +1646,8 @@ class ThoughtShowPageTest extends TestCase
 
     public function test_meeting_thought_detail_header_includes_meetings_stream_link_and_destination_ok(): void
     {
+        Queue::fake();
+
         $owner = User::factory()->create();
         $thought = Thought::factory()->create([
             'user_id' => $owner->id,

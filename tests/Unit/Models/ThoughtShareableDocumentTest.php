@@ -5,6 +5,7 @@ namespace Tests\Unit\Models;
 use App\Models\Thought;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class ThoughtShareableDocumentTest extends TestCase
@@ -47,6 +48,8 @@ class ThoughtShareableDocumentTest extends TestCase
 
     public function test_meeting_and_meetings_aliases_are_shareable(): void
     {
+        Queue::fake();
+
         $user = User::factory()->create();
 
         $meeting = Thought::factory()->create([

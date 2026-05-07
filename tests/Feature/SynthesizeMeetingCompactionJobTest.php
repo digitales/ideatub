@@ -19,15 +19,8 @@ final class SynthesizeMeetingCompactionJobTest extends TestCase
     #[Test]
     public function it_creates_a_compaction_version_for_a_meeting_thought(): void
     {
-        $user = User::factory()->create();
-        $meeting = Thought::factory()->create([
-            'user_id' => $user->id,
-            'content' => 'Weekly check-in 2026-05-07. Decided to ship DEZ-2819 fix.',
-            'metadata' => ['type' => 'meeting', 'tags' => ['scope:project', 'project:dezeen']],
-        ]);
-
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')->once()->andReturn(json_encode([
+        $openRouter->shouldReceive('researchFromPrompt')->twice()->andReturn(json_encode([
             'summary_markdown' => "## Summary\nWeekly check-in agreed PHP upgrade scope.\n## Decisions\n- Ship DEZ-2819.",
             'structured_sections' => [
                 'Summary' => [['text' => 'Weekly check-in agreed PHP upgrade scope.', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []]],
@@ -39,6 +32,13 @@ final class SynthesizeMeetingCompactionJobTest extends TestCase
             'references' => [],
         ]));
         $this->app->instance(OpenRouterService::class, $openRouter);
+
+        $user = User::factory()->create();
+        $meeting = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Weekly check-in 2026-05-07. Decided to ship DEZ-2819 fix.',
+            'metadata' => ['type' => 'meeting', 'tags' => ['scope:project', 'project:dezeen']],
+        ]);
 
         SynthesizeMeetingCompactionJob::dispatchSync($meeting->id);
 
