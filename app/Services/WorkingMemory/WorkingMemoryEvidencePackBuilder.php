@@ -3,6 +3,8 @@
 namespace App\Services\WorkingMemory;
 
 use App\Models\Thought;
+use App\Models\WorkingMemory;
+use App\Models\WorkingMemoryVersion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -33,6 +35,13 @@ final class WorkingMemoryEvidencePackBuilder
      *         created_at: string|null,
      *         references: array<int, array{type: string, url: string, label: string}>
      *     }>,
+     *     compactions: array<int, array{
+     *         version_id: string,
+     *         subtype: string,
+     *         summary_markdown: string,
+     *         created_at: string,
+     *         references: array<int, array{type: string, url: string, label: string}>
+     *     }>,
      *     section_candidates: array<string, array<int, string>>,
      *     section_bundles: array<string, array<int, array{type: string, url: string, label: string}>>
      * }
@@ -61,14 +70,72 @@ final class WorkingMemoryEvidencePackBuilder
             })
             ->all();
 
+        $compactions = $this->loadCompactions($userId, $normalizedScopeType, $normalizedScopeKey);
+
         return [
             'scope_type' => $normalizedScopeType,
             'scope_key' => $normalizedScopeKey,
             'generated_at' => now()->toIso8601String(),
             'signals' => $signals,
+            'compactions' => $compactions,
             'section_candidates' => $this->buildSectionCandidates($selectedThoughts),
             'section_bundles' => $this->buildSectionBundles($selectedThoughts),
         ];
+    }
+
+    /**
+     * @return array<int, array{
+     *     version_id: string,
+     *     subtype: string,
+     *     summary_markdown: string,
+     *     created_at: string,
+     *     references: array<int, array{type: string, url: string, label: string}>
+     * }>
+     */
+    private function loadCompactions(int $userId, string $scopeType, string $scopeKey): array
+    {
+        $memory = WorkingMemory::query()
+            ->where('user_id', $userId)
+            ->where('scope_type', $scopeType)
+            ->where('scope_key', $scopeKey)
+            ->first();
+
+        if ($memory === null) {
+            return [];
+        }
+
+        return $memory->versions()
+            ->where('build_type', 'like', 'compaction:%')
+            ->orderByDesc('created_at')
+            ->limit(20)
+            ->get()
+            ->map(function (WorkingMemoryVersion $version) use ($scopeType, $scopeKey): array {
+                $permalink = sprintf('/memory/%s/%s/compactions/%s', $scopeType, $scopeKey, $version->id);
+                $references = is_array($version->references_json) ? $version->references_json : [];
+
+                $compactionRef = [
+                    'type' => 'compaction',
+                    'url' => $permalink,
+                    'label' => sprintf(
+                        'compaction:%s %s',
+                        $version->compactionSubtype() ?? 'unknown',
+                        $version->created_at?->toDateString() ?? ''
+                    ),
+                ];
+
+                // Prepend canonical compaction permalink so the composer cites it directly,
+                // followed by the references the compaction itself surfaced.
+                $references = array_merge([$compactionRef], $references);
+
+                return [
+                    'version_id' => (string) $version->id,
+                    'subtype' => $version->compactionSubtype() ?? 'unknown',
+                    'summary_markdown' => (string) $version->summary_markdown,
+                    'created_at' => $version->created_at?->toIso8601String() ?? '',
+                    'references' => $references,
+                ];
+            })
+            ->all();
     }
 
     /**
