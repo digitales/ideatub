@@ -29,6 +29,7 @@ use App\Http\Controllers\Learning\LearningQuizAttemptController;
 use App\Http\Controllers\Learning\LearningResearchController;
 use App\Http\Controllers\McpKeyController;
 use App\Http\Controllers\MeetingSkillSettingsController;
+use App\Http\Controllers\MemoryCompactionController;
 use App\Http\Controllers\MemoryController;
 use App\Http\Controllers\MemoryInsightsController;
 use App\Http\Controllers\OAuthServerController;
@@ -327,6 +328,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/memory', [MemoryController::class, 'show'])->name('memory.show');
         Route::get('/memory/tag', [MemoryController::class, 'showTag'])->name('memory.tag.show');
         Route::get('/projects/{project}/memory', [MemoryController::class, 'showProject'])->name('projects.memory.show');
+        Route::get(
+            '/memory/{scopeType}/{scopeKey}/compactions/{versionId}',
+            [MemoryCompactionController::class, 'show']
+        )->name('memory.compactions.show');
     });
 
     Route::middleware(['auth', 'working.memory.insights'])->group(function () {
