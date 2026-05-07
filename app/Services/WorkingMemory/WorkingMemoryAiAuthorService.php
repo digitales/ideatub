@@ -4,6 +4,7 @@ namespace App\Services\WorkingMemory;
 
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Composer\WorkingMemoryComposerPromptBuilder;
+use App\Support\Json\LlmJsonDecoder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -54,7 +55,7 @@ final class WorkingMemoryAiAuthorService
                 $model !== '' ? $model : null,
                 is_numeric($temperature) ? (float) $temperature : null,
             );
-            $decoded = $this->decodeJson($raw);
+            $decoded = LlmJsonDecoder::decode($raw);
 
             if ($decoded === null) {
                 Log::warning('WorkingMemoryAiAuthorService: model returned non-JSON output.', [
@@ -74,27 +75,6 @@ final class WorkingMemoryAiAuthorService
 
             return $this->emptyOutput();
         }
-    }
-
-    private function decodeJson(string $raw): ?array
-    {
-        $trimmed = trim($raw);
-        if ($trimmed === '') {
-            return null;
-        }
-
-        if (str_starts_with($trimmed, '```')) {
-            $trimmed = preg_replace('/^```(?:json)?\s*/', '', $trimmed) ?? $trimmed;
-            $trimmed = preg_replace('/```\s*$/', '', $trimmed) ?? $trimmed;
-        }
-
-        try {
-            $decoded = json_decode($trimmed, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return null;
-        }
-
-        return is_array($decoded) ? $decoded : null;
     }
 
     /**

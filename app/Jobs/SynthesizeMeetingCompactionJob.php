@@ -7,6 +7,7 @@ use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use App\Services\WorkingMemory\Compactions\MeetingCompactionPromptBuilder;
 use App\Services\WorkingMemory\WorkingMemoryScopeResolver;
+use App\Support\Json\LlmJsonDecoder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -60,7 +61,7 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
                 $model !== '' ? $model : null,
                 is_numeric($temperature) ? (float) $temperature : null,
             );
-            $decoded = $this->decodeJson($raw);
+            $decoded = LlmJsonDecoder::decode($raw);
 
             if ($decoded === null) {
                 Log::warning('SynthesizeMeetingCompactionJob: model returned non-JSON output.', [
@@ -123,22 +124,4 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
         return ['global', 'global'];
     }
 
-    private function decodeJson(string $raw): ?array
-    {
-        $trimmed = trim($raw);
-        if ($trimmed === '') {
-            return null;
-        }
-        if (str_starts_with($trimmed, '```')) {
-            $trimmed = preg_replace('/^```(?:json)?\s*/', '', $trimmed) ?? $trimmed;
-            $trimmed = preg_replace('/```\s*$/', '', $trimmed) ?? $trimmed;
-        }
-        try {
-            $decoded = json_decode($trimmed, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return null;
-        }
-
-        return is_array($decoded) ? $decoded : null;
-    }
 }
