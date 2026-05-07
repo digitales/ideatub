@@ -195,13 +195,146 @@ class WorkingMemoryOutputValidatorTest extends TestCase
         $this->assertSame(100.0, $result['coveragePercent']);
     }
 
-    /**
-     * @return array{
-     *     summary_markdown: string,
-     *     structured_sections: array<string, array<int, string>>,
-     *     references: array<int, array{url: string, label: string}>
-     * }
-     */
+    #[Test]
+    public function it_soft_fails_when_compactions_exist_but_payload_does_not_cite_any(): void
+    {
+        $thoughtUrl = 'https://ideatub.test/thoughts/abc-123';
+        $payload = [
+            'summary_markdown' => '# WM',
+            'structured_sections' => array_fill_keys(
+                ['Current Focus', 'Active Priorities', 'Recent Changes', 'Open Questions', 'Risks / Blockers', 'Next Actions', 'Latest Signals', 'Source Notes'],
+                [[
+                    'text' => 'Ship DEZ-2819.',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [['type' => 'thought', 'url' => $thoughtUrl, 'label' => 'abc-123']],
+                ]]
+            ),
+            'references' => [['type' => 'thought', 'url' => $thoughtUrl, 'label' => 'abc-123']],
+        ];
+
+        $validator = new WorkingMemoryOutputValidator;
+
+        $result = $validator->validate($payload, null, compactionCountInScope: 3);
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('soft', $result['failure_type']);
+        $this->assertContains('unused_compaction', $result['diagnostics']['reason_codes']);
+    }
+
+    #[Test]
+    public function it_passes_when_compactions_exist_and_payload_cites_at_least_one(): void
+    {
+        $compactionUrl = '/memory/project/dezeen/compactions/v-1';
+        $payload = [
+            'summary_markdown' => '# WM',
+            'structured_sections' => array_fill_keys(
+                ['Current Focus', 'Active Priorities', 'Recent Changes', 'Open Questions', 'Risks / Blockers', 'Next Actions', 'Latest Signals', 'Source Notes'],
+                [[
+                    'text' => 'Ship DEZ-2819.',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [['type' => 'compaction', 'url' => $compactionUrl, 'label' => 'compaction:meeting']],
+                ]]
+            ),
+            'references' => [['type' => 'compaction', 'url' => $compactionUrl, 'label' => 'compaction:meeting']],
+        ];
+
+        $validator = new WorkingMemoryOutputValidator;
+
+        $result = $validator->validate($payload, null, compactionCountInScope: 1);
+
+        $this->assertTrue($result['ok']);
+    }
+
+    #[Test]
+    public function it_does_not_check_unused_compaction_when_no_compactions_exist(): void
+    {
+        $thoughtUrl = 'https://ideatub.test/thoughts/abc-123';
+        $payload = [
+            'summary_markdown' => '# WM',
+            'structured_sections' => array_fill_keys(
+                ['Current Focus', 'Active Priorities', 'Recent Changes', 'Open Questions', 'Risks / Blockers', 'Next Actions', 'Latest Signals', 'Source Notes'],
+                [[
+                    'text' => 'Ship DEZ-2819.',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [['type' => 'thought', 'url' => $thoughtUrl, 'label' => 'abc-123']],
+                ]]
+            ),
+            'references' => [['type' => 'thought', 'url' => $thoughtUrl, 'label' => 'abc-123']],
+        ];
+
+        $validator = new WorkingMemoryOutputValidator;
+
+        $result = $validator->validate($payload, null, compactionCountInScope: 0);
+
+        $this->assertTrue($result['ok']);
+    }
+
+    #[Test]
+    public function diagnostics_expose_compaction_cited_items_resolving_bracket_markers(): void
+    {
+        $thoughtUrl = 'https://ideatub.test/thoughts/abc-123';
+        $compactionUrl = '/memory/project/dezeen/compactions/v-1';
+
+        $payload = [
+            'summary_markdown' => '# WM',
+            'structured_sections' => array_fill_keys(
+                ['Current Focus', 'Active Priorities', 'Recent Changes', 'Open Questions', 'Risks / Blockers', 'Next Actions', 'Latest Signals', 'Source Notes'],
+                [
+                    [
+                        'text' => 'Resolved via bracket marker [1].',
+                        'importance' => 1,
+                        'fallback_mode' => 'direct',
+                    ],
+                    [
+                        'text' => 'Resolved via thought citation.',
+                        'importance' => 1,
+                        'fallback_mode' => 'direct',
+                        'citations' => [['type' => 'thought', 'url' => $thoughtUrl, 'label' => 'abc-123']],
+                    ],
+                ],
+            ),
+            'references' => [
+                ['type' => 'compaction', 'url' => $compactionUrl, 'label' => 'compaction:meeting'],
+                ['type' => 'thought', 'url' => $thoughtUrl, 'label' => 'abc-123'],
+            ],
+        ];
+
+        $validator = new WorkingMemoryOutputValidator;
+
+        $result = $validator->validate($payload, null, compactionCountInScope: 1);
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame(16, $result['diagnostics']['cited_items']);
+        $this->assertSame(8, $result['diagnostics']['compaction_cited_items']);
+    }
+
+    #[Test]
+    public function it_passes_when_compactions_exist_and_payload_uses_bracket_markers(): void
+    {
+        $compactionUrl = '/memory/project/dezeen/compactions/v-1';
+        $payload = [
+            'summary_markdown' => '# WM',
+            'structured_sections' => array_fill_keys(
+                ['Current Focus', 'Active Priorities', 'Recent Changes', 'Open Questions', 'Risks / Blockers', 'Next Actions', 'Latest Signals', 'Source Notes'],
+                [[
+                    'text' => 'Ship DEZ-2819 [1].',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                ]]
+            ),
+            'references' => [['type' => 'compaction', 'url' => $compactionUrl, 'label' => 'compaction:meeting']],
+        ];
+
+        $validator = new WorkingMemoryOutputValidator;
+
+        $result = $validator->validate($payload, null, compactionCountInScope: 1);
+
+        $this->assertTrue($result['ok']);
+    }
+
     /**
      * @return array{
      *     summary_markdown: string,

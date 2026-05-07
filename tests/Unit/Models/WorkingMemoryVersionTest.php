@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class WorkingMemoryVersionTest extends TestCase
@@ -106,5 +107,26 @@ class WorkingMemoryVersionTest extends TestCase
             ],
             $version->build_diagnostics_json
         );
+    }
+
+    #[Test]
+    public function is_compaction_returns_true_for_compaction_build_types(): void
+    {
+        $compaction = WorkingMemoryVersion::factory()->make(['build_type' => 'compaction:meeting']);
+        $consolidated = WorkingMemoryVersion::factory()->make(['build_type' => 'consolidated']);
+
+        $this->assertTrue($compaction->isCompaction());
+        $this->assertSame('meeting', $compaction->compactionSubtype());
+
+        $this->assertFalse($consolidated->isCompaction());
+        $this->assertNull($consolidated->compactionSubtype());
+    }
+
+    #[Test]
+    public function compaction_subtype_returns_full_subtype_after_colon(): void
+    {
+        $weekly = WorkingMemoryVersion::factory()->make(['build_type' => 'compaction:weekly-digest']);
+
+        $this->assertSame('weekly-digest', $weekly->compactionSubtype());
     }
 }

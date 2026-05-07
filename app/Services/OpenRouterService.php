@@ -173,11 +173,20 @@ class OpenRouterService
     /**
      * Run a research-style completion using the full user prompt (no template merge).
      *
+     * Per-call overrides:
+     * - $modelOverride: short-circuit the default `services.openrouter.research_model` lookup.
+     *   Pass null (the default) to keep the existing config-driven selection.
+     * - $temperatureOverride: include a `temperature` field in the chat payload.
+     *   Pass null (the default) to omit `temperature` from the payload, matching prior behavior.
+     *
      * @throws RequestException On HTTP errors
      * @throws \RuntimeException If OPENROUTER_API_KEY is not set or response missing content
      */
-    public function researchFromPrompt(string $userPrompt): string
-    {
+    public function researchFromPrompt(
+        string $userPrompt,
+        ?string $modelOverride = null,
+        ?float $temperatureOverride = null,
+    ): string {
         $userPrompt = trim($userPrompt);
         if ($userPrompt === '') {
             throw new \RuntimeException('Research prompt is empty.');
@@ -188,10 +197,13 @@ class OpenRouterService
             throw new \RuntimeException('OPENROUTER_API_KEY is not set.');
         }
 
-        $model = config(
-            'services.openrouter.research_model',
-            config('services.openrouter.metadata_model', 'openai/gpt-4o-mini')
-        );
+        $resolvedOverride = is_string($modelOverride) ? trim($modelOverride) : '';
+        $model = $resolvedOverride !== ''
+            ? $resolvedOverride
+            : config(
+                'services.openrouter.research_model',
+                config('services.openrouter.metadata_model', 'openai/gpt-4o-mini')
+            );
 
         $payload = [
             'model' => $model,
@@ -200,6 +212,10 @@ class OpenRouterService
             ],
             'max_tokens' => config('research.max_tokens', 2048),
         ];
+
+        if ($temperatureOverride !== null) {
+            $payload['temperature'] = $temperatureOverride;
+        }
 
         $response = Http::withToken($apiKey)
             ->timeout(30)

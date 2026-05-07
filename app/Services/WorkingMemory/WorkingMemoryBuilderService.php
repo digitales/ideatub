@@ -57,7 +57,8 @@ class WorkingMemoryBuilderService
                 $authoredOutput = $this->aiAuthorService->authorFromEvidence($evidencePack);
                 $validation = $this->outputValidator->validate(
                     $authoredOutput,
-                    (float) config('working_memory.citation_min_coverage', 0.90)
+                    (float) config('working_memory.citation_min_coverage', 0.90),
+                    count(is_array($evidencePack['compactions'] ?? null) ? $evidencePack['compactions'] : [])
                 );
 
                 $buildDiagnostics = $validation['diagnostics'] ?? null;
@@ -76,6 +77,10 @@ class WorkingMemoryBuilderService
                     $summaryMarkdown = (string) ($authoredOutput['summary_markdown'] ?? '');
                     $payload = $this->payloadFromStructuredSections($structuredSections, $thoughts);
                     $authoringStatus = 'validated';
+                    $buildDiagnostics = $this->mergeCompactionDiagnostics(
+                        $buildDiagnostics,
+                        $evidencePack,
+                    );
                 } elseif (($validation['failure_type'] ?? null) === 'soft') {
                     [$payload, $summaryMarkdown] = $this->legacyPayloadAndSummary($normalizedScopeType, $thoughts);
                     $authoringStatus = 'fallback';
@@ -672,5 +677,48 @@ class WorkingMemoryBuilderService
         }
 
         return $scoped->take(20)->values();
+    }
+
+    /**
+     * Merge evidence-pack composition stats and the validator's normalized
+     * citation counts into the build diagnostics payload.
+     *
+     * The coverage ratio reuses the validator's `cited_items` /
+     * `compaction_cited_items`, which already account for bracket-marker
+     * resolution and default-reference fallback. Walking raw
+     * `structured_sections[].citations` here would underreport coverage when
+     * the model uses `[n]` markers instead of explicit citation arrays.
+     *
+     * @param  array<string, mixed>|null  $diagnostics  validator-emitted diagnostics
+     * @param  array<string, mixed>  $evidencePack
+     * @return array<string, mixed>
+     */
+    private function mergeCompactionDiagnostics(
+        ?array $diagnostics,
+        array $evidencePack,
+    ): array {
+        $compactions = is_array($evidencePack['compactions'] ?? null) ? $evidencePack['compactions'] : [];
+        $signals = is_array($evidencePack['signals'] ?? null) ? $evidencePack['signals'] : [];
+
+        $subtypes = [];
+        foreach ($compactions as $compaction) {
+            $subtype = (string) ($compaction['subtype'] ?? '');
+            if ($subtype !== '' && ! in_array($subtype, $subtypes, true)) {
+                $subtypes[] = $subtype;
+            }
+        }
+
+        $citedItems = (int) ($diagnostics['cited_items'] ?? 0);
+        $compactionCitedItems = (int) ($diagnostics['compaction_cited_items'] ?? 0);
+        $coverageRatio = $citedItems > 0
+            ? round($compactionCitedItems / $citedItems, 4)
+            : 0.0;
+
+        return array_merge($diagnostics ?? [], [
+            'compaction_inputs_count' => count($compactions),
+            'compaction_subtypes_used' => $subtypes,
+            'raw_thought_inputs_count' => count($signals),
+            'compaction_coverage_ratio' => $coverageRatio,
+        ]);
     }
 }

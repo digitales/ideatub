@@ -18,6 +18,7 @@ class WorkingMemoryInput extends Model
     protected $fillable = [
         'working_memory_version_id',
         'thought_id',
+        'source_version_id',
         'contribution_type',
         'weight',
     ];
@@ -40,5 +41,10 @@ class WorkingMemoryInput extends Model
     public function thought(): BelongsTo
     {
         return $this->belongsTo(Thought::class);
+    }
+
+    public function sourceVersion(): BelongsTo
+    {
+        return $this->belongsTo(WorkingMemoryVersion::class, 'source_version_id');
     }
 }

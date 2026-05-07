@@ -66,4 +66,18 @@ class WorkingMemoryVersion extends Model
     {
         return $this->hasMany(WorkingMemoryInput::class);
     }
+
+    public function isCompaction(): bool
+    {
+        return str_starts_with((string) $this->build_type, 'compaction:');
+    }
+
+    public function compactionSubtype(): ?string
+    {
+        if (! $this->isCompaction()) {
+            return null;
+        }
+
+        return substr((string) $this->build_type, strlen('compaction:'));
+    }
 }

@@ -4,6 +4,8 @@ namespace Tests\Unit\Services\WorkingMemory;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Models\WorkingMemory;
+use App\Models\WorkingMemoryVersion;
 use App\Services\WorkingMemory\WorkingMemoryEvidencePackBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -255,5 +257,33 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
 
         $this->assertCount(1, $pack['signals']);
         $this->assertSame((string) $selectedThought->id, $pack['signals'][0]['thought_id']);
+    }
+
+    #[Test]
+    public function it_includes_compactions_for_the_scope_in_the_evidence_pack(): void
+    {
+        $user = User::factory()->create();
+        $memory = WorkingMemory::factory()->create([
+            'user_id' => $user->id,
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+        ]);
+        $compaction = WorkingMemoryVersion::factory()->create([
+            'working_memory_id' => $memory->id,
+            'build_type' => 'compaction:meeting',
+            'summary_markdown' => "## Summary\nWeekly check-in agreed PHP upgrade scope.",
+            'references_json' => [['type' => 'thought', 'url' => '/thoughts/t9', 'label' => 'standup notes']],
+        ]);
+        $thought = Thought::factory()->create(['user_id' => $user->id]);
+
+        $builder = app(WorkingMemoryEvidencePackBuilder::class);
+        $pack = $builder->build($user->id, 'project', 'dezeen', collect([$thought]));
+
+        $this->assertArrayHasKey('compactions', $pack);
+        $this->assertCount(1, $pack['compactions']);
+        $this->assertSame('meeting', $pack['compactions'][0]['subtype']);
+        $this->assertSame($compaction->id, $pack['compactions'][0]['version_id']);
+        $this->assertStringContainsString('PHP upgrade', $pack['compactions'][0]['summary_markdown']);
+        $this->assertSame('/memory/project/dezeen/compactions/'.$compaction->id, $pack['compactions'][0]['references'][0]['url'] ?? null);
     }
 }
