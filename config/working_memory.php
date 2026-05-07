@@ -37,4 +37,21 @@ return [
     'authoring_meeting_compaction_temperature' => (float) env('WORKING_MEMORY_MEETING_COMPACTION_TEMPERATURE', 0.2),
     'authoring_max_prompt_input_chars' => (int) env('WORKING_MEMORY_MAX_PROMPT_INPUT_CHARS', 60000),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Meeting refresh delay (seconds)
+    |--------------------------------------------------------------------------
+    |
+    | When a meeting thought is captured, ThoughtObserver dispatches both a
+    | SynthesizeMeetingCompactionJob and a RefreshWorkingMemoryIncremental.
+    | Async queue workers may execute them in any order, so the refresh would
+    | otherwise risk running before the compaction is persisted (missing it in
+    | the evidence pack). This delay gives the compaction a head start.
+    |
+    | A value of 0 disables the delay (useful for sync queues / tests).
+    |
+    */
+
+    'meeting_refresh_delay_seconds' => (int) env('WORKING_MEMORY_MEETING_REFRESH_DELAY_SECONDS', 60),
+
 ];

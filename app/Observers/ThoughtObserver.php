@@ -16,6 +16,9 @@ class ThoughtObserver
 
         if ($this->isMeetingThought($thought)) {
             SynthesizeMeetingCompactionJob::dispatch($thought->id);
+            $this->dispatchRefreshWithMeetingDelay($thought);
+
+            return;
         }
 
         RefreshWorkingMemoryIncremental::dispatch($thought->id);
@@ -41,6 +44,9 @@ class ThoughtObserver
 
         if ($this->isMeetingThought($thought) && $thought->wasChanged(['content', 'metadata'])) {
             SynthesizeMeetingCompactionJob::dispatch($thought->id);
+            $this->dispatchRefreshWithMeetingDelay($thought);
+
+            return;
         }
 
         RefreshWorkingMemoryIncremental::dispatch($thought->id);
@@ -49,5 +55,26 @@ class ThoughtObserver
     private function isMeetingThought(Thought $thought): bool
     {
         return data_get($thought->metadata, 'type') === 'meeting';
+    }
+
+    /**
+     * Race-avoidance: the meeting compaction job and the incremental refresh both run
+     * async. If refresh runs first, the new compaction:meeting version is missing from
+     * the evidence pack and won't be cited until the next refresh trigger. Delaying the
+     * refresh gives the compaction a head start so it's persisted by the time refresh
+     * builds the evidence pack.
+     *
+     * The delay is configurable; 0 disables it (useful for sync queues and deterministic
+     * tests).
+     */
+    private function dispatchRefreshWithMeetingDelay(Thought $thought): void
+    {
+        $delaySeconds = max(0, (int) config('working_memory.meeting_refresh_delay_seconds', 60));
+
+        $dispatch = RefreshWorkingMemoryIncremental::dispatch($thought->id);
+
+        if ($delaySeconds > 0) {
+            $dispatch->delay(now()->addSeconds($delaySeconds));
+        }
     }
 }
