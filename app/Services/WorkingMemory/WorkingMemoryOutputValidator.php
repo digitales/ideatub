@@ -31,7 +31,7 @@ class WorkingMemoryOutputValidator
      *     }
      * }
      */
-    public function validate(array $payload, ?float $minimumCoverage = null): array
+    public function validate(array $payload, ?float $minimumCoverage = null, int $compactionCountInScope = 0): array
     {
         $sections = $payload['structured_sections'] ?? null;
         if (! is_array($sections)) {
@@ -84,6 +84,7 @@ class WorkingMemoryOutputValidator
 
         $requiredItems = 0;
         $citedItems = 0;
+        $hasCompactionCitation = false;
         $reasonCodes = [];
         $missingSections = [];
 
@@ -125,6 +126,9 @@ class WorkingMemoryOutputValidator
                 }
 
                 $citedItems++;
+                if ($this->containsCompactionType($citations)) {
+                    $hasCompactionCitation = true;
+                }
             }
         }
 
@@ -165,6 +169,20 @@ class WorkingMemoryOutputValidator
                     $requiredItems,
                     $citedItems,
                     ['coverage_below_threshold']
+                ),
+            ];
+        }
+
+        if ($compactionCountInScope > 0 && ! $hasCompactionCitation) {
+            return [
+                'ok' => false,
+                'message' => 'Working memory must cite at least one compaction when compactions exist in scope.',
+                'coveragePercent' => $coveragePercent,
+                'failure_type' => 'soft',
+                'diagnostics' => $this->diagnosticsPayload(
+                    $requiredItems,
+                    $citedItems,
+                    ['unused_compaction']
                 ),
             ];
         }
@@ -489,5 +507,19 @@ class WorkingMemoryOutputValidator
             'failure_type' => 'hard',
             'diagnostics' => $this->diagnosticsPayload($requiredItems, $citedItems, $reasonCodes),
         ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $citations
+     */
+    private function containsCompactionType(array $citations): bool
+    {
+        foreach ($citations as $citation) {
+            if (is_array($citation) && ($citation['type'] ?? null) === 'compaction') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

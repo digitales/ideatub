@@ -57,7 +57,8 @@ class WorkingMemoryBuilderService
                 $authoredOutput = $this->aiAuthorService->authorFromEvidence($evidencePack);
                 $validation = $this->outputValidator->validate(
                     $authoredOutput,
-                    (float) config('working_memory.citation_min_coverage', 0.90)
+                    (float) config('working_memory.citation_min_coverage', 0.90),
+                    count(is_array($evidencePack['compactions'] ?? null) ? $evidencePack['compactions'] : [])
                 );
 
                 $buildDiagnostics = $validation['diagnostics'] ?? null;
