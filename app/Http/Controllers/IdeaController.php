@@ -22,6 +22,7 @@ use App\Services\Email\ThoughtEmailSenderContextResolver;
 use App\Services\IdeasToRevisitService;
 use App\Services\OpenRouterService;
 use App\Services\ResearchService;
+use App\Services\Tags\UserCanonicalTagResolver;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Support\IdeaCompletedAtSql;
@@ -29,7 +30,6 @@ use App\Support\MarkdownDisplayHelper;
 use App\Support\Research\MicrositeInAppPathHelper;
 use App\Support\Research\MicrositePageLabel;
 use App\Support\SafeCommonMarkConverter;
-use App\Support\TagSlug;
 use App\View\Presenters\Comments\ResearchCommentsPresenter;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
@@ -74,7 +74,8 @@ class IdeaController extends Controller
         private ThoughtCaptureService $captureService,
         private ResearchService $researchService,
         private ThoughtSearchService $searchService,
-        private ThoughtEmailSenderContextResolver $thoughtEmailSenderContextResolver
+        private ThoughtEmailSenderContextResolver $thoughtEmailSenderContextResolver,
+        private UserCanonicalTagResolver $canonicalTagResolver,
     ) {}
 
     /**
@@ -632,7 +633,7 @@ class IdeaController extends Controller
 
         $canonicalTag =
             $tagSlug !== null
-                ? $this->resolveTagSlugToCanonical($tagSlug)
+                ? $this->canonicalTagResolver->resolve((int) auth()->id(), $tagSlug)
                 : null;
         $tagForDisplay = $tagSlug !== null ? $canonicalTag ?? $tagSlug : null;
 
@@ -2803,31 +2804,6 @@ class IdeaController extends Controller
             ->where('user_id', $thought->user_id)
             ->where('thought_id', $thought->id)
             ->first();
-    }
-
-    /**
-     * Resolve a URL slug (e.g. web_development) to the canonical tag value stored in metadata (e.g. "web development").
-     */
-    private function resolveTagSlugToCanonical(string $tagSlug): ?string
-    {
-        $tags = Thought::query()
-            ->where('user_id', auth()->id())
-            ->select('metadata')
-            ->get()
-            ->pluck('metadata')
-            ->pluck('tags')
-            ->flatten()
-            ->unique()
-            ->filter()
-            ->values();
-
-        foreach ($tags as $t) {
-            if (TagSlug::from((string) $t) === $tagSlug) {
-                return $t;
-            }
-        }
-
-        return null;
     }
 
     /**

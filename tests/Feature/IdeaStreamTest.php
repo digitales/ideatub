@@ -30,6 +30,8 @@ class IdeaStreamTest extends TestCase
         $response->assertSee('name="tag" value="ai-notes"', false);
         $response->assertDontSee('name="active_tag"', false);
         $response->assertSee('Refresh working memory', false);
+        $response->assertSee('Open tag working memory', false);
+        $response->assertSee(route('memory.tag.show', ['tag' => 'ai-notes']), false);
     }
 
     public function test_non_tag_stream_does_not_show_refresh_button(): void

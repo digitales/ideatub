@@ -26,16 +26,20 @@
 
             @if($tag)
                 @php
-                    $refreshTagValue = $tagSlug ?: $tag;
-                    $refreshTagAction = \Illuminate\Support\Facades\URL::signedRoute('working-memory.refresh.tag', ['tag' => $refreshTagValue]);
+                    $memoryTagParam = $tagSlug !== null && $tagSlug !== '' ? $tagSlug : \App\Support\TagSlug::from((string) $tag);
+                    $refreshTagScopeKey = \Illuminate\Support\Str::of((string) $tag)->trim()->lower()->toString();
+                    $refreshTagAction = \Illuminate\Support\Facades\URL::signedRoute('working-memory.refresh.tag', ['tag' => $refreshTagScopeKey]);
                 @endphp
-                <div class="mb-4 flex items-center justify-center gap-3">
+                <div class="mb-4 flex items-center justify-center gap-3 flex-wrap">
                     <a href="{{ route('idea.stream') }}" class="text-[12px] font-medium text-memory-violet hover:underline">
                         All thoughts
                     </a>
+                    <a href="{{ route('memory.tag.show', ['tag' => $memoryTagParam]) }}" class="text-[12px] font-medium text-memory-violet hover:underline">
+                        Open tag working memory
+                    </a>
                     <form method="POST" action="{{ $refreshTagAction }}" onsubmit="if (this.dataset.submitting === '1') { return false; } this.dataset.submitting = '1'; var submitButton = this.querySelector('button[type=submit]'); if (submitButton) { submitButton.disabled = true; submitButton.setAttribute('aria-disabled', 'true'); }">
                         @csrf
-                        <input type="hidden" name="tag" value="{{ $refreshTagValue }}">
+                        <input type="hidden" name="tag" value="{{ $refreshTagScopeKey }}">
                         <button type="submit" class="inline-flex items-center rounded-full border border-memory-violet/40 px-3 py-1 text-[12px] font-medium text-memory-violet transition hover:bg-memory-violet/5">
                             Refresh working memory
                         </button>

@@ -1,15 +1,21 @@
 @extends('layouts.idea')
 
-@section('title', ($isProjectScope ?? false)
-    ? (($scopeTitle ?? 'Project').' — Working memory — IdeaTub')
-    : 'Working memory — IdeaTub')
+@section('title', ($isTagScope ?? false)
+    ? ('Tag: '.e($scopeTitle ?? 'Tag').' — Working memory — IdeaTub')
+    : (($isProjectScope ?? false)
+        ? (($scopeTitle ?? 'Project').' — Working memory — IdeaTub')
+        : 'Working memory — IdeaTub'))
 
 @section('content')
 @php
     $isProject = $isProjectScope ?? false;
-    $refreshAction = $isProject
-        ? route('working-memory.refresh.project', $project)
-        : route('working-memory.refresh.global');
+    $isTag = $isTagScope ?? false;
+    $tagRefreshScopeKey = $tagRefreshScopeKey ?? '';
+    $refreshAction = $isTag
+        ? \Illuminate\Support\Facades\URL::signedRoute('working-memory.refresh.tag', ['tag' => $tagRefreshScopeKey])
+        : ($isProject
+            ? route('working-memory.refresh.project', $project)
+            : route('working-memory.refresh.global'));
     $freshness = $freshness_state ?? 'stale';
     $freshnessClasses = match ($freshness) {
         'fresh' => 'bg-neural-teal/15 text-neural-teal border-neural-teal/30',
@@ -49,7 +55,9 @@
             <div class="min-w-0">
                 <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">Working memory</h1>
                 <p class="text-sm text-slate-brand mt-1">
-                    @if ($isProject)
+                    @if ($isTag)
+                        {{ $scopeTitle ?? 'Tag' }} — synthesized from captures with this tag.
+                    @elseif ($isProject)
                         {{ $scopeTitle ?? ($project->title ?? 'Project') }} — synthesized from captures linked to this project.
                     @else
                         Global scope — synthesized from your captures.
@@ -66,6 +74,9 @@
                     onsubmit="const button=this.querySelector('button[type=submit]'); if(!button||button.disabled){return false;} button.disabled=true; button.setAttribute('aria-busy','true'); return true;"
                 >
                     @csrf
+                    @if ($isTag)
+                        <input type="hidden" name="tag" value="{{ $tagRefreshScopeKey }}">
+                    @endif
                     <button
                         type="submit"
                         class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
@@ -73,7 +84,15 @@
                         Refresh working memory
                     </button>
                 </form>
-                @if (! $isProject && config('features.working_memory_insights'))
+                @if ($isTag && ! empty($tagSlugQuery ?? null))
+                    <a
+                        href="{{ route('idea.stream', ['tag' => $tagSlugQuery]) }}"
+                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
+                    >
+                        Tag stream
+                    </a>
+                @endif
+                @if (! $isProject && ! $isTag && config('features.working_memory_insights'))
                     <a
                         href="{{ route('memory.insights') }}"
                         class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"

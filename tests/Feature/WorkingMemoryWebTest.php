@@ -38,6 +38,15 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertRedirect(route('login'));
     }
 
+    public function test_guest_get_tag_memory_redirects_to_login(): void
+    {
+        config(['features.working_memory_ui' => true]);
+
+        $response = $this->get(route('memory.tag.show', ['tag' => 'demo']));
+
+        $response->assertRedirect(route('login'));
+    }
+
     public function test_authenticated_flag_off_returns_404(): void
     {
         config(['features.working_memory_ui' => false]);
@@ -109,6 +118,21 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertOk();
         $response->assertSee('Refresh working memory', false);
         $response->assertSee('action="'.route('working-memory.refresh.project', $project).'"', false);
+    }
+
+    public function test_tag_memory_page_uses_signed_tag_refresh_and_tag_stream_link(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('memory.tag.show', ['tag' => 'alpha-beta']));
+
+        $response->assertOk();
+        $response->assertSee('synthesized from captures with this tag', false);
+        $response->assertSee('Tag stream', false);
+        $response->assertSee(route('idea.stream', ['tag' => 'alpha-beta']), false);
+        $response->assertSee('/stream/tag/memory/refresh?tag=alpha-beta&amp;signature=', false);
+        $response->assertSee('name="tag" value="alpha-beta"', false);
     }
 
     public function test_working_memory_shows_details_and_recent_updates_when_overlay_deltas_exist(): void
