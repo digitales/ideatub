@@ -116,4 +116,20 @@ class LinkSummaryFetcherTest extends TestCase
 
         $fetcher->fetch('https://example.com/huge');
     }
+
+    #[Test]
+    public function fetch_handles_malformed_utf8_in_html_without_type_errors(): void
+    {
+        $invalidUtf8 = "<html><body>Broken \xC3\x28 text</body></html>";
+
+        Http::fake([
+            'example.com/*' => Http::response($invalidUtf8, 200),
+        ]);
+
+        $fetcher = new LinkSummaryFetcher;
+
+        $result = $fetcher->fetch('https://example.com/bad-encoding');
+
+        $this->assertIsString($result['visible_text']);
+    }
 }

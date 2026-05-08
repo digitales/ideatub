@@ -215,7 +215,8 @@ class LinkSummaryFetcher
         $without = preg_replace('#<noscript\b[^>]*>.*?</noscript>#is', '', $without) ?? $without;
 
         $text = html_entity_decode(strip_tags($without), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = @iconv('UTF-8', 'UTF-8//IGNORE', $text) ?: $text;
 
-        return Str::squish($text);
+        return Str::squish($text) ?? '';
     }
 }
