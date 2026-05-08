@@ -143,6 +143,7 @@ class MemoryScopesIndexTest extends TestCase
         $response->assertSee(route('projects.index'), false);
     }
 
+
     public function test_tag_section_shows_canonical_label_and_bounded_thought_queries(): void
     {
         config(['features.working_memory_ui' => true]);
@@ -188,6 +189,26 @@ class MemoryScopesIndexTest extends TestCase
         $response->assertOk();
         $response->assertSee('Display Canonical', false);
         $this->assertLessThanOrEqual(3, $thoughtSelects);
+    }
+
+    public function test_project_scope_slug_resolves_via_title_slug_not_uuid(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = $this->createUser();
+        Project::factory()->for($user)->create(['title' => 'Dezeen']);
+
+        $this->createMemory($user, [
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+            'last_refreshed_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('memory.scopes.index'));
+
+        $response->assertOk();
+        $response->assertSee('Dezeen', false);
+        $response->assertDontSee('Unavailable project', false);
+
     }
 
     private function createUser(): User

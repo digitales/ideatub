@@ -111,21 +111,65 @@ final class WorkingMemoryScopesIndexBuilder
      */
     private function projectsFor(int $userId, Collection $projectMemories): Collection
     {
-        $projectIds = $projectMemories
+        $scopeKeys = $projectMemories
             ->pluck('scope_key')
+            ->map(fn ($key): string => Str::lower((string) $key))
             ->filter()
             ->unique()
             ->values();
 
-        if ($projectIds->isEmpty()) {
+        if ($scopeKeys->isEmpty()) {
             return collect();
         }
 
-        return Project::query()
-            ->where('user_id', $userId)
-            ->whereIn('id', $projectIds)
-            ->get()
-            ->keyBy(fn (Project $project): string => Str::lower((string) $project->getKey()));
+        $uuidKeys = $scopeKeys->filter(fn (string $key): bool => Str::isUuid($key))->values();
+        $slugKeys = $scopeKeys->reject(fn (string $key): bool => Str::isUuid($key))->values();
+
+        $projects = collect();
+
+        if ($uuidKeys->isNotEmpty()) {
+            $projects = $projects->merge(
+                Project::query()
+                    ->where('user_id', $userId)
+                    ->whereIn('id', $uuidKeys)
+                    ->get()
+            );
+        }
+
+        if ($slugKeys->isNotEmpty()) {
+            $projects = $projects->merge(
+                Project::query()
+                    ->where('user_id', $userId)
+                    ->get()
+                    ->filter(function (Project $project) use ($slugKeys): bool {
+                        $slug = Str::slug($project->title);
+
+                        return $slug !== '' && $slugKeys->contains(Str::lower($slug));
+                    })
+            );
+        }
+
+        return $this->projectLookupMap($projects->unique(fn (Project $project): string => (string) $project->getKey()));
+    }
+
+    /**
+     * @param  Collection<int, Project>  $projects
+     * @return Collection<string, Project>
+     */
+    private function projectLookupMap(Collection $projects): Collection
+    {
+        $map = collect();
+
+        foreach ($projects as $project) {
+            $map[Str::lower((string) $project->getKey())] = $project;
+
+            $slug = Str::slug($project->title);
+            if ($slug !== '') {
+                $map[Str::lower($slug)] = $project;
+            }
+        }
+
+        return $map;
     }
 
     /**
