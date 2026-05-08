@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -30,38 +31,58 @@ class OpenRouterService
 
         $model = config('services.openrouter.embedding_model', 'openai/text-embedding-3-small');
         $input = $this->truncateEmbeddingInput($text, $model);
+        $retriedForContextLimit = false;
 
-        $response = Http::withToken($apiKey)
-            ->timeout(30)
-            ->post(self::EMBEDDINGS_URL, [
-                'input' => $input,
-                'model' => $model,
-            ]);
+        while (true) {
+            $response = Http::withToken($apiKey)
+                ->timeout((int) config('services.openrouter.embedding_timeout_seconds', 45))
+                ->connectTimeout((int) config('services.openrouter.embedding_connect_timeout_seconds', 10))
+                ->post(self::EMBEDDINGS_URL, [
+                    'input' => $input,
+                    'model' => $model,
+                ]);
 
-        $response->throw();
+            $response->throw();
 
-        $providerError = $response->json('error.message');
-        if (is_string($providerError) && trim($providerError) !== '') {
-            Log::error('OpenRouter embeddings response contained error payload.', [
-                'status' => $response->status(),
-                'model' => $model,
-                'error_message' => $providerError,
-                'body_preview' => Str::limit($response->body(), 800),
-            ]);
-            throw new \RuntimeException('OpenRouter embeddings request failed: '.$providerError);
+            $providerError = $response->json('error.message');
+            if (is_string($providerError) && trim($providerError) !== '') {
+                $tokenLimit = $this->extractContextLimitTokens($providerError);
+                if (! $retriedForContextLimit && $tokenLimit !== null) {
+                    $retryInput = $this->truncateEmbeddingInputForTokenLimit($text, $tokenLimit);
+                    if (mb_strlen($retryInput) < mb_strlen($input)) {
+                        $retriedForContextLimit = true;
+                        $input = $retryInput;
+                        Log::warning('OpenRouter embedding retrying after provider context-limit error.', [
+                            'model' => $model,
+                            'provider_error' => $providerError,
+                            'token_limit' => $tokenLimit,
+                            'retry_chars' => mb_strlen($input),
+                        ]);
+                        continue;
+                    }
+                }
+
+                Log::error('OpenRouter embeddings response contained error payload.', [
+                    'status' => $response->status(),
+                    'model' => $model,
+                    'error_message' => $providerError,
+                    'body_preview' => Str::limit($response->body(), 800),
+                ]);
+                throw new \RuntimeException('OpenRouter embeddings request failed: '.$providerError);
+            }
+
+            $embedding = $response->json('data.0.embedding');
+            if (! is_array($embedding)) {
+                Log::error('OpenRouter embeddings response missing data[0].embedding.', [
+                    'status' => $response->status(),
+                    'model' => $model,
+                    'body_preview' => Str::limit($response->body(), 800),
+                ]);
+                throw new \RuntimeException('OpenRouter embeddings response missing data[0].embedding.');
+            }
+
+            return $embedding;
         }
-
-        $embedding = $response->json('data.0.embedding');
-        if (! is_array($embedding)) {
-            Log::error('OpenRouter embeddings response missing data[0].embedding.', [
-                'status' => $response->status(),
-                'model' => $model,
-                'body_preview' => Str::limit($response->body(), 800),
-            ]);
-            throw new \RuntimeException('OpenRouter embeddings response missing data[0].embedding.');
-        }
-
-        return $embedding;
     }
 
     private function truncateEmbeddingInput(string $text, string $model): string
@@ -80,6 +101,28 @@ class OpenRouterService
         ]);
 
         return $truncated;
+    }
+
+    private function extractContextLimitTokens(string $providerError): ?int
+    {
+        if (! preg_match('/maximum context length is\s+(\d+)\s+tokens/i', $providerError, $matches)) {
+            return null;
+        }
+
+        $tokens = (int) ($matches[1] ?? 0);
+
+        return $tokens > 0 ? $tokens : null;
+    }
+
+    private function truncateEmbeddingInputForTokenLimit(string $text, int $tokenLimit): string
+    {
+        $charsPerToken = (float) config('services.openrouter.embedding_chars_per_token', 2.0);
+        $safetyMargin = (float) config('services.openrouter.embedding_token_safety_margin', 0.75);
+
+        $estimatedSafeChars = (int) floor($tokenLimit * $charsPerToken * $safetyMargin);
+        $estimatedSafeChars = max(1_000, min($estimatedSafeChars, mb_strlen($text)));
+
+        return mb_substr($text, 0, $estimatedSafeChars);
     }
 
     /**
@@ -120,16 +163,14 @@ class OpenRouterService
         );
         $userMessage = '<user_content>'.$escaped.'</user_content>';
 
-        $response = Http::withToken($apiKey)
-            ->timeout(30)
-            ->post(self::CHAT_URL, [
-                'model' => $model,
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $userMessage],
-                ],
-                'max_tokens' => 512,
-            ]);
+        $response = $this->sendChatCompletionRequest([
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userMessage],
+            ],
+            'max_tokens' => 512,
+        ], $apiKey, (int) config('services.openrouter.metadata_timeout_seconds', 45));
 
         $response->throw();
 
@@ -217,9 +258,11 @@ class OpenRouterService
             $payload['temperature'] = $temperatureOverride;
         }
 
-        $response = Http::withToken($apiKey)
-            ->timeout(30)
-            ->post(self::CHAT_URL, $payload);
+        $response = $this->sendChatCompletionRequest(
+            $payload,
+            $apiKey,
+            (int) config('services.openrouter.chat_timeout_seconds', 60),
+        );
 
         $response->throw();
 
@@ -315,16 +358,14 @@ PROMPT;
 
         $userContent = "Page title:\n".trim($fetchedTitle)."\n\nVisible page text:\n".trim($textSnippet)."\n\nNewsletter source excerpt (context):\n".trim($sourceExcerpt);
 
-        $response = Http::withToken($apiKey)
-            ->timeout(60)
-            ->post(self::CHAT_URL, [
-                'model' => $model,
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $userContent],
-                ],
-                'max_tokens' => 768,
-            ]);
+        $response = $this->sendChatCompletionRequest([
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userContent],
+            ],
+            'max_tokens' => 768,
+        ], $apiKey, (int) config('services.openrouter.chat_timeout_seconds', 60));
 
         $response->throw();
 
@@ -422,16 +463,14 @@ PROMPT;
 
         $userContent = 'Subject: '.trim($subject)."\n\nNewsletter body:\n".trim($truncatedBody);
 
-        $response = Http::withToken($apiKey)
-            ->timeout(60)
-            ->post(self::CHAT_URL, [
-                'model' => $model,
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $userContent],
-                ],
-                'max_tokens' => 1024,
-            ]);
+        $response = $this->sendChatCompletionRequest([
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userContent],
+            ],
+            'max_tokens' => 1024,
+        ], $apiKey, (int) config('services.openrouter.chat_timeout_seconds', 60));
 
         $response->throw();
 
@@ -475,5 +514,23 @@ PROMPT;
             'highlights' => $toStringArray($decoded['highlights'] ?? null),
             'quality_notes' => $quality,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function sendChatCompletionRequest(array $payload, string $apiKey, int $timeoutSeconds): \Illuminate\Http\Client\Response
+    {
+        $retryTimes = (int) config('services.openrouter.chat_retry_times', 2);
+        $retrySleepMs = (int) config('services.openrouter.chat_retry_sleep_ms', 250);
+        $connectTimeout = (int) config('services.openrouter.chat_connect_timeout_seconds', 15);
+
+        return Http::withToken($apiKey)
+            ->connectTimeout($connectTimeout)
+            ->timeout($timeoutSeconds)
+            ->retry($retryTimes, $retrySleepMs, function (\Exception $exception): bool {
+                return $exception instanceof ConnectionException;
+            })
+            ->post(self::CHAT_URL, $payload);
     }
 }

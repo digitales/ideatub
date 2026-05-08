@@ -605,7 +605,9 @@ class McpController extends Controller
         $name = $params['name'] ?? null;
         $arguments = is_array($params['arguments'] ?? null) ? $params['arguments'] : [];
 
-        Log::warning('MCP tools/call', ['tool' => $name]);
+        if (config('mcp.log_tool_calls', false)) {
+            Log::info('MCP tools/call', ['tool' => $name]);
+        }
 
         if (! is_string($name) || $name === '') {
             return $this->jsonRpcError(-32602, 'tools/call requires "name"', $id);

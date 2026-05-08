@@ -29,9 +29,75 @@ class LlmJsonDecoder
         try {
             $decoded = json_decode($trimmed, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
-            return null;
+            $candidate = self::extractFirstJsonObject($trimmed);
+            if ($candidate === null) {
+                return null;
+            }
+
+            try {
+                $decoded = json_decode($candidate, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                return null;
+            }
         }
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    private static function extractFirstJsonObject(string $input): ?string
+    {
+        $length = strlen($input);
+        $start = null;
+        $depth = 0;
+        $inString = false;
+        $escaped = false;
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $input[$i];
+
+            if ($inString) {
+                if ($escaped) {
+                    $escaped = false;
+                    continue;
+                }
+
+                if ($char === '\\') {
+                    $escaped = true;
+                    continue;
+                }
+
+                if ($char === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = true;
+                continue;
+            }
+
+            if ($char === '{') {
+                if ($depth === 0) {
+                    $start = $i;
+                }
+                $depth++;
+                continue;
+            }
+
+            if ($char === '}') {
+                if ($depth === 0) {
+                    continue;
+                }
+
+                $depth--;
+                if ($depth === 0 && $start !== null) {
+                    return substr($input, $start, $i - $start + 1);
+                }
+            }
+        }
+
+        return null;
     }
 }

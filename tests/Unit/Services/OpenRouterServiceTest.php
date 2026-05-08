@@ -128,6 +128,40 @@ class OpenRouterServiceTest extends TestCase
     }
 
     #[Test]
+    public function embed_retries_with_more_aggressive_truncation_when_provider_reports_context_limit(): void
+    {
+        Config::set('services.openrouter.embedding_max_input_chars', 24000);
+        $vector = array_fill(0, 3, 0.5);
+        $longInput = str_repeat('x', 20000);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/embeddings' => Http::sequence()
+                ->push([
+                    'error' => [
+                        'message' => "Invalid 'input': maximum context length is 8192 tokens.",
+                    ],
+                ], 200)
+                ->push([
+                    'data' => [
+                        ['embedding' => $vector],
+                    ],
+                ], 200),
+        ]);
+
+        $result = $this->service->embed($longInput);
+
+        $this->assertSame($vector, $result);
+        $recorded = Http::recorded();
+        $this->assertCount(2, $recorded);
+
+        $firstRequest = $recorded[0][0];
+        $secondRequest = $recorded[1][0];
+
+        $this->assertSame(20000, mb_strlen((string) $firstRequest['input']));
+        $this->assertLessThan(mb_strlen((string) $firstRequest['input']), mb_strlen((string) $secondRequest['input']));
+    }
+
+    #[Test]
     public function extract_metadata_returns_structured_array_from_chat_completion(): void
     {
         $json = '{"type":"note","tags":["work"],"people":["Alice"],"action_items":["Follow up"]}';

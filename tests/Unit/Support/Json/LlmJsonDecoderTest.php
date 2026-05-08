@@ -55,6 +55,18 @@ final class LlmJsonDecoderTest extends TestCase
     }
 
     #[Test]
+    public function it_extracts_json_object_when_wrapped_in_plain_text(): void
+    {
+        $raw = "Here is your digest:\n\n{\"summary_markdown\":\"ok\",\"references\":[]}\n\nThanks.";
+
+        $result = LlmJsonDecoder::decode($raw);
+
+        $this->assertIsArray($result);
+        $this->assertSame('ok', $result['summary_markdown']);
+        $this->assertSame([], $result['references']);
+    }
+
+    #[Test]
     public function it_returns_null_when_root_is_not_an_array(): void
     {
         $this->assertNull(LlmJsonDecoder::decode('"just a string"'));

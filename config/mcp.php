@@ -26,6 +26,11 @@ return [
     'debug_auth' => filter_var(env('MCP_DEBUG_AUTH', false), FILTER_VALIDATE_BOOLEAN),
 
     /*
+    | Log each tools/call invocation. Disabled by default to avoid noisy warning logs.
+    */
+    'log_tool_calls' => filter_var(env('MCP_LOG_TOOL_CALLS', false), FILTER_VALIDATE_BOOLEAN),
+
+    /*
     | Optional comma-separated extra hostnames allowed in Origin (in addition to
     | APP_URL host and the built-in defaults in McpController).
     */
