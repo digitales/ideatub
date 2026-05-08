@@ -120,7 +120,7 @@
                     </ul>
                 @endforeach
             @else
-                {!! \Illuminate\Support\Str::markdown($summary_markdown ?? '', ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
+                <x-safe-markdown :markdown="$summary_markdown ?? ''" />
             @endif
         </article>
 

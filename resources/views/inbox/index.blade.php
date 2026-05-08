@@ -51,10 +51,7 @@
                     </div>
 
                     <div class="prose prose-sm mt-3 max-w-none text-slate-brand prose-headings:text-deep-indigo prose-p:text-slate-brand prose-strong:text-deep-indigo prose-li:text-slate-brand">
-                        {!! \Illuminate\Support\Str::markdown($item->body ?? '', [
-                            'html_input' => 'strip',
-                            'allow_unsafe_links' => false,
-                        ]) !!}
+                        <x-safe-markdown :markdown="$item->body ?? ''" />
                     </div>
 
                     @if (($item->generator_type ?? '') === 'email_sender_review')

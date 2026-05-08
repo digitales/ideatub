@@ -13,7 +13,10 @@
     @endphp
     @continue($itemText === '')
     <li class="leading-relaxed">
-        <span>{{ $itemText }}</span>
+        <x-safe-markdown
+            :markdown="$itemText"
+            class="structured-section-item-markdown [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0"
+        />
         @if ($showSourceBundleBadge)
             <span class="inline-flex items-center rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-amber-900 ml-1.5 align-middle">Source bundle</span>
         @endif

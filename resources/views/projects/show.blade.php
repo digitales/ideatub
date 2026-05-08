@@ -15,7 +15,7 @@
             <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">{{ $project->title }}</h1>
             @if ($project->description)
                 <div class="mt-3 prose prose-sm max-w-none text-slate-brand">
-                    {!! Str::markdown($project->description, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
+                    <x-safe-markdown :markdown="$project->description" />
                 </div>
             @endif
         </div>
