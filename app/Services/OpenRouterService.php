@@ -374,13 +374,7 @@ PROMPT;
             throw new \RuntimeException('OpenRouter link summary response missing choices[0].message.content.');
         }
 
-        $content = trim((string) $content);
-        if (str_starts_with($content, '```')) {
-            $content = preg_replace('/^```(?:json)?\s*|\s*```$/s', '', $content) ?? $content;
-            $content = trim($content);
-        }
-
-        $decoded = json_decode($content, true);
+        $decoded = $this->decodeModelJsonObject((string) $content);
         if (! is_array($decoded)) {
             throw new \RuntimeException('OpenRouter link summary response was not valid JSON.');
         }
@@ -479,13 +473,7 @@ PROMPT;
             throw new \RuntimeException('OpenRouter newsletter analysis response missing choices[0].message.content.');
         }
 
-        $content = trim((string) $content);
-        if (str_starts_with($content, '```')) {
-            $content = preg_replace('/^```(?:json)?\s*|\s*```$/s', '', $content) ?? $content;
-            $content = trim($content);
-        }
-
-        $decoded = json_decode($content, true);
+        $decoded = $this->decodeModelJsonObject((string) $content);
         if (! is_array($decoded)) {
             throw new \RuntimeException('OpenRouter newsletter analysis response was not valid JSON.');
         }
@@ -532,5 +520,40 @@ PROMPT;
                 return $exception instanceof ConnectionException;
             })
             ->post(self::CHAT_URL, $payload);
+    }
+
+    /**
+     * Decode the first JSON object we can recover from a model response.
+     * Handles plain JSON, fenced blocks, and prose-wrapped JSON.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function decodeModelJsonObject(string $content): ?array
+    {
+        $trimmed = trim($content);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        $attempts = [$trimmed];
+
+        if (preg_match('/```(?:json)?\s*({[\s\S]*?})\s*```/i', $trimmed, $matches) === 1) {
+            $attempts[] = $matches[1];
+        }
+
+        $firstBrace = strpos($trimmed, '{');
+        $lastBrace = strrpos($trimmed, '}');
+        if ($firstBrace !== false && $lastBrace !== false && $lastBrace > $firstBrace) {
+            $attempts[] = substr($trimmed, $firstBrace, ($lastBrace - $firstBrace) + 1);
+        }
+
+        foreach ($attempts as $candidate) {
+            $decoded = json_decode(trim($candidate), true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
     }
 }

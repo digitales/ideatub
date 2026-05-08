@@ -464,6 +464,37 @@ class OpenRouterServiceTest extends TestCase
     }
 
     #[Test]
+    public function analyze_newsletter_parses_json_wrapped_in_markdown_and_prose(): void
+    {
+        $json = json_encode([
+            'summary' => 'A concise wrap-up of product and market updates.',
+            'key_points' => ['Launch date moved to June'],
+            'positives_mentioned' => ['Strong customer retention'],
+            'negatives_mentioned' => ['Concerns about churn in SMB segment'],
+            'highlights' => ['New benchmark data included'],
+            'quality_notes' => null,
+        ], JSON_THROW_ON_ERROR);
+
+        $wrapped = "Here is the analysis:\n```json\n{$json}\n```\nHope this helps.";
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response([
+                'choices' => [['message' => ['content' => $wrapped]]],
+            ], 200),
+        ]);
+
+        $result = $this->service->analyzeNewsletter(
+            subject: 'Market Digest',
+            body: str_repeat('Newsletter body content. ', 25),
+        );
+
+        $this->assertSame('A concise wrap-up of product and market updates.', $result['summary']);
+        $this->assertSame(['Launch date moved to June'], $result['key_points']);
+        $this->assertSame(['Strong customer retention'], $result['positives_mentioned']);
+        $this->assertSame(['Concerns about churn in SMB segment'], $result['negatives_mentioned']);
+    }
+
+    #[Test]
     public function analyze_newsletter_appends_truncation_note_to_quality_notes_when_body_exceeds_limit(): void
     {
         Config::set('services.openrouter.api_key', 'test-api-key');
