@@ -7,6 +7,7 @@ use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use App\Services\WorkingMemory\Compactions\MeetingCompactionPromptBuilder;
 use App\Services\WorkingMemory\Compactions\MeetingPrimaryScopeResolver;
+use App\Support\Json\LlmDecodeFailureLogContext;
 use App\Support\Json\LlmJsonDecoder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -64,9 +65,9 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
             $decoded = LlmJsonDecoder::decode($raw);
 
             if ($decoded === null) {
-                Log::warning('SynthesizeMeetingCompactionJob: model returned non-JSON output.', [
+                Log::warning('SynthesizeMeetingCompactionJob: model returned non-JSON output.', LlmDecodeFailureLogContext::withOptionalRawPreview([
                     'thought_id' => $meeting->id,
-                ]);
+                ], $raw));
 
                 return;
             }
@@ -90,5 +91,4 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
             throw $e;
         }
     }
-
 }

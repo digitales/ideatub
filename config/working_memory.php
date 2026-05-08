@@ -47,6 +47,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | LLM JSON decode failure logging
+    |--------------------------------------------------------------------------
+    |
+    | When an LLM returns output that LlmJsonDecoder cannot parse, jobs log a
+    | warning. Set log_llm_decode_failure_preview to true temporarily in
+    | production to attach a truncated raw_preview field (PII-sensitive).
+    |
+    */
+
+    'log_llm_decode_failure_preview' => (bool) env('WORKING_MEMORY_LOG_LLM_DECODE_FAILURE_PREVIEW', false),
+    'llm_decode_failure_preview_max_chars' => (int) env('WORKING_MEMORY_LLM_DECODE_FAILURE_PREVIEW_MAX_CHARS', 800),
+
+    /*
+    |--------------------------------------------------------------------------
     | Meeting refresh delay (seconds)
     |--------------------------------------------------------------------------
     |

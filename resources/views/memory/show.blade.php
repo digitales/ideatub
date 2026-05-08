@@ -81,6 +81,14 @@
                         Tag stream
                     </a>
                 @endif
+                @if (! $isProject && ! $isTag && config('features.working_memory_ui'))
+                    <a
+                        href="{{ route('memory.scopes.index') }}"
+                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
+                    >
+                        All memories
+                    </a>
+                @endif
                 @if (! $isProject && ! $isTag && config('features.working_memory_insights'))
                     <a
                         href="{{ route('memory.insights') }}"

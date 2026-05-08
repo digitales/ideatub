@@ -1,6 +1,6 @@
 # Design: Working memory index (all scopes)
 
-**Status:** Draft — pending user review  
+**Status:** Approved — implemented (`feature/working-memory-index`)  
 **Date:** 2026-05-08
 
 ## Relationship to other specs

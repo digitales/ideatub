@@ -4,6 +4,7 @@ namespace App\Services\WorkingMemory;
 
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Composer\WorkingMemoryComposerPromptBuilder;
+use App\Support\Json\LlmDecodeFailureLogContext;
 use App\Support\Json\LlmJsonDecoder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -58,11 +59,10 @@ final class WorkingMemoryAiAuthorService
             $decoded = LlmJsonDecoder::decode($raw);
 
             if ($decoded === null) {
-                Log::warning('WorkingMemoryAiAuthorService: model returned non-JSON output.', [
+                Log::warning('WorkingMemoryAiAuthorService: model returned non-JSON output.', LlmDecodeFailureLogContext::withOptionalRawPreview([
                     'scope_type' => $evidencePack['scope_type'] ?? null,
                     'scope_key' => $evidencePack['scope_key'] ?? null,
-                    'preview' => Str::limit((string) $raw, 400),
-                ]);
+                ], (string) $raw));
 
                 return $this->emptyOutput();
             }

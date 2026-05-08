@@ -36,6 +36,18 @@ class WorkingMemoryBuilderService
     {
         [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);
 
+        $memory = WorkingMemory::query()->firstOrCreate(
+            [
+                'user_id' => $userId,
+                'scope_type' => $normalizedScopeType,
+                'scope_key' => $normalizedScopeKey,
+            ],
+            [
+                'freshness_state' => 'stale',
+            ]
+        );
+        $memory->forceFill(['build_started_at' => now()])->save();
+
         $thoughts = $this->selectThoughts($userId, $normalizedScopeType, $normalizedScopeKey, $buildType);
         $structuredSections = null;
         $references = null;
@@ -101,13 +113,17 @@ class WorkingMemoryBuilderService
                 return $fallbackVersion;
             }
 
+            WorkingMemory::query()
+                ->where('user_id', $userId)
+                ->where('scope_type', $normalizedScopeType)
+                ->where('scope_key', $normalizedScopeKey)
+                ->update(['build_started_at' => null]);
+
             throw $e;
         }
 
         return DB::transaction(function () use (
-            $userId,
-            $normalizedScopeType,
-            $normalizedScopeKey,
+            $memory,
             $buildType,
             $thoughts,
             $payload,
@@ -120,17 +136,6 @@ class WorkingMemoryBuilderService
             $validationError,
             $buildDiagnostics,
         ): WorkingMemoryVersion {
-            $memory = WorkingMemory::query()->firstOrCreate(
-                [
-                    'user_id' => $userId,
-                    'scope_type' => $normalizedScopeType,
-                    'scope_key' => $normalizedScopeKey,
-                ],
-                [
-                    'freshness_state' => 'stale',
-                ]
-            );
-
             $version = $memory->versions()->create([
                 'build_type' => $buildType,
                 'summary_markdown' => $summaryMarkdown,
@@ -166,6 +171,7 @@ class WorkingMemoryBuilderService
                 'latest_version_id' => $version->id,
                 'freshness_state' => $this->assembler->freshnessFromAge(now()),
                 'last_refreshed_at' => now(),
+                'build_started_at' => null,
             ])->save();
 
             return $version->fresh(['workingMemory', 'inputs']);
@@ -195,6 +201,7 @@ class WorkingMemoryBuilderService
 
         $memory->forceFill([
             'freshness_state' => 'degraded',
+            'build_started_at' => null,
         ])->save();
 
         return $fallbackVersion;

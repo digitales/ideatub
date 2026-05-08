@@ -8,6 +8,7 @@ use App\Models\WorkingMemoryVersion;
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use App\Services\WorkingMemory\Compactions\ScopeDigestPromptBuilder;
+use App\Support\Json\LlmDecodeFailureLogContext;
 use App\Support\Json\LlmJsonDecoder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -79,11 +80,11 @@ class BuildScopeDigestJob implements ShouldQueue
 
             $decoded = LlmJsonDecoder::decode($raw);
             if ($decoded === null) {
-                Log::warning('BuildScopeDigestJob: model returned non-JSON output.', [
+                Log::warning('BuildScopeDigestJob: model returned non-JSON output.', LlmDecodeFailureLogContext::withOptionalRawPreview([
                     'user_id' => $this->userId,
                     'scope_type' => $this->scopeType,
                     'scope_key' => $this->scopeKey,
-                ]);
+                ], $raw));
 
                 return;
             }
