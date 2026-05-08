@@ -6,6 +6,7 @@ use App\Models\Thought;
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use App\Services\WorkingMemory\Compactions\TopicDigestPromptBuilder;
+use App\Support\Json\LlmDecodeFailureLogContext;
 use App\Support\Json\LlmJsonDecoder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -61,12 +62,12 @@ class BuildTopicDigestJob implements ShouldQueue
 
             $decoded = LlmJsonDecoder::decode($raw);
             if ($decoded === null) {
-                Log::warning('BuildTopicDigestJob: model returned non-JSON output.', [
+                Log::warning('BuildTopicDigestJob: model returned non-JSON output.', LlmDecodeFailureLogContext::withOptionalRawPreview([
                     'user_id' => $this->userId,
                     'scope_type' => $this->scopeType,
                     'scope_key' => $this->scopeKey,
                     'topic' => $this->topic,
-                ]);
+                ], $raw));
 
                 return;
             }

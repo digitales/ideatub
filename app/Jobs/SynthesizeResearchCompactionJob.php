@@ -9,6 +9,7 @@ use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use App\Services\WorkingMemory\Compactions\ResearchSynthesisPromptBuilder;
 use App\Services\WorkingMemory\MemoryInsightsService;
+use App\Support\Json\LlmDecodeFailureLogContext;
 use App\Support\Json\LlmJsonDecoder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -70,11 +71,11 @@ class SynthesizeResearchCompactionJob implements ShouldQueue
 
             $decoded = LlmJsonDecoder::decode($raw);
             if ($decoded === null) {
-                Log::warning('SynthesizeResearchCompactionJob: model returned non-JSON output.', [
+                Log::warning('SynthesizeResearchCompactionJob: model returned non-JSON output.', LlmDecodeFailureLogContext::withOptionalRawPreview([
                     'user_id' => $this->userId,
                     'scope_type' => $this->scopeType,
                     'scope_key' => $this->scopeKey,
-                ]);
+                ], $raw));
 
                 return;
             }
