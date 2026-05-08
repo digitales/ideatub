@@ -233,6 +233,34 @@ class WorkingMemoryBuilderServiceTest extends TestCase
     }
 
     #[Test]
+    public function it_maps_structured_recent_changes_citations_to_legacy_active_threads(): void
+    {
+        $builder = app(WorkingMemoryBuilderService::class);
+        $method = new ReflectionMethod(WorkingMemoryBuilderService::class, 'payloadFromStructuredSections');
+        $method->setAccessible(true);
+
+        $tid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        $sections = [
+            'Active Priorities' => [],
+            'Recent Changes' => [[
+                'text' => 'Migration kickoff discussed.',
+                'citations' => [
+                    ['type' => 'thought', 'url' => '/thoughts/'.$tid, 'label' => 'Meeting'],
+                ],
+            ]],
+            'Open Questions' => [],
+            'Next Actions' => [],
+        ];
+
+        /** @var array<string, mixed> $payload */
+        $payload = $method->invoke($builder, $sections, collect());
+
+        $this->assertSame('Migration kickoff discussed.', $payload['active_threads'][0]['title']);
+        $this->assertSame($tid, $payload['active_threads'][0]['thought_id']);
+        $this->assertSame('/thoughts/'.$tid, $payload['active_threads'][0]['url']);
+    }
+
+    #[Test]
     public function it_builds_section_references_with_section_specific_urls_and_deduped_valid_links(): void
     {
         $builder = app(WorkingMemoryBuilderService::class);

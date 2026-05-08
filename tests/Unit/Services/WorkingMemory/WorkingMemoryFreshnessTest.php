@@ -11,6 +11,7 @@ use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use App\Services\WorkingMemory\WorkingMemoryConsolidationWindowResolver;
 use App\Services\WorkingMemory\WorkingMemoryEvidencePackBuilder;
+use App\Services\WorkingMemory\WorkingMemoryLegacyRowCitationResolver;
 use App\Services\WorkingMemory\WorkingMemoryOutputValidator;
 use App\Services\WorkingMemory\WorkingMemoryScopeNormalizer;
 use Carbon\Carbon;
@@ -70,6 +71,7 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryEvidencePackBuilder::class),
             app(WorkingMemoryAiAuthorService::class),
             app(WorkingMemoryOutputValidator::class),
+            app(WorkingMemoryLegacyRowCitationResolver::class),
         );
 
         $fallbackVersion = $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -120,6 +122,7 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryEvidencePackBuilder::class),
             app(WorkingMemoryAiAuthorService::class),
             app(WorkingMemoryOutputValidator::class),
+            app(WorkingMemoryLegacyRowCitationResolver::class),
         );
 
         $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -169,6 +172,7 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryEvidencePackBuilder::class),
             app(WorkingMemoryAiAuthorService::class),
             app(WorkingMemoryOutputValidator::class),
+            app(WorkingMemoryLegacyRowCitationResolver::class),
         );
 
         try {
@@ -225,6 +229,7 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryEvidencePackBuilder::class),
             app(WorkingMemoryAiAuthorService::class),
             app(WorkingMemoryOutputValidator::class),
+            app(WorkingMemoryLegacyRowCitationResolver::class),
         );
 
         try {

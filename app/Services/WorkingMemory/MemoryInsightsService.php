@@ -24,7 +24,7 @@ class MemoryInsightsService
      * @return array{
      *     summary_markdown: string,
      *     key_concepts: array<int, array{title: string}>,
-     *     active_threads: array<int, array{title: string}>,
+     *     active_threads: array<int, array<string, string>>,
      *     open_questions: array<int, array{question: string}>,
      *     next_actions: array<int, array{action: string}>,
      *     confidence_score: float
@@ -35,12 +35,26 @@ class MemoryInsightsService
         $research = $researchThoughts->values();
         $tagCounts = $this->countTags($research);
 
-        $titles = $research
-            ->sortByDesc(fn (Thought $t) => $t->created_at)
-            ->take(8)
-            ->map(fn (Thought $t): string => Str::limit($this->captureTitle($t), 80))
-            ->values()
-            ->all();
+        $researchSorted = $research->sortByDesc(fn (Thought $t) => $t->created_at)->values();
+
+        $titles = [];
+        $activeThreads = [];
+        $seenTitles = [];
+        foreach ($researchSorted as $thought) {
+            $title = Str::limit($this->captureTitle($thought), 80);
+            if (trim($title) === '') {
+                continue;
+            }
+            if (isset($seenTitles[$title])) {
+                continue;
+            }
+            $seenTitles[$title] = true;
+            $titles[] = $title;
+            $activeThreads[] = ['title' => $title, 'thought_id' => (string) $thought->id];
+            if (count($titles) >= 8) {
+                break;
+            }
+        }
 
         $commentary = $this->maybeCommentary($research, $tagCounts, $titles);
         $summaryMarkdown = $this->buildInsightsMarkdown($research, $tagCounts, $titles, $commentary);
@@ -53,10 +67,6 @@ class MemoryInsightsService
             $keyConcepts = [['title' => 'No topic tags in recent research captures']];
         }
 
-        $activeThreads = [];
-        foreach ($titles as $title) {
-            $activeThreads[] = ['title' => $title];
-        }
         if ($activeThreads === []) {
             $activeThreads = [['title' => 'No research captures in the selection window']];
         }

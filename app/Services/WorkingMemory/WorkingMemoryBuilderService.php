@@ -20,6 +20,7 @@ class WorkingMemoryBuilderService
         private readonly WorkingMemoryEvidencePackBuilder $evidencePackBuilder,
         private readonly WorkingMemoryAiAuthorService $aiAuthorService,
         private readonly WorkingMemoryOutputValidator $outputValidator,
+        private readonly WorkingMemoryLegacyRowCitationResolver $legacyRowCitationResolver,
     ) {}
 
     public function buildConsolidated(int $userId, string $scopeType, string $scopeKey): WorkingMemoryVersion
@@ -564,9 +565,9 @@ class WorkingMemoryBuilderService
      * @param  Collection<int, Thought>  $thoughts
      * @return array{
      *     key_concepts: array<int, array{title: string}>,
-     *     active_threads: array<int, array{title: string}>,
-     *     open_questions: array<int, array{question: string}>,
-     *     next_actions: array<int, array{action: string}>,
+     *     active_threads: array<int, array<string, string>>,
+     *     open_questions: array<int, array<string, string>>,
+     *     next_actions: array<int, array<string, string>>,
      *     confidence_score: float
      * }
      */
@@ -580,23 +581,9 @@ class WorkingMemoryBuilderService
             ->values()
             ->all();
 
-        $activeThreads = collect($this->sectionTextsForPayload($sections['Recent Changes'] ?? []))
-            ->take(8)
-            ->map(fn (string $entry): array => ['title' => $entry])
-            ->values()
-            ->all();
-
-        $openQuestions = collect($this->sectionTextsForPayload($sections['Open Questions'] ?? []))
-            ->take(8)
-            ->map(fn (string $entry): array => ['question' => $entry])
-            ->values()
-            ->all();
-
-        $nextActions = collect($this->sectionTextsForPayload($sections['Next Actions'] ?? []))
-            ->take(8)
-            ->map(fn (string $entry): array => ['action' => $entry])
-            ->values()
-            ->all();
+        $activeThreads = $this->legacyRowsFromStructuredSection($sections['Recent Changes'] ?? [], 'title', 8);
+        $openQuestions = $this->legacyRowsFromStructuredSection($sections['Open Questions'] ?? [], 'question', 8);
+        $nextActions = $this->legacyRowsFromStructuredSection($sections['Next Actions'] ?? [], 'action', 8);
 
         return [
             'key_concepts' => $keyConcepts,
@@ -605,6 +592,61 @@ class WorkingMemoryBuilderService
             'next_actions' => $nextActions,
             'confidence_score' => (float) $legacyConfidence,
         ];
+    }
+
+    /**
+     * @param  mixed  $entries
+     * @return array<int, array<string, string>>
+     */
+    private function legacyRowsFromStructuredSection($entries, string $fieldName, int $limit): array
+    {
+        $seen = [];
+        $rows = [];
+        foreach ($this->iterateStructuredSectionEntries(is_array($entries) ? $entries : []) as [$text, $citations]) {
+            if ($text === '') {
+                continue;
+            }
+            if (isset($seen[$text])) {
+                continue;
+            }
+            $seen[$text] = true;
+
+            $row = [$fieldName => $text];
+            $link = $this->legacyRowCitationResolver->resolvePrimaryThought($citations);
+            if ($link !== null) {
+                $row['thought_id'] = $link['thought_id'];
+                if (isset($link['url'])) {
+                    $row['url'] = $link['url'];
+                }
+            }
+            $rows[] = $row;
+            if (count($rows) >= $limit) {
+                break;
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<int, mixed>  $entries
+     * @return \Generator<int, array{0: string, 1: array<int, mixed>}>
+     */
+    private function iterateStructuredSectionEntries(array $entries): \Generator
+    {
+        foreach ($entries as $entry) {
+            if (is_string($entry)) {
+                yield [trim($entry), []];
+
+                continue;
+            }
+            if (is_array($entry)) {
+                $text = trim((string) ($entry['text'] ?? ''));
+                $citations = $entry['citations'] ?? [];
+                $citations = is_array($citations) ? $citations : [];
+                yield [$text, $citations];
+            }
+        }
     }
 
     private function authoringEnabled(): bool

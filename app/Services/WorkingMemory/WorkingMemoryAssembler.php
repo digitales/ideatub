@@ -7,8 +7,10 @@ use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class WorkingMemoryAssembler
 {
@@ -28,9 +30,9 @@ class WorkingMemoryAssembler
      * @return array{
      *     executive_summary: string,
      *     key_concepts: array<int, array{title: string}>,
-     *     active_threads: array<int, array{title: string}>,
-     *     open_questions: array<int, array{question: string}>,
-     *     next_actions: array<int, array{action: string}>,
+     *     active_threads: array<int, array<string, string>>,
+     *     open_questions: array<int, array<string, string>>,
+     *     next_actions: array<int, array<string, string>>,
      *     confidence_score: float
      * }
      */
@@ -42,32 +44,89 @@ class WorkingMemoryAssembler
             array_slice(array_keys($tagCounts), 0, 5)
         );
 
-        $activeThreads = $thoughts
-            ->pluck('content')
-            ->filter(fn ($content): bool => is_string($content) && trim($content) !== '')
-            ->map(fn (string $content): array => ['title' => Str::limit(trim($content), 90)])
-            ->unique('title')
-            ->take(5)
-            ->values()
-            ->all();
+        $sorted = $thoughts->sortByDesc(fn (Thought $t): int => (int) ($t->created_at?->timestamp ?? 0))->values();
 
-        $openQuestions = $thoughts
-            ->pluck('content')
-            ->filter(fn ($content): bool => is_string($content) && str_contains($content, '?'))
-            ->map(fn (string $content): array => ['question' => Str::finish(Str::limit(trim($content), 90, ''), '?')])
-            ->unique('question')
-            ->take(5)
-            ->values()
-            ->all();
+        $openQuestionIds = [];
+        $openQuestions = [];
+        $seenQuestionText = [];
+        foreach ($sorted as $thought) {
+            $content = $thought->content;
+            if (! is_string($content) || ! str_contains($content, '?')) {
+                continue;
+            }
+            $trimmed = trim($content);
+            if ($trimmed === '') {
+                continue;
+            }
+            $question = Str::finish(Str::limit($trimmed, 90, ''), '?');
+            if (isset($seenQuestionText[$question])) {
+                continue;
+            }
+            $seenQuestionText[$question] = true;
+            $tid = (string) $thought->id;
+            $openQuestionIds[$tid] = true;
+            $openQuestions[] = ['question' => $question, 'thought_id' => $tid];
+            if (count($openQuestions) >= 5) {
+                break;
+            }
+        }
 
-        $nextActions = $thoughts
-            ->pluck('content')
-            ->filter(fn ($content): bool => is_string($content) && trim($content) !== '')
-            ->map(fn (string $content): array => ['action' => Str::limit(trim($content), 90)])
-            ->unique('action')
-            ->take(5)
-            ->values()
-            ->all();
+        $threadIds = [];
+        $activeThreads = [];
+        $seenThreadTitle = [];
+        foreach ($sorted as $thought) {
+            $tid = (string) $thought->id;
+            if (isset($openQuestionIds[$tid])) {
+                continue;
+            }
+            $content = $thought->content;
+            if (! is_string($content)) {
+                continue;
+            }
+            $trimmed = trim($content);
+            if ($trimmed === '') {
+                continue;
+            }
+            $title = Str::limit($trimmed, 90);
+            if (isset($seenThreadTitle[$title])) {
+                continue;
+            }
+            $seenThreadTitle[$title] = true;
+            $threadIds[$tid] = true;
+            $activeThreads[] = ['title' => $title, 'thought_id' => $tid];
+            if (count($activeThreads) >= 5) {
+                break;
+            }
+        }
+
+        $nextActions = [];
+        $seenActionText = [];
+        foreach ($sorted as $thought) {
+            $tid = (string) $thought->id;
+            if (isset($openQuestionIds[$tid])) {
+                continue;
+            }
+            if (isset($threadIds[$tid])) {
+                continue;
+            }
+            $content = $thought->content;
+            if (! is_string($content)) {
+                continue;
+            }
+            $trimmed = trim($content);
+            if ($trimmed === '') {
+                continue;
+            }
+            $action = Str::limit($trimmed, 90);
+            if (isset($seenActionText[$action])) {
+                continue;
+            }
+            $seenActionText[$action] = true;
+            $nextActions[] = ['action' => $action, 'thought_id' => $tid];
+            if (count($nextActions) >= 5) {
+                break;
+            }
+        }
 
         $thoughtCount = $thoughts->count();
         $confidenceScore = $this->boundConfidence(25 + ($thoughtCount * 2.5) + (count($keyConcepts) * 8));
@@ -99,9 +158,9 @@ class WorkingMemoryAssembler
      * @param  array{
      *     executive_summary: string,
      *     key_concepts: array<int, array{title: string}>,
-     *     active_threads: array<int, array{title: string}>,
-     *     open_questions: array<int, array{question: string}>,
-     *     next_actions: array<int, array{action: string}>
+     *     active_threads: array<int, array<string, string>>,
+     *     open_questions: array<int, array<string, string>>,
+     *     next_actions: array<int, array<string, string>>
      * }  $payload
      */
     public function renderSummary(array $payload): string
@@ -110,13 +169,13 @@ class WorkingMemoryAssembler
             '## Executive summary',
             $payload['executive_summary'],
             '## Key concepts',
-            $this->renderBullets($payload['key_concepts'], 'title'),
+            $this->renderPlainBullets($payload['key_concepts'], 'title'),
             '## Active threads',
-            $this->renderBullets($payload['active_threads'], 'title'),
+            $this->renderLegacyMarkdownBullets($payload['active_threads'], 'title'),
             '## Open questions',
-            $this->renderBullets($payload['open_questions'], 'question'),
+            $this->renderLegacyMarkdownBullets($payload['open_questions'], 'question'),
             '## Next actions',
-            $this->renderBullets($payload['next_actions'], 'action'),
+            $this->renderLegacyMarkdownBullets($payload['next_actions'], 'action'),
         ]);
     }
 
@@ -157,11 +216,81 @@ class WorkingMemoryAssembler
     /**
      * @param  array<int, array<string, string>>  $rows
      */
-    private function renderBullets(array $rows, string $key): string
+    private function renderPlainBullets(array $rows, string $key): string
     {
         return collect($rows)
             ->map(fn (array $row): string => '- '.(string) ($row[$key] ?? ''))
             ->implode("\n");
+    }
+
+    /**
+     * @param  array<int, array<string, string>>  $rows
+     */
+    private function renderLegacyMarkdownBullets(array $rows, string $key): string
+    {
+        return collect($rows)
+            ->map(fn (array $row): string => $this->legacyMarkdownBulletLine($row, $key))
+            ->implode("\n");
+    }
+
+    /**
+     * @param  array<string, string>  $row
+     */
+    private function legacyMarkdownBulletLine(array $row, string $key): string
+    {
+        $text = (string) ($row[$key] ?? '');
+        $url = trim((string) ($row['url'] ?? ''));
+        if ($url === '' && isset($row['thought_id'])) {
+            $tid = trim((string) $row['thought_id']);
+            if ($tid !== '' && Str::isUuid($tid)) {
+                try {
+                    $url = Route::has('thoughts.show')
+                        ? route('thoughts.show', ['thought' => $tid])
+                        : '';
+                } catch (Throwable) {
+                    $url = '';
+                }
+            }
+        }
+        if ($url !== '') {
+            return '- ['.$this->escapeMarkdownLinkText($text).']('.$url.')';
+        }
+
+        return '- '.$text;
+    }
+
+    private function escapeMarkdownLinkText(string $text): string
+    {
+        return str_replace(['\\', '[', ']'], ['\\\\', '\\[', '\\]'], $text);
+    }
+
+    /**
+     * @param  array<int, mixed>  $rows
+     * @return array<int, array<string, string>>
+     */
+    private function enrichLegacyRowsWithUrls(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $merged = $row;
+            $url = trim((string) ($merged['url'] ?? ''));
+            $tid = isset($merged['thought_id']) ? trim((string) $merged['thought_id']) : '';
+            if ($url === '' && $tid !== '' && Str::isUuid($tid)) {
+                try {
+                    if (Route::has('thoughts.show')) {
+                        $merged['url'] = route('thoughts.show', ['thought' => $tid]);
+                    }
+                } catch (Throwable) {
+                    // omit derived url
+                }
+            }
+            $out[] = $merged;
+        }
+
+        return $out;
     }
 
     /**
@@ -188,9 +317,9 @@ class WorkingMemoryAssembler
      *     confidence_score: float,
      *     summary_markdown: string,
      *     key_concepts: array<int, array{title: string}>,
-     *     active_threads: array<int, array{title: string}>,
-     *     open_questions: array<int, array{question: string}>,
-     *     next_actions: array<int, array{action: string}>,
+     *     active_threads: array<int, array<string, string>>,
+     *     open_questions: array<int, array<string, string>>,
+     *     next_actions: array<int, array<string, string>>,
      *     structured_sections: array<string, array<int, array<string, mixed>>>,
      *     references: array<int, array{type: string, url: string, label: string}>,
      *     section_references: array<string, array<int, array<string, mixed>>>,
@@ -244,9 +373,9 @@ class WorkingMemoryAssembler
      *     confidence_score: float,
      *     summary_markdown: string,
      *     key_concepts: array<int, array{title: string}>,
-     *     active_threads: array<int, array{title: string}>,
-     *     open_questions: array<int, array{question: string}>,
-     *     next_actions: array<int, array{action: string}>,
+     *     active_threads: array<int, array<string, string>>,
+     *     open_questions: array<int, array<string, string>>,
+     *     next_actions: array<int, array<string, string>>,
      *     structured_sections: array<string, array<int, array<string, mixed>>>,
      *     references: array<int, array{type: string, url: string, label: string}>,
      *     section_references: array<string, array<int, array<string, mixed>>>,
@@ -282,9 +411,9 @@ class WorkingMemoryAssembler
             'confidence_score' => (float) $canonical->confidence_score,
             'summary_markdown' => $canonical->summary_markdown,
             'key_concepts' => $canonical->key_concepts_json ?? [],
-            'active_threads' => $canonical->active_threads_json ?? [],
-            'open_questions' => $canonical->open_questions_json ?? [],
-            'next_actions' => $canonical->next_actions_json ?? [],
+            'active_threads' => $this->enrichLegacyRowsWithUrls($canonical->active_threads_json ?? []),
+            'open_questions' => $this->enrichLegacyRowsWithUrls($canonical->open_questions_json ?? []),
+            'next_actions' => $this->enrichLegacyRowsWithUrls($canonical->next_actions_json ?? []),
             'structured_sections' => $canonical->structured_sections_json ?? [],
             'references' => $canonical->references_json ?? [],
             'section_references' => $canonical->section_references_json ?? [],

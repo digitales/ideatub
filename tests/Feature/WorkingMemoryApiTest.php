@@ -410,4 +410,43 @@ class WorkingMemoryApiTest extends TestCase
         $response->assertJsonPath('scope_key', 'global');
         $this->assertStringContainsString('# Memory insights', (string) $response->json('summary_markdown'));
     }
+
+    #[Test]
+    public function test_working_memory_legacy_lists_include_derived_urls_for_heuristic_build(): void
+    {
+        config([
+            'features.working_memory_ai_authored' => false,
+            'working_memory.authoring_enabled' => false,
+        ]);
+
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Heuristic capture without a question mark.',
+        ]);
+
+        app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
+
+        $token = 'test-access-token';
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/thoughts/working-memory?scope_type=global&scope_key=global');
+
+        $response->assertOk();
+        $threads = $response->json('active_threads');
+        $this->assertIsArray($threads);
+        $first = $threads[0];
+        $this->assertSame((string) $thought->id, $first['thought_id']);
+        $this->assertArrayHasKey('url', $first);
+        $this->assertStringContainsString('/thoughts/', (string) $first['url']);
+    }
 }
