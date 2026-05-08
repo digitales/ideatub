@@ -100,5 +100,6 @@ The consolidated/incremental builder runs authoring **synchronously inside the j
 
 ## Future enhancements
 
+- Performance: batch canonical tag resolution and DB-side tag extraction for `/memory/scopes` — see [`2026-05-08-working-memory-scopes-performance-design.md`](2026-05-08-working-memory-scopes-performance-design.md).
 - Separate **Queued** vs **Running** if queue latency matters.
 - Poll or live region for automatic badge clearance after background completion.
