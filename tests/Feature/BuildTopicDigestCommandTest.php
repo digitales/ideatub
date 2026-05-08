@@ -138,6 +138,25 @@ final class BuildTopicDigestCommandTest extends TestCase
     }
 
     #[Test]
+    public function it_trims_scope_key_before_dispatch(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+
+        $exit = $this->artisan('compactions:topic-digest', [
+            'scope_type' => 'project',
+            'scope_key' => '  dezeen  ',
+            'topic' => 'pricing',
+            '--user' => (string) $user->id,
+        ])->run();
+
+        $this->assertSame(0, $exit);
+
+        Queue::assertPushed(BuildTopicDigestJob::class, fn (BuildTopicDigestJob $job) => $job->scopeKey === 'dezeen');
+    }
+
+    #[Test]
     public function it_dispatches_under_tag_scope(): void
     {
         Queue::fake();

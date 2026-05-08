@@ -125,7 +125,8 @@ A new prompt builder mirrors `MeetingPromptBuilder`:
 
 - `WorkingMemoryComposerPromptBuilder` — for canonical narrative authoring.
 - `MeetingCompactionPromptBuilder` — for `compaction:meeting`.
-- `ScopeDigestPromptBuilder` — for `compaction:weekly-digest` and `compaction:topic-digest`.
+- `ScopeDigestPromptBuilder` — for `compaction:weekly-digest`.
+- `TopicDigestPromptBuilder` — for `compaction:topic-digest`.
 - `ResearchSynthesisPromptBuilder` — for `compaction:research-synth`.
 
 All four return a single string prompt and are unit-testable in isolation.

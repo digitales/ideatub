@@ -17,7 +17,7 @@ class BuildTopicDigestCommand extends Command
     public function handle(): int
     {
         $scopeType = (string) $this->argument('scope_type');
-        $scopeKey = (string) $this->argument('scope_key');
+        $scopeKey = trim((string) $this->argument('scope_key'));
         $topic = trim((string) $this->argument('topic'));
 
         if (! in_array($scopeType, self::SCOPE_TYPES, true)) {
@@ -26,7 +26,7 @@ class BuildTopicDigestCommand extends Command
             return self::FAILURE;
         }
 
-        if (trim($scopeKey) === '') {
+        if ($scopeKey === '') {
             $this->error('scope_key must not be empty.');
 
             return self::FAILURE;
