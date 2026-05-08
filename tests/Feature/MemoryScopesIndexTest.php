@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\Project;
+use App\Models\Thought;
 use App\Models\User;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
+use App\Support\TagSlug;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -138,6 +141,53 @@ class MemoryScopesIndexTest extends TestCase
         $response->assertOk();
         $response->assertSee('Unavailable project', false);
         $response->assertSee(route('projects.index'), false);
+    }
+
+    public function test_tag_section_shows_canonical_label_and_bounded_thought_queries(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = $this->createUser();
+
+        foreach (range(1, 12) as $i) {
+            Thought::factory()->for($user)->create([
+                'metadata' => ['tags' => ["bulk-tag-$i"]],
+            ]);
+        }
+
+        Thought::factory()->for($user)->create([
+            'metadata' => ['tags' => ['Display Canonical']],
+        ]);
+
+        $slug = TagSlug::from('Display Canonical');
+
+        $this->createMemory($user, [
+            'scope_type' => 'tag',
+            'scope_key' => $slug,
+        ]);
+
+        foreach (['alpha_tag', 'beta_tag'] as $key) {
+            $this->createMemory($user, [
+                'scope_type' => 'tag',
+                'scope_key' => $key,
+            ]);
+        }
+
+        $thoughtSelects = 0;
+        DB::listen(function ($query) use (&$thoughtSelects): void {
+            if (! preg_match('/^\s*select/i', $query->sql)) {
+                return;
+            }
+            if (! preg_match('/\bthoughts\b/i', $query->sql)) {
+                return;
+            }
+            $thoughtSelects++;
+        });
+
+        $response = $this->actingAs($user)->get(route('memory.scopes.index'));
+
+        $response->assertOk();
+        $response->assertSee('Display Canonical', false);
+        $this->assertLessThanOrEqual(3, $thoughtSelects);
     }
 
     private function createUser(): User

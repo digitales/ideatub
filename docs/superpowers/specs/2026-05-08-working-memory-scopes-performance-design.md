@@ -1,6 +1,6 @@
 # Design: Working memory scopes index — performance (phases A → C)
 
-**Status:** Draft — approved direction (batch resolution, then DB-side tag extraction)  
+**Status:** Implemented — Phase A (`resolveMany`, scopes index batching) and Phase C (SQLite + PostgreSQL tag extraction); fallback metadata scan for other drivers  
 **Date:** 2026-05-08  
 **Depends on:** [`2026-05-08-working-memory-index-design.md`](2026-05-08-working-memory-index-design.md)
 

@@ -49,13 +49,21 @@ final class WorkingMemoryScopesIndexBuilder
 
         $projects = $this->projectsFor($userId, $projectMemories);
 
+        $tagCanonicalBySlug = [];
+        if ($tagMemories->isNotEmpty()) {
+            $tagCanonicalBySlug = $this->canonicalTagResolver->resolveMany(
+                $userId,
+                $tagMemories->pluck('scope_key')->map(fn ($k): string => (string) $k)->unique()->values()->all(),
+            );
+        }
+
         $sections = [];
 
         if ($globalMemories->isNotEmpty()) {
             $sections[] = [
                 'key' => 'global',
                 'title' => 'Global',
-                'rows' => $globalMemories->map(fn (WorkingMemory $memory): array => $this->rowFor($userId, $memory, $projects))->values()->all(),
+                'rows' => $globalMemories->map(fn (WorkingMemory $memory): array => $this->rowFor($userId, $memory, $projects, $tagCanonicalBySlug))->values()->all(),
             ];
         }
 
@@ -63,7 +71,7 @@ final class WorkingMemoryScopesIndexBuilder
             $sections[] = [
                 'key' => 'insights',
                 'title' => 'Insights',
-                'rows' => $insightsMemories->map(fn (WorkingMemory $memory): array => $this->rowFor($userId, $memory, $projects))->values()->all(),
+                'rows' => $insightsMemories->map(fn (WorkingMemory $memory): array => $this->rowFor($userId, $memory, $projects, $tagCanonicalBySlug))->values()->all(),
             ];
         }
 
@@ -71,7 +79,7 @@ final class WorkingMemoryScopesIndexBuilder
             $sections[] = [
                 'key' => 'projects',
                 'title' => 'Projects',
-                'rows' => $projectMemories->map(fn (WorkingMemory $memory): array => $this->rowFor($userId, $memory, $projects))->values()->all(),
+                'rows' => $projectMemories->map(fn (WorkingMemory $memory): array => $this->rowFor($userId, $memory, $projects, $tagCanonicalBySlug))->values()->all(),
             ];
         }
 
@@ -79,7 +87,7 @@ final class WorkingMemoryScopesIndexBuilder
             $sections[] = [
                 'key' => 'tags',
                 'title' => 'Tags',
-                'rows' => $tagMemories->map(fn (WorkingMemory $memory): array => $this->rowFor($userId, $memory, $projects))->values()->all(),
+                'rows' => $tagMemories->map(fn (WorkingMemory $memory): array => $this->rowFor($userId, $memory, $projects, $tagCanonicalBySlug))->values()->all(),
             ];
         }
 
@@ -122,9 +130,10 @@ final class WorkingMemoryScopesIndexBuilder
 
     /**
      * @param  Collection<string, Project>  $projects
+     * @param  array<string, string|null>  $tagCanonicalBySlug
      * @return array{title: string, href: string, badge: string|null, freshness: string|null, refreshed: string|null, aria_label: string}
      */
-    private function rowFor(int $userId, WorkingMemory $memory, Collection $projects): array
+    private function rowFor(int $userId, WorkingMemory $memory, Collection $projects, array $tagCanonicalBySlug = []): array
     {
         $scopeKey = (string) $memory->scope_key;
         $project = null;
@@ -133,7 +142,7 @@ final class WorkingMemoryScopesIndexBuilder
             $project = $projects->get(Str::lower($scopeKey));
         }
 
-        $title = $this->titleFor($userId, $memory, $project);
+        $title = $this->titleFor($userId, $memory, $project, $tagCanonicalBySlug);
         $badge = WorkingMemoryScopeRowBadge::label($memory);
         $ariaLabel = "{$title} working memory";
 
@@ -151,7 +160,10 @@ final class WorkingMemoryScopesIndexBuilder
         ];
     }
 
-    private function titleFor(int $userId, WorkingMemory $memory, ?Project $project): string
+    /**
+     * @param  array<string, string|null>  $tagCanonicalBySlug
+     */
+    private function titleFor(int $userId, WorkingMemory $memory, ?Project $project, array $tagCanonicalBySlug): string
     {
         $scopeKey = (string) $memory->scope_key;
 
@@ -159,7 +171,7 @@ final class WorkingMemoryScopesIndexBuilder
             'global' => 'Global',
             'insights' => 'Insights',
             'project' => $project?->title ?? 'Unavailable project',
-            'tag' => $this->canonicalTagResolver->resolve($userId, $scopeKey) ?? $this->readableTagTitle($scopeKey),
+            'tag' => ($tagCanonicalBySlug[$scopeKey] ?? null) ?? $this->readableTagTitle($scopeKey),
             default => $scopeKey,
         };
     }
