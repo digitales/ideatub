@@ -234,7 +234,7 @@ PROMPT;
     {
         $fromMeta = data_get($thought->metadata, 'title');
         if (is_string($fromMeta) && trim($fromMeta) !== '') {
-            return trim($fromMeta);
+            return $this->normalizeCaptureTitleLine(trim($fromMeta));
         }
 
         $content = is_string($thought->content) ? trim($thought->content) : '';
@@ -243,7 +243,22 @@ PROMPT;
         }
 
         $lines = preg_split('/\R/u', $content, 2);
+        $first = trim(is_array($lines) && isset($lines[0]) ? $lines[0] : $content);
 
-        return trim(is_array($lines) && isset($lines[0]) ? $lines[0] : $content);
+        return $this->normalizeCaptureTitleLine($first);
+    }
+
+    /**
+     * Strip ATX heading markers so titles embedded in markdown lists are not parsed as heading blocks.
+     */
+    private function normalizeCaptureTitleLine(string $line): string
+    {
+        $stripped = preg_replace('/^#{1,6}(?:\s+|$)/u', '', trim($line));
+        if (! is_string($stripped)) {
+            $stripped = trim($line);
+        }
+        $stripped = trim($stripped);
+
+        return $stripped !== '' ? $stripped : '(untitled)';
     }
 }

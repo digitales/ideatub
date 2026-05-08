@@ -10,3 +10,15 @@
 .shared-research-root .prose hr:last-of-type {
   display: none;
 }
+
+/*
+ * Working memory markdown: #-prefixed lines inside bullets become headings in HTML.
+ * Keep them body-sized when they appear inside list items (notable captures, structured bullets).
+ */
+.prose-memory-list-headings ul > li :where(h1, h2, h3, h4, h5, h6) {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 0;
+  line-height: 1.5;
+}

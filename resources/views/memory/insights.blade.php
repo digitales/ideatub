@@ -53,7 +53,7 @@
         @endif
     </div>
 
-    <article class="rounded-xl border border-memory-violet/15 bg-white/70 backdrop-blur px-6 py-8 shadow-[0_2px_16px_rgba(109,106,247,0.06)] text-deep-indigo prose prose-slate prose-headings:text-deep-indigo prose-a:text-memory-violet max-w-none">
+    <article class="prose-memory-list-headings rounded-xl border border-memory-violet/15 bg-white/70 backdrop-blur px-6 py-8 shadow-[0_2px_16px_rgba(109,106,247,0.06)] text-deep-indigo prose prose-slate prose-headings:text-deep-indigo prose-a:text-memory-violet max-w-none">
         @if ($renderStructuredSections)
             @foreach ($structuredSections as $sectionTitle => $sectionItems)
                 @php
