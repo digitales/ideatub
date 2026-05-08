@@ -32,6 +32,7 @@ use App\Http\Controllers\MeetingSkillSettingsController;
 use App\Http\Controllers\MemoryCompactionController;
 use App\Http\Controllers\MemoryController;
 use App\Http\Controllers\MemoryInsightsController;
+use App\Http\Controllers\MemoryScopesController;
 use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\PostmarkInboundController;
@@ -325,6 +326,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware(['auth', 'working.memory.ui'])->group(function () {
+        Route::get('/memory/scopes', [MemoryScopesController::class, 'index'])->name('memory.scopes.index');
         Route::get('/memory', [MemoryController::class, 'show'])->name('memory.show');
         Route::get('/memory/tag', [MemoryController::class, 'showTag'])->name('memory.tag.show');
         Route::get('/projects/{project}/memory', [MemoryController::class, 'showProject'])->name('projects.memory.show');
