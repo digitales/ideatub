@@ -83,6 +83,7 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertOk();
         $response->assertSee('Refresh working memory', false);
         $response->assertSee('action="'.route('working-memory.refresh.global').'"', false);
+        $response->assertSee('data-working-memory-refresh', false);
     }
 
     public function test_project_memory_other_user_returns_403(): void
@@ -122,6 +123,7 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertOk();
         $response->assertSee('Refresh working memory', false);
         $response->assertSee('action="'.route('working-memory.refresh.project', $project).'"', false);
+        $response->assertSee('data-working-memory-refresh', false);
     }
 
     public function test_tag_memory_page_uses_signed_tag_refresh_and_tag_stream_link(): void
@@ -137,6 +139,7 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertSee(route('idea.stream', ['tag' => 'alpha-beta']), false);
         $response->assertSee('/stream/tag/memory/refresh?tag=alpha-beta&amp;signature=', false);
         $response->assertSee('name="tag" value="alpha-beta"', false);
+        $response->assertSee('data-working-memory-refresh', false);
     }
 
     public function test_working_memory_shows_details_and_recent_updates_when_overlay_deltas_exist(): void

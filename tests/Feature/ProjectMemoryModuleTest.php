@@ -30,17 +30,19 @@ class ProjectMemoryModuleTest extends TestCase
 
         $html = (string) $response->getContent();
         $refreshAction = route('working-memory.refresh.project', $project);
-        $formStart = '<form method="POST" action="'.$refreshAction.'"';
-        $formStartPosition = strpos($html, $formStart);
+        $response->assertSee('action="'.$refreshAction.'"', false);
 
-        $this->assertNotFalse($formStartPosition, 'Refresh form action should point to project refresh route.');
+        $matched = preg_match(
+            '/<form[\s\S]*?data-working-memory-refresh[\s\S]*?>[\s\S]*?<\/form>/',
+            $html,
+            $matches
+        );
+        $this->assertSame(1, $matched, 'Refresh form with data-working-memory-refresh should be present.');
+        $formHtml = $matches[0];
 
-        $formEndPosition = strpos($html, '</form>', $formStartPosition);
-        $this->assertNotFalse($formEndPosition, 'Refresh form should have a closing </form> tag.');
-
-        $formHtml = substr($html, $formStartPosition, ($formEndPosition - $formStartPosition) + strlen('</form>'));
         $this->assertStringContainsString('name="_token"', $formHtml, 'Refresh form should include a CSRF token field.');
         $this->assertStringContainsString('type="submit"', $formHtml, 'Refresh form should include a submit button.');
         $this->assertStringContainsString('Refresh working memory', $formHtml, 'Refresh form submit button label should be present.');
+        $this->assertStringContainsString('data-working-memory-refresh', $formHtml, 'Refresh form should be marked for shared pending-state script.');
     }
 }

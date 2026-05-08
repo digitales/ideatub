@@ -68,22 +68,11 @@
                 <span class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $freshnessClasses }}">
                     {{ $freshness }}
                 </span>
-                <form
-                    method="POST"
-                    action="{{ $refreshAction }}"
-                    onsubmit="const button=this.querySelector('button[type=submit]'); if(!button||button.disabled){return false;} button.disabled=true; button.setAttribute('aria-busy','true'); return true;"
-                >
-                    @csrf
-                    @if ($isTag)
-                        <input type="hidden" name="tag" value="{{ $tagRefreshScopeKey }}">
-                    @endif
-                    <button
-                        type="submit"
-                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
-                    >
-                        Refresh working memory
-                    </button>
-                </form>
+                @include('components.working-memory-refresh-form', [
+                    'action' => $refreshAction,
+                    'buttonClass' => 'text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors',
+                    'hiddenFields' => $isTag ? ['tag' => $tagRefreshScopeKey] : [],
+                ])
                 @if ($isTag && ! empty($tagSlugQuery ?? null))
                     <a
                         href="{{ route('idea.stream', ['tag' => $tagSlugQuery]) }}"
