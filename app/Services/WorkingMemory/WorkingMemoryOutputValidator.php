@@ -19,6 +19,15 @@ class WorkingMemoryOutputValidator
     ];
 
     /**
+     * Validate a working-memory composition payload.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  float|null  $minimumCoverage  Override for the citation-coverage threshold; null uses configured default.
+     * @param  int  $compactionCountInScope  Number of compactions in scope (used for unused-compaction check).
+     * @param  array<int, string>|null  $requiredSections  Per-call required-sections override.
+     *                                                     `null` falls back to `working_memory.citation_required_sections`.
+     *                                                     `[]` (or any input that normalizes to empty) disables required-section enforcement for this call.
+     *
      * @return array{
      *     ok: bool,
      *     message: string|null,
@@ -32,7 +41,12 @@ class WorkingMemoryOutputValidator
      *     }
      * }
      */
-    public function validate(array $payload, ?float $minimumCoverage = null, int $compactionCountInScope = 0): array
+    public function validate(
+        array $payload,
+        ?float $minimumCoverage = null,
+        int $compactionCountInScope = 0,
+        ?array $requiredSections = null
+    ): array
     {
         $sections = $payload['structured_sections'] ?? null;
         if (! is_array($sections)) {
@@ -90,7 +104,7 @@ class WorkingMemoryOutputValidator
         $reasonCodes = [];
         $missingSections = [];
 
-        foreach ($this->requiredSectionKeys() as $requiredSection) {
+        foreach ($this->requiredSectionKeys($requiredSections) as $requiredSection) {
             if (! array_key_exists($requiredSection, $sections)) {
                 $missingSections[] = $requiredSection;
 
@@ -206,8 +220,28 @@ class WorkingMemoryOutputValidator
     /**
      * @return array<int, string>
      */
-    private function requiredSectionKeys(): array
+    private function requiredSectionKeys(?array $override = null): array
     {
+        // Any non-null override is authoritative for this call; empty
+        // normalized output disables required-section enforcement.
+        if (is_array($override)) {
+            $normalizedOverride = [];
+            foreach ($override as $section) {
+                if (! is_string($section)) {
+                    continue;
+                }
+
+                $normalizedSection = trim($section);
+                if ($normalizedSection === '') {
+                    continue;
+                }
+
+                $normalizedOverride[] = $normalizedSection;
+            }
+
+            return array_values(array_unique($normalizedOverride));
+        }
+
         $configuredSections = config('working_memory.citation_required_sections', self::REQUIRED_SECTION_KEYS);
         if (! is_array($configuredSections)) {
             return self::REQUIRED_SECTION_KEYS;
