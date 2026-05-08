@@ -36,12 +36,20 @@
             <p class="text-sm text-slate-brand mt-1">Research-heavy signals from your recent stream-visible captures.</p>
         </div>
         @if (config('features.working_memory_ui') && \Illuminate\Support\Facades\Route::has('memory.show'))
-            <a
-                href="{{ route('memory.show') }}"
-                class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
-            >
-                Working memory
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                <a
+                    href="{{ route('memory.scopes.index') }}"
+                    class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
+                >
+                    All memories
+                </a>
+                <a
+                    href="{{ route('memory.show') }}"
+                    class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
+                >
+                    Working memory
+                </a>
+            </div>
         @endif
     </div>
 

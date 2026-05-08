@@ -83,6 +83,9 @@
                     <a href="{{route('memory.show')}}" class="{{$navLinkClass}}">
                         Memory
                     </a>
+                    <a href="{{route('memory.scopes.index')}}" class="{{$navLinkClass}}">
+                        All memories
+                    </a>
                 @endif
                 <a href="{{route('help')}}" class="{{$navLinkClass}}">
                     Help
@@ -115,6 +118,9 @@
                         @if (config('features.working_memory_ui'))
                             <a href="{{route('memory.show')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
                                 Memory
+                            </a>
+                            <a href="{{route('memory.scopes.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                                All memories
                             </a>
                         @endif
                         <div class="border-t border-memory-violet/10 my-1"></div>
