@@ -102,14 +102,16 @@ final class CompactionVersionWriterTest extends TestCase
 
         $this->assertNotNull($version);
         $this->assertSame('compaction:topic-digest', $version->build_type);
-        Log::shouldHaveReceived('warning')
+        Log::shouldHaveReceived('notice')
             ->withArgs(function ($message, $context = []) use ($user) {
                 return str_contains((string) $message, 'CompactionVersionWriter')
+                    && str_contains((string) $message, 'observation mode')
                     && ($context['build_type'] ?? null) === 'compaction:topic-digest'
                     && ($context['user_id'] ?? null) === $user->id
                     && ($context['scope_type'] ?? null) === 'project'
                     && ($context['scope_key'] ?? null) === 'dezeen'
                     && ($context['enforced'] ?? null) === false
+                    && ($context['persistence_aborted'] ?? null) === false
                     && is_array($context['reason_codes'] ?? null)
                     && is_string($context['message'] ?? null) && $context['message'] !== '';
             })
@@ -152,7 +154,9 @@ final class CompactionVersionWriterTest extends TestCase
             'Enforced hard-fail must not open the DB transaction (no WorkingMemory row).'
         );
         Log::shouldHaveReceived('warning')
-            ->withArgs(fn ($message, $context = []) => ($context['enforced'] ?? null) === true && ($context['build_type'] ?? null) === 'compaction:topic-digest')
+            ->withArgs(fn ($message, $context = []) => ($context['enforced'] ?? null) === true
+                && ($context['persistence_aborted'] ?? null) === true
+                && ($context['build_type'] ?? null) === 'compaction:topic-digest')
             ->atLeast()
             ->once();
     }

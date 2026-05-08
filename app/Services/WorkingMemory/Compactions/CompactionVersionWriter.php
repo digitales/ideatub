@@ -146,16 +146,23 @@ class CompactionVersionWriter
 
         $enforced = (bool) config('working_memory.compaction_validation_enforced', false);
 
-        Log::warning('CompactionVersionWriter validation hard-failed', [
+        $context = [
             'user_id' => $userId,
             'build_type' => $buildType,
             'scope_type' => $scopeType,
             'scope_key' => $scopeKey,
             'enforced' => $enforced,
+            'persistence_aborted' => $enforced,
             'message' => $result['message'] ?? null,
             'reason_codes' => $result['diagnostics']['reason_codes'] ?? [],
             'diagnostics' => $result['diagnostics'] ?? [],
-        ]);
+        ];
+
+        if ($enforced) {
+            Log::warning('CompactionVersionWriter validation hard-failed; persistence aborted.', $context);
+        } else {
+            Log::notice('CompactionVersionWriter validation hard-failed in observation mode; persisting version.', $context);
+        }
 
         return $enforced;
     }
