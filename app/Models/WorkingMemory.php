@@ -23,6 +23,7 @@ class WorkingMemory extends Model
         'latest_version_id',
         'freshness_state',
         'last_refreshed_at',
+        'build_started_at',
     ];
 
     /**
@@ -32,6 +33,7 @@ class WorkingMemory extends Model
     {
         return [
             'last_refreshed_at' => 'datetime',
+            'build_started_at' => 'datetime',
         ];
     }
 
