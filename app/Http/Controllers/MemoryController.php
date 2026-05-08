@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Services\Tags\UserCanonicalTagResolver;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
+use App\Support\TagSlug;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -44,16 +46,25 @@ class MemoryController extends Controller
         ]));
     }
 
-    public function showTag(Request $request): View
+    public function showTag(Request $request): View|RedirectResponse
     {
         $request->validate([
             'tag' => 'required|string|max:100',
         ]);
 
-        $tagSlug = Str::of((string) $request->query('tag'))->trim()->toString();
-        $canonical = $this->canonicalTagResolver->resolve((int) $request->user()->id, $tagSlug);
-        $tagLabel = $canonical ?? $tagSlug;
-        $scopeKey = Str::of($canonical ?? $tagSlug)->trim()->lower()->toString();
+        $tagSlugRaw = Str::of((string) $request->query('tag'))->trim()->toString();
+        $normalizedSlug = TagSlug::from($tagSlugRaw);
+        if ($normalizedSlug === '') {
+            abort(404);
+        }
+
+        if ($normalizedSlug !== $tagSlugRaw) {
+            return redirect()->route('memory.tag.show', ['tag' => $normalizedSlug]);
+        }
+
+        $canonical = $this->canonicalTagResolver->resolve((int) $request->user()->id, $normalizedSlug);
+        $tagLabel = $canonical ?? $normalizedSlug;
+        $scopeKey = Str::of($canonical ?? $normalizedSlug)->trim()->lower()->toString();
 
         $payload = $this->workingMemoryAssembler->forScope(
             (int) $request->user()->id,
@@ -64,8 +75,8 @@ class MemoryController extends Controller
         return view('memory.show', array_merge($payload, [
             'scopeTitle' => $tagLabel,
             'isTagScope' => true,
-            'tagSlugQuery' => $tagSlug,
-            'tagRefreshScopeKey' => $scopeKey,
+            'tagSlugQuery' => $normalizedSlug,
+            'tagRefreshScopeKey' => $normalizedSlug,
         ]));
     }
 }

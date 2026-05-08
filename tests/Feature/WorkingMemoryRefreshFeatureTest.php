@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\ConsolidateWorkingMemory;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\TagSlug;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
@@ -86,17 +87,17 @@ class WorkingMemoryRefreshFeatureTest extends TestCase
         $signedUrl = $this->signedTagRefreshUrl('ai-notes');
 
         $response = $this->actingAs($user)
-            ->from(route('idea.stream', ['tag' => 'AI-Notes']))
+            ->from(route('idea.stream', ['tag' => 'ai_notes']))
             ->post($signedUrl, [
                 'tag' => '  AI-Notes  ',
             ]);
 
-        $response->assertRedirect(route('idea.stream', ['tag' => 'AI-Notes']));
+        $response->assertRedirect(route('idea.stream', ['tag' => 'ai_notes']));
         $response->assertSessionHas('success', 'Queued consolidated rebuild for tag working memory.');
 
         Queue::assertPushed(
             ConsolidateWorkingMemory::class,
-            fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'tag', 'ai-notes')
+            fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'tag', 'ai_notes')
         );
     }
 
@@ -178,17 +179,17 @@ class WorkingMemoryRefreshFeatureTest extends TestCase
         $signedUrl = $this->signedTagRefreshUrl('product/ai');
 
         $response = $this->actingAs($user)
-            ->from(route('idea.stream', ['tag' => 'product/ai']))
+            ->from(route('idea.stream', ['tag' => 'product_ai']))
             ->post($signedUrl, [
                 'tag' => 'Product/AI',
             ]);
 
-        $response->assertRedirect(route('idea.stream', ['tag' => 'product/ai']));
+        $response->assertRedirect(route('idea.stream', ['tag' => 'product_ai']));
         $response->assertSessionHas('success', 'Queued consolidated rebuild for tag working memory.');
 
         Queue::assertPushed(
             ConsolidateWorkingMemory::class,
-            fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'tag', 'product/ai')
+            fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $user->id, 'tag', 'product_ai')
         );
     }
 
@@ -238,6 +239,6 @@ class WorkingMemoryRefreshFeatureTest extends TestCase
 
     private function signedTagRefreshUrl(string $tag): string
     {
-        return URL::signedRoute('working-memory.refresh.tag', ['tag' => $tag]);
+        return URL::signedRoute('working-memory.refresh.tag', ['tag' => TagSlug::from($tag)]);
     }
 }

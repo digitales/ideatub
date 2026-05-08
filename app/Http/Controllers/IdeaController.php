@@ -30,6 +30,7 @@ use App\Support\MarkdownDisplayHelper;
 use App\Support\Research\MicrositeInAppPathHelper;
 use App\Support\Research\MicrositePageLabel;
 use App\Support\SafeCommonMarkConverter;
+use App\Support\TagSlug;
 use App\View\Presenters\Comments\ResearchCommentsPresenter;
 use App\View\Presenters\Email\EmailMetadataPresenter;
 use App\View\Presenters\Email\NewsletterResearchStatusPresenter;
@@ -621,15 +622,29 @@ class IdeaController extends Controller
      * Tag in URL is a slug (e.g. web_development); we resolve it to the canonical tag for querying.
      * For AJAX requests (infinite scroll), returns JSON with HTML fragment and pagination state.
      */
-    public function stream(Request $request): View|JsonResponse
+    public function stream(Request $request): View|JsonResponse|RedirectResponse
     {
         $request->validate([
             'tag' => 'nullable|string|max:100',
             'page' => 'nullable|integer|min:1',
         ]);
-        $tagSlug = $request->input('tag');
-        $tagSlug = is_string($tagSlug) ? trim($tagSlug) : '';
-        $tagSlug = $tagSlug !== '' ? $tagSlug : null;
+        $tagInput = $request->input('tag');
+        $tagInput = is_string($tagInput) ? trim($tagInput) : '';
+        $tagSlug = $tagInput !== '' ? $tagInput : null;
+
+        if ($tagSlug !== null) {
+            $normalizedTagSlug = TagSlug::from($tagSlug);
+            if ($normalizedTagSlug === '') {
+                $tagSlug = null;
+            } elseif ($normalizedTagSlug !== $tagSlug && ! $request->ajax()) {
+                return redirect()->route('idea.stream', array_merge(
+                    $request->except('tag'),
+                    ['tag' => $normalizedTagSlug]
+                ));
+            } else {
+                $tagSlug = $normalizedTagSlug;
+            }
+        }
 
         $canonicalTag =
             $tagSlug !== null

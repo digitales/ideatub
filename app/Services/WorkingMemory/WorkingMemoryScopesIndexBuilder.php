@@ -5,6 +5,7 @@ namespace App\Services\WorkingMemory;
 use App\Models\Project;
 use App\Models\WorkingMemory;
 use App\Services\Tags\UserCanonicalTagResolver;
+use App\Support\TagSlug;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -51,10 +52,18 @@ final class WorkingMemoryScopesIndexBuilder
 
         $tagCanonicalBySlug = [];
         if ($tagMemories->isNotEmpty()) {
-            $tagCanonicalBySlug = $this->canonicalTagResolver->resolveMany(
-                $userId,
-                $tagMemories->pluck('scope_key')->map(fn ($k): string => (string) $k)->unique()->values()->all(),
-            );
+            $lookupSlugs = $tagMemories
+                ->pluck('scope_key')
+                ->map(fn ($k): string => TagSlug::from((string) $k))
+                ->unique()
+                ->values()
+                ->all();
+            $resolvedBySlug = $this->canonicalTagResolver->resolveMany($userId, $lookupSlugs);
+            foreach ($tagMemories->pluck('scope_key')->unique() as $storedKey) {
+                $storedKey = (string) $storedKey;
+                $slug = TagSlug::from($storedKey);
+                $tagCanonicalBySlug[$storedKey] = $resolvedBySlug[$slug] ?? null;
+            }
         }
 
         $sections = [];
@@ -196,7 +205,7 @@ final class WorkingMemoryScopesIndexBuilder
 
         return [
             'title' => $title,
-            'href' => $this->hrefFor($memory, $project),
+            'href' => $this->hrefFor($memory, $project, $tagCanonicalBySlug),
             'badge' => $badge,
             'freshness' => $memory->freshness_state,
             'refreshed' => $memory->last_refreshed_at?->diffForHumans(),
@@ -220,7 +229,10 @@ final class WorkingMemoryScopesIndexBuilder
         };
     }
 
-    private function hrefFor(WorkingMemory $memory, ?Project $project): string
+    /**
+     * @param  array<string, string|null>  $tagCanonicalBySlug
+     */
+    private function hrefFor(WorkingMemory $memory, ?Project $project, array $tagCanonicalBySlug = []): string
     {
         $scopeKey = (string) $memory->scope_key;
 
@@ -230,7 +242,9 @@ final class WorkingMemoryScopesIndexBuilder
             'project' => $project !== null
                 ? route('projects.memory.show', $project)
                 : route('projects.index'),
-            'tag' => route('memory.tag.show', ['tag' => $scopeKey]),
+            'tag' => route('memory.tag.show', [
+                'tag' => TagSlug::from(($tagCanonicalBySlug[$scopeKey] ?? null) ?? $scopeKey),
+            ]),
             default => route('memory.show'),
         };
     }

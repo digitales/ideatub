@@ -1,6 +1,7 @@
 @extends('layouts.idea')
 
 @php
+    use App\Support\TagSlug;
     use App\Support\ThoughtTypeNavigation;
     $__collectionKey = $streamCollectionKey ?? ((isset($streamJira) && $streamJira) ? 'jira' : null);
     $__typedStreamRouteName = $__collectionKey ? ThoughtTypeNavigation::routeName($__collectionKey) : null;
@@ -26,21 +27,20 @@
 
             @if($tag)
                 @php
-                    $memoryTagParam = $tagSlug !== null && $tagSlug !== '' ? $tagSlug : \App\Support\TagSlug::from((string) $tag);
-                    $refreshTagScopeKey = \Illuminate\Support\Str::of((string) $tag)->trim()->lower()->toString();
-                    $refreshTagAction = \Illuminate\Support\Facades\URL::signedRoute('working-memory.refresh.tag', ['tag' => $refreshTagScopeKey]);
+                    $refreshTagSlug = ($tagSlug !== null && $tagSlug !== '') ? $tagSlug : TagSlug::from((string) $tag);
+                    $refreshTagAction = \Illuminate\Support\Facades\URL::signedRoute('working-memory.refresh.tag', ['tag' => $refreshTagSlug]);
                 @endphp
                 <div class="mb-4 flex items-center justify-center gap-3 flex-wrap">
                     <a href="{{ route('idea.stream') }}" class="text-[12px] font-medium text-memory-violet hover:underline">
                         All thoughts
                     </a>
-                    <a href="{{ route('memory.tag.show', ['tag' => $memoryTagParam]) }}" class="text-[12px] font-medium text-memory-violet hover:underline">
+                    <a href="{{ route('memory.tag.show', ['tag' => $refreshTagSlug]) }}" class="text-[12px] font-medium text-memory-violet hover:underline">
                         Open tag working memory
                     </a>
                     @include('components.working-memory-refresh-form', [
                         'action' => $refreshTagAction,
                         'buttonClass' => 'rounded-full border border-memory-violet/40 px-3 py-1 text-[12px] font-medium text-memory-violet transition hover:bg-memory-violet/5',
-                        'hiddenFields' => ['tag' => $refreshTagScopeKey],
+                        'hiddenFields' => ['tag' => $refreshTagSlug],
                     ])
                 </div>
             @endif

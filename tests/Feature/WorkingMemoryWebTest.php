@@ -133,14 +133,18 @@ class WorkingMemoryWebTest extends TestCase
         config(['features.working_memory_ui' => true]);
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get(route('memory.tag.show', ['tag' => 'alpha-beta']));
+        $this->actingAs($user)
+            ->get(route('memory.tag.show', ['tag' => 'alpha-beta']))
+            ->assertRedirect(route('memory.tag.show', ['tag' => 'alpha_beta']));
+
+        $response = $this->actingAs($user)->get(route('memory.tag.show', ['tag' => 'alpha_beta']));
 
         $response->assertOk();
         $response->assertSee('synthesized from captures with this tag', false);
         $response->assertSee('Tag page', false);
-        $response->assertSee(route('idea.stream', ['tag' => 'alpha-beta']), false);
-        $response->assertSee('/stream/tag/memory/refresh?tag=alpha-beta&amp;signature=', false);
-        $response->assertSee('name="tag" value="alpha-beta"', false);
+        $response->assertSee(route('idea.stream', ['tag' => 'alpha_beta']), false);
+        $response->assertSee('/stream/tag/memory/refresh?tag=alpha_beta&amp;signature=', false);
+        $response->assertSee('name="tag" value="alpha_beta"', false);
         $response->assertSee('data-working-memory-refresh', false);
     }
 
