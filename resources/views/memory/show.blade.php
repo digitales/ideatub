@@ -68,19 +68,27 @@
                 <span class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $freshnessClasses }}">
                     {{ $freshness }}
                 </span>
-                @include('components.working-memory-refresh-form', [
-                    'action' => $refreshAction,
-                    'buttonClass' => 'text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors',
-                    'hiddenFields' => $isTag ? ['tag' => $tagRefreshScopeKey] : [],
-                ])
+                @if ($isProject && ! empty($project))
+                    <a
+                        href="{{ route('projects.show', $project) }}"
+                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
+                    >
+                        Project page
+                    </a>
+                @endif
                 @if ($isTag && ! empty($tagSlugQuery ?? null))
                     <a
                         href="{{ route('idea.stream', ['tag' => $tagSlugQuery]) }}"
                         class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
                     >
-                        Tag stream
+                        Tag page
                     </a>
                 @endif
+                @include('components.working-memory-refresh-form', [
+                    'action' => $refreshAction,
+                    'buttonClass' => 'text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors',
+                    'hiddenFields' => $isTag ? ['tag' => $tagRefreshScopeKey] : [],
+                ])
                 @if (! $isProject && ! $isTag && config('features.working_memory_ui'))
                     <a
                         href="{{ route('memory.scopes.index') }}"

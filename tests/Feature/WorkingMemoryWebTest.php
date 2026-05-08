@@ -110,6 +110,8 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertSee('Working memory', false);
         $response->assertSee('Alpha Research', false);
         $response->assertSee('Details', false);
+        $response->assertSee(route('projects.show', $project), false);
+        $response->assertSee('Project page', false);
     }
 
     public function test_project_memory_page_shows_refresh_button_with_project_refresh_action(): void
@@ -126,7 +128,7 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertSee('data-working-memory-refresh', false);
     }
 
-    public function test_tag_memory_page_uses_signed_tag_refresh_and_tag_stream_link(): void
+    public function test_tag_memory_page_uses_signed_tag_refresh_and_tag_page_link(): void
     {
         config(['features.working_memory_ui' => true]);
         $user = User::factory()->create();
@@ -135,7 +137,7 @@ class WorkingMemoryWebTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('synthesized from captures with this tag', false);
-        $response->assertSee('Tag stream', false);
+        $response->assertSee('Tag page', false);
         $response->assertSee(route('idea.stream', ['tag' => 'alpha-beta']), false);
         $response->assertSee('/stream/tag/memory/refresh?tag=alpha-beta&amp;signature=', false);
         $response->assertSee('name="tag" value="alpha-beta"', false);
