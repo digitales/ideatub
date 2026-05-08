@@ -69,4 +69,22 @@ return [
         'research-synth' => (int) env('WORKING_MEMORY_RETAIN_RESEARCH_SYNTH', 12),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Compaction validator gate
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, CompactionVersionWriter runs WorkingMemoryOutputValidator
+    | against the compaction's structured_sections + references using the
+    | per-subtype required-sections map. If validation hard-fails, persistence
+    | is aborted and a log warning is emitted.
+    |
+    | When disabled (the default), validation still runs but hard-fails only
+    | log a warning; the compaction is persisted regardless. This is the
+    | "observation mode" introduced before compaction prompts emit citations.
+    |
+    */
+
+    'compaction_validation_enforced' => (bool) env('WORKING_MEMORY_COMPACTION_VALIDATION_ENFORCED', false),
+
 ];

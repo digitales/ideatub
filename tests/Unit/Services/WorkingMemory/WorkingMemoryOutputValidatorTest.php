@@ -335,6 +335,153 @@ class WorkingMemoryOutputValidatorTest extends TestCase
         $this->assertTrue($result['ok']);
     }
 
+    #[Test]
+    public function it_accepts_a_required_sections_override_replacing_the_config_default(): void
+    {
+        config()->set('working_memory.citation_required_sections', [
+            'Active Priorities',
+            'Open Questions',
+            'Recent Changes',
+        ]);
+
+        $payload = [
+            'summary_markdown' => '# WM',
+            'structured_sections' => [
+                'Active Priorities' => [[
+                    'text' => 'P',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [[
+                        'type' => 'thought',
+                        'url' => 'https://example.com/t-1',
+                        'label' => 't-1',
+                    ]],
+                ]],
+                'Open Questions' => [[
+                    'text' => 'Q',
+                    'importance' => 2,
+                    'fallback_mode' => 'direct',
+                    'citations' => [[
+                        'type' => 'thought',
+                        'url' => 'https://example.com/t-2',
+                        'label' => 't-2',
+                    ]],
+                ]],
+                'Latest Signals' => [[
+                    'text' => 'S',
+                    'importance' => 3,
+                    'fallback_mode' => 'direct',
+                    'citations' => [[
+                        'type' => 'thought',
+                        'url' => 'https://example.com/t-3',
+                        'label' => 't-3',
+                    ]],
+                ]],
+            ],
+            'references' => [],
+        ];
+
+        $diagnostics = app(WorkingMemoryOutputValidator::class)->validate(
+            $payload,
+            null,
+            0,
+            ['Active Priorities', 'Open Questions', 'Latest Signals'],
+        );
+
+        $this->assertTrue($diagnostics['ok']);
+        $this->assertNull($diagnostics['failure_type']);
+        $this->assertStringNotContainsString('Recent Changes', (string) ($diagnostics['message'] ?? ''));
+        $this->assertStringNotContainsString('Latest Signals', (string) ($diagnostics['message'] ?? ''));
+        $this->assertStringNotContainsString('Active Priorities', (string) ($diagnostics['message'] ?? ''));
+        $this->assertStringNotContainsString('Open Questions', (string) ($diagnostics['message'] ?? ''));
+    }
+
+    #[Test]
+    public function it_hard_fails_for_missing_overridden_required_sections(): void
+    {
+        config()->set('working_memory.citation_required_sections', [
+            'Active Priorities',
+            'Open Questions',
+            'Recent Changes',
+        ]);
+
+        $payload = [
+            'summary_markdown' => '# WM',
+            'structured_sections' => [
+                'Active Priorities' => [[
+                    'text' => 'P',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [[
+                        'type' => 'thought',
+                        'url' => 'https://example.com/t-1',
+                        'label' => 't-1',
+                    ]],
+                ]],
+            ],
+            'references' => [],
+        ];
+
+        $diagnostics = app(WorkingMemoryOutputValidator::class)->validate(
+            $payload,
+            null,
+            0,
+            ['Active Priorities', 'Open Questions', 'Latest Signals'],
+        );
+
+        $this->assertFalse($diagnostics['ok']);
+        $this->assertSame('hard', $diagnostics['failure_type']);
+        $this->assertStringContainsString('Open Questions', (string) ($diagnostics['message'] ?? ''));
+        $this->assertStringContainsString('Latest Signals', (string) ($diagnostics['message'] ?? ''));
+        $this->assertStringNotContainsString('Recent Changes', (string) ($diagnostics['message'] ?? ''));
+    }
+
+    #[Test]
+    public function it_treats_empty_required_sections_override_as_no_required_sections(): void
+    {
+        config()->set('working_memory.citation_required_sections', [
+            'Active Priorities',
+            'Open Questions',
+            'Recent Changes',
+        ]);
+
+        $payload = [
+            'summary_markdown' => '# WM',
+            'structured_sections' => [
+                'Latest Signals' => [[
+                    'text' => 'Signal',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [[
+                        'type' => 'thought',
+                        'url' => 'https://example.com/t-1',
+                        'label' => 't-1',
+                    ]],
+                ]],
+            ],
+            'references' => [],
+        ];
+
+        $diagnostics = app(WorkingMemoryOutputValidator::class)->validate(
+            $payload,
+            null,
+            0,
+            [],
+        );
+
+        $this->assertTrue($diagnostics['ok']);
+        $this->assertNull($diagnostics['failure_type']);
+
+        $message = (string) ($diagnostics['message'] ?? '');
+        foreach (['Active Priorities', 'Open Questions', 'Recent Changes'] as $configuredSection) {
+            $this->assertStringNotContainsString(
+                $configuredSection,
+                $message,
+                "Empty override should not hard-fail for [{$configuredSection}]."
+            );
+        }
+    }
+
     /**
      * @return array{
      *     summary_markdown: string,

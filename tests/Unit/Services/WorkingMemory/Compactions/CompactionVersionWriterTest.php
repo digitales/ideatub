@@ -4,9 +4,12 @@ namespace Tests\Unit\Services\WorkingMemory\Compactions;
 
 use App\Models\Thought;
 use App\Models\User;
+use App\Models\WorkingMemory;
+use App\Models\WorkingMemoryVersion;
 use App\Models\WorkingMemoryInput;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -71,5 +74,112 @@ final class CompactionVersionWriterTest extends TestCase
             references: [],
             sourceThoughtIds: [],
         );
+    }
+
+    #[Test]
+    public function it_logs_warning_but_persists_when_validation_hard_fails_in_observation_mode(): void
+    {
+        config()->set('working_memory.compaction_validation_enforced', false);
+        Log::spy();
+
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create(['user_id' => $user->id]);
+
+        $version = app(CompactionVersionWriter::class)->write(
+            userId: $user->id,
+            scopeType: 'project',
+            scopeKey: 'dezeen',
+            buildType: 'compaction:topic-digest',
+            summaryMarkdown: "## Active Priorities\n- Pricing rollback.",
+            structuredSections: [
+                'Active Priorities' => [
+                    ['text' => 'Pricing rollback.', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []],
+                ],
+            ],
+            references: [],
+            sourceThoughtIds: [$thought->id],
+        );
+
+        $this->assertNotNull($version);
+        $this->assertSame('compaction:topic-digest', $version->build_type);
+        Log::shouldHaveReceived('warning')
+            ->withArgs(function ($message, $context = []) use ($user) {
+                return str_contains((string) $message, 'CompactionVersionWriter')
+                    && ($context['build_type'] ?? null) === 'compaction:topic-digest'
+                    && ($context['user_id'] ?? null) === $user->id
+                    && ($context['scope_type'] ?? null) === 'project'
+                    && ($context['scope_key'] ?? null) === 'dezeen'
+                    && ($context['enforced'] ?? null) === false
+                    && is_array($context['reason_codes'] ?? null)
+                    && is_string($context['message'] ?? null) && $context['message'] !== '';
+            })
+            ->atLeast()
+            ->once();
+    }
+
+    #[Test]
+    public function it_aborts_persistence_when_validation_hard_fails_and_enforcement_is_enabled(): void
+    {
+        config()->set('working_memory.compaction_validation_enforced', true);
+        Log::spy();
+
+        $user = User::factory()->create();
+
+        $version = app(CompactionVersionWriter::class)->write(
+            userId: $user->id,
+            scopeType: 'project',
+            scopeKey: 'dezeen',
+            buildType: 'compaction:topic-digest',
+            summaryMarkdown: '## Active Priorities',
+            structuredSections: [
+                'Active Priorities' => [
+                    ['text' => 'Pricing rollback.', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []],
+                ],
+            ],
+            references: [],
+            sourceThoughtIds: [],
+        );
+
+        $this->assertNull($version);
+        $this->assertSame(0, WorkingMemoryVersion::query()->where('build_type', 'compaction:topic-digest')->count());
+        $this->assertSame(
+            0,
+            WorkingMemory::query()
+                ->where('user_id', $user->id)
+                ->where('scope_type', 'project')
+                ->where('scope_key', 'dezeen')
+                ->count(),
+            'Enforced hard-fail must not open the DB transaction (no WorkingMemory row).'
+        );
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn ($message, $context = []) => ($context['enforced'] ?? null) === true && ($context['build_type'] ?? null) === 'compaction:topic-digest')
+            ->atLeast()
+            ->once();
+    }
+
+    #[Test]
+    public function it_persists_when_build_type_is_outside_the_required_sections_map(): void
+    {
+        config()->set('working_memory.compaction_validation_enforced', true);
+
+        $user = User::factory()->create();
+
+        $version = app(CompactionVersionWriter::class)->write(
+            userId: $user->id,
+            scopeType: 'project',
+            scopeKey: 'dezeen',
+            buildType: 'compaction:custom-experimental',
+            summaryMarkdown: '## Anything goes',
+            structuredSections: [
+                'Anything' => [
+                    ['text' => 'X.', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []],
+                ],
+            ],
+            references: [],
+            sourceThoughtIds: [],
+        );
+
+        $this->assertNotNull($version);
+        $this->assertSame('compaction:custom-experimental', $version->build_type);
     }
 }
