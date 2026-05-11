@@ -106,6 +106,12 @@
                     </ul>
                 </a>
             @endif
+
+            <button
+                type="button"
+                class="stream-card-expand mt-2 text-[11px] font-medium text-memory-violet hover:underline relative z-10"
+                onclick="var card=this.closest('[data-stream-card]');if(card.hasAttribute('data-expanded')){card.removeAttribute('data-expanded');this.textContent='Read more'}else{card.setAttribute('data-expanded','');this.textContent='Show less'}"
+            >Read more</button>
         </div>
     </div>
 @endforeach
