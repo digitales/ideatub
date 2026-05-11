@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Import\FileImportService;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Tests\TestCase;
 
@@ -98,5 +99,30 @@ class MarkdownImportServiceTest extends TestCase
         );
 
         $this->assertEquals('notes-2026-05-11.md', data_get($thought->source_metadata, 'original_filename'));
+    }
+
+    public function test_meeting_type_queues_auto_run(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'title' => 'Test Project']);
+
+        $meetingService = Mockery::mock(\App\Services\Meetings\MeetingService::class);
+        $meetingService->shouldReceive('queueAutoRunForMeetingThought')
+            ->once()
+            ->withArgs(function (Thought $thought, string $source) {
+                return $source === 'upload';
+            });
+        $this->app->instance(\App\Services\Meetings\MeetingService::class, $meetingService);
+
+        $service = app(FileImportService::class);
+        $service->importMarkdownWithMetadata(
+            content: '# Meeting notes',
+            title: 'Standup',
+            type: 'meeting',
+            project: $project,
+            user: $user,
+        );
     }
 }

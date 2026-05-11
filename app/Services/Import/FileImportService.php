@@ -8,6 +8,7 @@ use App\Models\ImportBatchFile;
 use App\Models\Project;
 use App\Models\Thought;
 use App\Models\User;
+use App\Services\Meetings\MeetingService;
 use App\Services\ProjectMembershipService;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +33,7 @@ class FileImportService
         private ImportStagingStore $staging,
         private ThoughtCaptureService $capture,
         private ProjectMembershipService $projectMembership,
+        private MeetingService $meetingService,
     ) {}
 
     public function process(ImportBatchFile $row): void
@@ -238,6 +240,10 @@ class FileImportService
         $thought = $result['thought'] ?? $result['root'];
 
         $this->projectMembership->addThought($project, $thought);
+
+        if ($type === 'meeting') {
+            $this->meetingService->queueAutoRunForMeetingThought($thought, 'upload');
+        }
 
         return $thought;
     }
