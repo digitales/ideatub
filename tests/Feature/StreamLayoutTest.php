@@ -123,4 +123,34 @@ class StreamLayoutTest extends TestCase
         $response->assertOk();
         $response->assertSee('data-stream-card', false);
     }
+
+    public function test_tag_stream_respects_grid_session(): void
+    {
+        $user = User::factory()->create();
+        \App\Models\Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Tagged thought',
+            'metadata' => ['tags' => ['work']],
+        ]);
+
+        $response = $this->withSession(['stream_layout' => 'grid'])
+            ->actingAs($user)
+            ->get(route('idea.stream', ['tag' => 'work']));
+
+        $response->assertOk();
+        $response->assertSee('data-stream-layout="grid"', false);
+        $response->assertSee('data-testid="layout-toggle-grid"', false);
+    }
+
+    public function test_collection_stream_respects_grid_session(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->withSession(['stream_layout' => 'grid'])
+            ->actingAs($user)
+            ->get(route('idea.stream.meetings'));
+
+        $response->assertOk();
+        $response->assertSee('data-stream-layout="grid"', false);
+    }
 }
