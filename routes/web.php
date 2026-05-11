@@ -28,6 +28,7 @@ use App\Http\Controllers\Learning\LearningProjectController;
 use App\Http\Controllers\Learning\LearningQuizAttemptController;
 use App\Http\Controllers\Learning\LearningResearchController;
 use App\Http\Controllers\McpKeyController;
+use App\Http\Controllers\StreamLayoutController;
 use App\Http\Controllers\MeetingSkillSettingsController;
 use App\Http\Controllers\MemoryCompactionController;
 use App\Http\Controllers\MemoryController;
@@ -159,6 +160,8 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/demo-mode/enable', [DemoModeController::class, 'enable'])->name('demo-mode.enable');
     Route::post('/demo-mode/disable', [DemoModeController::class, 'disable'])->name('demo-mode.disable');
+
+    Route::post('/stream/layout', [StreamLayoutController::class, 'store'])->name('stream.layout.store');
 
     Route::get('/api/thoughts/realtime-check', [RealtimeCheckController::class, 'realtimeCheck'])->name('api.thoughts.realtime-check');
 
