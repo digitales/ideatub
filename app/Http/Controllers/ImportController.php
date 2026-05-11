@@ -294,6 +294,62 @@ class ImportController extends Controller
             ->with('success', 'Imported thoughts deleted.');
     }
 
+    public function importMarkdown(
+        Request $request,
+        Project $project,
+        DemoMode $demo,
+        FileImportService $fileService,
+    ): JsonResponse {
+        if (! config('features.file_upload', false)) {
+            abort(404);
+        }
+        if ($demo->enabled()) {
+            abort(403, 'Uploads are disabled in demo mode.');
+        }
+        if ($project->user_id !== $request->user()->id) {
+            abort(403, 'You do not own this project.');
+        }
+
+        $validated = $request->validate([
+            'type' => ['required', 'string', 'in:thought,meeting,research,plan,decision,spec'],
+            'files' => ['required', 'array', 'min:1'],
+            'files.*.title' => ['required', 'string', 'max:255'],
+            'files.*.content' => ['required', 'string', 'max:1048576'],
+        ]);
+
+        $imported = [];
+        $failed = [];
+
+        foreach ($validated['files'] as $file) {
+            try {
+                $thought = $fileService->importMarkdownWithMetadata(
+                    content: $file['content'],
+                    title: $file['title'],
+                    type: $validated['type'],
+                    project: $project,
+                    user: $request->user(),
+                );
+
+                $imported[] = [
+                    'id' => $thought->id,
+                    'title' => $file['title'],
+                    'status' => 'success',
+                ];
+            } catch (\Throwable $e) {
+                $failed[] = [
+                    'title' => $file['title'],
+                    'status' => 'failed',
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json([
+            'imported' => $imported,
+            'failed' => $failed,
+        ]);
+    }
+
     public function previewMarkdown(Request $request): JsonResponse
     {
         if (! config('features.file_upload', false)) {
