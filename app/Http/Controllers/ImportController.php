@@ -17,9 +17,12 @@ use App\Services\Import\FileImportService;
 use App\Services\Import\ImportStagingStore;
 use App\Services\Import\MicrositeImportDetector;
 use App\Services\ThoughtCaptureService;
+use App\Support\MarkdownDisplayHelper;
+use App\Support\SafeCommonMarkConverter;
 use Illuminate\Bus\Batch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -289,5 +292,77 @@ class ImportController extends Controller
         return redirect()
             ->route('imports.show', $batch)
             ->with('success', 'Imported thoughts deleted.');
+    }
+
+    public function importMarkdown(
+        Request $request,
+        Project $project,
+        DemoMode $demo,
+        FileImportService $fileService,
+    ): JsonResponse {
+        if (! config('features.file_upload', false)) {
+            abort(404);
+        }
+        if ($demo->enabled()) {
+            abort(403, 'Uploads are disabled in demo mode.');
+        }
+        if ($project->user_id !== $request->user()->id) {
+            abort(403, 'You do not own this project.');
+        }
+
+        $validated = $request->validate([
+            'type' => ['required', 'string', 'in:thought,meeting,research,plan,decision,spec'],
+            'files' => ['required', 'array', 'min:1'],
+            'files.*.title' => ['required', 'string', 'max:255'],
+            'files.*.content' => ['required', 'string', 'max:1048576'],
+        ]);
+
+        $imported = [];
+        $failed = [];
+
+        foreach ($validated['files'] as $file) {
+            try {
+                $thought = $fileService->importMarkdownWithMetadata(
+                    content: $file['content'],
+                    title: $file['title'],
+                    type: $validated['type'],
+                    project: $project,
+                    user: $request->user(),
+                );
+
+                $imported[] = [
+                    'id' => $thought->id,
+                    'title' => $file['title'],
+                    'status' => 'success',
+                ];
+            } catch (\Throwable $e) {
+                $failed[] = [
+                    'title' => $file['title'],
+                    'status' => 'failed',
+                    'error' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json([
+            'imported' => $imported,
+            'failed' => $failed,
+        ]);
+    }
+
+    public function previewMarkdown(Request $request): JsonResponse
+    {
+        if (! config('features.file_upload', false)) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'content' => ['required', 'string', 'max:1048576'],
+        ]);
+
+        $cleaned = MarkdownDisplayHelper::stripPreambleForMarkdownDisplay($validated['content']);
+        $html = SafeCommonMarkConverter::toHtml($cleaned);
+
+        return response()->json(['html' => $html]);
     }
 }

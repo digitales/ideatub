@@ -50,6 +50,116 @@
         @enderror
     </section>
 
+    @if (config('features.file_upload'))
+    <section
+        x-data="mdDropZone({
+            previewUrl: '{{ route('imports.preview-markdown') }}',
+            importUrl: '{{ route('projects.import-markdown', $project) }}',
+            csrfToken: '{{ csrf_token() }}',
+        })"
+        class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-5 mb-8"
+        @dragover.prevent="onDragOver"
+        @dragleave.prevent="onDragLeave"
+        @drop.prevent="onDrop($event)"
+    >
+        <div
+            class="border-2 border-dashed rounded-xl p-6 text-center transition-colors"
+            :class="dragging ? 'border-memory-violet bg-memory-violet/5' : 'border-slate-brand/20'"
+        >
+            <p class="text-sm text-slate-brand/70">
+                <span class="font-medium text-memory-violet">Drop .md files here</span> to import into this project
+            </p>
+        </div>
+
+        <template x-if="skippedCount > 0 && !modalOpen">
+            <p class="mt-2 text-xs text-amber-600" x-text="skippedCount + ' file(s) skipped — only .md supported'"></p>
+        </template>
+
+        {{-- Import Modal --}}
+        <template x-if="modalOpen">
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="closeModal">
+                <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full mx-4 max-h-[85vh] flex flex-col" @keydown.escape.window="closeModal">
+                    <div class="px-6 pt-5 pb-4 border-b border-slate-brand/10">
+                        <h3 class="text-lg font-semibold text-deep-indigo">Import Markdown Files</h3>
+
+                        <div class="mt-3">
+                            <label class="block text-xs font-medium text-slate-brand/70 mb-1">Content type</label>
+                            <select
+                                x-model="selectedType"
+                                class="w-full rounded-lg border border-memory-violet/20 bg-white px-3 py-2 text-sm text-deep-indigo"
+                            >
+                                <option value="thought">Thought</option>
+                                <option value="meeting">Meeting</option>
+                                <option value="research">Research</option>
+                                <option value="plan">Plan</option>
+                                <option value="decision">Decision</option>
+                                <option value="spec">Spec</option>
+                            </select>
+                        </div>
+
+                        <template x-if="skippedCount > 0">
+                            <p class="mt-2 text-xs text-amber-600" x-text="skippedCount + ' file(s) skipped — only .md supported'"></p>
+                        </template>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                        <template x-for="(file, index) in files" :key="index">
+                            <div class="rounded-xl border border-memory-violet/10 bg-white/60 p-4">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <input
+                                        type="text"
+                                        x-model="file.title"
+                                        class="flex-1 rounded-lg border border-memory-violet/20 bg-white px-3 py-1.5 text-sm text-deep-indigo"
+                                        placeholder="Title"
+                                    />
+                                    <button
+                                        type="button"
+                                        @click="removeFile(index)"
+                                        class="text-xs text-slate-brand hover:text-red-600 shrink-0"
+                                    >Remove</button>
+                                </div>
+                                <div class="prose prose-sm max-w-none text-slate-brand max-h-48 overflow-y-auto rounded-lg border border-slate-brand/10 bg-slate-50 p-3">
+                                    <template x-if="file.previewHtml">
+                                        <div x-html="file.previewHtml"></div>
+                                    </template>
+                                    <template x-if="!file.previewHtml && file.previewLoading">
+                                        <p class="text-xs text-slate-brand/50">Loading preview…</p>
+                                    </template>
+                                    <template x-if="!file.previewHtml && !file.previewLoading">
+                                        <pre class="whitespace-pre-wrap text-xs" x-text="file.content.substring(0, 2000)"></pre>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="px-6 py-4 border-t border-slate-brand/10 flex items-center justify-between">
+                        <span class="text-xs text-slate-brand/50" x-text="files.length + ' file(s)'"></span>
+                        <div class="flex gap-2">
+                            <button
+                                type="button"
+                                @click="closeModal"
+                                class="rounded-lg border border-slate-brand/20 px-4 py-2 text-sm font-medium text-slate-brand hover:bg-slate-50"
+                            >Cancel</button>
+                            <button
+                                type="button"
+                                @click="submitImport"
+                                :disabled="importing || files.length === 0"
+                                class="rounded-lg bg-memory-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                                x-text="importing ? 'Importing…' : 'Import ' + files.length + ' file(s)'"
+                            ></button>
+                        </div>
+                    </div>
+
+                    <template x-if="importError">
+                        <p class="px-6 pb-4 text-xs text-red-600" x-text="importError"></p>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </section>
+    @endif
+
     <section>
         <h2 class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-3">Members</h2>
         @if ($project->thoughts->isEmpty())

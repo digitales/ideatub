@@ -5,7 +5,10 @@ namespace App\Services\Import;
 use App\Exceptions\FileImportRejectedException;
 use App\Models\ImportBatch;
 use App\Models\ImportBatchFile;
+use App\Models\Project;
 use App\Models\Thought;
+use App\Models\User;
+use App\Services\Meetings\MeetingService;
 use App\Services\ProjectMembershipService;
 use App\Services\ThoughtCaptureService;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +33,7 @@ class FileImportService
         private ImportStagingStore $staging,
         private ThoughtCaptureService $capture,
         private ProjectMembershipService $projectMembership,
+        private MeetingService $meetingService,
     ) {}
 
     public function process(ImportBatchFile $row): void
@@ -187,6 +191,59 @@ class FileImportService
 
         /** @var Thought */
         $thought = $result['thought'] ?? $result['root'];
+
+        return $thought;
+    }
+
+    public function importMarkdownWithMetadata(
+        string $content,
+        string $title,
+        string $type,
+        Project $project,
+        User $user,
+        ?string $originalFilename = null,
+    ): Thought {
+        $sourceMap = [
+            'thought' => 'upload',
+            'meeting' => 'meeting',
+            'research' => 'research',
+            'plan' => 'plan',
+            'decision' => 'decision',
+            'spec' => 'spec',
+        ];
+
+        $source = $sourceMap[$type] ?? 'upload';
+
+        $sourceMeta = [
+            'provenance' => 'upload',
+            'untrusted_origin' => true,
+        ];
+
+        if ($type !== 'thought') {
+            $sourceMeta['doc_type'] = $type;
+        }
+
+        if ($originalFilename !== null) {
+            $sourceMeta['original_filename'] = $originalFilename;
+            $sourceMeta['file_path'] = $originalFilename;
+        }
+
+        $result = $this->capture->create([
+            'content' => $content,
+            'user_id' => (int) $user->id,
+            'source' => $source,
+            'source_metadata' => $sourceMeta,
+            'idea_metadata' => ['title' => $title],
+        ]);
+
+        /** @var Thought */
+        $thought = $result['thought'] ?? $result['root'];
+
+        $this->projectMembership->addThought($project, $thought);
+
+        if ($type === 'meeting') {
+            $this->meetingService->queueAutoRunForMeetingThought($thought, 'upload');
+        }
 
         return $thought;
     }

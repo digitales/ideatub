@@ -1415,4 +1415,180 @@ Alpine.data('thoughtCardActions', (deleteUrl, thoughtId) => ({
   },
 }));
 
+Alpine.data('mdDropZone', ({ previewUrl, importUrl, csrfToken }) => ({
+  dragging: false,
+  modalOpen: false,
+  files: [],
+  selectedType: 'thought',
+  skippedCount: 0,
+  importing: false,
+  importError: '',
+
+  onDragOver() {
+    this.dragging = true;
+  },
+
+  onDragLeave() {
+    this.dragging = false;
+  },
+
+  async onDrop(event) {
+    this.dragging = false;
+    const droppedFiles = Array.from(event.dataTransfer?.files || []);
+    if (droppedFiles.length === 0) return;
+
+    const MAX_SIZE = 1048576;
+    const mdFiles = [];
+    let skipped = 0;
+
+    for (const f of droppedFiles) {
+      if (!f.name.toLowerCase().endsWith('.md')) {
+        skipped++;
+        continue;
+      }
+      if (f.size === 0 || f.size > MAX_SIZE) {
+        skipped++;
+        continue;
+      }
+      mdFiles.push(f);
+    }
+
+    this.skippedCount = skipped;
+
+    if (mdFiles.length === 0) {
+      return;
+    }
+
+    const fileEntries = [];
+
+    for (const f of mdFiles) {
+      const content = await this.readFileText(f);
+      if (!content || content.trim() === '') {
+        this.skippedCount++;
+        continue;
+      }
+      const title = f.name.replace(/\.md$/i, '');
+      fileEntries.push({
+        title,
+        content,
+        previewHtml: null,
+        previewLoading: true,
+      });
+    }
+
+    if (fileEntries.length === 0) return;
+
+    this.files = fileEntries;
+    this.importError = '';
+    this.modalOpen = true;
+
+    for (let i = 0; i < this.files.length; i++) {
+      this.fetchPreview(i);
+    }
+  },
+
+  readFileText(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsText(file);
+    });
+  },
+
+  async fetchPreview(index) {
+    const file = this.files[index];
+    if (!file) return;
+    try {
+      const res = await fetch(previewUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify({ content: file.content }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        file.previewHtml = data.html || null;
+      }
+    } catch {
+      // fallback to raw content (previewHtml stays null)
+    } finally {
+      file.previewLoading = false;
+    }
+  },
+
+  removeFile(index) {
+    this.files.splice(index, 1);
+    if (this.files.length === 0) {
+      this.closeModal();
+    }
+  },
+
+  closeModal() {
+    this.modalOpen = false;
+    this.files = [];
+    this.skippedCount = 0;
+    this.importError = '';
+  },
+
+  async submitImport() {
+    if (this.importing || this.files.length === 0) return;
+    this.importing = true;
+    this.importError = '';
+
+    const payload = {
+      type: this.selectedType,
+      files: this.files.map((f) => ({
+        title: f.title,
+        content: f.content,
+      })),
+    };
+
+    try {
+      const res = await fetch(importUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        if (res.status === 419) {
+          this.importError = 'Session expired. Please refresh the page.';
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        this.importError = data.message || 'Import failed. Please try again.';
+        return;
+      }
+
+      const data = await res.json();
+      const failedCount = (data.failed || []).length;
+      const importedCount = (data.imported || []).length;
+
+      if (failedCount > 0 && importedCount === 0) {
+        this.importError = `All ${failedCount} file(s) failed to import.`;
+        return;
+      }
+
+      if (failedCount > 0) {
+        this.importError = `${importedCount} imported, ${failedCount} failed.`;
+        return;
+      }
+
+      window.location.reload();
+    } catch {
+      this.importError = 'Import failed. Check your network and try again.';
+    } finally {
+      this.importing = false;
+    }
+  },
+}));
+
 Alpine.start();
