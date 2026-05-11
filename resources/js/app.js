@@ -789,6 +789,7 @@ Alpine.data('thoughtContentEditor', ({
   previewExpanded: false,
   previewHasOverflow: false,
   editing: false,
+  focusOverlayOpen: false,
   saving: false,
   error: '',
   _previewResizeHandler: null,
@@ -817,6 +818,9 @@ Alpine.data('thoughtContentEditor', ({
     if (this._previewResizeHandler) {
       window.removeEventListener('resize', this._previewResizeHandler);
       this._previewResizeHandler = null;
+    }
+    if (this.focusOverlayOpen) {
+      document.body.style.overflow = '';
     }
   },
 
@@ -889,7 +893,30 @@ Alpine.data('thoughtContentEditor', ({
     textarea.style.height = textarea.scrollHeight + 'px';
   },
 
+  toggleFocus() {
+    this.focusOverlayOpen = !this.focusOverlayOpen;
+    if (this.focusOverlayOpen) {
+      document.body.style.overflow = 'hidden';
+      this.$nextTick(() => this.$refs.editTextarea?.focus());
+    } else {
+      document.body.style.overflow = '';
+      this.$nextTick(() => this.resizeTextarea());
+    }
+  },
+
+  handleEditEscape() {
+    if (this.focusOverlayOpen) {
+      this.toggleFocus();
+    } else {
+      this.cancelEdit();
+    }
+  },
+
   cancelEdit() {
+    if (this.focusOverlayOpen) {
+      this.focusOverlayOpen = false;
+      document.body.style.overflow = '';
+    }
     this.editing = false;
     this.draftContent = this.originalContent;
     this.error = '';
@@ -934,6 +961,10 @@ Alpine.data('thoughtContentEditor', ({
         if (el) {
           el.innerHTML = data.content_html;
         }
+      }
+      if (this.focusOverlayOpen) {
+        this.focusOverlayOpen = false;
+        document.body.style.overflow = '';
       }
       this.editing = false;
     } catch {
