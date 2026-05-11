@@ -82,6 +82,21 @@ When the user or a research agent has research output to save to IdeaTub, use th
 
 ---
 
+## IdeaTub: Capture web articles via capture_article
+
+Use the MCP tool **capture_article** to scrape and save a web article to IdeaTub:
+
+- **url** (required): The article URL to capture.
+- **title**: Optional title override.
+- **tags**: Optional extra tags.
+- **project**: Optional project context.
+
+The pipeline automatically: scrapes the article content, extracts copyright notices and editorial links, summarizes each editorial link, and runs research on the article. Progress is tracked via `source_metadata.status` on the root thought.
+
+**Stream:** Articles appear in Stream with source `article`. Filter at `/stream/articles`.
+
+---
+
 ## IdeaTub: Save meeting notes via capture_plan
 
 When the user wants meeting notes in IdeaTub as a first-class type (Stream → **Meetings**), use **`capture_plan`** with **`doc_type`:** `meeting`, **or** any of the equivalent MCP methods **`capture_meeting`**, **`add_meeting`**, **`add_meeting_notes`** (same parameters as `capture_plan` except `doc_type` is implied).
