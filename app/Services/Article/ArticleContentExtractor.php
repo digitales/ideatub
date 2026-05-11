@@ -37,10 +37,10 @@ class ArticleContentExtractor
         @$dom->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NOERROR);
         $xpath = new DOMXPath($dom);
 
-        $title = $this->extractTitle($xpath);
+        $title = $this->extractTitle($xpath, $sourceUrl);
         $author = $this->extractAuthor($xpath);
         $publishedDate = $this->extractPublishedDate($xpath);
-        $copyright = $this->extractCopyright($xpath, $html);
+        $copyright = $this->extractCopyright($xpath);
         $bodyNode = $this->findBodyContainer($xpath);
         $bodyText = $bodyNode !== null ? $this->nodeToCleanText($bodyNode) : '';
         $links = $bodyNode !== null ? $this->extractLinks($xpath, $bodyNode, $sourceUrl) : [];
@@ -57,7 +57,7 @@ class ArticleContentExtractor
         ];
     }
 
-    private function extractTitle(DOMXPath $xpath): string
+    private function extractTitle(DOMXPath $xpath, string $sourceUrl): string
     {
         $og = $xpath->query('//meta[@property="og:title"]/@content');
         if ($og->length > 0) {
@@ -74,7 +74,7 @@ class ArticleContentExtractor
             return trim($h1->item(0)->textContent);
         }
 
-        return '';
+        return parse_url($sourceUrl, PHP_URL_PATH) ?: '';
     }
 
     private function extractAuthor(DOMXPath $xpath): ?string
@@ -121,7 +121,7 @@ class ArticleContentExtractor
         return null;
     }
 
-    private function extractCopyright(DOMXPath $xpath, string $html): ?string
+    private function extractCopyright(DOMXPath $xpath): ?string
     {
         $footer = $xpath->query('//footer');
         if ($footer->length > 0) {
@@ -129,10 +129,6 @@ class ArticleContentExtractor
             if (preg_match('/(?:©|copyright|all rights reserved).{0,200}/i', $footerText, $m)) {
                 return trim($m[0]);
             }
-        }
-
-        if (preg_match('/(?:©|copyright)\s*.{0,200}/i', $html, $m)) {
-            return trim(strip_tags($m[0]));
         }
 
         $meta = $xpath->query('//meta[@name="copyright"]/@content');
