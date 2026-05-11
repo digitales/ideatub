@@ -18,7 +18,7 @@ class ArticleCaptureService
     ) {}
 
     /**
-     * @param  array{user_id?: int, title?: string, tags?: list<string>, project?: string}  $options
+     * @param  array{user_id?: int, title?: string, tags?: list<string>, project?: string, sync?: bool}  $options
      */
     public function capture(string $url, array $options = []): Thought
     {
@@ -74,8 +74,14 @@ class ArticleCaptureService
         }
 
         $thoughtId = $thought->id;
-        DB::afterCommit(function () use ($thoughtId): void {
-            ScrapeArticleContent::dispatch($thoughtId);
+        $sync = ! empty($options['sync']);
+
+        DB::afterCommit(function () use ($thoughtId, $sync): void {
+            if ($sync) {
+                ScrapeArticleContent::dispatchSync($thoughtId);
+            } else {
+                ScrapeArticleContent::dispatch($thoughtId);
+            }
         });
 
         return $thought;
