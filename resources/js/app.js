@@ -873,7 +873,20 @@ Alpine.data('thoughtContentEditor', ({
     this.editing = true;
     this.draftContent = this.originalContent;
     this.error = '';
-    this.$nextTick(() => this.$el.querySelector('textarea')?.focus());
+    this.$nextTick(() => {
+      const textarea = this.$refs.editTextarea;
+      if (textarea) {
+        textarea.focus();
+        this.resizeTextarea();
+      }
+    });
+  },
+
+  resizeTextarea() {
+    const textarea = this.$refs.editTextarea;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
   },
 
   cancelEdit() {
