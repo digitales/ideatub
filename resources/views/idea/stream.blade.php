@@ -79,7 +79,7 @@
                                 class="p-1 rounded transition-colors"
                                 aria-label="List layout"
                             >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
                                 </svg>
                             </button>
@@ -91,7 +91,7 @@
                                 class="p-1 rounded transition-colors"
                                 aria-label="Grid layout"
                             >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                                     <rect x="3" y="3" width="7" height="7" rx="1" />
                                     <rect x="14" y="3" width="7" height="7" rx="1" />
                                     <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -156,8 +156,7 @@
                     }
                 })();
                 </script>
-            @endif
-            @if(!$thoughts->isEmpty() && $thoughts->hasMorePages())
+            @if($thoughts->hasMorePages())
                 <script>
                 (function() {
                     var sentinel = document.getElementById('stream-load-more-sentinel');
@@ -214,7 +213,6 @@
                 })();
                 </script>
             @endif
-
                 <script>
                 function streamLayout(initial) {
                     return {
@@ -230,7 +228,7 @@
                                     'X-Requested-With': 'XMLHttpRequest',
                                 },
                                 body: JSON.stringify({ layout: mode }),
-                            });
+                            }).catch(function() {});
                         },
                         applyLayout() {
                             var container = this.$el.closest('[data-stream-layout]');
@@ -267,5 +265,6 @@
                     margin-bottom: 0;
                 }
                 </style>
+            @endif
         @endpush
 @endsection
