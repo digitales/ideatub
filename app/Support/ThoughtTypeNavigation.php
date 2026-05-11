@@ -45,6 +45,12 @@ final class ThoughtTypeNavigation
             'route_name' => 'idea.stream.meetings',
             'stored_values' => ['meeting', 'meetings'],
         ],
+        'article' => [
+            'collection_label' => 'Articles',
+            'thought_label' => 'Article',
+            'route_name' => 'idea.stream.articles',
+            'stored_values' => ['article', 'articles'],
+        ],
     ];
 
     /**
@@ -141,6 +147,9 @@ final class ThoughtTypeNavigation
         }
         if ($sourceKey === 'email') {
             return 'email';
+        }
+        if ($sourceKey === 'article') {
+            return 'article';
         }
 
         $metadata = $thought->metadata;
