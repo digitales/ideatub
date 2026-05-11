@@ -49,7 +49,7 @@
             x-show="editing"
             x-on:keydown.escape.stop.prevent="cancelEdit()"
         >
-            <textarea x-model="draftContent" rows="4" class="{{ $editorClass }}"></textarea>
+            <textarea x-ref="editTextarea" x-model="draftContent" rows="4" @input="resizeTextarea()" class="{{ $editorClass }} resize-none overflow-hidden"></textarea>
             <p x-show="error" x-text="error" class="text-[11px] text-red-600 mt-1"></p>
             <div class="flex items-center gap-2 mt-2">
                 <button type="button" @click="saveEdit()" :disabled="saveDisabled" class="text-[11px] font-medium text-white px-2 py-1 rounded bg-memory-violet disabled:opacity-50">Save</button>
@@ -109,7 +109,7 @@
 
         <template x-if="editing">
             <div class="mb-2" x-on:keydown.escape.stop.prevent="cancelEdit()">
-                <textarea x-model="draftContent" rows="4" class="{{ $editorClass }}"></textarea>
+                <textarea x-ref="editTextarea" x-model="draftContent" rows="4" @input="resizeTextarea()" class="{{ $editorClass }} resize-none overflow-hidden"></textarea>
                 <p x-show="error" x-text="error" class="text-[11px] text-red-600 mt-1"></p>
                 <div class="flex items-center gap-2 mt-2">
                     <button type="button" @click="saveEdit()" :disabled="saveDisabled" class="text-[11px] font-medium text-white px-2 py-1 rounded bg-memory-violet disabled:opacity-50">Save</button>
