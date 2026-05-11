@@ -101,7 +101,7 @@
                         </div>
                     </div>
                     <div id="stream-thoughts-list"
-                        :class="layout === 'grid' ? 'grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-2' : ''"
+                        :class="layout === 'grid' ? 'columns-[300px] gap-x-3' : ''"
                         data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
                         data-stream-since="{{ $streamSince }}">
                         @include('idea.stream_thoughts', ['cards' => $cards])
@@ -126,7 +126,7 @@
                         fetch(refetchUrl, { method: 'GET', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
                             .then(function(r) { return r.json(); })
                             .then(function(data) {
-                                if (data.html) list.innerHTML = data.html;
+                                if (data.html) { list.innerHTML = data.html; if (typeof streamLayoutCheckOverflow === 'function') streamLayoutCheckOverflow(); }
                                 var showing = document.getElementById('stream-showing-count');
                                 var total = document.getElementById('stream-total-count');
                                 if (showing && data.count !== undefined) showing.textContent = data.count;
@@ -187,6 +187,7 @@
                                     list.insertAdjacentHTML('beforeend', data.html);
                                     var current = parseInt(showingEl.textContent, 10) + (data.count || 0);
                                     showingEl.textContent = current;
+                                    if (typeof streamLayoutCheckOverflow === 'function') streamLayoutCheckOverflow();
                                 }
                                 if (data.has_more && data.next_page) {
                                     nextPage = data.next_page;
@@ -241,28 +242,48 @@
                                 container.classList.remove('max-w-[1400px]');
                                 container.classList.add('max-w-[600px]');
                             }
+                            this.$nextTick(function() { streamLayoutCheckOverflow(); });
                         },
                     };
+                }
+                function streamLayoutCheckOverflow() {
+                    document.querySelectorAll('[data-stream-card]').forEach(function(card) {
+                        var btn = card.querySelector('.stream-card-expand');
+                        if (!btn) return;
+                        var isGrid = card.closest('[data-stream-layout="grid"]');
+                        if (!isGrid) { btn.style.display = 'none'; card.removeAttribute('data-expanded'); btn.textContent = 'Read more'; return; }
+                        if (card.hasAttribute('data-expanded')) { btn.style.display = 'block'; return; }
+                        var overflows = card.scrollHeight > card.clientHeight;
+                        btn.style.display = overflows ? 'block' : 'none';
+                    });
                 }
                 </script>
                 <style>
                 [data-stream-layout="grid"] [data-stream-card] {
-                    max-height: 200px;
+                    max-height: 450px;
                     overflow: hidden;
                     position: relative;
+                    break-inside: avoid;
                 }
-                [data-stream-layout="grid"] [data-stream-card]::after {
+                [data-stream-layout="grid"] [data-stream-card][data-expanded] {
+                    max-height: none;
+                    overflow: visible;
+                }
+                [data-stream-layout="grid"] [data-stream-card]:not([data-expanded])::after {
                     content: '';
                     position: absolute;
                     bottom: 0;
                     left: 0;
                     right: 0;
-                    height: 2rem;
-                    background: linear-gradient(to top, rgba(255,255,255,0.9), transparent);
+                    height: 3rem;
+                    background: linear-gradient(to top, rgba(255,255,255,0.95), transparent);
                     pointer-events: none;
                 }
                 [data-stream-layout="grid"] [data-stream-card] .mb-2:last-child {
                     margin-bottom: 0;
+                }
+                .stream-card-expand {
+                    display: none;
                 }
                 </style>
             @endif
