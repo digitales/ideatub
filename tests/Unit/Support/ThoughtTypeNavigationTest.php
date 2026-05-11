@@ -10,7 +10,7 @@ class ThoughtTypeNavigationTest extends TestCase
 {
     public function test_ordered_nav_types_match_spec(): void
     {
-        $this->assertSame(['jira', 'email', 'research', 'plan', 'meeting'], ThoughtTypeNavigation::orderedNavTypes());
+        $this->assertSame(['jira', 'email', 'research', 'plan', 'meeting', 'article'], ThoughtTypeNavigation::orderedNavTypes());
     }
 
     public function test_collection_labels(): void
@@ -20,6 +20,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('Research', ThoughtTypeNavigation::collectionLabel('research'));
         $this->assertSame('Plans', ThoughtTypeNavigation::collectionLabel('plan'));
         $this->assertSame('Meetings', ThoughtTypeNavigation::collectionLabel('meeting'));
+        $this->assertSame('Articles', ThoughtTypeNavigation::collectionLabel('article'));
     }
 
     public function test_thought_display_labels(): void
@@ -29,6 +30,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('Research', ThoughtTypeNavigation::thoughtDisplayLabel('research'));
         $this->assertSame('Plan', ThoughtTypeNavigation::thoughtDisplayLabel('plan'));
         $this->assertSame('Meeting', ThoughtTypeNavigation::thoughtDisplayLabel('meeting'));
+        $this->assertSame('Article', ThoughtTypeNavigation::thoughtDisplayLabel('article'));
     }
 
     public function test_aliases_normalize(): void
@@ -39,6 +41,8 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('plan', ThoughtTypeNavigation::normalizeTypeKey(' PlanS '));
         $this->assertSame('meeting', ThoughtTypeNavigation::normalizeTypeKey('meetings'));
         $this->assertSame('meeting', ThoughtTypeNavigation::normalizeTypeKey('MEETING'));
+        $this->assertSame('article', ThoughtTypeNavigation::normalizeTypeKey('articles'));
+        $this->assertSame('article', ThoughtTypeNavigation::normalizeTypeKey('ARTICLE'));
     }
 
     public function test_stored_values_for_collection_are_shared_with_normalization(): void
@@ -64,6 +68,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertTrue(ThoughtTypeNavigation::isAvailable('research'));
         $this->assertTrue(ThoughtTypeNavigation::isAvailable('plan'));
         $this->assertTrue(ThoughtTypeNavigation::isAvailable('meeting'));
+        $this->assertTrue(ThoughtTypeNavigation::isAvailable('article'));
     }
 
     public function test_route_names_per_type(): void
@@ -73,6 +78,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('idea.stream.research', ThoughtTypeNavigation::routeName('research'));
         $this->assertSame('idea.stream.plans', ThoughtTypeNavigation::routeName('plan'));
         $this->assertSame('idea.stream.meetings', ThoughtTypeNavigation::routeName('meeting'));
+        $this->assertSame('idea.stream.articles', ThoughtTypeNavigation::routeName('article'));
     }
 
     public function test_resolve_thought_to_type_key_from_source_and_metadata(): void
@@ -91,6 +97,9 @@ class ThoughtTypeNavigationTest extends TestCase
 
         $meeting = new Thought(['source' => 'meeting', 'metadata' => ['type' => 'meeting']]);
         $this->assertSame('meeting', ThoughtTypeNavigation::resolveThoughtToTypeKey($meeting));
+
+        $article = new Thought(['source' => 'article', 'metadata' => null]);
+        $this->assertSame('article', ThoughtTypeNavigation::resolveThoughtToTypeKey($article));
     }
 
     public function test_resolve_normalizes_metadata_type_aliases(): void
