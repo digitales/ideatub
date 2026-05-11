@@ -1508,6 +1508,35 @@ class IdeaController extends Controller
     }
 
     /**
+     * Update research thought title stored in metadata.
+     */
+    public function updateTitle(
+        Request $request,
+        Thought $thought
+    ): RedirectResponse|JsonResponse {
+        $this->authorize('update', $thought);
+
+        $validated = $request->validate([
+            'title' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $title = $validated['title'] !== null ? trim($validated['title']) : null;
+        if ($title === '') {
+            $title = null;
+        }
+
+        $metadata = $thought->metadata ?? [];
+        $metadata['title'] = $title;
+        $thought->update(['metadata' => $metadata]);
+
+        if ($request->expectsJson()) {
+            return response()->json(['title' => $title]);
+        }
+
+        return redirect()->back()->with('success', 'Title updated.');
+    }
+
+    /**
      * Update thought content only. Tags and metadata stay untouched.
      */
     public function updateContent(
