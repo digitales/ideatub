@@ -66,6 +66,8 @@
             'root_html' => $root_html,
             'sections' => $sections,
             'researchContentComments' => $researchContentComments,
+            'editable' => $editable ?? false,
+            'rootThought' => $root,
         ])
         @else
         @include('idea.partials.microsite_reader', [

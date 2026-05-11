@@ -6,9 +6,22 @@
 --}}
 <div class="@if ($researchContentComments->hasComments && $sections->isNotEmpty()) lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-10 @endif">
     <div>
-        <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-headings:font-semibold prose-headings:tracking-tight prose-p:text-deep-indigo prose-p:leading-relaxed prose-li:text-slate-brand prose-strong:text-deep-indigo prose-pre:bg-slate-100/90 prose-pre:border prose-pre:border-memory-violet/10 prose-pre:rounded-lg prose-pre:py-3 prose-pre:px-4 prose-code:text-deep-indigo prose-code:bg-slate-100/90 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-a:text-memory-violet prose-a:no-underline hover:prose-a:underline prose-blockquote:border-memory-violet/30 prose-blockquote:bg-memory-violet/5 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg text-[14px] md:text-[15px]">
-            {!! $root_html !!}
-        </div>
+        @if (($editable ?? false) && isset($rootThought))
+            @include('idea.partials.editable_thought_content', [
+                'thought' => $rootThought,
+                'editable' => true,
+                'displayContent' => '',
+                'rawEditorContent' => $rootThought->content,
+                'detailMarkdownRead' => true,
+                'contentHtml' => $root_html,
+                'displayClass' => 'text-[14px] md:text-[15px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line break-words [overflow-wrap:anywhere]',
+                'editorClass' => 'w-full text-[14px] md:text-[15px] text-deep-indigo leading-relaxed rounded-lg border border-memory-violet/20 focus:border-memory-violet focus:ring-memory-violet/20',
+            ])
+        @else
+            <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-headings:font-semibold prose-headings:tracking-tight prose-p:text-deep-indigo prose-p:leading-relaxed prose-li:text-slate-brand prose-strong:text-deep-indigo prose-pre:bg-slate-100/90 prose-pre:border prose-pre:border-memory-violet/10 prose-pre:rounded-lg prose-pre:py-3 prose-pre:px-4 prose-code:text-deep-indigo prose-code:bg-slate-100/90 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-a:text-memory-violet prose-a:no-underline hover:prose-a:underline prose-blockquote:border-memory-violet/30 prose-blockquote:bg-memory-violet/5 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg text-[14px] md:text-[15px]">
+                {!! $root_html !!}
+            </div>
+        @endif
         @stack('research-after-root')
         @if($sections->isNotEmpty())
             <ul class="mt-8 space-y-8 border-t border-memory-violet/10 pt-8 list-none pl-0">
@@ -33,9 +46,22 @@
                 @else
                     @foreach($sections as $section)
                         <li @if(isset($section->id)) id="section-{{ $section->id }}" @endif>
-                            <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-headings:font-semibold prose-headings:tracking-tight prose-p:text-slate-brand prose-p:leading-relaxed prose-li:text-slate-brand prose-strong:text-deep-indigo prose-pre:bg-slate-100/90 prose-pre:border prose-pre:border-memory-violet/10 prose-pre:rounded-lg prose-pre:py-3 prose-pre:px-4 prose-code:text-deep-indigo prose-code:bg-slate-100/90 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-a:text-memory-violet prose-a:no-underline hover:prose-a:underline prose-blockquote:border-memory-violet/30 prose-blockquote:bg-memory-violet/5 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg text-[13px] md:text-[14px]">
-                                {!! $section->content_html !!}
-                            </div>
+                            @if (($editable ?? false) && isset($section->thought))
+                                @include('idea.partials.editable_thought_content', [
+                                    'thought' => $section->thought,
+                                    'editable' => true,
+                                    'displayContent' => '',
+                                    'rawEditorContent' => $section->thought->content,
+                                    'detailMarkdownRead' => true,
+                                    'contentHtml' => $section->content_html,
+                                    'displayClass' => 'text-[13px] md:text-[14px] text-deep-indigo leading-relaxed mb-2 whitespace-pre-line break-words [overflow-wrap:anywhere]',
+                                    'editorClass' => 'w-full text-[13px] md:text-[14px] text-deep-indigo leading-relaxed rounded-lg border border-memory-violet/20 focus:border-memory-violet focus:ring-memory-violet/20',
+                                ])
+                            @else
+                                <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-headings:font-semibold prose-headings:tracking-tight prose-p:text-slate-brand prose-p:leading-relaxed prose-li:text-slate-brand prose-strong:text-deep-indigo prose-pre:bg-slate-100/90 prose-pre:border prose-pre:border-memory-violet/10 prose-pre:rounded-lg prose-pre:py-3 prose-pre:px-4 prose-code:text-deep-indigo prose-code:bg-slate-100/90 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-a:text-memory-violet prose-a:no-underline hover:prose-a:underline prose-blockquote:border-memory-violet/30 prose-blockquote:bg-memory-violet/5 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg text-[13px] md:text-[14px]">
+                                    {!! $section->content_html !!}
+                                </div>
+                            @endif
                         </li>
                     @endforeach
                 @endif
