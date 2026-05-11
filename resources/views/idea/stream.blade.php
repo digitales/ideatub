@@ -65,17 +65,51 @@
                     @endif
                 </div>
             @else
-                <p class="text-[11px] text-slate-brand/40 mb-2" id="stream-count-line">
-                    Showing <span id="stream-showing-count">{{$thoughts->count()}}</span> of <span id="stream-total-count">{{$thoughts->total()}}</span> thoughts
-                </p>
-                <div id="stream-thoughts-list"
-                    data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
-                    data-stream-since="{{ $streamSince }}">
-                    @include('idea.stream_thoughts', ['cards' => $cards])
+                <div x-data="streamLayout('{{ $streamLayout }}')" x-init="applyLayout()">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-[11px] text-slate-brand/40" id="stream-count-line">
+                            Showing <span id="stream-showing-count">{{$thoughts->count()}}</span> of <span id="stream-total-count">{{$thoughts->total()}}</span> thoughts
+                        </p>
+                        <div class="flex items-center gap-1">
+                            <button
+                                type="button"
+                                data-testid="layout-toggle-list"
+                                @click="setLayout('list')"
+                                :class="layout === 'list' ? 'text-memory-violet' : 'text-slate-brand/40 hover:text-slate-brand'"
+                                class="p-1 rounded transition-colors"
+                                aria-label="List layout"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                            <button
+                                type="button"
+                                data-testid="layout-toggle-grid"
+                                @click="setLayout('grid')"
+                                :class="layout === 'grid' ? 'text-memory-violet' : 'text-slate-brand/40 hover:text-slate-brand'"
+                                class="p-1 rounded transition-colors"
+                                aria-label="Grid layout"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="stream-thoughts-list"
+                        :class="layout === 'grid' ? 'grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-2' : ''"
+                        data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
+                        data-stream-since="{{ $streamSince }}">
+                        @include('idea.stream_thoughts', ['cards' => $cards])
+                    </div>
+                    @if($thoughts->hasMorePages())
+                        <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}" data-stream-total="{{$thoughts->total()}}"></div>
+                    @endif
                 </div>
-                @if($thoughts->hasMorePages())
-                    <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}" data-stream-total="{{$thoughts->total()}}"></div>
-                @endif
             @endif
         </div>
 
@@ -181,5 +215,37 @@
                 </script>
             @endif
 
+                <script>
+                function streamLayout(initial) {
+                    return {
+                        layout: initial || 'list',
+                        setLayout(mode) {
+                            this.layout = mode;
+                            this.applyLayout();
+                            fetch('{{ route("stream.layout.store") }}', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                body: JSON.stringify({ layout: mode }),
+                            });
+                        },
+                        applyLayout() {
+                            var container = this.$el.closest('[data-stream-layout]');
+                            if (!container) return;
+                            container.setAttribute('data-stream-layout', this.layout);
+                            if (this.layout === 'grid') {
+                                container.classList.remove('max-w-[600px]');
+                                container.classList.add('max-w-[1400px]');
+                            } else {
+                                container.classList.remove('max-w-[1400px]');
+                                container.classList.add('max-w-[600px]');
+                            }
+                        },
+                    };
+                }
+                </script>
         @endpush
 @endsection

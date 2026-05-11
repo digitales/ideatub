@@ -84,4 +84,29 @@ class StreamLayoutTest extends TestCase
         $response->assertOk();
         $response->assertSee('data-stream-layout="grid"', false);
     }
+
+    public function test_stream_page_shows_layout_toggle_buttons(): void
+    {
+        $user = User::factory()->create();
+        \App\Models\Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Toggle test thought',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $response->assertSee('data-testid="layout-toggle-list"', false);
+        $response->assertSee('data-testid="layout-toggle-grid"', false);
+    }
+
+    public function test_stream_toggle_not_shown_when_empty(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $response->assertDontSee('data-testid="layout-toggle-list"', false);
+    }
 }
