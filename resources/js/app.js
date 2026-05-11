@@ -888,7 +888,7 @@ Alpine.data('thoughtContentEditor', ({
 
   resizeTextarea() {
     const textarea = this.$refs.editTextarea;
-    if (!textarea) return;
+    if (!textarea || this.focusOverlayOpen) return;
     textarea.style.height = 'auto';
     textarea.style.height = textarea.scrollHeight + 'px';
   },
@@ -897,7 +897,13 @@ Alpine.data('thoughtContentEditor', ({
     this.focusOverlayOpen = !this.focusOverlayOpen;
     if (this.focusOverlayOpen) {
       document.body.style.overflow = 'hidden';
-      this.$nextTick(() => this.$refs.editTextarea?.focus());
+      this.$nextTick(() => {
+        const textarea = this.$refs.editTextarea;
+        if (textarea) {
+          textarea.style.height = '';
+          textarea.focus();
+        }
+      });
     } else {
       document.body.style.overflow = '';
       this.$nextTick(() => this.resizeTextarea());
@@ -969,6 +975,74 @@ Alpine.data('thoughtContentEditor', ({
       this.editing = false;
     } catch {
       this.error = 'Unable to update thought.';
+    } finally {
+      this.saving = false;
+    }
+  },
+}));
+
+Alpine.data('thoughtTitleEditor', (initialTitle, updateUrl, editable = false) => ({
+  title: initialTitle || '',
+  updateUrl: updateUrl || '',
+  editable: !!editable,
+  editing: false,
+  draft: initialTitle || '',
+  saving: false,
+  error: '',
+
+  startEdit() {
+    if (!this.editable) return;
+    this.editing = true;
+    this.draft = this.title;
+    this.error = '';
+    this.$nextTick(() => this.$refs.titleInput?.focus());
+  },
+
+  cancelEdit() {
+    this.editing = false;
+    this.draft = this.title;
+    this.error = '';
+  },
+
+  async saveEdit() {
+    if (this.saving) return;
+    const trimmed = this.draft.trim();
+    if (trimmed === this.title) {
+      this.editing = false;
+      return;
+    }
+
+    this.saving = true;
+    this.error = '';
+
+    try {
+      const res = await fetch(this.updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN':
+            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: JSON.stringify({ title: trimmed || null }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (res.status === 422 && data.errors?.title?.[0]) {
+          this.error = data.errors.title[0];
+        } else {
+          this.error = 'Failed to save title.';
+        }
+        return;
+      }
+
+      this.title = data.title || '';
+      this.editing = false;
+    } catch {
+      this.error = 'Network error. Try again.';
     } finally {
       this.saving = false;
     }
