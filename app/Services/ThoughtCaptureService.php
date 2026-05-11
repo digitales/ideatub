@@ -93,6 +93,18 @@ class ThoughtCaptureService
 
         $thought = $this->createOne($content, $userId, $parent?->id, $source, $sourceMetadata, $planSlug, $docType, $extraTags, $ideaMetadata, $skipAiMetadata);
 
+        $singleSectionTitle = data_get($sourceMetadata, 'section_title');
+        if (
+            $singleSectionTitle !== null
+            && $singleSectionTitle !== ''
+            && ($thought->metadata['type'] ?? null) === 'research'
+            && ! isset($thought->metadata['title'])
+        ) {
+            $meta = $thought->metadata;
+            $meta['title'] = mb_substr(trim((string) $singleSectionTitle), 0, 255);
+            $thought->update(['metadata' => $meta]);
+        }
+
         return [
             'thought' => $thought,
             'chunked' => false,
@@ -216,6 +228,17 @@ class ThoughtCaptureService
             'parent_id' => null,
         ]);
         $sectionIds = [$root->id];
+
+        $rootSectionTitle = $sections[0]['title'] ?? null;
+        if (
+            $rootSectionTitle !== null
+            && $rootSectionTitle !== ''
+            && ($metadata['type'] ?? null) === 'research'
+            && ! isset($metadata['title'])
+        ) {
+            $metadata['title'] = mb_substr(trim($rootSectionTitle), 0, 255);
+            $root->update(['metadata' => $metadata]);
+        }
 
         foreach (array_slice($sections, 1) as $index => $section) {
             $sectionContent = $section['content'];
