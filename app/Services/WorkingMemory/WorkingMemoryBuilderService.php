@@ -7,8 +7,9 @@ use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use RuntimeException;
+use Throwable;
 
 class WorkingMemoryBuilderService
 {
@@ -103,24 +104,32 @@ class WorkingMemoryBuilderService
                     $sectionReferences = [];
                     $citationCoverage = null;
                 } else {
-                    throw new RuntimeException((string) ($validation['message'] ?? 'AI-authored output failed hard validation.'));
+                    throw new \RuntimeException((string) ($validation['message'] ?? 'AI-authored output failed hard validation.'));
                 }
             } else {
                 [$payload, $summaryMarkdown] = $this->legacyPayloadAndSummary($normalizedScopeType, $thoughts);
             }
-        } catch (RuntimeException $e) {
+        } catch (Throwable $e) {
+            Log::warning('WorkingMemoryBuilderService: build failed, attempting fallback.', [
+                'user_id' => $userId,
+                'scope_type' => $normalizedScopeType,
+                'scope_key' => $normalizedScopeKey,
+                'build_type' => $buildType,
+                'message' => $e->getMessage(),
+            ]);
+
             $fallbackVersion = $this->lastKnownGoodVersion($userId, $normalizedScopeType, $normalizedScopeKey);
             if ($fallbackVersion !== null) {
                 return $fallbackVersion;
             }
 
-            WorkingMemory::query()
-                ->where('user_id', $userId)
-                ->where('scope_type', $normalizedScopeType)
-                ->where('scope_key', $normalizedScopeKey)
-                ->update(['build_started_at' => null]);
-
-            throw $e;
+            [$payload, $summaryMarkdown] = $this->legacyPayloadAndSummary($normalizedScopeType, $thoughts);
+            $authoringStatus = 'fallback';
+            $validationError = $e->getMessage();
+            $structuredSections = null;
+            $references = [];
+            $sectionReferences = [];
+            $citationCoverage = null;
         }
 
         return DB::transaction(function () use (

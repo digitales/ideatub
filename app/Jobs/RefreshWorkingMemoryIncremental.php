@@ -3,18 +3,25 @@
 namespace App\Jobs;
 
 use App\Models\Thought;
+use App\Models\WorkingMemory;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use App\Services\WorkingMemory\WorkingMemoryScopeResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class RefreshWorkingMemoryIncremental implements ShouldQueue
 {
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
+
+    public int $tries = 3;
+
+    public int $backoff = 30;
 
     public function __construct(
         private readonly string $thoughtId
@@ -36,5 +43,23 @@ class RefreshWorkingMemoryIncremental implements ShouldQueue
                 $scope['scope_key']
             );
         }
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        Log::warning('RefreshWorkingMemoryIncremental failed permanently.', [
+            'thought_id' => $this->thoughtId,
+            'message' => $exception->getMessage(),
+        ]);
+
+        $thought = Thought::query()->find($this->thoughtId);
+        if (! $thought instanceof Thought || $thought->user_id === null) {
+            return;
+        }
+
+        WorkingMemory::query()
+            ->where('user_id', $thought->user_id)
+            ->whereNotNull('build_started_at')
+            ->update(['build_started_at' => null]);
     }
 }

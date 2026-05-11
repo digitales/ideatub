@@ -721,7 +721,7 @@ class WorkingMemoryBuilderServiceTest extends TestCase
     }
 
     #[Test]
-    public function ai_hard_failure_bubbles_when_no_prior_version_exists(): void
+    public function ai_hard_failure_falls_back_to_legacy_when_no_prior_version_exists(): void
     {
         config([
             'features.working_memory_ai_authored' => true,
@@ -741,16 +741,12 @@ class WorkingMemoryBuilderServiceTest extends TestCase
             ]);
         });
 
-        try {
-            app(WorkingMemoryBuilderService::class)
-                ->buildConsolidated($user->id, 'global', 'global');
-            $this->fail('Expected RuntimeException');
-        } catch (RuntimeException $e) {
-            $this->assertSame(
-                'Required section items must include resolvable citations.',
-                $e->getMessage()
-            );
-        }
+        $version = app(WorkingMemoryBuilderService::class)
+            ->buildConsolidated($user->id, 'global', 'global');
+
+        $this->assertSame('fallback', $version->authoring_status);
+        $this->assertStringContainsString('resolvable citations', $version->validation_error);
+        $this->assertNull($version->structured_sections_json);
     }
 
     #[Test]

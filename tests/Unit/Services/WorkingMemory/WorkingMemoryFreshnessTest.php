@@ -135,7 +135,7 @@ class WorkingMemoryFreshnessTest extends TestCase
     }
 
     #[Test]
-    public function it_bubbles_non_runtime_failures_instead_of_falling_back(): void
+    public function it_falls_back_to_last_known_good_for_non_runtime_failures(): void
     {
         config([
             'features.working_memory_ai_authored' => false,
@@ -151,7 +151,7 @@ class WorkingMemoryFreshnessTest extends TestCase
             'metadata' => ['tags' => ['infra']],
         ]);
 
-        app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
+        $firstVersion = app(WorkingMemoryBuilderService::class)->buildConsolidated($user->id, 'global', 'global');
         $memory = WorkingMemory::query()->where('user_id', $user->id)->firstOrFail();
         $this->assertSame('fresh', $memory->freshness_state);
 
@@ -175,19 +175,15 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryLegacyRowCitationResolver::class),
         );
 
-        try {
-            $failingBuilder->buildIncremental($user->id, 'global', 'global');
-            $this->fail('Expected Error');
-        } catch (\Error $e) {
-            $this->assertSame('db connection dropped', $e->getMessage());
-        }
+        $fallbackVersion = $failingBuilder->buildIncremental($user->id, 'global', 'global');
 
+        $this->assertSame($firstVersion->id, $fallbackVersion->id);
         $memory->refresh();
-        $this->assertSame('fresh', $memory->freshness_state);
+        $this->assertSame('degraded', $memory->freshness_state);
     }
 
     #[Test]
-    public function it_does_not_mark_degraded_when_latest_version_pointer_is_missing(): void
+    public function it_falls_back_to_legacy_when_latest_version_pointer_is_missing_and_assembler_fails(): void
     {
         config([
             'features.working_memory_ai_authored' => false,
@@ -212,14 +208,25 @@ class WorkingMemoryFreshnessTest extends TestCase
             'freshness_state' => 'fresh',
         ])->save();
 
+        $callCount = 0;
+
         /** @var WorkingMemoryAssembler&MockInterface $mockAssembler */
         $mockAssembler = Mockery::mock(WorkingMemoryAssembler::class, [
             app(WorkingMemoryScopeNormalizer::class),
             app(WorkingMemoryConsolidationWindowResolver::class),
         ])->makePartial();
         $mockAssembler->shouldReceive('assemblePayload')
-            ->once()
-            ->andThrow(new RuntimeException('synthesis failed'));
+            ->twice()
+            ->andReturnUsing(function () use (&$callCount) {
+                $callCount++;
+                if ($callCount === 1) {
+                    throw new RuntimeException('synthesis failed');
+                }
+
+                return app(WorkingMemoryAssembler::class)->assemblePayload(
+                    Thought::query()->get()
+                );
+            });
 
         $failingBuilder = new WorkingMemoryBuilderService(
             $mockAssembler,
@@ -232,15 +239,10 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryLegacyRowCitationResolver::class),
         );
 
-        try {
-            $failingBuilder->buildIncremental($user->id, 'global', 'global');
-            $this->fail('Expected RuntimeException');
-        } catch (RuntimeException $e) {
-            $this->assertSame('synthesis failed', $e->getMessage());
-        }
+        $version = $failingBuilder->buildIncremental($user->id, 'global', 'global');
 
-        $memory->refresh();
-        $this->assertSame('fresh', $memory->freshness_state);
+        $this->assertSame('fallback', $version->authoring_status);
+        $this->assertSame('synthesis failed', $version->validation_error);
     }
 
     #[Test]
