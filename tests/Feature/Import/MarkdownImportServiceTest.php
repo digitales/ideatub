@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\Import\FileImportService;
+use App\Services\Meetings\MeetingService;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -108,13 +109,13 @@ class MarkdownImportServiceTest extends TestCase
         $user = User::factory()->create();
         $project = Project::create(['user_id' => $user->id, 'title' => 'Test Project']);
 
-        $meetingService = Mockery::mock(\App\Services\Meetings\MeetingService::class);
+        $meetingService = Mockery::mock(MeetingService::class);
         $meetingService->shouldReceive('queueAutoRunForMeetingThought')
             ->once()
             ->withArgs(function (Thought $thought, string $source) {
                 return $source === 'upload';
             });
-        $this->app->instance(\App\Services\Meetings\MeetingService::class, $meetingService);
+        $this->app->instance(MeetingService::class, $meetingService);
 
         $service = app(FileImportService::class);
         $service->importMarkdownWithMetadata(

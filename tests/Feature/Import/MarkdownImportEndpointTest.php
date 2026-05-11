@@ -3,7 +3,6 @@
 namespace Tests\Feature\Import;
 
 use App\Models\Project;
-use App\Models\Thought;
 use App\Models\User;
 use App\Services\OpenRouterService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
