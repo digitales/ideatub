@@ -247,5 +247,25 @@
                     };
                 }
                 </script>
+                <style>
+                [data-stream-layout="grid"] [data-stream-card] {
+                    max-height: 200px;
+                    overflow: hidden;
+                    position: relative;
+                }
+                [data-stream-layout="grid"] [data-stream-card]::after {
+                    content: '';
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    height: 2rem;
+                    background: linear-gradient(to top, rgba(255,255,255,0.9), transparent);
+                    pointer-events: none;
+                }
+                [data-stream-layout="grid"] [data-stream-card] .mb-2:last-child {
+                    margin-bottom: 0;
+                }
+                </style>
         @endpush
 @endsection

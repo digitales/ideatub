@@ -109,4 +109,18 @@ class StreamLayoutTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('data-testid="layout-toggle-list"', false);
     }
+
+    public function test_stream_cards_include_grid_truncation_data_attribute(): void
+    {
+        $user = User::factory()->create();
+        \App\Models\Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Truncation test thought',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $response->assertSee('data-stream-card', false);
+    }
 }
