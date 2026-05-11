@@ -1859,10 +1859,13 @@ class IdeaController extends Controller
 
         ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
 
+        $editable = ! app(\App\Services\DemoMode::class)->enabled();
+        $thoughtProjectsForDetail = $thought->projects;
+
         return view('idea.research_show', [
             'root' => $thought,
             'isMicrosite' => false,
-            'pageTitle' => $pageTitle,
+            'pageTitle' => data_get($thought->metadata, 'title') ?: $pageTitle,
             'root_html' => $rootHtml,
             'sections' => $sectionsWithHtml,
             'sectionThoughts' => $sections,
@@ -1873,6 +1876,8 @@ class IdeaController extends Controller
             'commentsPresenter' => $commentsPresenter,
             'researchContentComments' => ResearchContentCommentsViewData::none(),
             'researchUnreadBannerCount' => $researchUnreadBannerCount,
+            'editable' => $editable,
+            'thoughtProjectsForDetail' => $thoughtProjectsForDetail,
         ]);
     }
 
