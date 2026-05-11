@@ -789,6 +789,7 @@ Alpine.data('thoughtContentEditor', ({
   previewExpanded: false,
   previewHasOverflow: false,
   editing: false,
+  focusOverlayOpen: false,
   saving: false,
   error: '',
   _previewResizeHandler: null,
@@ -817,6 +818,9 @@ Alpine.data('thoughtContentEditor', ({
     if (this._previewResizeHandler) {
       window.removeEventListener('resize', this._previewResizeHandler);
       this._previewResizeHandler = null;
+    }
+    if (this.focusOverlayOpen) {
+      document.body.style.overflow = '';
     }
   },
 
@@ -873,10 +877,52 @@ Alpine.data('thoughtContentEditor', ({
     this.editing = true;
     this.draftContent = this.originalContent;
     this.error = '';
-    this.$nextTick(() => this.$el.querySelector('textarea')?.focus());
+    this.$nextTick(() => {
+      const textarea = this.$refs.editTextarea;
+      if (textarea) {
+        textarea.focus();
+        this.resizeTextarea();
+      }
+    });
+  },
+
+  resizeTextarea() {
+    const textarea = this.$refs.editTextarea;
+    if (!textarea || this.focusOverlayOpen) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  },
+
+  toggleFocus() {
+    this.focusOverlayOpen = !this.focusOverlayOpen;
+    if (this.focusOverlayOpen) {
+      document.body.style.overflow = 'hidden';
+      this.$nextTick(() => {
+        const textarea = this.$refs.editTextarea;
+        if (textarea) {
+          textarea.style.height = '';
+          textarea.focus();
+        }
+      });
+    } else {
+      document.body.style.overflow = '';
+      this.$nextTick(() => this.resizeTextarea());
+    }
+  },
+
+  handleEditEscape() {
+    if (this.focusOverlayOpen) {
+      this.toggleFocus();
+    } else {
+      this.cancelEdit();
+    }
   },
 
   cancelEdit() {
+    if (this.focusOverlayOpen) {
+      this.focusOverlayOpen = false;
+      document.body.style.overflow = '';
+    }
     this.editing = false;
     this.draftContent = this.originalContent;
     this.error = '';
@@ -922,9 +968,81 @@ Alpine.data('thoughtContentEditor', ({
           el.innerHTML = data.content_html;
         }
       }
+      if (this.focusOverlayOpen) {
+        this.focusOverlayOpen = false;
+        document.body.style.overflow = '';
+      }
       this.editing = false;
     } catch {
       this.error = 'Unable to update thought.';
+    } finally {
+      this.saving = false;
+    }
+  },
+}));
+
+Alpine.data('thoughtTitleEditor', (initialTitle, updateUrl, editable = false) => ({
+  title: initialTitle || '',
+  updateUrl: updateUrl || '',
+  editable: !!editable,
+  editing: false,
+  draft: initialTitle || '',
+  saving: false,
+  error: '',
+
+  startEdit() {
+    if (!this.editable) return;
+    this.editing = true;
+    this.draft = this.title;
+    this.error = '';
+    this.$nextTick(() => this.$refs.titleInput?.focus());
+  },
+
+  cancelEdit() {
+    this.editing = false;
+    this.draft = this.title;
+    this.error = '';
+  },
+
+  async saveEdit() {
+    if (this.saving) return;
+    const trimmed = this.draft.trim();
+    if (trimmed === this.title) {
+      this.editing = false;
+      return;
+    }
+
+    this.saving = true;
+    this.error = '';
+
+    try {
+      const res = await fetch(this.updateUrl, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN':
+            document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        },
+        body: JSON.stringify({ title: trimmed || null }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (res.status === 422 && data.errors?.title?.[0]) {
+          this.error = data.errors.title[0];
+        } else {
+          this.error = 'Failed to save title.';
+        }
+        return;
+      }
+
+      this.title = data.title || '';
+      this.editing = false;
+    } catch {
+      this.error = 'Network error. Try again.';
     } finally {
       this.saving = false;
     }

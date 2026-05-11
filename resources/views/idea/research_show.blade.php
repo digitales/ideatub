@@ -11,6 +11,31 @@
     </p>
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 md:p-8 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
         <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-4">Research</p>
+
+        @include('idea.partials.thought_detail_title', [
+            'thought' => $root,
+            'editable' => $editable ?? false,
+        ])
+
+        @if (($thoughtProjectsForDetail ?? collect())->isNotEmpty())
+            @include('idea.partials.thought_detail_projects_and_links', [
+                'thought' => $root,
+                'thoughtProjectsForDetail' => $thoughtProjectsForDetail,
+                'editable' => false,
+            ])
+        @endif
+
+        <div class="mt-3 mb-4">
+            @include('idea.partials.thought_tag_row', [
+                'thought' => $root,
+                'editable' => $editable ?? false,
+            ])
+        </div>
+
+        @if (empty($isMicrosite))
+            <p class="text-[11px] text-slate-brand/50 mb-6">{{ $root->created_at->diffForHumans() }}</p>
+        @endif
+
         @if (empty($isMicrosite) || ! empty($onMicrositeRootIndex))
         @if (! empty($linkedVideo ?? null))
             <div class="mb-6 rounded-xl border border-rose-400/25 bg-rose-500/[0.06] p-4 md:p-5">
@@ -35,14 +60,14 @@
         @include('idea.partials.research_newsletter_analysis', ['newsletterAnalysis' => $newsletterAnalysis ?? null])
         @include('idea.partials.research_editorial_link_summaries', ['editorialLinkSummaries' => $editorialLinkSummaries])
         @endif
+
         @if (empty($isMicrosite))
-        @push('research-after-root')
-            <p class="text-[11px] text-slate-brand/50 mt-4">{{ $root->created_at->diffForHumans() }}</p>
-        @endpush
         @include('idea.partials.research_content', [
             'root_html' => $root_html,
             'sections' => $sections,
             'researchContentComments' => $researchContentComments,
+            'editable' => $editable ?? false,
+            'rootThought' => $root,
         ])
         @else
         @include('idea.partials.microsite_reader', [

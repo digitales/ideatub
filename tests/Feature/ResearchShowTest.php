@@ -1143,6 +1143,76 @@ class ResearchShowTest extends TestCase
         $response->assertSee('Main section', false);
     }
 
+    public function test_research_show_displays_project_when_associated(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => '# With project',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+        $project = \App\Models\Project::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'Test Project',
+        ]);
+        $thought->projects()->attach($project, ['sort_order' => 0]);
+
+        $response = $this->actingAs($user)->get(route('idea.research.show', $thought));
+
+        $response->assertStatus(200);
+        $response->assertSee('Test Project', false);
+    }
+
+    public function test_research_show_displays_tags(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => '# Tagged research',
+            'metadata' => ['type' => 'research', 'tags' => ['ai', 'ml']],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.research.show', $thought));
+
+        $response->assertStatus(200);
+        $response->assertSee('ai', false);
+        $response->assertSee('ml', false);
+    }
+
+    public function test_research_show_includes_edit_button_for_content(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => '# Editable research',
+            'metadata' => ['type' => 'research', 'tags' => []],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.research.show', $thought));
+
+        $response->assertStatus(200);
+        $response->assertSee('ideatub-thought-content-update', false);
+    }
+
+    public function test_research_show_displays_title_from_metadata(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => 'Body content here.',
+            'metadata' => ['type' => 'research', 'tags' => [], 'title' => 'My Custom Title'],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.research.show', $thought));
+
+        $response->assertStatus(200);
+        $response->assertSee('My Custom Title', false);
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */
