@@ -899,8 +899,32 @@ class IdeaController extends Controller
         );
     }
 
+    public function streamArticles(Request $request): View|JsonResponse
+    {
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
+
+        $thoughts = Thought::query()
+            ->where('user_id', auth()->id())
+            ->visibleInStream()
+            ->topLevel()
+            ->matchingCanonicalSourceType('article')
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
+
+        return $this->streamCollectionResponse(
+            $request,
+            $thoughts,
+            'article',
+            fn (LengthAwarePaginator $thoughts) => $thoughts->isNotEmpty()
+                ? $thoughts->first()->created_at->toIso8601String()
+                : null
+        );
+    }
+
     /**
-     * Shared HTML/JSON response for typed stream collection pages (Jira, Emails, Research, Plans, Meetings).
+     * Shared HTML/JSON response for typed stream collection pages.
      *
      * @param  callable(LengthAwarePaginator<int, Thought>): string|null  $latestForAjax
      */

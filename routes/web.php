@@ -53,6 +53,7 @@ use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\ThoughtLinkController;
 use App\Http\Controllers\ThoughtProjectController;
 use App\Http\Controllers\ToolController;
+use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\WorkingMemoryRefreshController;
@@ -183,6 +184,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/stream/research', [IdeaController::class, 'streamResearch'])->name('idea.stream.research');
     Route::get('/stream/plans', [IdeaController::class, 'streamPlans'])->name('idea.stream.plans');
     Route::get('/stream/meetings', [IdeaController::class, 'streamMeetings'])->name('idea.stream.meetings');
+    Route::get('/stream/articles', [IdeaController::class, 'streamArticles'])->name('idea.stream.articles');
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
 
     Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');
@@ -197,6 +199,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/ideas/completed', [IdeaController::class, 'completed'])->name('idea.completed');
     Route::post('/ideas', [IdeaController::class, 'storeIdea'])->name('ideas.store');
     Route::post('/videos', [VideoController::class, 'store'])->name('videos.store');
+    Route::get('/articles', [ArticleController::class, 'index'])->name('articles.index');
+    Route::post('/articles', [ArticleController::class, 'store'])->name('articles.store');
     Route::patch('/ideas/{thought}/completed', [IdeaController::class, 'toggleCompleted'])->name('ideas.toggle-completed');
     Route::patch('/ideas/{thought}/tags', [IdeaController::class, 'updateTags'])->name('ideas.update-tags');
     Route::patch('/ideas/{thought}/content', [IdeaController::class, 'updateContent'])->name('ideas.update-content');
