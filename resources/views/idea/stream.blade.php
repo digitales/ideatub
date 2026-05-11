@@ -10,7 +10,7 @@
 @section('title', $__collectionKey ? ThoughtTypeNavigation::documentTitle($__collectionKey) : ($tag ? 'Tag: ' . e($tag) . ' — IdeaTub' : 'Stream — IdeaTub'))
 
 @section('content')
-        <div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
+        <div data-stream-layout="{{ $streamLayout }}" class="mx-auto px-6 pt-16 pb-24 {{ $streamLayout === 'grid' ? 'max-w-[1400px]' : 'max-w-[600px]' }}">
             <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-6">
                 @if($__collectionKey)
                     {{ ThoughtTypeNavigation::collectionLabel($__collectionKey) }}

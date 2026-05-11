@@ -62,4 +62,26 @@ class StreamLayoutTest extends TestCase
         $response->assertNoContent();
         $this->assertEquals('list', session('stream_layout'));
     }
+
+    public function test_stream_page_defaults_to_list_layout(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+
+        $response->assertOk();
+        $response->assertSee('data-stream-layout="list"', false);
+    }
+
+    public function test_stream_page_renders_grid_when_session_set(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->withSession(['stream_layout' => 'grid'])
+            ->actingAs($user)
+            ->get(route('idea.stream'));
+
+        $response->assertOk();
+        $response->assertSee('data-stream-layout="grid"', false);
+    }
 }

@@ -130,6 +130,11 @@ class AppServiceProvider extends ServiceProvider
 
             $view->with('inboxActionableCount', $count);
             $view->with('demoModeEnabled', app(DemoMode::class)->enabled());
+            $view->with('streamLayout', session('stream_layout', 'list'));
+        });
+
+        View::composer('idea.stream', function ($view): void {
+            $view->with('streamLayout', session('stream_layout', 'list'));
         });
     }
 }
