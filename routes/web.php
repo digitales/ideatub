@@ -262,6 +262,8 @@ Route::middleware('auth')->group(function () {
                 ->middleware('throttle:import-upload')->name('quick');
             Route::post('/batch', [ImportController::class, 'batch'])
                 ->middleware('throttle:import-upload')->name('batch');
+            Route::post('/preview-markdown', [ImportController::class, 'previewMarkdown'])
+                ->name('preview-markdown');
             Route::get('/{batch}', [ImportController::class, 'show'])
                 ->middleware('can:view,batch')->name('show');
             Route::get('/{batch}/status', [ImportController::class, 'status'])
@@ -273,6 +275,8 @@ Route::middleware('auth')->group(function () {
             Route::delete('/{batch}/thoughts', [ImportController::class, 'destroyThoughts'])
                 ->middleware('can:deleteThoughts,batch')->name('thoughts.destroy');
         });
+        Route::post('/projects/{project}/import-markdown', [ImportController::class, 'importMarkdown'])
+            ->name('projects.import-markdown');
     }
     Route::get('/projects/{project}/shares', [ProjectShareController::class, 'index'])->name('projects.shares.index');
     Route::post('/projects/{project}/shares', [ProjectShareController::class, 'store'])->name('projects.shares.store');
