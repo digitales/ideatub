@@ -39,6 +39,7 @@ class ArticleController extends Controller
         try {
             $captureService->capture($validated['url'], [
                 'user_id' => $user->id,
+                'sync' => true,
             ]);
         } catch (\InvalidArgumentException $e) {
             return redirect()
