@@ -101,7 +101,7 @@
                         </div>
                     </div>
                     <div id="stream-thoughts-list"
-                        :class="layout === 'grid' ? 'columns-[300px] gap-x-3' : ''"
+                        :class="layout === 'grid' ? 'grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3 items-start' : ''"
                         data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
                         data-stream-since="{{ $streamSince }}">
                         @include('idea.stream_thoughts', ['cards' => $cards])
@@ -263,7 +263,8 @@
                     max-height: 450px;
                     overflow: hidden;
                     position: relative;
-                    break-inside: avoid;
+                    content-visibility: auto;
+                    contain-intrinsic-size: auto 200px;
                 }
                 [data-stream-layout="grid"] [data-stream-card][data-expanded] {
                     max-height: none;
