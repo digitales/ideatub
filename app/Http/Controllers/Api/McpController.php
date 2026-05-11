@@ -114,6 +114,7 @@ class McpController extends Controller
             'research_idea',
             'process_meeting',
             'capture_video',
+            'capture_article',
             'get_working_memory',
             'get_compaction',
         ];
@@ -555,6 +556,20 @@ class McpController extends Controller
                 ],
             ],
             [
+                'name' => 'capture_article',
+                'description' => 'Capture a web article into IdeaTub. Scrapes the article content, extracts copyright and editorial links, summarizes each link, and runs research automatically.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'url' => ['type' => 'string', 'description' => 'The article URL to capture'],
+                        'title' => ['type' => 'string', 'description' => 'Optional title override'],
+                        'tags' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Additional tags'],
+                        'project' => ['type' => 'string', 'description' => 'Project context'],
+                    ],
+                    'required' => ['url'],
+                ],
+            ],
+            [
                 'name' => 'get_working_memory',
                 'description' => 'Return global, project, insights, or tag working memory snapshot with canonical sections, references, section_references, and diagnostics. Section/reference URLs may be IdeaTub-relative routes (for example /stream?...) or safe source URLs.',
                 'inputSchema' => [
@@ -790,6 +805,7 @@ class McpController extends Controller
             'research_idea' => $this->researchIdea($params),
             'process_meeting' => $this->processMeeting($params),
             'capture_video' => $this->captureVideo($params),
+            'capture_article' => $this->captureArticle($params),
             'get_working_memory' => $this->getWorkingMemory($params),
             'get_compaction' => $this->getCompaction($params),
             'sync_jira' => $this->syncJira($params),
@@ -1099,6 +1115,46 @@ class McpController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * capture_article: Capture a web article via {@see \App\Services\ArticleCaptureService}.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{id: string, status: string, url: string}
+     */
+    private function captureArticle(array $params): array
+    {
+        $v = Validator::make($params, [
+            'url' => 'required|string|max:2048',
+            'title' => 'sometimes|nullable|string|max:512',
+            'tags' => 'sometimes|nullable|array',
+            'tags.*' => 'string|max:128',
+            'project' => 'sometimes|nullable|string|max:256',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $user = Auth::user();
+        if ($user === null) {
+            throw new \InvalidArgumentException('Not authenticated.');
+        }
+
+        $service = app(\App\Services\ArticleCaptureService::class);
+
+        $thought = $service->capture(trim((string) $params['url']), [
+            'user_id' => $user->id,
+            'title' => $params['title'] ?? null,
+            'tags' => $params['tags'] ?? [],
+            'project' => $params['project'] ?? null,
+        ]);
+
+        return [
+            'id' => $thought->id,
+            'status' => $thought->source_metadata['status'] ?? 'queued',
+            'url' => $thought->source_metadata['url'] ?? '',
+        ];
     }
 
     /**
