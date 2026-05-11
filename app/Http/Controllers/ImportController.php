@@ -13,6 +13,8 @@ use App\Models\ImportBatchFile;
 use App\Models\Project;
 use App\Models\Thought;
 use App\Services\DemoMode;
+use App\Support\MarkdownDisplayHelper;
+use App\Support\SafeCommonMarkConverter;
 use App\Services\Import\FileImportService;
 use App\Services\Import\ImportStagingStore;
 use App\Services\Import\MicrositeImportDetector;
@@ -20,6 +22,7 @@ use App\Services\ThoughtCaptureService;
 use Illuminate\Bus\Batch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -289,5 +292,21 @@ class ImportController extends Controller
         return redirect()
             ->route('imports.show', $batch)
             ->with('success', 'Imported thoughts deleted.');
+    }
+
+    public function previewMarkdown(Request $request): JsonResponse
+    {
+        if (! config('features.file_upload', false)) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'content' => ['required', 'string', 'max:1048576'],
+        ]);
+
+        $cleaned = MarkdownDisplayHelper::stripPreambleForMarkdownDisplay($validated['content']);
+        $html = SafeCommonMarkConverter::toHtml($cleaned);
+
+        return response()->json(['html' => $html]);
     }
 }
