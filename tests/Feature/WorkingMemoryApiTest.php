@@ -412,6 +412,75 @@ class WorkingMemoryApiTest extends TestCase
     }
 
     #[Test]
+    public function test_upsert_working_memory_via_rest_persists_external_version(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $markdown = "## Current Focus\n\n- Ship the fix.\n\n## Active Priorities\n\n- Test staging.";
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/thoughts/working-memory/upsert', [
+                'scope_type' => 'project',
+                'scope_key' => 'dezeen',
+                'content' => $markdown,
+                'source_label' => 'elixirr-sync',
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('build_type', 'external');
+        $response->assertJsonPath('scope_type', 'project');
+        $response->assertJsonPath('scope_key', 'dezeen');
+    }
+
+    #[Test]
+    public function test_upsert_working_memory_rest_requires_auth(): void
+    {
+        $response = $this->postJson('/api/thoughts/working-memory/upsert', [
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+            'content' => "## Current Focus\n\n- Test.",
+        ]);
+
+        $response->assertUnauthorized();
+    }
+
+    #[Test]
+    public function test_upsert_working_memory_rest_validates_content(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/thoughts/working-memory/upsert', [
+                'scope_type' => 'project',
+                'scope_key' => 'dezeen',
+            ]);
+
+        $response->assertUnprocessable();
+    }
+
+    #[Test]
     public function test_working_memory_legacy_lists_include_derived_urls_for_heuristic_build(): void
     {
         config([

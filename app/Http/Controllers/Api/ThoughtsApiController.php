@@ -8,6 +8,7 @@ use App\Services\OpenRouterService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
+use App\Services\WorkingMemory\WorkingMemoryUpsertService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -135,6 +136,52 @@ class ThoughtsApiController extends Controller
         }
 
         return response()->json($payload);
+    }
+
+    /**
+     * POST /api/thoughts/working-memory/upsert — Upsert external working memory.
+     */
+    public function upsertWorkingMemory(Request $request): JsonResponse
+    {
+        $input = $request->only(['scope_type', 'scope_key', 'content', 'source_label']);
+        foreach (['scope_type', 'scope_key', 'content', 'source_label'] as $key) {
+            if (isset($input[$key]) && is_string($input[$key])) {
+                $input[$key] = trim($input[$key]);
+            }
+        }
+
+        $v = Validator::make($input, [
+            'scope_type' => 'required|string|in:global,project,insights,tag',
+            'scope_key' => 'required|string|max:191',
+            'content' => 'required|string|min:1',
+            'source_label' => 'nullable|string|max:191',
+        ]);
+        if ($v->fails()) {
+            return response()->json(['error' => 'validation_error', 'message' => $v->errors()->first()], 422);
+        }
+
+        /** @var array{scope_type: string, scope_key: string, content: string, source_label: ?string} $validated */
+        $validated = $v->validated();
+
+        try {
+            $version = app(WorkingMemoryUpsertService::class)->upsert(
+                (int) auth()->id(),
+                $validated['scope_type'],
+                $validated['scope_key'],
+                $validated['content'],
+                $validated['source_label'] ?? null,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => 'validation_error', 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'build_type' => $version->build_type,
+            'version_id' => (string) $version->id,
+            'scope_type' => $version->workingMemory->scope_type,
+            'scope_key' => $version->workingMemory->scope_key,
+            'freshness_state' => $version->workingMemory->freshness_state,
+        ]);
     }
 
     /**
