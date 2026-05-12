@@ -597,6 +597,33 @@ class McpController extends Controller
                     ],
                 ],
             ],
+            [
+                'name' => 'upsert_working_memory',
+                'description' => 'Persist externally-authored working memory markdown as the canonical online working memory for a scope. The markdown should contain ## headings for the standard sections: Current Focus, Active Priorities, Recent Changes, Open Questions, Risks / Blockers, Next Actions, Latest Signals, Source Notes.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'scope_type' => [
+                            'type' => 'string',
+                            'description' => 'Scope type.',
+                            'enum' => ['global', 'project', 'insights', 'tag'],
+                        ],
+                        'scope_key' => [
+                            'type' => 'string',
+                            'description' => 'Scope identifier (e.g. "dezeen" for project scope, "global" for global scope).',
+                        ],
+                        'content' => [
+                            'type' => 'string',
+                            'description' => 'Full working memory markdown content with ## section headings.',
+                        ],
+                        'source_label' => [
+                            'type' => 'string',
+                            'description' => 'Optional origin identifier (e.g. "elixirr-sync").',
+                        ],
+                    ],
+                    'required' => ['scope_type', 'scope_key', 'content'],
+                ],
+            ],
         ];
         if (config('services.jira.enabled', true)) {
             $tools[] = [
