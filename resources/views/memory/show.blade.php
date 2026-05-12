@@ -13,7 +13,7 @@
     $tagRefreshScopeKey = $tagRefreshScopeKey ?? '';
     $refreshAction = $isTag
         ? \Illuminate\Support\Facades\URL::signedRoute('working-memory.refresh.tag', ['tag' => $tagRefreshScopeKey])
-        : ($isProject
+        : ($isProject && ! empty($project)
             ? route('working-memory.refresh.project', $project)
             : route('working-memory.refresh.global'));
     $freshness = $freshness_state ?? 'stale';
