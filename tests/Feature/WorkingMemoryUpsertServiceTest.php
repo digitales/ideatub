@@ -173,6 +173,26 @@ MD;
     }
 
     #[Test]
+    public function it_returns_external_version_as_canonical_via_forScope(): void
+    {
+        $user = User::factory()->create();
+        $service = app(WorkingMemoryUpsertService::class);
+
+        $markdown = "## Current Focus\n\n- Ship the fix.\n\n## Active Priorities\n\n- Test staging.\n\n## Recent Changes\n\n- Upgrade scheduled.\n\n## Open Questions\n\n- When is the key available?\n\n## Risks / Blockers\n\n- Blocked on API key.\n\n## Next Actions\n\n- Run staging tests.\n\n## Latest Signals\n\n- Check-in 2026-05-08.\n\n## Source Notes\n\n- Reviewed context.";
+
+        $service->upsert($user->id, 'project', 'dezeen', $markdown);
+
+        $assembler = app(\App\Services\WorkingMemory\WorkingMemoryAssembler::class);
+        $payload = $assembler->forScope($user->id, 'project', 'dezeen');
+
+        $this->assertEquals('project', $payload['scope_type']);
+        $this->assertEquals('dezeen', $payload['scope_key']);
+        $this->assertEquals('external', $payload['baseline_build_type']);
+        $this->assertStringContainsString('Ship the fix', $payload['summary_markdown']);
+        $this->assertArrayHasKey('Current Focus', $payload['structured_sections']);
+    }
+
+    #[Test]
     public function it_rejects_empty_content_with_exception(): void
     {
         $user = User::factory()->create();
