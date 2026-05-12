@@ -392,8 +392,8 @@ class WorkingMemoryAssembler
      */
     private function payloadFromPersistedMemory(WorkingMemory $memory): array
     {
-        $latestConsolidated = $memory->versions()
-            ->where('build_type', 'consolidated')
+        $latestAuthoritative = $memory->versions()
+            ->whereIn('build_type', ['consolidated', 'external'])
             ->orderByDesc('created_at')
             ->first();
 
@@ -402,7 +402,7 @@ class WorkingMemoryAssembler
             ->orderByDesc('created_at')
             ->first();
 
-        $canonical = $this->resolveCanonicalVersion($memory, $latestConsolidated);
+        $canonical = $this->resolveCanonicalVersion($memory, $latestAuthoritative);
 
         return [
             'scope_type' => $memory->scope_type,
@@ -426,15 +426,15 @@ class WorkingMemoryAssembler
             'last_refreshed_at' => $memory->last_refreshed_at?->toIso8601String(),
             'effective_consolidation_window_days' => $this->consolidationWindowResolver->effectiveDaysForUserId((int) $memory->user_id),
             'baseline_build_type' => (string) $canonical->build_type,
-            'overlay_deltas' => $this->buildOverlayDeltas($latestIncremental, $latestConsolidated),
+            'overlay_deltas' => $this->buildOverlayDeltas($latestIncremental, $latestAuthoritative),
             'input_count' => $canonical->inputs()->count(),
         ];
     }
 
-    private function resolveCanonicalVersion(WorkingMemory $memory, ?WorkingMemoryVersion $latestConsolidated): WorkingMemoryVersion
+    private function resolveCanonicalVersion(WorkingMemory $memory, ?WorkingMemoryVersion $latestAuthoritative): WorkingMemoryVersion
     {
-        if ($latestConsolidated !== null) {
-            return $latestConsolidated;
+        if ($latestAuthoritative !== null) {
+            return $latestAuthoritative;
         }
 
         $latest = $memory->latestVersion;
