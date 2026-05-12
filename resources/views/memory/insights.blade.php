@@ -7,7 +7,7 @@
     $structuredSections = is_array($payload['structured_sections'] ?? null) ? $payload['structured_sections'] : [];
     $authoringStatus = $payload['authoring_status'] ?? null;
     $renderStructuredSections = $structuredSections !== []
-        && ($authoringStatus === null || $authoringStatus === 'validated');
+        && ($authoringStatus === null || $authoringStatus === 'validated' || $authoringStatus === 'external');
     $references = is_array($payload['references'] ?? null) ? $payload['references'] : [];
     $isSafeReferenceUrl = static function (string $url): bool {
         if ($url === '') {
