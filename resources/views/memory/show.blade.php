@@ -26,7 +26,7 @@
     $structuredSections = is_array($structured_sections ?? null) ? $structured_sections : [];
     $authoringStatus = $authoring_status ?? null;
     $renderStructuredSections = $structuredSections !== []
-        && ($authoringStatus === null || $authoringStatus === 'validated');
+        && ($authoringStatus === null || $authoringStatus === 'validated' || $authoringStatus === 'external');
     $references = is_array($references ?? null) ? $references : [];
     $isSafeReferenceUrl = static function (string $url): bool {
         if ($url === '') {
