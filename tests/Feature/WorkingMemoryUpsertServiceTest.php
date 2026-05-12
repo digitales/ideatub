@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\UserMcpKey;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
 use App\Services\WorkingMemory\WorkingMemoryUpsertService;
@@ -206,5 +207,84 @@ MD;
             scopeKey: 'global',
             markdown: '',
         );
+    }
+
+    #[Test]
+    public function it_returns_upserted_memory_via_get_working_memory_mcp(): void
+    {
+        $user = User::factory()->create();
+        $keyValue = 'ideatub_'.str_repeat('u', 32);
+        UserMcpKey::query()->create([
+            'user_id' => $user->id,
+            'key_hash' => UserMcpKey::hashKey($keyValue),
+        ]);
+
+        $markdown = <<<'MD'
+        ## Current Focus
+
+        - Deliver the comments-page release.
+
+        ## Active Priorities
+
+        - Test Evessio plugin in staging.
+
+        ## Recent Changes
+
+        - WordPress upgrade scheduled for 2026-05-13.
+
+        ## Open Questions
+
+        - When will the API key be available?
+
+        ## Risks / Blockers
+
+        - Evessio blocked on API key access.
+
+        ## Next Actions
+
+        - Get the API key and run staging tests.
+
+        ## Latest Signals
+
+        - Weekly check-in confirmed comments service restored.
+
+        ## Source Notes
+
+        - Reviewed weekly check-in 2026-05-08.
+        MD;
+
+        $upsertResponse = $this->postJson('/api/mcp', [
+            'jsonrpc' => '2.0',
+            'method' => 'upsert_working_memory',
+            'params' => [
+                'scope_type' => 'project',
+                'scope_key' => 'dezeen',
+                'content' => trim($markdown),
+                'source_label' => 'elixirr-sync',
+            ],
+            'id' => 1,
+        ], ['x-ideatub-key' => $keyValue]);
+        $upsertResponse->assertOk();
+        $this->assertNull($upsertResponse->json('error'));
+
+        $readResponse = $this->postJson('/api/mcp', [
+            'jsonrpc' => '2.0',
+            'method' => 'get_working_memory',
+            'params' => [
+                'scope_type' => 'project',
+                'scope_key' => 'dezeen',
+            ],
+            'id' => 2,
+        ], ['x-ideatub-key' => $keyValue]);
+        $readResponse->assertOk();
+
+        $result = $readResponse->json('result');
+
+        $this->assertStringContainsString('Deliver the comments-page release', $result['summary_markdown'] ?? '');
+        $this->assertEquals('external', $result['baseline_build_type'] ?? '');
+        $this->assertEquals('project', $result['scope_type']);
+        $this->assertEquals('dezeen', $result['scope_key']);
+        $this->assertArrayHasKey('Current Focus', $result['structured_sections'] ?? []);
+        $this->assertEquals('fresh', $result['freshness_state']);
     }
 }
