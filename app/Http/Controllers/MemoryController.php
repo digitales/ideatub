@@ -46,6 +46,31 @@ class MemoryController extends Controller
         ]));
     }
 
+    public function showProjectScope(Request $request, string $scopeKey): View
+    {
+        $normalizedKey = Str::of($scopeKey)->trim()->lower()->toString();
+        if ($normalizedKey === '') {
+            abort(404);
+        }
+
+        $payload = $this->workingMemoryAssembler->forScope(
+            (int) $request->user()->id,
+            'project',
+            $normalizedKey
+        );
+
+        $title = str_contains($normalizedKey, '/')
+            ? collect(explode('/', $normalizedKey, 2))
+                ->map(fn (string $part): string => Str::of($part)->replace(['-', '_'], ' ')->squish()->title()->toString())
+                ->implode(' / ')
+            : Str::of($normalizedKey)->replace(['-', '_'], ' ')->squish()->title()->toString();
+
+        return view('memory.show', array_merge($payload, [
+            'scopeTitle' => $title,
+            'isProjectScope' => true,
+        ]));
+    }
+
     public function showTag(Request $request): View|RedirectResponse
     {
         $request->validate([

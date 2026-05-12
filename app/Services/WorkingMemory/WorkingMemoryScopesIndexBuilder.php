@@ -223,7 +223,7 @@ final class WorkingMemoryScopesIndexBuilder
         return match ($memory->scope_type) {
             'global' => 'Global',
             'insights' => 'Insights',
-            'project' => $project?->title ?? 'Unavailable project',
+            'project' => $project?->title ?? $this->readableProjectTitle($scopeKey),
             'tag' => ($tagCanonicalBySlug[$scopeKey] ?? null) ?? $this->readableTagTitle($scopeKey),
             default => $scopeKey,
         };
@@ -241,12 +241,29 @@ final class WorkingMemoryScopesIndexBuilder
             'insights' => route('memory.insights'),
             'project' => $project !== null
                 ? route('projects.memory.show', $project)
-                : route('projects.index'),
+                : route('memory.project-scope.show', ['scopeKey' => $scopeKey]),
             'tag' => route('memory.tag.show', [
                 'tag' => TagSlug::from(($tagCanonicalBySlug[$scopeKey] ?? null) ?? $scopeKey),
             ]),
             default => route('memory.show'),
         };
+    }
+
+    private function readableProjectTitle(string $scopeKey): string
+    {
+        if (str_contains($scopeKey, '/')) {
+            $parts = explode('/', $scopeKey, 2);
+
+            return Str::of($parts[0])->replace(['-', '_'], ' ')->squish()->title()->toString()
+                .' / '
+                .Str::of($parts[1])->replace(['-', '_'], ' ')->squish()->title()->toString();
+        }
+
+        return Str::of($scopeKey)
+            ->replace(['-', '_'], ' ')
+            ->squish()
+            ->title()
+            ->toString();
     }
 
     private function readableTagTitle(string $scopeKey): string

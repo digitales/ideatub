@@ -341,6 +341,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/memory/scopes', [MemoryScopesController::class, 'index'])->name('memory.scopes.index');
         Route::get('/memory', [MemoryController::class, 'show'])->name('memory.show');
         Route::get('/memory/tag', [MemoryController::class, 'showTag'])->name('memory.tag.show');
+        Route::get('/memory/project/{scopeKey}', [MemoryController::class, 'showProjectScope'])->where('scopeKey', '[a-z0-9._/-]+')->name('memory.project-scope.show');
         Route::get('/projects/{project}/memory', [MemoryController::class, 'showProject'])->name('projects.memory.show');
         Route::get(
             '/memory/{scopeType}/{scopeKey}/compactions/{versionId}',
