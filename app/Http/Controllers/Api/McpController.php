@@ -19,6 +19,7 @@ use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Services\Video\VideoCaptureService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
+use App\Services\WorkingMemory\WorkingMemoryUpsertService;
 use App\Support\BearerTokenExtractor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,6 +42,7 @@ class McpController extends Controller
         private McpSessionService $mcpSessions,
         private OAuthMcpJwtService $oauthJwt,
         private WorkingMemoryAssembler $workingMemoryAssembler,
+        private WorkingMemoryUpsertService $workingMemoryUpsertService,
     ) {}
 
     /**
@@ -117,6 +119,7 @@ class McpController extends Controller
             'capture_article',
             'get_working_memory',
             'get_compaction',
+            'upsert_working_memory',
         ];
         if (config('services.jira.enabled', true)) {
             $base[] = 'sync_jira';
@@ -808,6 +811,7 @@ class McpController extends Controller
             'capture_article' => $this->captureArticle($params),
             'get_working_memory' => $this->getWorkingMemory($params),
             'get_compaction' => $this->getCompaction($params),
+            'upsert_working_memory' => $this->upsertWorkingMemory($params),
             'sync_jira' => $this->syncJira($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
@@ -844,6 +848,51 @@ class McpController extends Controller
             $validated['scope_type'],
             $validated['scope_key']
         );
+    }
+
+    /**
+     * upsert_working_memory: Persist externally-authored working memory markdown for a scope.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    private function upsertWorkingMemory(array $params): array
+    {
+        $input = $params;
+        foreach (['scope_type', 'scope_key', 'content', 'source_label'] as $key) {
+            if (isset($input[$key]) && is_string($input[$key])) {
+                $input[$key] = trim($input[$key]);
+            }
+        }
+
+        $v = Validator::make($input, [
+            'scope_type' => 'required|string|in:global,project,insights,tag',
+            'scope_key' => 'required|string|max:191',
+            'content' => 'required|string|min:1',
+            'source_label' => 'nullable|string|max:191',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        /** @var array{scope_type: string, scope_key: string, content: string, source_label: ?string} $validated */
+        $validated = $v->validated();
+
+        $version = $this->workingMemoryUpsertService->upsert(
+            (int) auth()->id(),
+            $validated['scope_type'],
+            $validated['scope_key'],
+            $validated['content'],
+            $validated['source_label'] ?? null,
+        );
+
+        return [
+            'build_type' => $version->build_type,
+            'version_id' => (string) $version->id,
+            'scope_type' => $version->workingMemory->scope_type,
+            'scope_key' => $version->workingMemory->scope_key,
+            'freshness_state' => $version->workingMemory->freshness_state,
+        ];
     }
 
     /**
