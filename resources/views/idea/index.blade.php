@@ -58,21 +58,21 @@
         @endif
         @focus-capture.window="focusCapture()"
         class="ideatub-surface mb-3 p-4 transition focus-within:ring-memory-violet/30 dark:focus-within:ring-violet-400/40"
-        :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6 ideatub-focus-shell' : ''"
-        @click.self="focusOverlayOpen && (focusOverlayOpen = false)"
+        :class="focusOverlayOpen ? 'ideatub-focus-shell' : ''"
+        @click.self="focusOverlayOpen && closeFocusOverlay()"
     >
         {{-- Focus mode: full-screen white backdrop (click to close) --}}
         <div
             x-show="focusOverlayOpen"
             x-cloak
-            @click="focusOverlayOpen = false"
+            @click="closeFocusOverlay()"
             class="ideatub-focus-backdrop"
             aria-hidden="true"
         ></div>
 
         <div
-            class="max-w-[600px] w-full"
-            :class="focusOverlayOpen ? 'ideatub-focus-panel' : ''"
+            class="w-full"
+            :class="focusOverlayOpen ? 'ideatub-focus-panel' : 'max-w-[600px]'"
             :role="focusOverlayOpen ? 'dialog' : null"
             :aria-modal="focusOverlayOpen ? 'true' : null"
             :aria-label="focusOverlayOpen ? 'Capture thought' : null"
@@ -202,7 +202,7 @@
                         type="button"
                         x-show="focusOverlayOpen"
                         x-cloak
-                        @click="focusOverlayOpen = false"
+                        @click="closeFocusOverlay()"
                         class="text-xs font-medium text-slate-brand hover:text-deep-indigo"
                     >
                         Close

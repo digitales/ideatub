@@ -125,13 +125,24 @@ Alpine.data('captureBox', () => ({
     });
     this.$watch('noChunking', () => this.scheduleDraftSave());
     this._escapeHandler = (e) => {
-      if (e.key === 'Escape' && this.focusOverlayOpen) this.focusOverlayOpen = false;
+      if (e.key === 'Escape' && this.focusOverlayOpen) this.closeFocusOverlay();
     };
     document.addEventListener('keydown', this._escapeHandler);
   },
 
   destroy() {
     if (this._escapeHandler) document.removeEventListener('keydown', this._escapeHandler);
+    if (this.focusOverlayOpen) document.body.style.overflow = '';
+  },
+
+  closeFocusOverlay() {
+    if (!this.focusOverlayOpen) return;
+    this.focusOverlayOpen = false;
+    document.body.style.overflow = '';
+    this.$nextTick(() => {
+      const btn = this.$refs.focusButton;
+      if (btn?.focus) btn.focus();
+    });
   },
 
   focusCapture() {
@@ -273,13 +284,13 @@ Alpine.data('captureBox', () => ({
   },
 
   toggleFocus() {
-    this.focusOverlayOpen = !this.focusOverlayOpen;
     if (this.focusOverlayOpen) {
-      this.$nextTick(() => this.focusCapture());
-    } else {
-      const btn = this.$refs.focusButton;
-      if (btn && btn.focus) btn.focus();
+      this.closeFocusOverlay();
+      return;
     }
+    this.focusOverlayOpen = true;
+    document.body.style.overflow = 'hidden';
+    this.$nextTick(() => this.focusCapture());
   },
 
   async submitCapture() {

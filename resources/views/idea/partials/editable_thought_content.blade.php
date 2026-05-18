@@ -47,7 +47,7 @@
         <div
             x-show="editing"
             x-on:keydown.escape.stop.prevent="handleEditEscape()"
-            :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6 ideatub-focus-shell' : 'mb-2'"
+            :class="focusOverlayOpen ? 'ideatub-focus-shell' : 'mb-2'"
         >
             <div
                 x-show="focusOverlayOpen"
@@ -119,7 +119,7 @@
         </template>
 
         <template x-if="editing">
-            <div x-on:keydown.escape.stop.prevent="handleEditEscape()" :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6 ideatub-focus-shell' : 'mb-2'">
+            <div x-on:keydown.escape.stop.prevent="handleEditEscape()" :class="focusOverlayOpen ? 'ideatub-focus-shell' : 'mb-2'">
                 <div
                     x-show="focusOverlayOpen"
                     x-cloak
