@@ -17,16 +17,16 @@
                 <h1 class="text-3xl font-semibold tracking-tight text-deep-indigo">Projects</h1>
                 <p class="mt-1.5 text-sm text-slate-brand max-w-[48ch]">Group ideas, notes, and plans by client or initiative.</p>
             </div>
-            <a href="{{ route('projects.create') }}" class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-memory-violet px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-memory-violet/90">
+            <a href="{{ route('projects.create') }}" class="ideatub-btn-primary shrink-0 gap-2">
                 New project
             </a>
         </div>
     </header>
 
     @if ($projects->isEmpty())
-        <div class="rounded-2xl bg-white/70 px-6 py-12 text-center ring-1 ring-deep-indigo/[0.06]">
+        <div class="ideatub-surface-muted px-6 py-12 text-center">
             <p class="text-sm text-slate-brand/70 max-w-sm mx-auto">No projects yet. Create one to group ideas, notes, and plans.</p>
-            <a href="{{ route('projects.create') }}" class="mt-5 inline-flex items-center gap-2 rounded-xl bg-memory-violet px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-memory-violet/90">
+            <a href="{{ route('projects.create') }}" class="ideatub-btn-primary mt-5 gap-2">
                 New project
             </a>
         </div>
@@ -34,7 +34,7 @@
         <ul class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" role="list">
             @foreach ($projects as $project)
                 <li class="min-w-0">
-                    <a href="{{ route('projects.show', $project) }}" class="group flex h-full flex-col rounded-2xl bg-white p-5 ring-1 ring-deep-indigo/[0.06] shadow-[0_1px_3px_rgba(30,37,71,0.04)] transition hover:ring-memory-violet/25 hover:shadow-[0_10px_32px_rgba(109,106,247,0.1)]">
+                    <a href="{{ route('projects.show', $project) }}" class="ideatub-surface group flex h-full flex-col p-5 transition hover:ring-memory-violet/25 dark:hover:ring-violet-400/30">
                         <div class="flex items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-memory-violet/10 text-memory-violet" aria-hidden="true">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">

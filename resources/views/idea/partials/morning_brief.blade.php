@@ -13,7 +13,7 @@
                     @if ($card->draftId !== null)
                         <button
                             type="button"
-                            class="group flex w-full items-start gap-3 text-left rounded-2xl bg-white px-4 py-4 ring-1 ring-deep-indigo/[0.06] shadow-[0_1px_3px_rgba(30,37,71,0.04)] transition hover:ring-memory-violet/25 hover:shadow-[0_10px_32px_rgba(109,106,247,0.1)]"
+                            class="ideatub-surface group flex w-full items-start gap-3 px-4 py-4 text-left transition hover:ring-memory-violet/25 dark:hover:ring-violet-400/30"
                             @click="$dispatch('ideatub-load-draft', { id: '{{ $card->draftId }}' })"
                         >
                             @include('idea.partials.morning_brief_card_inner', ['card' => $card])
@@ -21,7 +21,7 @@
                     @else
                         <a
                             href="{{ $card->href }}"
-                            class="group flex items-start gap-3 rounded-2xl bg-white px-4 py-4 ring-1 ring-deep-indigo/[0.06] shadow-[0_1px_3px_rgba(30,37,71,0.04)] transition hover:ring-memory-violet/25 hover:shadow-[0_10px_32px_rgba(109,106,247,0.1)]"
+                            class="ideatub-surface group flex items-start gap-3 px-4 py-4 transition hover:ring-memory-violet/25 dark:hover:ring-violet-400/30"
                         >
                             @include('idea.partials.morning_brief_card_inner', ['card' => $card])
                         </a>

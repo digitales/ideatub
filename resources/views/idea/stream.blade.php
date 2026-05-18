@@ -52,7 +52,7 @@
             @endif
 
             @if($thoughts->isEmpty())
-                <div class="rounded-2xl bg-white/70 px-6 py-10 text-center text-sm text-slate-brand/60 ring-1 ring-deep-indigo/[0.06]">
+                <div class="ideatub-surface-muted px-6 py-10 text-center text-sm text-slate-brand/60">
                     @if($__collectionKey === 'jira')
                         No Jira activity yet. @if(config('services.jira.enabled', true))<a href="{{ route('settings.jira.index') }}" class="text-memory-violet hover:underline">Sync from Jira settings</a>.@endif
                     @elseif($__collectionKey === 'email')
@@ -72,17 +72,17 @@
                 </div>
             @else
                 <div x-data="streamLayout('{{ $streamLayout }}')" x-init="applyLayout()">
-                    <div class="flex items-center justify-between gap-3 mb-4 rounded-2xl bg-white/55 px-3 py-2 ring-1 ring-deep-indigo/[0.06] backdrop-blur-sm">
+                    <div class="ideatub-surface-frosted mb-4 flex items-center justify-between gap-3 px-3 py-2">
                         <p class="text-xs text-slate-brand/55 tabular-nums" id="stream-count-line">
                             Showing <span id="stream-showing-count" class="font-medium text-deep-indigo/80">{{$thoughts->count()}}</span> of <span id="stream-total-count" class="font-medium text-deep-indigo/80">{{$thoughts->total()}}</span> thoughts
                         </p>
-                        <div class="flex items-center gap-0.5 rounded-xl bg-white/80 p-0.5 ring-1 ring-deep-indigo/[0.05]" role="group" aria-label="Layout">
+                        <div class="ideatub-segment-track gap-0.5 p-0.5" role="group" aria-label="Layout">
                             <button
                                 type="button"
                                 data-testid="layout-toggle-list"
                                 @click="setLayout('list')"
-                                :class="layout === 'list' ? 'bg-white text-memory-violet shadow-sm ring-1 ring-deep-indigo/5' : 'text-slate-brand/45 hover:text-slate-brand'"
-                                class="p-1.5 rounded-lg transition"
+                                :class="layout === 'list' ? 'ideatub-segment-tab-active' : 'ideatub-segment-tab'"
+                                class="p-1.5"
                                 aria-label="List layout"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -93,8 +93,8 @@
                                 type="button"
                                 data-testid="layout-toggle-grid"
                                 @click="setLayout('grid')"
-                                :class="layout === 'grid' ? 'bg-white text-memory-violet shadow-sm ring-1 ring-deep-indigo/5' : 'text-slate-brand/45 hover:text-slate-brand'"
-                                class="p-1.5 rounded-lg transition"
+                                :class="layout === 'grid' ? 'ideatub-segment-tab-active' : 'ideatub-segment-tab'"
+                                class="p-1.5"
                                 aria-label="Grid layout"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">

@@ -17,6 +17,9 @@ class UserPreference extends Model
 
     public const KEY_WORKING_MEMORY_FORCED_TAGS = 'working_memory_forced_tags';
 
+    /** UI appearance: light, dark, or system. Stored as JSON string. */
+    public const KEY_APPEARANCE = 'appearance';
+
     /**
      * The attributes that are mass assignable.
      *

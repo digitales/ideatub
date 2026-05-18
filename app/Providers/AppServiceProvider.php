@@ -13,6 +13,7 @@ use App\Observers\CommentObserver;
 use App\Observers\ThoughtObserver;
 use App\Policies\ImportPolicy;
 use App\Policies\LearningProjectPolicy;
+use App\Services\AppearanceService;
 use App\Services\DemoMode;
 use App\Services\Evernote\EvernoteSdkApiGateway;
 use GuzzleHttp\Client;
@@ -136,5 +137,18 @@ class AppServiceProvider extends ServiceProvider
         View::composer('idea.stream', function ($view): void {
             $view->with('streamLayout', session('stream_layout', 'list'));
         });
+
+        View::composer(
+            ['layouts.idea', 'layouts.auth', 'layouts.minimal'],
+            function ($view): void {
+                $appearanceService = app(AppearanceService::class);
+                $appearance = auth()->check()
+                    ? $appearanceService->current(request()->session())
+                    : $appearanceService->default();
+
+                $view->with('appearance', $appearance);
+                $view->with('appearanceEffectiveDark', $appearanceService->isEffectivelyDark($appearance));
+            }
+        );
     }
 }

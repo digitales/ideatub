@@ -22,3 +22,243 @@
   margin-bottom: 0;
   line-height: 1.5;
 }
+
+/* -------------------------------------------------------------------------- */
+/* IdeaTub design tokens (light defaults; dark via prefers-color-scheme)       */
+/* -------------------------------------------------------------------------- */
+
+@layer components {
+  .ideatub-shell {
+    @apply min-h-screen bg-gradient-to-br from-[#eef2ff] via-[#f3f0ff] to-[#f0f5ff] text-deep-indigo;
+    padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+  }
+
+  .ideatub-nav {
+    @apply sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-memory-violet/10 bg-[rgba(238,242,255,0.82)] px-6 py-4 backdrop-blur-md md:px-8;
+  }
+
+  .ideatub-nav-search-overlay {
+    @apply absolute inset-x-0 top-0 bottom-0 z-10 flex items-center bg-[rgba(238,242,255,0.95)] px-6 backdrop-blur-md md:px-8;
+  }
+
+  .ideatub-nav-link {
+    @apply rounded-lg px-3 py-1.5 text-[12.5px] font-medium text-slate-brand transition-colors hover:bg-memory-violet/10 hover:text-memory-violet;
+  }
+
+  .ideatub-search-pill {
+    @apply flex items-center gap-1.5 rounded-full border border-neural-teal/20 bg-white/70 px-3.5 py-1.5 text-xs text-slate-brand transition-all hover:border-neural-teal/40 hover:bg-white;
+  }
+
+  .ideatub-dropdown {
+    @apply absolute right-0 z-30 mt-2 w-48 rounded-xl border border-memory-violet/10 bg-white py-1 shadow-lg;
+  }
+
+  .ideatub-mobile-nav-panel {
+    @apply absolute right-0 z-40 mt-2 max-h-[min(80vh,32rem)] w-[min(100vw-2rem,20rem)] overflow-y-auto rounded-xl border border-memory-violet/10 bg-white py-2 shadow-lg;
+  }
+
+  .ideatub-surface {
+    @apply rounded-2xl bg-white shadow-[0_1px_3px_rgba(30,37,71,0.04)] ring-1 ring-deep-indigo/[0.06];
+  }
+
+  .ideatub-surface-muted {
+    @apply rounded-2xl bg-white/70 ring-1 ring-deep-indigo/[0.06];
+  }
+
+  .ideatub-surface-frosted {
+    @apply rounded-2xl bg-white/55 ring-1 ring-deep-indigo/[0.06] backdrop-blur-sm;
+  }
+
+  .ideatub-input {
+    @apply rounded-md border border-slate-200/80 bg-white px-3 py-2 text-sm text-deep-indigo outline-none placeholder:text-slate-brand/50 focus:border-memory-violet/50 focus:ring-2 focus:ring-memory-violet/30;
+  }
+
+  .ideatub-btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-memory-violet px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-memory-violet/90;
+  }
+
+  .ideatub-modal-backdrop {
+    @apply fixed inset-0 z-40 flex items-center justify-center bg-deep-indigo/40 p-4 backdrop-blur-sm;
+  }
+
+  .ideatub-modal-panel {
+    @apply w-full max-w-md rounded-2xl border border-memory-violet/25 bg-white p-6 shadow-2xl;
+  }
+
+  .ideatub-segment-track {
+    @apply inline-flex items-center gap-0.5 rounded-2xl bg-white/55 p-1 ring-1 ring-deep-indigo/[0.06] backdrop-blur-sm;
+  }
+
+  .ideatub-segment-tab {
+    @apply inline-flex shrink-0 items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-brand/75 transition hover:bg-white/50 hover:text-deep-indigo;
+  }
+
+  .ideatub-segment-tab-active {
+    @apply bg-white text-deep-indigo shadow-sm ring-1 ring-deep-indigo/5;
+  }
+
+  .ideatub-gradient-btn {
+    @apply text-white transition-opacity hover:opacity-90;
+    background: linear-gradient(135deg, #6d6af7, #2a8c8c);
+  }
+
+  .ideatub-avatar {
+    @apply relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white;
+    background: linear-gradient(135deg, #6d6af7, #2a8c8c);
+  }
+
+  .ideatub-auth-card {
+    @apply w-full max-w-sm rounded-2xl border border-memory-violet/20 bg-white/80 p-8 shadow-[0_4px_24px_rgba(109,106,247,0.08)] backdrop-blur;
+  }
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+.dark .ideatub-app {
+  color-scheme: dark;
+}
+
+.dark .ideatub-shell {
+    @apply bg-gray-950 bg-none text-gray-100;
+  }
+
+.dark .ideatub-nav {
+    @apply border-white/10 bg-gray-950/90;
+  }
+
+.dark .ideatub-nav-search-overlay {
+    @apply bg-gray-950/95;
+  }
+
+.dark .ideatub-nav-link {
+    @apply text-gray-400 hover:bg-white/5 hover:text-gray-100;
+  }
+
+.dark .ideatub-search-pill {
+    @apply border-white/15 bg-gray-900/80 text-gray-300 hover:border-white/25 hover:bg-gray-900;
+  }
+
+.dark .ideatub-dropdown,
+.dark .ideatub-mobile-nav-panel {
+    @apply border-white/10 bg-gray-900 shadow-none;
+  }
+
+.dark .ideatub-surface,
+.dark .ideatub-surface-muted,
+.dark .ideatub-surface-frosted {
+    @apply bg-gray-900 shadow-none ring-white/10;
+  }
+
+.dark .ideatub-input {
+    @apply border-white/10 bg-gray-900 text-gray-100 placeholder:text-gray-500 focus:border-memory-violet/50 focus:ring-memory-violet/30;
+  }
+
+.dark .ideatub-btn-primary {
+    @apply shadow-none;
+  }
+
+.dark .ideatub-modal-backdrop {
+    @apply bg-black/70;
+  }
+
+.dark .ideatub-modal-panel {
+    @apply border-white/10 bg-gray-900 shadow-none;
+  }
+
+.dark .ideatub-segment-track {
+    @apply bg-gray-900/80 ring-white/10;
+  }
+
+.dark .ideatub-segment-tab {
+    @apply text-gray-500 hover:bg-white/5 hover:text-gray-200;
+  }
+
+.dark .ideatub-segment-tab-active {
+    @apply bg-gray-800 text-gray-100 ring-white/10 shadow-none;
+  }
+
+.dark .ideatub-auth-card {
+    @apply border-white/10 bg-gray-900/90 shadow-none;
+  }
+
+  /* Broad coverage for existing Tailwind utility markup inside the app shell */
+.dark .ideatub-app .text-deep-indigo {
+    @apply text-gray-100;
+  }
+
+.dark .ideatub-app .text-slate-brand {
+    @apply text-gray-400;
+  }
+
+.dark .ideatub-app .text-slate-brand\/30 {
+    color: rgb(107 114 128 / 0.45);
+  }
+
+.dark .ideatub-app .text-slate-brand\/40,
+.dark .ideatub-app .text-slate-brand\/45,
+.dark .ideatub-app .text-slate-brand\/50,
+.dark .ideatub-app .text-slate-brand\/55 {
+    color: rgb(107 114 128 / 0.55);
+  }
+
+.dark .ideatub-app .text-slate-brand\/60,
+.dark .ideatub-app .text-slate-brand\/65,
+.dark .ideatub-app .text-slate-brand\/70 {
+    color: rgb(156 163 175 / 0.85);
+  }
+
+.dark .ideatub-app .text-slate-brand\/80 {
+    @apply text-gray-400;
+  }
+
+.dark .ideatub-app .text-memory-violet {
+    @apply text-violet-300;
+  }
+
+.dark .ideatub-app .text-memory-violet\/60,
+.dark .ideatub-app .text-memory-violet\/70,
+.dark .ideatub-app .text-memory-violet\/80 {
+    @apply text-violet-300/80;
+  }
+
+.dark .ideatub-app [class*='border-memory-violet'] {
+    @apply border-white/10;
+  }
+
+.dark .ideatub-app [class*='divide-memory-violet'] {
+    @apply divide-white/10;
+  }
+
+.dark .ideatub-app main [class*='rounded-2xl'][class*='bg-white'],
+.dark .ideatub-app main [class*='rounded-xl'][class*='bg-white'] {
+    @apply bg-gray-900;
+    box-shadow: none !important;
+    --tw-ring-color: rgb(255 255 255 / 0.1);
+  }
+
+.dark .ideatub-app main [class*='rounded-2xl'][class*='bg-white'][class*='shadow-'],
+.dark .ideatub-app main [class*='rounded-xl'][class*='bg-white'][class*='shadow-'] {
+    box-shadow: none !important;
+  }
+
+.dark .ideatub-app .prose {
+    @apply prose-invert;
+  }
+
+.dark .ideatub-app .bg-amber-50\/95 {
+    @apply border-amber-500/30 bg-amber-950/40 text-amber-100;
+  }
+
+.dark .ideatub-app .bg-neural-teal\/10 {
+    @apply border-neural-teal/30 bg-teal-950/40 text-teal-200;
+  }
+
+.dark .ideatub-app .bg-red-50 {
+    @apply border-red-500/30 bg-red-950/40 text-red-200;
+  }
+
+.dark .ideatub-app .bg-rose-500\/\[0\.06\] {
+    @apply border-rose-500/25 bg-rose-950/30;
+  }

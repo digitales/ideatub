@@ -1,4 +1,5 @@
 import './bootstrap';
+import './appearance';
 import { shouldShowReadMoreToggle } from './lib/thoughtPreview.js';
 import Alpine from 'alpinejs';
 import Pusher from 'pusher-js';

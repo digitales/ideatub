@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAppearanceInSession;
 use App\Http\Middleware\AuthenticateOAuthBearer;
 use App\Http\Middleware\CheckOperationLimit;
 use App\Http\Middleware\EnsureWorkingMemoryInsightsEnabled;
@@ -29,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->web(append: [
+            EnsureAppearanceInSession::class,
             CheckOperationLimit::class,
             SecurityHeaders::class,
         ]);

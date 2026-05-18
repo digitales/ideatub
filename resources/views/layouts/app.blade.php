@@ -24,10 +24,10 @@
         {{-- Vite manifest missing: run "npm run build" (or "npm run dev") --}}
     @endif
 </head>
-<body class="font-sans antialiased bg-gray-50">
+<body class="font-sans antialiased bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
     <div class="min-h-screen flex flex-col">
         <!-- Navigation -->
-        <nav class="bg-white shadow-sm border-b border-gray-200">
+        <nav class="border-b border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-900 dark:shadow-none">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex">
@@ -72,7 +72,7 @@
         </main>
 
         <!-- Footer -->
-        <footer class="bg-white border-t border-gray-200 mt-auto">
+        <footer class="mt-auto border-t border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
             <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>

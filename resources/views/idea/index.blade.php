@@ -57,7 +57,7 @@
             data-import-batch-url="{{ route('imports.batch') }}"
         @endif
         @focus-capture.window="focusCapture()"
-        class="rounded-2xl bg-white p-4 mb-3 ring-1 ring-deep-indigo/[0.06] shadow-[0_1px_3px_rgba(30,37,71,0.04)] transition focus-within:ring-memory-violet/30 focus-within:shadow-[0_8px_32px_rgba(109,106,247,0.12)]"
+        class="ideatub-surface mb-3 p-4 transition focus-within:ring-memory-violet/30 dark:focus-within:ring-violet-400/40"
         :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6' : ''"
         @click.self="focusOverlayOpen && (focusOverlayOpen = false)"
     >

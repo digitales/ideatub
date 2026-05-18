@@ -13,6 +13,12 @@
         </div>
     @endif
 
+    <div class="ideatub-surface mb-6 p-6">
+        <h2 class="text-lg font-semibold text-deep-indigo mb-1">Appearance</h2>
+        <p class="text-sm text-slate-brand mb-4">System follows your device setting.</p>
+        <x-appearance-control :appearance="$appearance ?? 'system'" />
+    </div>
+
     <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-6">
         <h2 class="text-lg font-semibold text-deep-indigo mb-4">Account</h2>
 
