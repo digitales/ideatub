@@ -4,7 +4,7 @@
     $active = $active ?? 'all';
 
     $tabClass = fn (bool $isActive): string => $isActive
-        ? 'ideatub-segment-tab-active'
+        ? 'ideatub-segment-tab ideatub-segment-tab-active'
         : 'ideatub-segment-tab';
 @endphp
 <nav

@@ -53,7 +53,7 @@
                             Cancel
                         </button>
                     </div>
-                    <p class="text-[11px] text-slate-brand/50 mt-0.5">Escape to close · ⌘K to focus search</p>
+                    <p class="ideatub-nav-search-hint text-[11px] text-slate-brand/50 mt-0.5">Escape to close · ⌘K to focus search</p>
                 </div>
             </form>
 
@@ -100,9 +100,9 @@
             </div>
 
             {{-- Right: compact / overflow + search + avatar --}}
-            <div class="flex items-center gap-1 flex-shrink-0 ml-auto" :class="{ 'hidden': searching }">
+            <div class="flex min-w-0 items-center gap-1 flex-shrink-0 ml-auto" :class="{ 'hidden': searching }">
                 {{-- Small viewports: explicit overflow menu (avoids two-row wrapped nav) --}}
-                <div x-data="{ mobileNavOpen: false }" class="relative lg:hidden">
+                <div x-data="{ mobileNavOpen: false }" class="relative overflow-visible lg:hidden">
                     <button type="button" data-testid="mobile-nav-trigger" @click="mobileNavOpen = !mobileNavOpen" :aria-expanded="mobileNavOpen.toString()" aria-controls="mobile-nav-panel" class="inline-flex items-center justify-center rounded-lg border border-memory-violet/15 bg-white/60 px-2.5 py-1.5 text-slate-brand hover:bg-memory-violet/8 dark:border-white/10 dark:bg-gray-900/80 dark:text-gray-300 dark:hover:bg-white/5">
                         <span class="sr-only">Open navigation menu</span>
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -110,28 +110,28 @@
                         </svg>
                     </button>
                     <div id="mobile-nav-panel" data-testid="mobile-nav-panel" x-show="mobileNavOpen" x-transition x-cloak @click.away="mobileNavOpen = false" class="ideatub-mobile-nav-panel">
-                        <a href="{{route('idea.ideas')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                        <a href="{{route('idea.ideas')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                             Ideas
                         </a>
-                        <a href="{{route('idea.stream')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                        <a href="{{route('idea.stream')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                             Stream
                         </a>
-                        <a href="{{route('projects.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                        <a href="{{route('projects.index')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                             Projects
                         </a>
                         @if (config('features.working_memory_ui'))
-                            <a href="{{route('memory.show')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                            <a href="{{route('memory.show')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                                 Memory
                             </a>
-                            <a href="{{route('memory.scopes.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                            <a href="{{route('memory.scopes.index')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                                 All memories
                             </a>
                         @endif
                         <div class="border-t border-memory-violet/10 my-1"></div>
-                        <a href="{{route('help')}}" class="block px-4 py-2 text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false">
+                        <a href="{{route('help')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                             Help
                         </a>
-                        <button type="button" class="w-full px-4 py-2 text-left text-sm text-slate-brand hover:bg-memory-violet/5" @click="mobileNavOpen = false; $dispatch('ideatub-open-shortcuts')">
+                        <button type="button" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false; $dispatch('ideatub-open-shortcuts')">
                             Keyboard shortcuts
                         </button>
                     </div>
@@ -140,13 +140,13 @@
                 <div class="hidden sm:block w-px h-4 bg-memory-violet/20 mx-1"></div>
 
                 {{-- Search pill --}}
-                <button type="button" @click="searching = true" class="ideatub-search-pill">
+                <button type="button" @click="searching = true" class="ideatub-search-pill" aria-label="Find a memory">
                     <svg class="w-3 h-3 text-neural-teal" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                         <circle cx="11" cy="11" r="8" />
                         <path d="m21 21-4.35-4.35" />
                     </svg>
-                    Find a memory
-                    <span class="text-[10px] text-slate-brand/50">⌘K</span>
+                    <span class="ideatub-search-pill-label">Find a memory</span>
+                    <span class="ideatub-search-pill-kbd text-[10px] text-slate-brand/50">⌘K</span>
                 </button>
 
                 {{-- Avatar / logout --}}

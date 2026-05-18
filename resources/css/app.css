@@ -34,11 +34,24 @@
   }
 
   .ideatub-nav {
-    @apply sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-memory-violet/10 bg-[rgba(238,242,255,0.82)] px-6 py-4 backdrop-blur-md md:px-8;
+    @apply sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-memory-violet/10 bg-[rgba(238,242,255,0.82)] px-4 py-3 backdrop-blur-md sm:gap-3 sm:px-6 sm:py-4 md:px-8;
   }
 
   .ideatub-nav-search-overlay {
-    @apply absolute inset-x-0 top-0 bottom-0 z-10 flex items-center bg-[rgba(238,242,255,0.95)] px-6 backdrop-blur-md md:px-8;
+    @apply absolute inset-x-0 top-0 bottom-0 z-10 flex items-center bg-[rgba(238,242,255,0.95)] px-4 backdrop-blur-md sm:px-6 md:px-8;
+  }
+
+  @media (max-width: 1023px) {
+    .ideatub-nav-search-overlay {
+      @apply fixed inset-0 z-50 items-start justify-center px-4 pt-4;
+      padding-top: max(1rem, env(safe-area-inset-top, 0px));
+      padding-left: max(1rem, env(safe-area-inset-left, 0px));
+      padding-right: max(1rem, env(safe-area-inset-right, 0px));
+    }
+
+    .ideatub-nav-search-hint {
+      display: none;
+    }
   }
 
   .ideatub-nav-link {
@@ -46,7 +59,25 @@
   }
 
   .ideatub-search-pill {
-    @apply flex items-center gap-1.5 rounded-full border border-neural-teal/20 bg-white/70 px-3.5 py-1.5 text-xs text-slate-brand transition-all hover:border-neural-teal/40 hover:bg-white;
+    @apply flex min-w-0 max-w-[7.5rem] shrink items-center gap-1.5 rounded-full border border-neural-teal/20 bg-white/70 px-2.5 py-1.5 text-xs text-slate-brand transition-all hover:border-neural-teal/40 hover:bg-white sm:max-w-none sm:px-3.5;
+  }
+
+  .ideatub-search-pill-label {
+    @apply truncate;
+  }
+
+  @media (max-width: 639px) {
+    .ideatub-search-pill-label {
+      @apply sr-only;
+    }
+
+    .ideatub-search-pill {
+      @apply max-w-none px-2;
+    }
+  }
+
+  .ideatub-search-pill-kbd {
+    @apply hidden shrink-0 sm:inline;
   }
 
   .ideatub-dropdown {
@@ -55,6 +86,17 @@
 
   .ideatub-mobile-nav-panel {
     @apply absolute right-0 z-40 mt-2 max-h-[min(80vh,32rem)] w-[min(100vw-2rem,20rem)] overflow-y-auto rounded-xl border border-memory-violet/10 bg-white py-2 shadow-lg;
+  }
+
+  .ideatub-mobile-nav-link {
+    @apply block w-full px-4 py-2.5 text-left text-sm font-medium text-deep-indigo transition-colors hover:bg-memory-violet/5;
+  }
+
+  @media (max-width: 1023px) {
+    .ideatub-mobile-nav-panel {
+      @apply fixed left-4 right-4 z-50 mt-0 w-auto max-w-none;
+      top: calc(env(safe-area-inset-top, 0px) + 3.25rem);
+    }
   }
 
   .ideatub-surface {
@@ -89,12 +131,17 @@
     @apply inline-flex items-center gap-0.5 rounded-2xl bg-white/55 p-1 ring-1 ring-deep-indigo/[0.06] backdrop-blur-sm;
   }
 
+  .ideatub-segment-tab,
+  .ideatub-segment-tab-active {
+    @apply inline-flex shrink-0 items-center whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition;
+  }
+
   .ideatub-segment-tab {
-    @apply inline-flex shrink-0 items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-brand/75 transition hover:bg-white/50 hover:text-deep-indigo;
+    @apply text-slate-brand/75 hover:bg-white/50 hover:text-deep-indigo;
   }
 
   .ideatub-segment-tab-active {
-    @apply bg-white text-deep-indigo shadow-sm ring-1 ring-deep-indigo/5;
+    @apply bg-white text-deep-indigo shadow-[0_1px_2px_rgba(30,37,71,0.08)] ring-1 ring-deep-indigo/[0.08] hover:bg-white hover:text-deep-indigo;
   }
 
   .ideatub-gradient-btn {
@@ -161,6 +208,10 @@ html.dark {
     @apply border-white/10 bg-gray-900 shadow-none;
   }
 
+.dark .ideatub-mobile-nav-link {
+    @apply text-gray-100 hover:bg-white/10;
+  }
+
 .dark .ideatub-surface,
 .dark .ideatub-surface-muted,
 .dark .ideatub-surface-frosted {
@@ -192,7 +243,7 @@ html.dark {
   }
 
 .dark .ideatub-segment-tab-active {
-    @apply bg-gray-800 text-gray-100 ring-white/10 shadow-none;
+    @apply bg-gray-800 text-gray-100 shadow-[0_1px_2px_rgba(0,0,0,0.25)] ring-1 ring-white/10 hover:bg-gray-800 hover:text-gray-100;
   }
 
 .dark .ideatub-auth-card {
