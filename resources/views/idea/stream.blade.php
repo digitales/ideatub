@@ -10,16 +10,22 @@
 @section('title', $__collectionKey ? ThoughtTypeNavigation::documentTitle($__collectionKey) : ($tag ? 'Tag: ' . e($tag) . ' — IdeaTub' : 'Stream — IdeaTub'))
 
 @section('content')
-        <div data-stream-layout="{{ $streamLayout }}" class="mx-auto px-6 pt-16 pb-24 {{ $streamLayout === 'grid' ? 'max-w-[1400px]' : 'max-w-[600px]' }}">
-            <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-6">
-                @if($__collectionKey)
-                    {{ ThoughtTypeNavigation::collectionLabel($__collectionKey) }}
-                @elseif($tag)
-                    Tag: {{e($tag)}}
-                @else
-                    Your Stream
-                @endif
-            </h1>
+        @php
+            $__streamTitle = $__collectionKey
+                ? ThoughtTypeNavigation::collectionLabel($__collectionKey)
+                : ($tag ? 'Tag: '.e($tag) : 'Your stream');
+            $__streamSubtitle = $tag
+                ? 'Thoughts tagged for this topic.'
+                : ($__collectionKey
+                    ? 'Filtered view of your captured thoughts.'
+                    : 'Everything you have captured, newest first.');
+        @endphp
+        <div data-stream-layout="{{ $streamLayout }}" class="mx-auto px-6 pt-10 pb-20 {{ $streamLayout === 'grid' ? 'max-w-[1400px]' : 'max-w-2xl' }}">
+            @include('idea.partials.page_shell_header', [
+                'eyebrow' => $tag ? 'Tagged stream' : 'Stream',
+                'title' => $__streamTitle,
+                'subtitle' => $__streamSubtitle,
+            ])
 
             @if (! $tag)
                 @include('idea.partials.stream_type_nav', ['active' => $__collectionKey ?? 'all'])
@@ -46,7 +52,7 @@
             @endif
 
             @if($thoughts->isEmpty())
-                <div class="rounded-xl border border-memory-violet/10 bg-white/50 px-4 py-8 text-center text-sm text-slate-brand/50">
+                <div class="rounded-2xl bg-white/70 px-6 py-10 text-center text-sm text-slate-brand/60 ring-1 ring-deep-indigo/[0.06]">
                     @if($__collectionKey === 'jira')
                         No Jira activity yet. @if(config('services.jira.enabled', true))<a href="{{ route('settings.jira.index') }}" class="text-memory-violet hover:underline">Sync from Jira settings</a>.@endif
                     @elseif($__collectionKey === 'email')
@@ -66,17 +72,17 @@
                 </div>
             @else
                 <div x-data="streamLayout('{{ $streamLayout }}')" x-init="applyLayout()">
-                    <div class="flex items-center justify-between mb-2">
-                        <p class="text-[11px] text-slate-brand/40" id="stream-count-line">
-                            Showing <span id="stream-showing-count">{{$thoughts->count()}}</span> of <span id="stream-total-count">{{$thoughts->total()}}</span> thoughts
+                    <div class="flex items-center justify-between gap-3 mb-4 rounded-2xl bg-white/55 px-3 py-2 ring-1 ring-deep-indigo/[0.06] backdrop-blur-sm">
+                        <p class="text-xs text-slate-brand/55 tabular-nums" id="stream-count-line">
+                            Showing <span id="stream-showing-count" class="font-medium text-deep-indigo/80">{{$thoughts->count()}}</span> of <span id="stream-total-count" class="font-medium text-deep-indigo/80">{{$thoughts->total()}}</span> thoughts
                         </p>
-                        <div class="flex items-center gap-1">
+                        <div class="flex items-center gap-0.5 rounded-xl bg-white/80 p-0.5 ring-1 ring-deep-indigo/[0.05]" role="group" aria-label="Layout">
                             <button
                                 type="button"
                                 data-testid="layout-toggle-list"
                                 @click="setLayout('list')"
-                                :class="layout === 'list' ? 'text-memory-violet' : 'text-slate-brand/40 hover:text-slate-brand'"
-                                class="p-1 rounded transition-colors"
+                                :class="layout === 'list' ? 'bg-white text-memory-violet shadow-sm ring-1 ring-deep-indigo/5' : 'text-slate-brand/45 hover:text-slate-brand'"
+                                class="p-1.5 rounded-lg transition"
                                 aria-label="List layout"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -87,8 +93,8 @@
                                 type="button"
                                 data-testid="layout-toggle-grid"
                                 @click="setLayout('grid')"
-                                :class="layout === 'grid' ? 'text-memory-violet' : 'text-slate-brand/40 hover:text-slate-brand'"
-                                class="p-1 rounded transition-colors"
+                                :class="layout === 'grid' ? 'bg-white text-memory-violet shadow-sm ring-1 ring-deep-indigo/5' : 'text-slate-brand/45 hover:text-slate-brand'"
+                                class="p-1.5 rounded-lg transition"
                                 aria-label="Grid layout"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -101,7 +107,7 @@
                         </div>
                     </div>
                     <div id="stream-thoughts-list"
-                        :class="layout === 'grid' ? 'grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-3 items-start' : ''"
+                        :class="layout === 'grid' ? 'grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4 items-start' : ''"
                         data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
                         data-stream-since="{{ $streamSince }}">
                         @include('idea.stream_thoughts', ['cards' => $cards])
@@ -236,11 +242,11 @@
                             if (!container) return;
                             container.setAttribute('data-stream-layout', this.layout);
                             if (this.layout === 'grid') {
-                                container.classList.remove('max-w-[600px]');
+                                container.classList.remove('max-w-2xl');
                                 container.classList.add('max-w-[1400px]');
                             } else {
                                 container.classList.remove('max-w-[1400px]');
-                                container.classList.add('max-w-[600px]');
+                                container.classList.add('max-w-2xl');
                             }
                             this.$nextTick(function() { streamLayoutCheckOverflow(); });
                         },

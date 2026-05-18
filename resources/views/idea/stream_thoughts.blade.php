@@ -3,7 +3,7 @@
         data-thought-id="{{ $card->thought()->id }}"
         data-stream-card
         @if ($card->isVideoThought()) data-thought-kind="video" @endif
-        class="relative rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all @if ($card->isVideoThought()) border-l-[3px] border-l-rose-400/90 @endif"
+        class="relative rounded-2xl bg-white px-4 py-4 mb-3 ring-1 ring-deep-indigo/[0.06] shadow-[0_1px_3px_rgba(30,37,71,0.04)] transition hover:ring-memory-violet/20 hover:shadow-[0_8px_28px_rgba(109,106,247,0.08)] @if ($card->isVideoThought()) border-l-[3px] border-l-rose-400/80 @endif"
     >
         <div class="absolute top-3 right-3">
             @include('idea.partials.thought_card_actions', [

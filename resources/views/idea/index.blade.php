@@ -3,7 +3,7 @@
 @section('title', $query ? 'Search — IdeaTub' : 'IdeaTub')
 
 @section('content')
-<div class="max-w-[600px] mx-auto px-6 pt-16 pb-24">
+<div class="max-w-2xl mx-auto px-6 pt-10 pb-20">
 
     {{-- Flash messages --}}
     @if (session('success'))
@@ -23,9 +23,12 @@
     @elseif (! empty($morningBrief))
         @include('idea.partials.morning_brief', ['morningBrief' => $morningBrief])
     @else
-        <p class="text-center text-[11px] font-semibold tracking-[0.12em] uppercase text-memory-violet mb-2.5">Your thinking space</p>
-        <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-1.5">A calm archive for your ideas</h1>
-        <p class="text-center text-sm text-slate-brand mb-9">Capture thoughts before they disappear.</p>
+        @include('idea.partials.page_shell_header', [
+            'eyebrow' => 'Your thinking space',
+            'title' => 'A calm archive for your ideas',
+            'subtitle' => 'Capture thoughts before they disappear.',
+            'centered' => true,
+        ])
     @endif
 
     @includeWhen(config('features.working_memory_ui'), 'idea.partials.working_memory_home_strip')
@@ -54,7 +57,7 @@
             data-import-batch-url="{{ route('imports.batch') }}"
         @endif
         @focus-capture.window="focusCapture()"
-        class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-4 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-3 transition-shadow focus-within:shadow-[0_4px_32px_rgba(109,106,247,0.16)] focus-within:border-memory-violet/50"
+        class="rounded-2xl bg-white p-4 mb-3 ring-1 ring-deep-indigo/[0.06] shadow-[0_1px_3px_rgba(30,37,71,0.04)] transition focus-within:ring-memory-violet/30 focus-within:shadow-[0_8px_32px_rgba(109,106,247,0.12)]"
         :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6' : ''"
         @click.self="focusOverlayOpen && (focusOverlayOpen = false)"
     >
