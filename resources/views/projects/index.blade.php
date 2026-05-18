@@ -3,7 +3,7 @@
 @section('title', 'Projects — IdeaTub')
 
 @section('content')
-<div class="max-w-5xl mx-auto px-6 pt-10 pb-20">
+<div class="max-w-7xl mx-auto px-6 pt-10 pb-20 w-full">
     @if (session('success'))
         <div class="mb-6 rounded-2xl bg-neural-teal/10 px-4 py-3 text-sm text-neural-teal ring-1 ring-neural-teal/20">
             {{ session('success') }}
@@ -31,9 +31,9 @@
             </a>
         </div>
     @else
-        <ul class="grid grid-cols-1 sm:grid-cols-2 gap-4" role="list">
+        <ul class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" role="list">
             @foreach ($projects as $project)
-                <li>
+                <li class="min-w-0">
                     <a href="{{ route('projects.show', $project) }}" class="group flex h-full flex-col rounded-2xl bg-white p-5 ring-1 ring-deep-indigo/[0.06] shadow-[0_1px_3px_rgba(30,37,71,0.04)] transition hover:ring-memory-violet/25 hover:shadow-[0_10px_32px_rgba(109,106,247,0.1)]">
                         <div class="flex items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-memory-violet/10 text-memory-violet" aria-hidden="true">

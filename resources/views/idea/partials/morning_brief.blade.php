@@ -7,7 +7,7 @@
     <p class="text-sm text-slate-brand mb-6 max-w-[48ch]">Pick up where you left off, or capture something new below.</p>
 
     @if ($morningBrief->hasCards())
-        <ul class="grid grid-cols-1 sm:grid-cols-2 gap-3" role="list">
+        <ul class="grid grid-cols-1 gap-3 md:grid-cols-2" role="list">
             @foreach ($morningBrief->cards as $card)
                 <li>
                     @if ($card->draftId !== null)

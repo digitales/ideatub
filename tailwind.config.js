@@ -28,4 +28,15 @@ export default {
     },
 
     plugins: [forms, typography],
+
+    safelist: [
+        'sm:grid-cols-2',
+        'md:grid-cols-2',
+        'md:grid-cols-3',
+        'lg:grid-cols-3',
+        'xl:grid-cols-3',
+        {
+            pattern: /grid-cols-\[repeat\(auto-fill/,
+        },
+    ],
 };
