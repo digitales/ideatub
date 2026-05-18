@@ -20,6 +20,7 @@ use App\Services\DemoMode;
 use App\Services\DemoObfuscator;
 use App\Services\Email\ThoughtEmailSenderContextResolver;
 use App\Services\IdeasToRevisitService;
+use App\Services\MorningBriefService;
 use App\Services\OpenRouterService;
 use App\Services\ResearchService;
 use App\Services\Tags\UserCanonicalTagResolver;
@@ -223,11 +224,17 @@ class IdeaController extends Controller
             $indexThoughtCollection
         );
 
+        $morningBrief = null;
+        if ($query === '' && $replyingTo === null) {
+            $morningBrief = app(MorningBriefService::class)->forUser($request->user());
+        }
+
         return view('idea.index', [
             'thoughts' => $thoughts,
             'query' => $query !== '' ? $query : null,
             'replyingTo' => $replyingTo,
             'replyingToPreview' => $replyingToPreview,
+            'morningBrief' => $morningBrief,
             'cards' => $this->buildIdeaIndexCardPresenters(
                 $thoughts,
                 0,
@@ -1859,7 +1866,7 @@ class IdeaController extends Controller
 
         ThoughtCommentRead::markRead((int) auth()->id(), $thought->id);
 
-        $editable = ! app(\App\Services\DemoMode::class)->enabled();
+        $editable = ! app(DemoMode::class)->enabled();
         $thoughtProjectsForDetail = $thought->projects;
 
         return view('idea.research_show', [

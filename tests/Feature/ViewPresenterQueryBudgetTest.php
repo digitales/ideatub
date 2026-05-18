@@ -31,7 +31,8 @@ class ViewPresenterQueryBudgetTest extends TestCase
      * `idea.index` recent feed (no search) with a full recent page.
      * Expected: main thoughts + eager `comments`, shared inbox badge. Must stay flat vs row count (no N+1 per card).
      */
-    private const QUERY_BUDGET_IDEA_INDEX = 4;
+    /** Includes morning-brief lookups (draft, inbox, revisit prefs + list, project) plus layout inbox badge. */
+    private const QUERY_BUDGET_IDEA_INDEX = 9;
 
     /**
      * `idea.stream` first page with a full page of thoughts.

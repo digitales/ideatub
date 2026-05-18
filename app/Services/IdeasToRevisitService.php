@@ -46,4 +46,9 @@ class IdeasToRevisitService
             return ($thought->metadata['type'] ?? null) === 'idea';
         }));
     }
+
+    public function countForUser(User $user): int
+    {
+        return count($this->forUser($user));
+    }
 }

@@ -17,10 +17,16 @@
         </div>
     @endif
 
-    {{-- Hero --}}
-    <p class="text-center text-[11px] font-semibold tracking-[0.12em] uppercase text-memory-violet mb-2.5">Your thinking space</p>
-    <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-1.5">A calm archive for your ideas</h1>
-    <p class="text-center text-sm text-slate-brand mb-9">Capture thoughts before they disappear.</p>
+    @if ($query)
+        <p class="text-center text-[11px] font-semibold tracking-[0.12em] uppercase text-memory-violet mb-2.5">Search</p>
+        <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-9">Find a memory</h1>
+    @elseif (! empty($morningBrief))
+        @include('idea.partials.morning_brief', ['morningBrief' => $morningBrief])
+    @else
+        <p class="text-center text-[11px] font-semibold tracking-[0.12em] uppercase text-memory-violet mb-2.5">Your thinking space</p>
+        <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-1.5">A calm archive for your ideas</h1>
+        <p class="text-center text-sm text-slate-brand mb-9">Capture thoughts before they disappear.</p>
+    @endif
 
     @includeWhen(config('features.working_memory_ui'), 'idea.partials.working_memory_home_strip')
 
@@ -35,6 +41,7 @@
     @endphp
     <div
         x-data="captureBox()"
+        @ideatub-load-draft.window="if ($event.detail?.id) loadDraft($event.detail.id)"
         data-initial-content="{{ e($initialContent) }}"
         data-force-video-mode="{{ $forceHomeVideoMode ? '1' : '0' }}"
         data-videos-store-url="{{ route('videos.store') }}"
