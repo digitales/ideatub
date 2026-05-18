@@ -9,6 +9,7 @@ use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
 use App\Models\WorkingMemoryVersion;
+use App\Services\ArticleCaptureService;
 use App\Services\IdeasToRevisitService;
 use App\Services\McpSessionService;
 use App\Services\Meetings\MeetingService;
@@ -20,7 +21,9 @@ use App\Services\ThoughtSearchService;
 use App\Services\Video\VideoCaptureService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryUpsertService;
+use App\Services\WorkingMemory\WorkingMemoryVersionCatalog;
 use App\Support\BearerTokenExtractor;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -43,6 +46,7 @@ class McpController extends Controller
         private OAuthMcpJwtService $oauthJwt,
         private WorkingMemoryAssembler $workingMemoryAssembler,
         private WorkingMemoryUpsertService $workingMemoryUpsertService,
+        private WorkingMemoryVersionCatalog $workingMemoryVersionCatalog,
     ) {}
 
     /**
@@ -118,6 +122,8 @@ class McpController extends Controller
             'capture_video',
             'capture_article',
             'get_working_memory',
+            'list_working_memory_versions',
+            'get_working_memory_version',
             'get_compaction',
             'upsert_working_memory',
         ];
@@ -585,6 +591,32 @@ class McpController extends Controller
                 ],
             ],
             [
+                'name' => 'list_working_memory_versions',
+                'description' => 'List paginated working memory version history for a scope (external and consolidated builds; compactions optional). Returns data items plus meta pagination fields.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'scope_type' => ['type' => 'string', 'enum' => ['global', 'project', 'insights', 'tag']],
+                        'scope_key' => ['type' => 'string'],
+                        'include_compactions' => ['type' => 'boolean', 'description' => 'When true, include compaction:* versions in addition to external and consolidated.'],
+                        'page' => ['type' => 'integer', 'description' => 'Page number (default 1).'],
+                        'per_page' => ['type' => 'integer', 'description' => 'Items per page (default 20, max 50).'],
+                    ],
+                    'required' => ['scope_type', 'scope_key'],
+                ],
+            ],
+            [
+                'name' => 'get_working_memory_version',
+                'description' => 'Return full working memory version payload by version_id (summary markdown, structured sections, references, and build metadata).',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'version_id' => ['type' => 'string', 'description' => 'UUID of the working memory version.'],
+                    ],
+                    'required' => ['version_id'],
+                ],
+            ],
+            [
                 'name' => 'get_compaction',
                 'description' => 'Read a single working-memory compaction version by id (build_type starts with `compaction:`). Returns markdown + structured sections + references for that compaction.',
                 'inputSchema' => [
@@ -837,6 +869,8 @@ class McpController extends Controller
             'capture_video' => $this->captureVideo($params),
             'capture_article' => $this->captureArticle($params),
             'get_working_memory' => $this->getWorkingMemory($params),
+            'list_working_memory_versions' => $this->listWorkingMemoryVersions($params),
+            'get_working_memory_version' => $this->getWorkingMemoryVersion($params),
             'get_compaction' => $this->getCompaction($params),
             'upsert_working_memory' => $this->upsertWorkingMemory($params),
             'sync_jira' => $this->syncJira($params),
@@ -875,6 +909,94 @@ class McpController extends Controller
             $validated['scope_type'],
             $validated['scope_key']
         );
+    }
+
+    /**
+     * list_working_memory_versions: Paginated version history for a scope via {@see WorkingMemoryVersionCatalog}.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{data: array<int, array<string, mixed>>, meta: array{current_page: int, last_page: int, per_page: int, total: int}}
+     */
+    private function listWorkingMemoryVersions(array $params): array
+    {
+        $input = $params;
+        foreach (['scope_type', 'scope_key'] as $key) {
+            if (isset($input[$key]) && is_string($input[$key])) {
+                $input[$key] = trim($input[$key]);
+            }
+        }
+
+        $v = Validator::make($input, [
+            'scope_type' => 'required|string|in:global,project,insights,tag',
+            'scope_key' => 'required|string|max:191',
+            'include_compactions' => 'sometimes|boolean',
+            'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1|max:50',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        /** @var array{scope_type: string, scope_key: string, include_compactions?: bool, page?: int, per_page?: int} $validated */
+        $validated = $v->validated();
+
+        $page = (int) ($validated['page'] ?? 1);
+        request()->merge(['page' => $page]);
+
+        $paginator = $this->workingMemoryVersionCatalog->listForScope(
+            (int) auth()->id(),
+            $validated['scope_type'],
+            $validated['scope_key'],
+            (bool) ($validated['include_compactions'] ?? false),
+            (int) ($validated['per_page'] ?? 20),
+        );
+
+        return [
+            'data' => collect($paginator->items())
+                ->map(fn (WorkingMemoryVersion $version) => $this->workingMemoryVersionCatalog->toListItem($version))
+                ->values()
+                ->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
+     * get_working_memory_version: Full version payload by id via {@see WorkingMemoryVersionCatalog}.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    private function getWorkingMemoryVersion(array $params): array
+    {
+        $versionId = isset($params['version_id']) && is_string($params['version_id'])
+            ? trim($params['version_id'])
+            : '';
+
+        $v = Validator::make(['version_id' => $versionId], [
+            'version_id' => 'required|uuid',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        /** @var array{version_id: string} $validated */
+        $validated = $v->validated();
+
+        try {
+            $version = $this->workingMemoryVersionCatalog->showForUser(
+                (int) auth()->id(),
+                $validated['version_id'],
+            );
+        } catch (ModelNotFoundException) {
+            throw new \InvalidArgumentException('Working memory version not found.');
+        }
+
+        return $this->workingMemoryVersionCatalog->toDetailPayload($version);
     }
 
     /**
@@ -1194,7 +1316,7 @@ class McpController extends Controller
     }
 
     /**
-     * capture_article: Capture a web article via {@see \App\Services\ArticleCaptureService}.
+     * capture_article: Capture a web article via {@see ArticleCaptureService}.
      *
      * @param  array<string, mixed>  $params
      * @return array{id: string, status: string, url: string}
@@ -1217,7 +1339,7 @@ class McpController extends Controller
             throw new \InvalidArgumentException('Not authenticated.');
         }
 
-        $service = app(\App\Services\ArticleCaptureService::class);
+        $service = app(ArticleCaptureService::class);
 
         $thought = $service->capture(trim((string) $params['url']), [
             'user_id' => $user->id,

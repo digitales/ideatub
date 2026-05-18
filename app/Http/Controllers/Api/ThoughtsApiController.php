@@ -9,6 +9,7 @@ use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryUpsertService;
+use App\Services\WorkingMemory\WorkingMemoryVersionCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -20,6 +21,7 @@ class ThoughtsApiController extends Controller
         private ThoughtCaptureService $captureService,
         private ThoughtSearchService $searchService,
         private WorkingMemoryAssembler $workingMemoryAssembler,
+        private WorkingMemoryVersionCatalog $workingMemoryVersionCatalog,
     ) {}
 
     /**
@@ -136,6 +138,68 @@ class ThoughtsApiController extends Controller
         }
 
         return response()->json($payload);
+    }
+
+    /**
+     * GET /api/thoughts/working-memory/versions — Paginated version history for a scope.
+     * Query params: scope_type (required), scope_key (required), include_compactions (optional bool), per_page (optional, max 50).
+     */
+    public function workingMemoryVersions(Request $request): JsonResponse
+    {
+        $input = $request->only(['scope_type', 'scope_key', 'include_compactions', 'per_page']);
+        foreach (['scope_type', 'scope_key'] as $key) {
+            if (isset($input[$key]) && is_string($input[$key])) {
+                $input[$key] = trim($input[$key]);
+            }
+        }
+
+        $v = Validator::make($input, [
+            'scope_type' => 'required|string|in:global,project,insights,tag',
+            'scope_key' => 'required|string|max:191',
+            'include_compactions' => 'sometimes|boolean',
+            'per_page' => 'sometimes|integer|min:1|max:50',
+        ]);
+        if ($v->fails()) {
+            return response()->json(['error' => 'validation_error', 'message' => $v->errors()->first()], 422);
+        }
+
+        /** @var array{scope_type: string, scope_key: string, include_compactions?: bool, per_page?: int} $validated */
+        $validated = $v->validated();
+
+        try {
+            $paginator = $this->workingMemoryVersionCatalog->listForScope(
+                (int) auth()->id(),
+                $validated['scope_type'],
+                $validated['scope_key'],
+                (bool) ($validated['include_compactions'] ?? false),
+                (int) ($validated['per_page'] ?? 20),
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => 'validation_error', 'message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'data' => collect($paginator->items())
+                ->map(fn ($version) => $this->workingMemoryVersionCatalog->toListItem($version))
+                ->values()
+                ->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * GET /api/thoughts/working-memory/versions/{version} — Full version payload.
+     */
+    public function workingMemoryVersion(Request $request, string $version): JsonResponse
+    {
+        $versionModel = $this->workingMemoryVersionCatalog->showForUser((int) auth()->id(), $version);
+
+        return response()->json($this->workingMemoryVersionCatalog->toDetailPayload($versionModel));
     }
 
     /**

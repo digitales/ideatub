@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\WorkingMemoryVersion;
 use App\Services\Tags\UserCanonicalTagResolver;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
+use App\Services\WorkingMemory\WorkingMemoryVersionCatalog;
 use App\Support\TagSlug;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -16,6 +19,7 @@ class MemoryController extends Controller
     public function __construct(
         private readonly WorkingMemoryAssembler $workingMemoryAssembler,
         private readonly UserCanonicalTagResolver $canonicalTagResolver,
+        private readonly WorkingMemoryVersionCatalog $versionCatalog,
     ) {}
 
     public function show(Request $request): View
@@ -103,5 +107,106 @@ class MemoryController extends Controller
             'tagSlugQuery' => $normalizedSlug,
             'tagRefreshScopeKey' => $normalizedSlug,
         ]));
+    }
+
+    public function historyGlobal(Request $request): View
+    {
+        $versions = $this->versionCatalog->listForScope(
+            (int) $request->user()->id,
+            'global',
+            'global',
+        );
+
+        return view('memory.history', $this->historyViewData(
+            scopeTitle: 'Global',
+            currentMemoryUrl: route('memory.show'),
+            versions: $versions,
+        ));
+    }
+
+    public function historyProject(Request $request, Project $project): View
+    {
+        $this->authorize('view', $project);
+
+        $versions = $this->versionCatalog->listForScope(
+            (int) $request->user()->id,
+            'project',
+            (string) $project->getKey(),
+        );
+
+        return view('memory.history', $this->historyViewData(
+            scopeTitle: $project->title,
+            currentMemoryUrl: route('projects.memory.show', $project),
+            versions: $versions,
+        ));
+    }
+
+    public function showVersion(Request $request, WorkingMemoryVersion $version): View
+    {
+        $versionModel = $this->versionCatalog->showForUser(
+            (int) $request->user()->id,
+            (string) $version->id,
+        );
+        $versionModel->loadMissing('workingMemory');
+        $memory = $versionModel->workingMemory;
+        $payload = $this->versionCatalog->toDetailPayload($versionModel);
+
+        $scopeType = (string) $memory->scope_type;
+        $scopeKey = (string) $memory->scope_key;
+        $isProjectScope = $scopeType === 'project';
+        $project = null;
+
+        if ($isProjectScope && Str::isUuid($scopeKey)) {
+            $project = Project::query()
+                ->where('user_id', (int) $request->user()->id)
+                ->whereKey($scopeKey)
+                ->first();
+        }
+
+        $currentMemoryUrl = match ($scopeType) {
+            'project' => $project !== null
+                ? route('projects.memory.show', $project)
+                : route('memory.project-scope.show', ['scopeKey' => $scopeKey]),
+            'tag' => route('memory.tag.show', ['tag' => $scopeKey]),
+            default => route('memory.show'),
+        };
+
+        $historyUrl = $isProjectScope && $project !== null
+            ? route('projects.memory.versions', $project)
+            : ($scopeType === 'global' ? route('memory.versions') : null);
+
+        $scopeTitle = match ($scopeType) {
+            'global' => 'Global',
+            'project' => $project?->title ?? Str::of($scopeKey)->replace(['-', '_'], ' ')->squish()->title()->toString(),
+            'tag' => Str::of($scopeKey)->replace(['-', '_'], ' ')->squish()->title()->toString(),
+            default => Str::of($scopeKey)->replace(['-', '_'], ' ')->squish()->title()->toString(),
+        };
+
+        return view('memory.version', array_merge($payload, [
+            'version' => $versionModel,
+            'scopeTitle' => $scopeTitle,
+            'scopeType' => $scopeType,
+            'currentMemoryUrl' => $currentMemoryUrl,
+            'historyUrl' => $historyUrl,
+            'readOnly' => true,
+        ]));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function historyViewData(string $scopeTitle, string $currentMemoryUrl, LengthAwarePaginator $versions): array
+    {
+        return [
+            'scopeTitle' => $scopeTitle,
+            'currentMemoryUrl' => $currentMemoryUrl,
+            'versions' => $versions,
+            'versionRows' => $versions->map(
+                fn (WorkingMemoryVersion $version): array => array_merge(
+                    $this->versionCatalog->toListItem($version),
+                    ['version' => $version],
+                )
+            ),
+        ];
     }
 }

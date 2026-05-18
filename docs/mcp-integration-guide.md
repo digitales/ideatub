@@ -33,6 +33,9 @@ Tools available:
 | `capture_meeting` / `add_meeting` / `add_meeting_notes` | Meeting aliases for `capture_plan` with `doc_type=meeting` |
 | `process_meeting` | Queue meeting summarization + categorization (from existing meeting thought or raw transcript content) |
 | `get_working_memory` | Return a global, project, **insights**, or **tag** scoped working memory snapshot (`scope_type`, `scope_key`; same payload shape as `GET /api/thoughts/working-memory`, including assembler metadata fields in [Get working memory response shape](#get-working-memory-response-shape)) |
+| `upsert_working_memory` | Persist externally-authored working memory markdown as the canonical `external` version for a scope (see [Working memory: external-first hybrid](#working-memory-external-first-hybrid)) |
+| `list_working_memory_versions` | Paginated version history for a scope (`external` and `consolidated` by default; optional compactions) |
+| `get_working_memory_version` | Full read-only payload for one version by `version_id` |
 
 Authentication is either **per-user MCP key** (`x-ideatub-key` header; query `?key=` is discouraged—prefer header) or **OAuth** (`Authorization: Bearer` after connector login). The MCP key identifies **your user account**, not the app.
 
@@ -249,6 +252,9 @@ Use this if you are scripting against IdeaTub or building a bridge.
 | `capture_meeting`, `add_meeting`, `add_meeting_notes` | `content` (string) | Same optional params as `capture_plan` **except** `doc_type` is omitted and always `meeting`. These three names are **aliases** of one implementation (any `doc_type` in params is ignored). |
 | `process_meeting` | One of `thought_id` (UUID) or `content` (string) | `plan_slug` (when `content` is provided), `meeting_skill_id` (int), `force_rerun` (bool) |
 | `get_working_memory` | `scope_type` (`global` \| `project` \| `insights` \| `tag`), `scope_key` (string, required; `global` for global and insights scopes, project id / normalized project slug for project scope, or normalized tag key for tag scope) | — |
+| `upsert_working_memory` | `scope_type`, `scope_key`, `content` (markdown with `##` section headings) | `source_label` (string, e.g. `elixirr-sync`) — **project `scope_key` must be the IdeaTub project UUID**, not a metadata slug |
+| `list_working_memory_versions` | `scope_type`, `scope_key` | `include_compactions` (bool), `page` (int), `per_page` (int, max 50) |
+| `get_working_memory_version` | `version_id` (UUID) | — |
 
 Example calls:
 
@@ -264,6 +270,9 @@ Example calls:
 {"jsonrpc":"2.0","method":"process_meeting","params":{"content":"Speaker A: ...","plan_slug":"2026-04-15-weekly-sync"},"id":9}
 {"jsonrpc":"2.0","method":"get_working_memory","params":{"scope_type":"global","scope_key":"global"},"id":10}
 {"jsonrpc":"2.0","method":"get_working_memory","params":{"scope_type":"tag","scope_key":"ai"},"id":11}
+{"jsonrpc":"2.0","method":"upsert_working_memory","params":{"scope_type":"project","scope_key":"019e0705-5591-73e9-be2e-0fb9c86b269a","content":"## Current Focus\n\n- Ship the fix.","source_label":"elixirr-sync"},"id":12}
+{"jsonrpc":"2.0","method":"list_working_memory_versions","params":{"scope_type":"project","scope_key":"019e0705-5591-73e9-be2e-0fb9c86b269a","page":1,"per_page":20},"id":13}
+{"jsonrpc":"2.0","method":"get_working_memory_version","params":{"version_id":"uuid-of-version"},"id":14}
 ```
 
 #### Get working memory response shape
@@ -277,6 +286,25 @@ Successful `get_working_memory` and **`GET /api/thoughts/working-memory`** retur
 | `baseline_build_type` | How the canonical consolidated baseline was produced (string). |
 | `overlay_deltas` | Structured list of incremental changes since consolidation (each item typically includes `label`, `detail`, `since`). |
 | `input_count` | Number of inputs contributing to the canonical baseline. |
+| `canonical_version_id` | UUID of the canonical baseline version (use for staleness checks against a prior read). |
+| `canonical_created_at` | ISO 8601 timestamp when that canonical version was created. |
+| `source_label` | Origin label when set on the canonical version (e.g. `elixirr-sync` from `upsert_working_memory`); otherwise `null`. |
+
+#### Working memory: external-first hybrid
+
+For project scopes where an agent maintains curated memory locally (e.g. `working-memory/current.md`), **sync via `upsert_working_memory`** after capturing thoughts — `capture_plan` alone does not update canonical working memory.
+
+**Project `scope_key`:** Use the **IdeaTub project UUID** (lowercased), not a metadata slug like `dezeen`. Find it in the web app project URL or API; slugs are not valid project scope keys for upsert.
+
+**`upsert_working_memory`:** Accepts full markdown with standard `##` headings (`Current Focus`, `Active Priorities`, `Recent Changes`, `Open Questions`, `Risks / Blockers`, `Next Actions`, `Latest Signals`, `Source Notes`). Creates an `external` canonical version. Optional `source_label` records the sync origin (shown in UI and version history).
+
+**Refresh protection:** When a fresh `external` version exists (default: within 14 days), **Refresh working memory** in the UI does not queue a legacy consolidated rebuild that would clobber agent-authored memory. Re-run your sync (`upsert_working_memory`) to update; use explicit **Rebuild in IdeaTub** only when you intend IdeaTub to replace the external baseline.
+
+**Version history:** Use `list_working_memory_versions` to audit prior canonical snapshots (`external` and `consolidated` by default; pass `include_compactions: true` for compaction rows). Use `get_working_memory_version` with a version `id` from the list for a full read-only payload. REST equivalents: `GET /api/thoughts/working-memory/versions` and `GET /api/thoughts/working-memory/versions/{id}`.
+
+Design: `docs/superpowers/specs/2026-05-18-working-memory-hybrid-external-first-design.md`.
+
+**Corpus growth (phases 2–3):** After local meeting notes, always call **`capture_meeting`** (or meeting aliases). After automation outputs, call **`capture_plan`** with tags such as `automation` and `client:<slug>`. Bulk-import historical Slack/automation markdown on the server with `php artisan working-memory:import-captures` (see `/help/working-memory-corpus-sync`). Enable AI-authored consolidation with `FEATURE_WORKING_MEMORY_AI_AUTHORED` and `WORKING_MEMORY_AUTHORING_ENABLED`; scheduled `working-memory:consolidate` skips scopes with fresh external memory unless `--force` is used.
 
 For more on `capture_thought` and comments, see [MCP capture_thought](mcp-capture-thought.md).
 

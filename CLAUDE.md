@@ -41,6 +41,10 @@ curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
   "http://localhost:8000/api/thoughts/working-memory?scope_type=global&scope_key=global"
 ```
 
+**External-first hybrid (project scopes):** After `capture_plan`, sync curated `current.md` via MCP **`upsert_working_memory`** (`scope_key` = **IdeaTub project UUID**, not slug; optional `source_label`, e.g. `elixirr-sync`). Fresh external memory is protected from accidental overwrite on refresh. Inspect prior snapshots with **`list_working_memory_versions`** / **`get_working_memory_version`**. Response includes **`canonical_version_id`**, **`canonical_created_at`**, and **`source_label`** for staleness checks. See `docs/mcp-integration-guide.md` (Working memory: external-first hybrid).
+
+**Corpus growth (phases 2–3):** Require **`capture_meeting`** after local meeting notes and **`capture_plan`** after automation outputs. Bulk-import Slack/automation markdown with `php artisan working-memory:import-captures` (see in-app **`/help/working-memory-corpus-sync`**). Enable AI consolidation only for scopes without fresh external memory (`FEATURE_WORKING_MEMORY_AI_AUTHORED`, `WORKING_MEMORY_AUTHORING_ENABLED`).
+
 ## IdeaTub: Sync docs via capture_plan
 
 When the user wants to sync this document (or other plan/decision/dev/support/spec markdown) to IdeaTub, use the MCP tool **capture_plan** with:

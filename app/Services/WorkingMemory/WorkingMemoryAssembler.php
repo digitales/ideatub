@@ -331,7 +331,10 @@ class WorkingMemoryAssembler
      *     effective_consolidation_window_days: int,
      *     baseline_build_type: string,
      *     overlay_deltas: array<int, array{label: string, detail: string, since: string|null}>,
-     *     input_count: int
+     *     input_count: int,
+     *     canonical_version_id: string,
+     *     canonical_created_at: string|null,
+     *     source_label: string|null
      * }
      */
     public function forScope(int $userId, string $scopeType, string $scopeKey): array
@@ -387,7 +390,10 @@ class WorkingMemoryAssembler
      *     effective_consolidation_window_days: int,
      *     baseline_build_type: string,
      *     overlay_deltas: array<int, array{label: string, detail: string, since: string|null}>,
-     *     input_count: int
+     *     input_count: int,
+     *     canonical_version_id: string,
+     *     canonical_created_at: string|null,
+     *     source_label: string|null
      * }
      */
     private function payloadFromPersistedMemory(WorkingMemory $memory): array
@@ -428,6 +434,11 @@ class WorkingMemoryAssembler
             'baseline_build_type' => (string) $canonical->build_type,
             'overlay_deltas' => $this->buildOverlayDeltas($latestIncremental, $latestAuthoritative),
             'input_count' => $canonical->inputs()->count(),
+            'canonical_version_id' => (string) $canonical->id,
+            'canonical_created_at' => $canonical->created_at?->toIso8601String(),
+            'source_label' => is_array($canonical->build_diagnostics_json)
+                ? ($canonical->build_diagnostics_json['source_label'] ?? null)
+                : null,
         ];
     }
 

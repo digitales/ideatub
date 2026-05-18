@@ -6,6 +6,7 @@ use App\Jobs\ConsolidateWorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\WorkingMemory\ForcedTagResolver;
+use App\Services\WorkingMemory\WorkingMemoryExternalGuard;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -13,12 +14,18 @@ use InvalidArgumentException;
 
 class WorkingMemoryConsolidateCommand extends Command
 {
-    protected $signature = 'working-memory:consolidate {--user=} {--scope_type=} {--scope_key=}';
+    protected $signature = 'working-memory:consolidate
+        {--user=}
+        {--scope_type=}
+        {--scope_key=}
+        {--force : Bypass external-memory protection and queue rebuild anyway}
+        {--only-without-external : Skip scopes with fresh external agent memory}';
 
     protected $description = 'Consolidate working memory snapshots for users and scopes.';
 
     public function __construct(
         private readonly ForcedTagResolver $forcedTagResolver,
+        private readonly WorkingMemoryExternalGuard $externalGuard,
     ) {
         parent::__construct();
     }
@@ -34,16 +41,44 @@ class WorkingMemoryConsolidateCommand extends Command
             return self::FAILURE;
         }
 
+        $force = (bool) $this->option('force');
+        $onlyWithoutExternal = (bool) $this->option('only-without-external');
+
+        if ($force && $onlyWithoutExternal) {
+            $this->error('Use either --force or --only-without-external, not both.');
+
+            return self::FAILURE;
+        }
+
+        $dispatched = 0;
+        $skippedExternal = 0;
+
         try {
             $userIds = $this->resolveUserIds($this->option('user'));
 
             foreach ($userIds as $userId) {
                 foreach ($this->resolveScopesForUser($userId, $scopeTypeOption, $scopeKeyOption) as $scope) {
+                    $shouldSkip = $this->externalGuard->shouldSkipConsolidatedBuild(
+                        $userId,
+                        $scope['scope_type'],
+                        $scope['scope_key'],
+                        false,
+                    );
+
+                    if ($shouldSkip && ($onlyWithoutExternal || ! $force)) {
+                        $skippedExternal++;
+                        $this->line("  skip {$scope['scope_type']}/{$scope['scope_key']} (fresh external memory)");
+
+                        continue;
+                    }
+
                     ConsolidateWorkingMemory::dispatch(
                         $userId,
                         $scope['scope_type'],
-                        $scope['scope_key']
+                        $scope['scope_key'],
+                        $force,
                     );
+                    $dispatched++;
                 }
             }
         } catch (InvalidArgumentException $exception) {
@@ -52,7 +87,7 @@ class WorkingMemoryConsolidateCommand extends Command
             return self::FAILURE;
         }
 
-        $this->info('Working memory consolidation complete.');
+        $this->info("Queued {$dispatched} consolidation job(s), skipped {$skippedExternal} protected scope(s).");
 
         return self::SUCCESS;
     }

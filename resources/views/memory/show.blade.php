@@ -23,11 +23,19 @@
         default => 'bg-slate-100 text-slate-600 border-slate-200',
     };
     $overlayDeltas = $overlay_deltas ?? [];
-    $structuredSections = is_array($structured_sections ?? null) ? $structured_sections : [];
-    $authoringStatus = $authoring_status ?? null;
-    $renderStructuredSections = $structuredSections !== []
-        && ($authoringStatus === null || $authoringStatus === 'validated' || $authoringStatus === 'external');
     $references = is_array($references ?? null) ? $references : [];
+    $externalProtected = false;
+    if (($baseline_build_type ?? '') === 'external'
+        && ($authoring_status ?? '') === 'external'
+        && ! empty($canonical_created_at)) {
+        $protectDays = max(0, (int) config('working_memory.external_protect_days', 14));
+        if ($protectDays > 0) {
+            $externalProtected = \Illuminate\Support\Carbon::parse($canonical_created_at)
+                ->gte(now()->subDays($protectDays));
+        }
+    }
+    $aiAuthoringEnabled = config('features.working_memory_ai_authored')
+        && config('working_memory.authoring_enabled');
     $isSafeReferenceUrl = static function (string $url): bool {
         if ($url === '') {
             return false;
@@ -68,6 +76,11 @@
                 <span class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $freshnessClasses }}">
                     {{ $freshness }}
                 </span>
+                @if (($baseline_build_type ?? '') === 'external')
+                    <span class="inline-flex items-center rounded-full border border-memory-violet/30 bg-memory-violet/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-memory-violet">
+                        Synced from agent
+                    </span>
+                @endif
                 @if ($isProject && ! empty($project))
                     <a
                         href="{{ route('projects.show', $project) }}"
@@ -84,11 +97,34 @@
                         Tag page
                     </a>
                 @endif
-                @include('components.working-memory-refresh-form', [
-                    'action' => $refreshAction,
-                    'buttonClass' => 'text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors',
-                    'hiddenFields' => $isTag ? ['tag' => $tagRefreshScopeKey] : [],
-                ])
+                @if (! $isTag && (! $isProject || ! empty($project)))
+                    <a
+                        href="{{ $isProject && ! empty($project) ? route('projects.memory.versions', $project) : route('memory.versions') }}"
+                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
+                    >
+                        History
+                    </a>
+                @endif
+                @if ($externalProtected)
+                    <div class="flex flex-col items-end gap-2 max-w-sm">
+                        <p class="text-xs text-slate-brand text-right">
+                            This memory is synced from your agent. Re-run your agent sync to update it.
+                        </p>
+                        @include('components.working-memory-refresh-form', [
+                            'action' => $refreshAction,
+                            'buttonClass' => 'text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors',
+                            'hiddenFields' => $isTag ? ['tag' => $tagRefreshScopeKey] : [],
+                            'showForceButton' => $aiAuthoringEnabled,
+                            'forceButtonClass' => 'text-xs font-medium text-slate-brand hover:text-deep-indigo px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors',
+                        ])
+                    </div>
+                @else
+                    @include('components.working-memory-refresh-form', [
+                        'action' => $refreshAction,
+                        'buttonClass' => 'text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors',
+                        'hiddenFields' => $isTag ? ['tag' => $tagRefreshScopeKey] : [],
+                    ])
+                @endif
                 @if (! $isProject && ! $isTag && config('features.working_memory_ui'))
                     <a
                         href="{{ route('memory.scopes.index') }}"
@@ -111,25 +147,12 @@
 
     @slot('main')
         <article class="prose-memory-list-headings rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 md:p-8 shadow-[0_4px_24px_rgba(109,106,247,0.08)] prose prose-slate prose-headings:text-deep-indigo prose-a:text-memory-violet max-w-none">
-            @if ($renderStructuredSections)
-                @foreach ($structuredSections as $sectionTitle => $sectionItems)
-                    @php
-                        $title = trim((string) $sectionTitle);
-                        $items = is_array($sectionItems) ? $sectionItems : [$sectionItems];
-                    @endphp
-                    @continue($title === '')
-
-                    <h2>{{ $title }}</h2>
-                    <ul>
-                        @include('memory.partials.structured_section_items', [
-                            'items' => $items,
-                            'isSafeCitationUrl' => $isSafeReferenceUrl,
-                        ])
-                    </ul>
-                @endforeach
-            @else
-                <x-safe-markdown :markdown="$summary_markdown ?? ''" />
-            @endif
+            @include('memory.partials.structured_sections_content', [
+                'structured_sections' => $structured_sections ?? [],
+                'authoring_status' => $authoring_status ?? null,
+                'summary_markdown' => $summary_markdown ?? '',
+                'isSafeReferenceUrl' => $isSafeReferenceUrl,
+            ])
         </article>
 
         @if ($references !== [])
@@ -159,6 +182,9 @@
             'effective_consolidation_window_days' => $effective_consolidation_window_days ?? null,
             'input_count' => $input_count ?? null,
             'baseline_build_type' => $baseline_build_type ?? null,
+            'source_label' => $source_label ?? null,
+            'canonical_created_at' => $canonical_created_at ?? null,
+            'authoring_status' => $authoring_status ?? null,
             'overlay_deltas' => $overlayDeltas,
         ])
 

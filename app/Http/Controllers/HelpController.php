@@ -307,6 +307,18 @@ class HelpController extends Controller
         ]);
     }
 
+    public function workingMemoryCorpusSync(): View
+    {
+        $path = resource_path('content/help/working-memory-corpus-sync.md');
+        $markdown = File::exists($path) ? File::get($path) : '';
+        $converter = SafeCommonMarkConverter::make();
+        $bodyHtml = $converter->convert($markdown)->getContent();
+
+        return view('help-working-memory-corpus-sync', [
+            'bodyHtml' => $bodyHtml,
+        ]);
+    }
+
     public function index(): View
     {
         $cursorRulePath = base_path('.cursor/rules/ideatub-sync-docs.mdc');

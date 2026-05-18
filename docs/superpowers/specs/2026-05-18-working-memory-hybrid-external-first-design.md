@@ -1,7 +1,7 @@
 # Working Memory: External-First Hybrid + Version History
 
 **Date:** 2026-05-18  
-**Status:** Draft — validated in brainstorming, pending written-spec review  
+**Status:** Approved (2026-05-18)  
 **Scope:** IdeaTub working memory (UI, REST, MCP) + Elixirr `elixirr-sync` skill  
 **Related:** [2026-05-12-working-memory-parity-design.md](./2026-05-12-working-memory-parity-design.md), [2026-05-05-working-memory-design.md](./2026-05-05-working-memory-design.md)
 
@@ -155,8 +155,8 @@ On `/memory` and `/projects/{project}/memory`:
 |-------|-------------|---------|
 | **1a** | External guard on refresh; Dezeen one-time upsert; `elixirr-sync` upsert step + UUID mapping | Rich memory live on ideatub.com |
 | **1b** | Version list/read API + MCP + UI history panel | Auditable changes; debug overwrites |
-| **2** | Required `capture_meeting`; automation `capture_plan` hooks (parity spec) | Stronger incremental overlay between syncs |
-| **3** | AI authoring for scopes without fresh external | Global and non-Elixirr projects |
+| **2** | Required `capture_meeting`; automation `capture_plan` hooks (parity spec); help at `/help/working-memory-corpus-sync` | Stronger incremental overlay between syncs |
+| **3** | `working-memory:import-captures`; consolidate `--only-without-external` / `--force`; AI env flags for non-external scopes | Global and non-Elixirr projects |
 
 Phases 2 and 3 match [2026-05-12-working-memory-parity-design.md](./2026-05-12-working-memory-parity-design.md); this spec adds **external protection** and **version history** as first-class requirements.
 

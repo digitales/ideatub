@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\WorkingMemory;
+use App\Models\WorkingMemoryVersion;
 use App\Services\OAuthMcpJwtService;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -441,6 +442,52 @@ class WorkingMemoryApiTest extends TestCase
         $response->assertJsonPath('build_type', 'external');
         $response->assertJsonPath('scope_type', 'project');
         $response->assertJsonPath('scope_key', 'dezeen');
+    }
+
+    #[Test]
+    public function test_working_memory_get_returns_canonical_metadata_after_upsert_with_source_label(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+        $markdown = "## Current Focus\n\n- Ship the fix.\n\n## Active Priorities\n\n- Test staging.";
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->twice()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/thoughts/working-memory/upsert', [
+                'scope_type' => 'project',
+                'scope_key' => 'dezeen',
+                'content' => $markdown,
+                'source_label' => 'elixirr-sync',
+            ])
+            ->assertOk();
+
+        $version = WorkingMemoryVersion::query()
+            ->whereHas('workingMemory', fn ($q) => $q
+                ->where('user_id', $user->id)
+                ->where('scope_type', 'project')
+                ->where('scope_key', 'dezeen'))
+            ->where('build_type', 'external')
+            ->first();
+
+        $this->assertNotNull($version);
+        $this->assertNotNull($version->created_at);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/thoughts/working-memory?scope_type=project&scope_key=dezeen');
+
+        $response->assertOk();
+        $response->assertJsonPath('canonical_version_id', (string) $version->id);
+        $response->assertJsonPath('canonical_created_at', $version->created_at->toIso8601String());
+        $response->assertJsonPath('source_label', 'elixirr-sync');
     }
 
     #[Test]

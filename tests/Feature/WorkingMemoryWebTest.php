@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Project;
 use App\Models\Thought;
 use App\Models\User;
+use App\Models\WorkingMemory;
+use App\Models\WorkingMemoryVersion;
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
@@ -379,6 +381,77 @@ class WorkingMemoryWebTest extends TestCase
         $response->assertOk();
         $response->assertSee('example.md', false);
         $response->assertDontSee('href="docs/', false);
+    }
+
+    public function test_working_memory_shows_external_badge_details_and_rebuild_when_protected(): void
+    {
+        config([
+            'features.working_memory_ui' => true,
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+            'working_memory.external_protect_days' => 14,
+        ]);
+
+        $user = User::factory()->create();
+        $memory = WorkingMemory::factory()->for($user)->create([
+            'scope_type' => 'global',
+            'scope_key' => 'global',
+        ]);
+        $external = WorkingMemoryVersion::factory()->for($memory)->create([
+            'build_type' => 'external',
+            'authoring_status' => 'external',
+            'created_at' => now()->subDay(),
+            'build_diagnostics_json' => ['source_label' => 'elixirr-sync'],
+            'structured_sections_json' => [
+                'Current Focus' => [[
+                    'text' => 'Agent-synced focus line.',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [],
+                ]],
+            ],
+        ]);
+        $memory->update(['latest_version_id' => $external->id]);
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('Synced from agent', false);
+        $response->assertSee('elixirr-sync', false);
+        $response->assertSee('external', false);
+        $response->assertSee('synced from your agent', false);
+        $response->assertSee('Rebuild in IdeaTub', false);
+        $response->assertSee('name="force"', false);
+        $response->assertSee('value="1"', false);
+    }
+
+    public function test_working_memory_hides_rebuild_button_when_ai_authoring_disabled(): void
+    {
+        config([
+            'features.working_memory_ui' => true,
+            'features.working_memory_ai_authored' => false,
+            'working_memory.authoring_enabled' => false,
+            'working_memory.external_protect_days' => 14,
+        ]);
+
+        $user = User::factory()->create();
+        $memory = WorkingMemory::factory()->for($user)->create([
+            'scope_type' => 'global',
+            'scope_key' => 'global',
+        ]);
+        $external = WorkingMemoryVersion::factory()->for($memory)->create([
+            'build_type' => 'external',
+            'authoring_status' => 'external',
+            'created_at' => now()->subDay(),
+        ]);
+        $memory->update(['latest_version_id' => $external->id]);
+
+        $response = $this->actingAs($user)->get(route('memory.show'));
+
+        $response->assertOk();
+        $response->assertSee('synced from your agent', false);
+        $response->assertDontSee('Rebuild in IdeaTub', false);
+        $response->assertDontSee('name="force"', false);
     }
 
     private function enableWorkingMemoryUi(): void

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\WorkingMemory;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
+use App\Services\WorkingMemory\WorkingMemoryExternalGuard;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -24,11 +25,27 @@ class ConsolidateWorkingMemory implements ShouldQueue
     public function __construct(
         private readonly int $userId,
         private readonly string $scopeType,
-        private readonly string $scopeKey
+        private readonly string $scopeKey,
+        public bool $force = false,
     ) {}
 
     public function handle(WorkingMemoryBuilderService $builderService): void
     {
+        if (app(WorkingMemoryExternalGuard::class)->shouldSkipConsolidatedBuild(
+            $this->userId,
+            $this->scopeType,
+            $this->scopeKey,
+            $this->force,
+        )) {
+            Log::info('ConsolidateWorkingMemory skipped: fresh external memory protected.', [
+                'user_id' => $this->userId,
+                'scope_type' => $this->scopeType,
+                'scope_key' => $this->scopeKey,
+            ]);
+
+            return;
+        }
+
         $builderService->buildConsolidated($this->userId, $this->scopeType, $this->scopeKey);
     }
 

@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Jobs\ConsolidateWorkingMemory;
 use App\Models\Project;
 use App\Models\User;
+use App\Models\WorkingMemory;
+use App\Models\WorkingMemoryVersion;
 use App\Support\TagSlug;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -77,6 +79,51 @@ class WorkingMemoryRefreshFeatureTest extends TestCase
             ->assertForbidden();
 
         Queue::assertNotPushed(ConsolidateWorkingMemory::class);
+    }
+
+    public function test_project_refresh_skipped_when_fresh_external_exists(): void
+    {
+        Queue::fake();
+        config(['working_memory.external_protect_days' => 14]);
+        /** @var User $owner */
+        $owner = User::factory()->create();
+        $project = Project::factory()->for($owner)->create();
+        $this->seedFreshExternalMemory($owner, 'project', (string) $project->getKey());
+
+        $response = $this->actingAs($owner)
+            ->from(route('projects.show', $project))
+            ->post(route('working-memory.refresh.project', $project));
+
+        $response->assertRedirect(route('projects.show', $project));
+        $response->assertSessionHas(
+            'info',
+            'Working memory is synced from your agent. Re-run your agent sync, or use Rebuild in IdeaTub to replace it.'
+        );
+        Queue::assertNotPushed(ConsolidateWorkingMemory::class);
+    }
+
+    public function test_project_refresh_force_queues_job_when_fresh_external_exists(): void
+    {
+        Queue::fake();
+        config(['working_memory.external_protect_days' => 14]);
+        /** @var User $owner */
+        $owner = User::factory()->create();
+        $project = Project::factory()->for($owner)->create();
+        $this->seedFreshExternalMemory($owner, 'project', (string) $project->getKey());
+
+        $response = $this->actingAs($owner)
+            ->from(route('projects.show', $project))
+            ->post(route('working-memory.refresh.project', $project), [
+                'force' => '1',
+            ]);
+
+        $response->assertRedirect(route('projects.show', $project));
+        $response->assertSessionHas('success', 'Queued consolidated rebuild for project working memory.');
+        Queue::assertPushed(
+            ConsolidateWorkingMemory::class,
+            fn (ConsolidateWorkingMemory $job): bool => $this->matchesJobScope($job, $owner->id, 'project', (string) $project->getKey())
+                && $job->force === true
+        );
     }
 
     public function test_tag_refresh_with_signed_context_normalizes_and_queues_tag_scope(): void
@@ -240,5 +287,21 @@ class WorkingMemoryRefreshFeatureTest extends TestCase
     private function signedTagRefreshUrl(string $tag): string
     {
         return URL::signedRoute('working-memory.refresh.tag', ['tag' => TagSlug::from($tag)]);
+    }
+
+    private function seedFreshExternalMemory(User $user, string $scopeType, string $scopeKey): WorkingMemory
+    {
+        $memory = WorkingMemory::factory()->for($user)->create([
+            'scope_type' => $scopeType,
+            'scope_key' => $scopeKey,
+        ]);
+        $external = WorkingMemoryVersion::factory()->for($memory)->create([
+            'build_type' => 'external',
+            'authoring_status' => 'external',
+            'created_at' => now()->subHour(),
+        ]);
+        $memory->update(['latest_version_id' => $external->id]);
+
+        return $memory;
     }
 }

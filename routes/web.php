@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\RealtimeCheckController;
+use App\Http\Controllers\AppearanceController;
+use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -28,8 +30,6 @@ use App\Http\Controllers\Learning\LearningProjectController;
 use App\Http\Controllers\Learning\LearningQuizAttemptController;
 use App\Http\Controllers\Learning\LearningResearchController;
 use App\Http\Controllers\McpKeyController;
-use App\Http\Controllers\AppearanceController;
-use App\Http\Controllers\StreamLayoutController;
 use App\Http\Controllers\MeetingSkillSettingsController;
 use App\Http\Controllers\MemoryCompactionController;
 use App\Http\Controllers\MemoryController;
@@ -52,10 +52,10 @@ use App\Http\Controllers\SharedResearchController;
 use App\Http\Controllers\SharedResearchViewController;
 use App\Http\Controllers\SkillSettingsController;
 use App\Http\Controllers\SocialAuthController;
+use App\Http\Controllers\StreamLayoutController;
 use App\Http\Controllers\ThoughtLinkController;
 use App\Http\Controllers\ThoughtProjectController;
 use App\Http\Controllers\ToolController;
-use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\WorkingMemoryRefreshController;
@@ -305,6 +305,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/help/research-to-decision/skills', [HelpController::class, 'researchToDecisionSkillsIndex'])->name('help.research-to-decision.skills.index');
     Route::get('/help/research-to-decision', [HelpController::class, 'researchToDecision'])->name('help.research-to-decision');
     Route::get('/help/repo-learning-coach', [HelpController::class, 'repoLearningCoach'])->name('help.repo-learning-coach');
+    Route::get('/help/working-memory-corpus-sync', [HelpController::class, 'workingMemoryCorpusSync'])->name('help.working-memory-corpus-sync');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
 
     // MCP key management (obtain / revoke auth key for AI clients)
@@ -345,6 +346,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/memory/tag', [MemoryController::class, 'showTag'])->name('memory.tag.show');
         Route::get('/memory/project/{scopeKey}', [MemoryController::class, 'showProjectScope'])->where('scopeKey', '[a-z0-9._/-]+')->name('memory.project-scope.show');
         Route::get('/projects/{project}/memory', [MemoryController::class, 'showProject'])->name('projects.memory.show');
+        Route::get('/memory/versions', [MemoryController::class, 'historyGlobal'])->name('memory.versions');
+        Route::get('/memory/versions/{version}', [MemoryController::class, 'showVersion'])
+            ->whereUuid('version')
+            ->name('memory.version.show');
+        Route::get('/projects/{project}/memory/versions', [MemoryController::class, 'historyProject'])
+            ->name('projects.memory.versions');
         Route::get(
             '/memory/{scopeType}/{scopeKey}/compactions/{versionId}',
             [MemoryCompactionController::class, 'show']
