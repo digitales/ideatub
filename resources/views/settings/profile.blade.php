@@ -19,7 +19,7 @@
         <x-appearance-control :appearance="$appearance ?? 'system'" />
     </div>
 
-    <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-6">
+    <div class="ideatub-surface mb-6 p-6">
         <h2 class="text-lg font-semibold text-deep-indigo mb-4">Account</h2>
 
         <form method="POST" action="{{ route('settings.profile.update') }}">
@@ -35,7 +35,7 @@
                         id="name"
                         value="{{ old('name', $user->name) }}"
                         required
-                        class="w-full rounded-lg border border-memory-violet/20 bg-white/80 px-3 py-2 text-sm text-deep-indigo focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50"
+                        class="ideatub-input w-full"
                     />
                     @error('name')
                         <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
@@ -50,7 +50,7 @@
                         id="email"
                         value="{{ old('email', $user->email) }}"
                         required
-                        class="w-full rounded-lg border border-memory-violet/20 bg-white/80 px-3 py-2 text-sm text-deep-indigo focus:ring-2 focus:ring-memory-violet/30 focus:border-memory-violet/50"
+                        class="ideatub-input w-full"
                     />
                     @error('email')
                         <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
@@ -70,7 +70,7 @@
         </form>
     </div>
 
-    <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-6">
+    <div class="ideatub-surface mb-6 p-6">
         <h2 class="text-lg font-semibold text-deep-indigo mb-4">Notifications</h2>
         <form method="POST" action="{{ route('settings.profile.notifications') }}" class="space-y-3">
             @csrf
@@ -85,7 +85,7 @@
         </form>
     </div>
 
-    <div class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-6 shadow-[0_4px_24px_rgba(109,106,247,0.08)] mb-6">
+    <div class="ideatub-surface mb-6 p-6">
         <h2 class="text-lg font-semibold text-deep-indigo mb-2">Demo mode</h2>
         <p class="text-sm text-slate-brand mb-4">Demo mode is session-based. It obfuscates narrative content for this browser session without changing stored data.</p>
 
@@ -121,7 +121,7 @@
         @endif
     </div>
 
-    <div class="rounded-2xl border border-memory-violet/15 bg-white/60 p-4">
+    <div class="ideatub-surface-muted p-4">
         <h2 class="text-sm font-semibold text-deep-indigo mb-3">More settings</h2>
         <div class="flex flex-col gap-2 text-sm">
             <a href="{{ route('settings.skills.index') }}" class="text-slate-brand hover:text-memory-violet">Skills</a>

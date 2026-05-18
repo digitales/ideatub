@@ -47,17 +47,17 @@
         <div
             x-show="editing"
             x-on:keydown.escape.stop.prevent="handleEditEscape()"
-            :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6' : 'mb-2'"
+            :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6 ideatub-focus-shell' : 'mb-2'"
         >
             <div
                 x-show="focusOverlayOpen"
                 x-cloak
                 @click="focusOverlayOpen = false; document.body.style.overflow = ''"
-                class="absolute inset-0 bg-white -z-10"
+                class="ideatub-focus-backdrop"
                 aria-hidden="true"
             ></div>
             <div :class="focusOverlayOpen ? 'max-w-4xl w-full mx-auto flex flex-col flex-1 min-h-0' : ''" :role="focusOverlayOpen ? 'dialog' : null" :aria-modal="focusOverlayOpen ? 'true' : null" :aria-label="focusOverlayOpen ? 'Edit thought' : null">
-                <textarea x-ref="editTextarea" x-model="draftContent" rows="4" @input="resizeTextarea()" class="{{ $editorClass }} resize-none overflow-hidden" :class="focusOverlayOpen ? 'flex-1 min-h-0 overflow-auto' : ''"></textarea>
+                <textarea x-ref="editTextarea" x-model="draftContent" rows="4" @input="resizeTextarea()" class="{{ $editorClass }} resize-none overflow-hidden" :class="focusOverlayOpen ? 'ideatub-focus-textarea overflow-auto' : ''"></textarea>
                 <p x-show="error" x-text="error" class="text-[11px] text-red-600 mt-1"></p>
                 <div class="flex items-center gap-2 mt-2">
                     <button type="button" @click="saveEdit()" :disabled="saveDisabled" class="text-[11px] font-medium text-white px-2 py-1 rounded bg-memory-violet disabled:opacity-50">Save</button>
@@ -119,16 +119,16 @@
         </template>
 
         <template x-if="editing">
-            <div x-on:keydown.escape.stop.prevent="handleEditEscape()" :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6' : 'mb-2'">
+            <div x-on:keydown.escape.stop.prevent="handleEditEscape()" :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6 ideatub-focus-shell' : 'mb-2'">
                 <div
                     x-show="focusOverlayOpen"
                     x-cloak
                     @click="focusOverlayOpen = false; document.body.style.overflow = ''"
-                    class="absolute inset-0 bg-white -z-10"
+                    class="ideatub-focus-backdrop"
                     aria-hidden="true"
                 ></div>
                 <div :class="focusOverlayOpen ? 'max-w-4xl w-full mx-auto flex flex-col flex-1 min-h-0' : ''" :role="focusOverlayOpen ? 'dialog' : null" :aria-modal="focusOverlayOpen ? 'true' : null" :aria-label="focusOverlayOpen ? 'Edit thought' : null">
-                    <textarea x-ref="editTextarea" x-model="draftContent" rows="4" @input="resizeTextarea()" class="{{ $editorClass }} resize-none overflow-hidden" :class="focusOverlayOpen ? 'flex-1 min-h-0 overflow-auto' : ''"></textarea>
+                    <textarea x-ref="editTextarea" x-model="draftContent" rows="4" @input="resizeTextarea()" class="{{ $editorClass }} resize-none overflow-hidden" :class="focusOverlayOpen ? 'ideatub-focus-textarea overflow-auto' : ''"></textarea>
                     <p x-show="error" x-text="error" class="text-[11px] text-red-600 mt-1"></p>
                     <div class="flex items-center gap-2 mt-2">
                         <button type="button" @click="saveEdit()" :disabled="saveDisabled" class="text-[11px] font-medium text-white px-2 py-1 rounded bg-memory-violet disabled:opacity-50">Save</button>

@@ -110,6 +110,22 @@
   .ideatub-auth-card {
     @apply w-full max-w-sm rounded-2xl border border-memory-violet/20 bg-white/80 p-8 shadow-[0_4px_24px_rgba(109,106,247,0.08)] backdrop-blur;
   }
+
+  .ideatub-focus-shell {
+    @apply bg-white;
+  }
+
+  .ideatub-focus-backdrop {
+    @apply absolute inset-0 -z-10 bg-white;
+  }
+
+  .ideatub-focus-panel {
+    @apply flex w-full max-w-none flex-1 flex-col min-h-0 rounded-xl bg-white p-6 shadow-sm;
+  }
+
+  .ideatub-focus-textarea {
+    @apply flex-1 min-h-0 rounded-lg border border-slate-200 bg-white p-3;
+  }
 }
 
 html.dark {
@@ -182,6 +198,33 @@ html.dark {
 .dark .ideatub-auth-card {
     @apply border-white/10 bg-gray-900/90 shadow-none;
   }
+
+.dark .ideatub-focus-shell {
+    @apply bg-gray-950 shadow-none ring-0;
+  }
+
+.dark .ideatub-focus-backdrop {
+    @apply bg-gray-950;
+  }
+
+.dark .ideatub-focus-panel {
+    @apply bg-gray-900 shadow-none ring-1 ring-white/10;
+  }
+
+.dark .ideatub-focus-textarea {
+    @apply border-white/10 bg-gray-900 text-gray-100 placeholder:text-gray-500;
+  }
+
+.dark .ideatub-app input[class*='bg-white'],
+.dark .ideatub-app textarea[class*='bg-white'],
+.dark .ideatub-app select[class*='bg-white'] {
+    @apply border-white/10 bg-gray-900 text-gray-100;
+}
+
+.dark .ideatub-app input[class*='bg-white']::placeholder,
+.dark .ideatub-app textarea[class*='bg-white']::placeholder {
+    @apply text-gray-500;
+}
 
   /* Broad coverage for existing Tailwind utility markup inside the app shell */
 .dark .ideatub-app .text-deep-indigo {

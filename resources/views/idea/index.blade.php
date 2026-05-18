@@ -58,7 +58,7 @@
         @endif
         @focus-capture.window="focusCapture()"
         class="ideatub-surface mb-3 p-4 transition focus-within:ring-memory-violet/30 dark:focus-within:ring-violet-400/40"
-        :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6' : ''"
+        :class="focusOverlayOpen ? 'fixed inset-0 z-50 flex flex-col p-6 ideatub-focus-shell' : ''"
         @click.self="focusOverlayOpen && (focusOverlayOpen = false)"
     >
         {{-- Focus mode: full-screen white backdrop (click to close) --}}
@@ -66,13 +66,13 @@
             x-show="focusOverlayOpen"
             x-cloak
             @click="focusOverlayOpen = false"
-            class="absolute inset-0 bg-white -z-10"
+            class="ideatub-focus-backdrop"
             aria-hidden="true"
         ></div>
 
         <div
             class="max-w-[600px] w-full"
-            :class="focusOverlayOpen ? 'flex flex-col flex-1 min-h-0 w-full max-w-none p-6 bg-white rounded-xl shadow-sm' : ''"
+            :class="focusOverlayOpen ? 'ideatub-focus-panel' : ''"
             :role="focusOverlayOpen ? 'dialog' : null"
             :aria-modal="focusOverlayOpen ? 'true' : null"
             :aria-label="focusOverlayOpen ? 'Capture thought' : null"
@@ -146,7 +146,7 @@
                 aria-describedby="content-error youtube-url-error"
                 x-bind:placeholder="videoMode && !isReplyMode ? 'Paste a YouTube link…' : 'What are you thinking?'"
                 class="w-full border-none outline-none resize-none text-sm text-deep-indigo placeholder-slate-brand/40 leading-relaxed"
-                :class="focusOverlayOpen ? 'flex-1 min-h-0 bg-white border border-slate-200 rounded-lg p-3' : 'bg-transparent'"
+                :class="focusOverlayOpen ? 'ideatub-focus-textarea' : 'bg-transparent'"
             ></textarea>
 
             <p id="content-error" class="mt-1 text-xs text-red-500" x-show="errorField || {{ $errors->has('content') ? 'true' : 'false' }}" x-text="errorField">@if($errors->has('content')){{ $errors->first('content') }}@endif</p>
