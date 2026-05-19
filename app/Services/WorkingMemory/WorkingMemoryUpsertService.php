@@ -46,6 +46,18 @@ class WorkingMemoryUpsertService
 
         [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);
 
+        $requireUuidLabels = config('working_memory.require_uuid_project_scope_key_for_source_labels', []);
+        if (
+            $normalizedScopeType === 'project'
+            && $sourceLabel !== null
+            && in_array($sourceLabel, $requireUuidLabels, true)
+            && ! Str::isUuid($normalizedScopeKey)
+        ) {
+            throw new InvalidArgumentException(
+                "Project scope_key must be a valid UUID when source_label is {$sourceLabel}."
+            );
+        }
+
         $sections = $this->parseMarkdownSections($trimmed);
 
         return DB::transaction(function () use (

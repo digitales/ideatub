@@ -17,6 +17,8 @@ return [
 
     'external_protect_days' => (int) env('WORKING_MEMORY_EXTERNAL_PROTECT_DAYS', 14),
 
+    'require_uuid_project_scope_key_for_source_labels' => ['elixirr-sync'],
+
     'import_rate_per_minute' => (int) env('WORKING_MEMORY_IMPORT_RATE_PER_MINUTE', 50),
 
     'insights_model_enabled' => env('WORKING_MEMORY_INSIGHTS_MODEL_ENABLED', false),
