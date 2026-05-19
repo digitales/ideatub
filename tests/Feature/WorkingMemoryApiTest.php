@@ -9,6 +9,7 @@ use App\Models\WorkingMemoryVersion;
 use App\Services\OAuthMcpJwtService;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -417,6 +418,7 @@ class WorkingMemoryApiTest extends TestCase
     {
         $user = User::factory()->create();
         $token = 'test-access-token';
+        $projectId = (string) Str::uuid();
 
         $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
             $mock->shouldReceive('verifyAccessToken')
@@ -433,7 +435,7 @@ class WorkingMemoryApiTest extends TestCase
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/thoughts/working-memory/upsert', [
                 'scope_type' => 'project',
-                'scope_key' => 'dezeen',
+                'scope_key' => $projectId,
                 'content' => $markdown,
                 'source_label' => 'elixirr-sync',
             ]);
@@ -441,7 +443,39 @@ class WorkingMemoryApiTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('build_type', 'external');
         $response->assertJsonPath('scope_type', 'project');
-        $response->assertJsonPath('scope_key', 'dezeen');
+        $response->assertJsonPath('scope_key', $projectId);
+    }
+
+    #[Test]
+    public function test_upsert_working_memory_elixirr_sync_rejects_slug_scope_key(): void
+    {
+        $user = User::factory()->create();
+        $token = 'test-access-token';
+
+        $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
+            $mock->shouldReceive('verifyAccessToken')
+                ->once()
+                ->with($token)
+                ->andReturn([
+                    'user_id' => $user->id,
+                    'aud' => config('oauth-mcp.resource_api'),
+                ]);
+        });
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/thoughts/working-memory/upsert', [
+                'scope_type' => 'project',
+                'scope_key' => 'dezeen',
+                'content' => "## Current Focus\n\n- Ship the fix.\n\n## Active Priorities\n\n- Test staging.",
+                'source_label' => 'elixirr-sync',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('error', 'validation_error');
+        $this->assertStringContainsString(
+            'UUID',
+            (string) $response->json('message'),
+        );
     }
 
     #[Test]
@@ -449,6 +483,7 @@ class WorkingMemoryApiTest extends TestCase
     {
         $user = User::factory()->create();
         $token = 'test-access-token';
+        $projectId = (string) Str::uuid();
         $markdown = "## Current Focus\n\n- Ship the fix.\n\n## Active Priorities\n\n- Test staging.";
 
         $this->mock(OAuthMcpJwtService::class, function ($mock) use ($user, $token): void {
@@ -464,7 +499,7 @@ class WorkingMemoryApiTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/thoughts/working-memory/upsert', [
                 'scope_type' => 'project',
-                'scope_key' => 'dezeen',
+                'scope_key' => $projectId,
                 'content' => $markdown,
                 'source_label' => 'elixirr-sync',
             ])
@@ -474,7 +509,7 @@ class WorkingMemoryApiTest extends TestCase
             ->whereHas('workingMemory', fn ($q) => $q
                 ->where('user_id', $user->id)
                 ->where('scope_type', 'project')
-                ->where('scope_key', 'dezeen'))
+                ->where('scope_key', $projectId))
             ->where('build_type', 'external')
             ->first();
 
@@ -482,7 +517,7 @@ class WorkingMemoryApiTest extends TestCase
         $this->assertNotNull($version->created_at);
 
         $response = $this->withHeader('Authorization', 'Bearer '.$token)
-            ->getJson('/api/thoughts/working-memory?scope_type=project&scope_key=dezeen');
+            ->getJson('/api/thoughts/working-memory?scope_type=project&scope_key='.$projectId);
 
         $response->assertOk();
         $response->assertJsonPath('canonical_version_id', (string) $version->id);

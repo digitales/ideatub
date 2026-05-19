@@ -27,11 +27,34 @@ class Project extends Model implements Commentable
         'user_id',
         'title',
         'description',
+        'parent_project_id',
+        'elixirr_client_slug',
+        'elixirr_project_slug',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Project::class, 'parent_project_id');
+    }
+
+    /**
+     * @return HasMany<Project, $this>
+     */
+    public function children(): HasMany
+    {
+        return $this->hasMany(Project::class, 'parent_project_id');
+    }
+
+    public function isElixirrClientRoot(): bool
+    {
+        return $this->parent_project_id === null
+            && $this->elixirr_client_slug !== null
+            && $this->elixirr_project_slug === null;
     }
 
     /**

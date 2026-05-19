@@ -21,4 +21,24 @@ class ProjectFactory extends Factory
             'description' => fake()->optional()->paragraph(),
         ];
     }
+
+    public function elixirrClientRoot(string $clientSlug = 'dezeen'): static
+    {
+        return $this->state(fn () => [
+            'title' => str($clientSlug)->title()->toString(),
+            'elixirr_client_slug' => $clientSlug,
+            'elixirr_project_slug' => null,
+            'parent_project_id' => null,
+        ]);
+    }
+
+    public function elixirrChild(Project $parent, string $projectSlug): static
+    {
+        return $this->state(fn () => [
+            'title' => str($projectSlug)->title()->toString(),
+            'elixirr_client_slug' => $parent->elixirr_client_slug,
+            'elixirr_project_slug' => $projectSlug,
+            'parent_project_id' => $parent->id,
+        ]);
+    }
 }

@@ -2,11 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\ValidatesElixirrProjectSlugs;
 use App\Models\Project;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateProjectRequest extends FormRequest
 {
+    use ValidatesElixirrProjectSlugs;
+
     public function authorize(): bool
     {
         /** @var Project $project */
@@ -16,13 +19,21 @@ class UpdateProjectRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
-        return [
+        return array_merge([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:65535'],
-        ];
+        ], $this->elixirrSlugRules());
+    }
+
+    protected function elixirrClientRootExclusionProjectId(): ?string
+    {
+        /** @var Project|null $project */
+        $project = $this->route('project');
+
+        return $project?->id;
     }
 }

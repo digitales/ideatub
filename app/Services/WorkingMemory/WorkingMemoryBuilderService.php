@@ -2,9 +2,11 @@
 
 namespace App\Services\WorkingMemory;
 
+use App\Models\Project;
 use App\Models\Thought;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
+use App\Services\Projects\ProjectScopeMatcher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -22,6 +24,7 @@ class WorkingMemoryBuilderService
         private readonly WorkingMemoryAiAuthorService $aiAuthorService,
         private readonly WorkingMemoryOutputValidator $outputValidator,
         private readonly WorkingMemoryLegacyRowCitationResolver $legacyRowCitationResolver,
+        private readonly ProjectScopeMatcher $projectScopeMatcher,
     ) {}
 
     public function buildConsolidated(int $userId, string $scopeType, string $scopeKey): WorkingMemoryVersion
@@ -680,7 +683,25 @@ class WorkingMemoryBuilderService
                 ->get();
         }
 
-        $scoped = $thoughts->filter(function (Thought $thought) use ($scopeType, $scopeKey): bool {
+        $scopeProject = null;
+        $childProjectIds = null;
+
+        if ($scopeType === 'project' && Str::isUuid($scopeKey)) {
+            $scopeProject = Project::query()
+                ->where('user_id', $userId)
+                ->find($scopeKey);
+
+            if ($scopeProject !== null && $scopeProject->isElixirrClientRoot()) {
+                $childProjectIds = $scopeProject->children()->pluck('id');
+            }
+        }
+
+        $scoped = $thoughts->filter(function (Thought $thought) use (
+            $scopeType,
+            $scopeKey,
+            $scopeProject,
+            $childProjectIds,
+        ): bool {
             if ($scopeType === 'global') {
                 return true;
             }
@@ -702,17 +723,12 @@ class WorkingMemoryBuilderService
                 return false;
             }
 
-            $metadataProject = Str::of((string) data_get($thought->source_metadata, 'project'))
-                ->trim()
-                ->lower()
-                ->toString();
-
-            $metadataMatch = $metadataProject !== '' && $metadataProject === $scopeKey;
-            $linkedProjectMatch = $thought->projects->contains(
-                fn ($project): bool => (string) $project->id === $scopeKey
+            return $this->projectScopeMatcher->thoughtMatchesProjectScope(
+                $thought,
+                $scopeKey,
+                $scopeProject,
+                $childProjectIds,
             );
-
-            return $metadataMatch || $linkedProjectMatch;
         })->values();
 
         if ($buildType === 'consolidated') {

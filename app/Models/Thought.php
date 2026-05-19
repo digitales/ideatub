@@ -103,6 +103,7 @@ class Thought extends Model implements Commentable
         'evernote_note_guid',
         'is_visible_in_stream',
         'visibility_reason',
+        'content_fingerprint',
     ];
 
     /**
@@ -736,31 +737,36 @@ class Thought extends Model implements Commentable
 
     /**
      * Scope to thoughts that should appear in stream-style listings (index recent, stream, search, API browse, etc.).
-     * Non-email sources are always included; email rows require is_visible_in_stream.
+     * Rows with is_visible_in_stream = false are excluded. Email rows additionally require is_visible_in_stream = true.
      */
     public function scopeVisibleInStream(Builder $query): Builder
     {
         $emailSourceValues = ThoughtTypeNavigation::storedValuesForCollection('email');
 
         return $query->where(function (Builder $q) use ($emailSourceValues): void {
-            $q->where(function (Builder $nonEmail) use ($emailSourceValues): void {
-                self::applyCanonicalTypeMatch(
-                    $nonEmail,
-                    'LOWER(COALESCE(source, ?))',
-                    $emailSourceValues,
-                    false,
-                    ['']
-                );
-            })->orWhere(function (Builder $email) use ($emailSourceValues): void {
-                self::applyCanonicalTypeMatch(
-                    $email,
-                    'LOWER(COALESCE(source, ?))',
-                    $emailSourceValues,
-                    true,
-                    ['']
-                );
+            $q->where(function (Builder $q2): void {
+                $q2->whereNull('is_visible_in_stream')
+                    ->orWhere('is_visible_in_stream', true);
+            })->where(function (Builder $q) use ($emailSourceValues): void {
+                $q->where(function (Builder $nonEmail) use ($emailSourceValues): void {
+                    self::applyCanonicalTypeMatch(
+                        $nonEmail,
+                        'LOWER(COALESCE(source, ?))',
+                        $emailSourceValues,
+                        false,
+                        ['']
+                    );
+                })->orWhere(function (Builder $email) use ($emailSourceValues): void {
+                    self::applyCanonicalTypeMatch(
+                        $email,
+                        'LOWER(COALESCE(source, ?))',
+                        $emailSourceValues,
+                        true,
+                        ['']
+                    );
 
-                $email->where('is_visible_in_stream', true);
+                    $email->where('is_visible_in_stream', true);
+                });
             });
         });
     }

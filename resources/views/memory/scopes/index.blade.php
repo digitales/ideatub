@@ -26,7 +26,12 @@
                 <section>
                     <h2 class="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-slate-brand">{{ $section['title'] }}</h2>
                     <ul class="space-y-2">
-                        @foreach ($section['rows'] as $row)
+                        @php
+                            $rows = ($section['key'] ?? '') === 'clients'
+                                ? collect($section['groups'] ?? [])->flatMap(fn ($group) => $group['rows'])->all()
+                                : ($section['rows'] ?? []);
+                        @endphp
+                        @foreach ($rows as $row)
                             @php
                                 $badge = $row['badge'] ?? null;
                                 $badgeClass = match ($badge) {
@@ -40,8 +45,9 @@
                                     $freshness !== null ? ucfirst($freshness) : null,
                                     $refreshed !== null ? "Refreshed {$refreshed}" : null,
                                 ])->filter()->implode(' · ');
+                                $indentClass = ($row['depth'] ?? 0) === 1 ? 'ml-6' : '';
                             @endphp
-                            <li>
+                            <li class="{{ $indentClass }}">
                                 @if (! empty($row['href']))
                                     <a
                                         href="{{ $row['href'] }}"
@@ -60,6 +66,14 @@
                                             @endif
                                         </div>
                                     </a>
+                                    @if (! empty($row['stream_href']))
+                                        <div class="-mt-2 px-5 pb-3">
+                                            <a
+                                                href="{{ $row['stream_href'] }}"
+                                                class="text-sm text-memory-violet hover:underline"
+                                            >Stream</a>
+                                        </div>
+                                    @endif
                                 @else
                                     <div
                                         aria-label="{{ $row['aria_label'] }}"

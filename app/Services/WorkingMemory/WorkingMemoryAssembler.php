@@ -400,6 +400,7 @@ class WorkingMemoryAssembler
     {
         $latestAuthoritative = $memory->versions()
             ->whereIn('build_type', ['consolidated', 'external'])
+            ->whereNull('superseded_at')
             ->orderByDesc('created_at')
             ->first();
 

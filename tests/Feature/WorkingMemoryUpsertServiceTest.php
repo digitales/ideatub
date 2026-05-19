@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\UserMcpKey;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
+use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use App\Services\WorkingMemory\WorkingMemoryUpsertService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
@@ -61,7 +62,7 @@ MD;
             scopeType: 'global',
             scopeKey: 'global',
             markdown: $this->sampleMarkdown(),
-        );
+        )->version;
 
         $this->assertInstanceOf(WorkingMemoryVersion::class, $version);
         $this->assertEquals('external', $version->build_type);
@@ -125,7 +126,7 @@ MD;
             scopeType: 'project',
             scopeKey: 'my-app',
             markdown: $this->sampleMarkdown(),
-        );
+        )->version;
 
         $updatedMarkdown = <<<'MD'
 ## Current Focus
@@ -140,7 +141,7 @@ MD;
             scopeType: 'project',
             scopeKey: 'my-app',
             markdown: $updatedMarkdown,
-        );
+        )->version;
 
         $this->assertNotEquals($v1->id, $v2->id);
         $this->assertEquals('Launch beta program', $v2->structured_sections_json['Current Focus'][0]['text']);
@@ -166,7 +167,7 @@ MD;
             scopeType: 'project',
             scopeKey: 'My-App',
             markdown: "## Current Focus\n- Test item",
-        );
+        )->version;
 
         $memory = $version->workingMemory;
         $this->assertEquals('my-app', $memory->scope_key);
@@ -174,7 +175,7 @@ MD;
     }
 
     #[Test]
-    public function it_returns_external_version_as_canonical_via_forScope(): void
+    public function it_returns_external_version_as_canonical_via_for_scope(): void
     {
         $user = User::factory()->create();
         $service = app(WorkingMemoryUpsertService::class);
@@ -183,7 +184,7 @@ MD;
 
         $service->upsert($user->id, 'project', 'dezeen', $markdown);
 
-        $assembler = app(\App\Services\WorkingMemory\WorkingMemoryAssembler::class);
+        $assembler = app(WorkingMemoryAssembler::class);
         $payload = $assembler->forScope($user->id, 'project', 'dezeen');
 
         $this->assertEquals('project', $payload['scope_type']);
@@ -253,12 +254,14 @@ MD;
         - Reviewed weekly check-in 2026-05-08.
         MD;
 
+        $projectId = '550e8400-e29b-41d4-a716-446655440000';
+
         $upsertResponse = $this->postJson('/api/mcp', [
             'jsonrpc' => '2.0',
             'method' => 'upsert_working_memory',
             'params' => [
                 'scope_type' => 'project',
-                'scope_key' => 'dezeen',
+                'scope_key' => $projectId,
                 'content' => trim($markdown),
                 'source_label' => 'elixirr-sync',
             ],
@@ -272,7 +275,7 @@ MD;
             'method' => 'get_working_memory',
             'params' => [
                 'scope_type' => 'project',
-                'scope_key' => 'dezeen',
+                'scope_key' => $projectId,
             ],
             'id' => 2,
         ], ['x-ideatub-key' => $keyValue]);
@@ -283,7 +286,7 @@ MD;
         $this->assertStringContainsString('Deliver the comments-page release', $result['summary_markdown'] ?? '');
         $this->assertEquals('external', $result['baseline_build_type'] ?? '');
         $this->assertEquals('project', $result['scope_type']);
-        $this->assertEquals('dezeen', $result['scope_key']);
+        $this->assertEquals($projectId, $result['scope_key']);
         $this->assertArrayHasKey('Current Focus', $result['structured_sections'] ?? []);
         $this->assertEquals('fresh', $result['freshness_state']);
     }
