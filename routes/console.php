@@ -16,5 +16,8 @@ Schedule::command('jira:sync-all')->hourly()->when(fn () => config('services.jir
 Schedule::command('mail:sync-all')->hourly()->when(fn () => config('services.mail_sync.enabled', true));
 Schedule::command('imports:prune-expired-batches')->dailyAt('03:00');
 Schedule::command('working-memory:consolidate')->dailyAt('02:45');
+Schedule::command('working-memory:dedupe --days=30')
+    ->dailyAt('03:15')
+    ->when(fn () => config('working_memory.dedupe_enabled', true));
 Schedule::command('compactions:digest')->hourly();
 Schedule::command('compactions:research')->dailyAt('04:15');

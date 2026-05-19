@@ -19,6 +19,17 @@ return [
 
     'require_uuid_project_scope_key_for_source_labels' => ['elixirr-sync'],
 
+    'dedupe_enabled' => filter_var(env('WORKING_MEMORY_DEDUPE_ENABLED', true), FILTER_VALIDATE_BOOL),
+
+    'dedupe_nightly_days' => (int) env('WORKING_MEMORY_DEDUPE_NIGHTLY_DAYS', 30),
+
+    'dedupe_volatile_patterns' => [
+        '/^#+\s*working memory\s*$/i',
+        '/^last updated:/i',
+        '/^scope:/i',
+        '/^\(?.*refreshed at.*\)?\s*$/i',
+    ],
+
     'import_rate_per_minute' => (int) env('WORKING_MEMORY_IMPORT_RATE_PER_MINUTE', 50),
 
     'insights_model_enabled' => env('WORKING_MEMORY_INSIGHTS_MODEL_ENABLED', false),

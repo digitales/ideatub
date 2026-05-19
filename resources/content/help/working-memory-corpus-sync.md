@@ -38,6 +38,8 @@ After captures, keep **`upsert_working_memory`** in `elixirr-sync` so canonical 
 - `scope_key`: **IdeaTub project UUID** (not client slug)
 - `source_label`: `elixirr-sync`
 
+**Server-side dedupe:** Unchanged `current.md` content (ignoring `Last Updated` / `refreshed at` lines) does not create a duplicate Stream card or `external` version. Use `no_chunking: true` on WM `capture_plan` snapshots. Backfill duplicates: `php artisan working-memory:dedupe --dry-run` (scheduled nightly on the server).
+
 ## Phase 3 — Bulk import & AI consolidation
 
 ### Bulk import from disk (Slack / automations / meetings)

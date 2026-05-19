@@ -2,11 +2,13 @@
 
 namespace App\Services\WorkingMemory;
 
+use App\Jobs\RetryWorkingMemorySupersedeJob;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Throwable;
 
 class WorkingMemoryUpsertService
 {
@@ -30,6 +32,9 @@ class WorkingMemoryUpsertService
 
     public function __construct(
         private readonly WorkingMemoryScopeNormalizer $scopeNormalizer,
+        private readonly WorkingMemoryContentFingerprint $fingerprint,
+        private readonly WorkingMemoryDedupeFamilyResolver $familyResolver,
+        private readonly WorkingMemoryVersionSuperseder $versionSuperseder,
     ) {}
 
     public function upsert(
@@ -38,7 +43,8 @@ class WorkingMemoryUpsertService
         string $scopeKey,
         string $markdown,
         ?string $sourceLabel = null,
-    ): WorkingMemoryVersion {
+        bool $strictContentHash = false,
+    ): WorkingMemoryUpsertResult {
         $trimmed = trim($markdown);
         if ($trimmed === '') {
             throw new InvalidArgumentException('Working memory content must not be empty.');
@@ -58,6 +64,29 @@ class WorkingMemoryUpsertService
             );
         }
 
+        $dedupeFamily = $this->familyResolver->resolveForUpsert($normalizedScopeType, $normalizedScopeKey);
+
+        if (! config('working_memory.dedupe_enabled', true)) {
+            $version = $this->persistExternalVersion(
+                $userId,
+                $normalizedScopeType,
+                $normalizedScopeKey,
+                $trimmed,
+                $sourceLabel,
+                null,
+                $dedupeFamily,
+            );
+
+            return new WorkingMemoryUpsertResult(
+                version: $version,
+                deduplicated: false,
+                contentFingerprint: '',
+                dedupeFamily: $dedupeFamily,
+                supersededVersionId: null,
+            );
+        }
+
+        $fingerprintHash = $this->fingerprint->hash($trimmed, $strictContentHash);
         $sections = $this->parseMarkdownSections($trimmed);
 
         return DB::transaction(function () use (
@@ -67,7 +96,9 @@ class WorkingMemoryUpsertService
             $trimmed,
             $sections,
             $sourceLabel,
-        ): WorkingMemoryVersion {
+            $fingerprintHash,
+            $dedupeFamily,
+        ): WorkingMemoryUpsertResult {
             $memory = WorkingMemory::query()->firstOrCreate(
                 [
                     'user_id' => $userId,
@@ -79,35 +110,123 @@ class WorkingMemoryUpsertService
                 ]
             );
 
-            $structuredSections = $this->buildStructuredSections($sections);
-            $legacy = $this->buildLegacyPayload($structuredSections);
-            $sectionReferences = $this->buildSectionReferences($structuredSections, $normalizedScopeType, $normalizedScopeKey);
+            $latestExternal = $memory->versions()
+                ->where('build_type', 'external')
+                ->whereNull('superseded_at')
+                ->orderByDesc('created_at')
+                ->first();
 
-            $version = $memory->versions()->create([
-                'build_type' => 'external',
-                'summary_markdown' => $trimmed,
-                'key_concepts_json' => $legacy['key_concepts'],
-                'active_threads_json' => $legacy['active_threads'],
-                'open_questions_json' => $legacy['open_questions'],
-                'next_actions_json' => $legacy['next_actions'],
-                'structured_sections_json' => $structuredSections,
-                'references_json' => [],
-                'section_references_json' => $sectionReferences,
-                'build_diagnostics_json' => $sourceLabel !== null
-                    ? ['source_label' => $sourceLabel]
-                    : null,
-                'authoring_status' => 'external',
-                'confidence_score' => 90.0,
-            ]);
+            if ($latestExternal !== null && $latestExternal->content_fingerprint === $fingerprintHash) {
+                return new WorkingMemoryUpsertResult(
+                    version: $latestExternal->fresh(['workingMemory']),
+                    deduplicated: true,
+                    contentFingerprint: $fingerprintHash,
+                    dedupeFamily: $dedupeFamily,
+                    supersededVersionId: null,
+                );
+            }
 
-            $memory->forceFill([
-                'latest_version_id' => $version->id,
-                'freshness_state' => 'fresh',
-                'last_refreshed_at' => now(),
-            ])->save();
+            $version = $this->persistExternalVersion(
+                $userId,
+                $normalizedScopeType,
+                $normalizedScopeKey,
+                $trimmed,
+                $sourceLabel,
+                $fingerprintHash,
+                $dedupeFamily,
+                $memory,
+                $sections,
+            );
 
-            return $version->fresh(['workingMemory']);
+            $supersededVersionId = null;
+            try {
+                $count = $this->versionSuperseder->supersedeAllExcept($memory, $version);
+                if ($count > 0) {
+                    $prior = $memory->versions()
+                        ->where('build_type', 'external')
+                        ->where('superseded_by_version_id', $version->id)
+                        ->orderByDesc('superseded_at')
+                        ->first();
+                    $supersededVersionId = $prior?->id !== null ? (string) $prior->id : null;
+                }
+            } catch (Throwable $e) {
+                RetryWorkingMemorySupersedeJob::dispatch(
+                    $userId,
+                    $dedupeFamily,
+                    null,
+                    (string) $version->id,
+                );
+                report($e);
+            }
+
+            return new WorkingMemoryUpsertResult(
+                version: $version->fresh(['workingMemory']),
+                deduplicated: false,
+                contentFingerprint: $fingerprintHash,
+                dedupeFamily: $dedupeFamily,
+                supersededVersionId: $supersededVersionId,
+            );
         });
+    }
+
+    /**
+     * @param  array<string, list<string>>|null  $preparsedSections
+     */
+    private function persistExternalVersion(
+        int $userId,
+        string $normalizedScopeType,
+        string $normalizedScopeKey,
+        string $trimmed,
+        ?string $sourceLabel,
+        ?string $fingerprintHash,
+        string $dedupeFamily,
+        ?WorkingMemory $existingMemory = null,
+        ?array $preparsedSections = null,
+    ): WorkingMemoryVersion {
+        $memory = $existingMemory ?? WorkingMemory::query()->firstOrCreate(
+            [
+                'user_id' => $userId,
+                'scope_type' => $normalizedScopeType,
+                'scope_key' => $normalizedScopeKey,
+            ],
+            [
+                'freshness_state' => 'stale',
+            ]
+        );
+
+        $sections = $preparsedSections ?? $this->parseMarkdownSections($trimmed);
+        $structuredSections = $this->buildStructuredSections($sections);
+        $legacy = $this->buildLegacyPayload($structuredSections);
+        $sectionReferences = $this->buildSectionReferences($structuredSections, $normalizedScopeType, $normalizedScopeKey);
+
+        $diagnostics = array_filter([
+            'source_label' => $sourceLabel,
+            'dedupe_family' => $dedupeFamily,
+        ], fn ($v) => $v !== null && $v !== '');
+
+        $version = $memory->versions()->create([
+            'build_type' => 'external',
+            'summary_markdown' => $trimmed,
+            'key_concepts_json' => $legacy['key_concepts'],
+            'active_threads_json' => $legacy['active_threads'],
+            'open_questions_json' => $legacy['open_questions'],
+            'next_actions_json' => $legacy['next_actions'],
+            'structured_sections_json' => $structuredSections,
+            'references_json' => [],
+            'section_references_json' => $sectionReferences,
+            'build_diagnostics_json' => $diagnostics !== [] ? $diagnostics : null,
+            'authoring_status' => 'external',
+            'content_fingerprint' => $fingerprintHash,
+            'confidence_score' => 90.0,
+        ]);
+
+        $memory->forceFill([
+            'latest_version_id' => $version->id,
+            'freshness_state' => 'fresh',
+            'last_refreshed_at' => now(),
+        ])->save();
+
+        return $version->fresh(['workingMemory']);
     }
 
     /**

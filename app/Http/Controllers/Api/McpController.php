@@ -21,6 +21,8 @@ use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Services\Video\VideoCaptureService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
+use App\Services\WorkingMemory\WorkingMemoryDedupeFamilyResolver;
+use App\Services\WorkingMemory\WorkingMemorySnapshotDedupeService;
 use App\Services\WorkingMemory\WorkingMemoryUpsertService;
 use App\Services\WorkingMemory\WorkingMemoryVersionCatalog;
 use App\Support\BearerTokenExtractor;
@@ -48,6 +50,8 @@ class McpController extends Controller
         private WorkingMemoryAssembler $workingMemoryAssembler,
         private WorkingMemoryUpsertService $workingMemoryUpsertService,
         private WorkingMemoryVersionCatalog $workingMemoryVersionCatalog,
+        private WorkingMemoryDedupeFamilyResolver $workingMemoryDedupeFamilyResolver,
+        private WorkingMemorySnapshotDedupeService $workingMemorySnapshotDedupeService,
     ) {}
 
     /**
@@ -418,6 +422,7 @@ class McpController extends Controller
             'project' => ['type' => 'string', 'description' => 'Optional code project name (e.g. workspace or repo name). Stored in source_metadata so you can filter by project.'],
             'tags' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Optional extra tags to merge with extracted and doc tag'],
             'no_chunking' => ['type' => 'boolean', 'description' => 'If true, do not auto-chunk long documents (default: documents over 500 words are split at markdown headings into linked sections).'],
+            'strict_content_hash' => ['type' => 'boolean', 'description' => 'If true, include volatile sync header lines (Last Updated, refreshed at) in working-memory dedupe fingerprint. Default false.'],
         ];
         if ($includeDocTypeProperty) {
             $properties = array_merge(
@@ -1056,21 +1061,27 @@ class McpController extends Controller
             'scope_key' => 'required|string|max:191',
             'content' => 'required|string|min:1',
             'source_label' => 'nullable|string|max:191',
+            'strict_content_hash' => 'sometimes|boolean',
         ]);
         if ($v->fails()) {
             throw new \InvalidArgumentException($v->errors()->first());
         }
 
-        /** @var array{scope_type: string, scope_key: string, content: string, source_label: ?string} $validated */
+        /** @var array{scope_type: string, scope_key: string, content: string, source_label: ?string, strict_content_hash?: bool} $validated */
         $validated = $v->validated();
 
-        $version = $this->workingMemoryUpsertService->upsert(
+        $strictContentHash = filter_var($params['strict_content_hash'] ?? false, FILTER_VALIDATE_BOOL);
+
+        $result = $this->workingMemoryUpsertService->upsert(
             (int) auth()->id(),
             $validated['scope_type'],
             $validated['scope_key'],
             $validated['content'],
             $validated['source_label'] ?? null,
+            $strictContentHash,
         );
+
+        $version = $result->version;
 
         return [
             'build_type' => $version->build_type,
@@ -1078,6 +1089,10 @@ class McpController extends Controller
             'scope_type' => $version->workingMemory->scope_type,
             'scope_key' => $version->workingMemory->scope_key,
             'freshness_state' => $version->workingMemory->freshness_state,
+            'deduplicated' => $result->deduplicated,
+            'content_fingerprint' => $result->contentFingerprint,
+            'dedupe_family' => $result->dedupeFamily,
+            'superseded_version_id' => $result->supersededVersionId,
         ];
     }
 

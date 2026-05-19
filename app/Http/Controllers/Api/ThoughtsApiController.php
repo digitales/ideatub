@@ -207,7 +207,7 @@ class ThoughtsApiController extends Controller
      */
     public function upsertWorkingMemory(Request $request): JsonResponse
     {
-        $input = $request->only(['scope_type', 'scope_key', 'content', 'source_label']);
+        $input = $request->only(['scope_type', 'scope_key', 'content', 'source_label', 'strict_content_hash']);
         foreach (['scope_type', 'scope_key', 'content', 'source_label'] as $key) {
             if (isset($input[$key]) && is_string($input[$key])) {
                 $input[$key] = trim($input[$key]);
@@ -219,25 +219,29 @@ class ThoughtsApiController extends Controller
             'scope_key' => 'required|string|max:191',
             'content' => 'required|string|min:1',
             'source_label' => 'nullable|string|max:191',
+            'strict_content_hash' => 'sometimes|boolean',
         ]);
         if ($v->fails()) {
             return response()->json(['error' => 'validation_error', 'message' => $v->errors()->first()], 422);
         }
 
-        /** @var array{scope_type: string, scope_key: string, content: string, source_label: ?string} $validated */
+        /** @var array{scope_type: string, scope_key: string, content: string, source_label: ?string, strict_content_hash?: bool} $validated */
         $validated = $v->validated();
 
         try {
-            $version = app(WorkingMemoryUpsertService::class)->upsert(
+            $result = app(WorkingMemoryUpsertService::class)->upsert(
                 (int) auth()->id(),
                 $validated['scope_type'],
                 $validated['scope_key'],
                 $validated['content'],
                 $validated['source_label'] ?? null,
+                (bool) ($validated['strict_content_hash'] ?? false),
             );
         } catch (\InvalidArgumentException $e) {
             return response()->json(['error' => 'validation_error', 'message' => $e->getMessage()], 422);
         }
+
+        $version = $result->version;
 
         return response()->json([
             'build_type' => $version->build_type,
@@ -245,6 +249,10 @@ class ThoughtsApiController extends Controller
             'scope_type' => $version->workingMemory->scope_type,
             'scope_key' => $version->workingMemory->scope_key,
             'freshness_state' => $version->workingMemory->freshness_state,
+            'deduplicated' => $result->deduplicated,
+            'content_fingerprint' => $result->contentFingerprint,
+            'dedupe_family' => $result->dedupeFamily,
+            'superseded_version_id' => $result->supersededVersionId,
         ]);
     }
 
