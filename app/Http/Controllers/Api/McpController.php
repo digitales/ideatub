@@ -15,6 +15,7 @@ use App\Services\McpSessionService;
 use App\Services\Meetings\MeetingService;
 use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
+use App\Services\Projects\ProjectListingService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
@@ -122,6 +123,7 @@ class McpController extends Controller
             'capture_video',
             'capture_article',
             'get_working_memory',
+            'list_projects',
             'list_working_memory_versions',
             'get_working_memory_version',
             'get_compaction',
@@ -591,6 +593,17 @@ class McpController extends Controller
                 ],
             ],
             [
+                'name' => 'list_projects',
+                'description' => 'List IdeaTub projects for Elixirr scope discovery. Returns project UUIDs, titles, elixirr_client_slug, elixirr_project_slug, and parent_project_id for mapping working memory scopes.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'elixirr_client_slug' => ['type' => 'string', 'description' => 'Filter to projects for this Elixirr client slug'],
+                        'parent_project_id' => ['type' => 'string', 'description' => 'Filter to child projects of this parent project UUID'],
+                    ],
+                ],
+            ],
+            [
                 'name' => 'list_working_memory_versions',
                 'description' => 'List paginated working memory version history for a scope (external and consolidated builds; compactions optional). Returns data items plus meta pagination fields.',
                 'inputSchema' => [
@@ -869,6 +882,7 @@ class McpController extends Controller
             'capture_video' => $this->captureVideo($params),
             'capture_article' => $this->captureArticle($params),
             'get_working_memory' => $this->getWorkingMemory($params),
+            'list_projects' => $this->listProjects($params),
             'list_working_memory_versions' => $this->listWorkingMemoryVersions($params),
             'get_working_memory_version' => $this->getWorkingMemoryVersion($params),
             'get_compaction' => $this->getCompaction($params),
@@ -908,6 +922,29 @@ class McpController extends Controller
             (int) auth()->id(),
             $validated['scope_type'],
             $validated['scope_key']
+        );
+    }
+
+    /**
+     * list_projects: List projects for Elixirr scope discovery via {@see ProjectListingService}.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{data: list<array{id: string, title: string, elixirr_client_slug: ?string, elixirr_project_slug: ?string, parent_project_id: ?string}>}
+     */
+    private function listProjects(array $params): array
+    {
+        $v = Validator::make($params, [
+            'elixirr_client_slug' => 'sometimes|string|max:64',
+            'parent_project_id' => 'sometimes|uuid',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        return app(ProjectListingService::class)->forUser(
+            (int) auth()->id(),
+            isset($params['elixirr_client_slug']) ? (string) $params['elixirr_client_slug'] : null,
+            isset($params['parent_project_id']) ? (string) $params['parent_project_id'] : null,
         );
     }
 
@@ -1646,6 +1683,7 @@ class McpController extends Controller
             'tags.*' => 'string|max:128',
             'no_chunking' => 'sometimes|nullable|boolean',
             'no-chunking' => 'sometimes|nullable|boolean',
+            'strict_content_hash' => 'sometimes|boolean',
         ]);
         if ($v->fails()) {
             throw new \InvalidArgumentException($v->errors()->first());
@@ -1692,6 +1730,25 @@ class McpController extends Controller
         }
 
         $noChunking = ! empty($params['no_chunking']) || ! empty($params['no-chunking']);
+        $strictContentHash = filter_var($params['strict_content_hash'] ?? false, FILTER_VALIDATE_BOOL);
+
+        if (config('working_memory.dedupe_enabled', true)
+            && $this->workingMemoryDedupeFamilyResolver->isWorkingMemoryCapture($planSlug, $extraTags, $project)) {
+            return $this->workingMemorySnapshotDedupeService->capture(
+                userId: (int) auth()->id(),
+                content: $content,
+                docType: $docType,
+                sourceMetadata: $sourceMetadata ?: null,
+                planSlug: $planSlug,
+                parentId: $parent?->id,
+                filePath: $filePath,
+                project: $project,
+                extraTags: $extraTags,
+                noChunking: $noChunking,
+                strictContentHash: $strictContentHash,
+            );
+        }
+
         $result = $this->captureService->create([
             'content' => $content,
             'user_id' => auth()->id(),

@@ -33,6 +33,7 @@ Tools available:
 | `capture_meeting` / `add_meeting` / `add_meeting_notes` | Meeting aliases for `capture_plan` with `doc_type=meeting` |
 | `process_meeting` | Queue meeting summarization + categorization (from existing meeting thought or raw transcript content) |
 | `get_working_memory` | Return a global, project, **insights**, or **tag** scoped working memory snapshot (`scope_type`, `scope_key`; same payload shape as `GET /api/thoughts/working-memory`, including assembler metadata fields in [Get working memory response shape](#get-working-memory-response-shape)) |
+| `list_projects` | List IdeaTub projects for Elixirr scope discovery (UUIDs, titles, `elixirr_client_slug`, `elixirr_project_slug`; same payload as `GET /api/projects`) |
 | `upsert_working_memory` | Persist externally-authored working memory markdown as the canonical `external` version for a scope (see [Working memory: external-first hybrid](#working-memory-external-first-hybrid)) |
 | `list_working_memory_versions` | Paginated version history for a scope (`external` and `consolidated` by default; optional compactions) |
 | `get_working_memory_version` | Full read-only payload for one version by `version_id` |
@@ -252,6 +253,7 @@ Use this if you are scripting against IdeaTub or building a bridge.
 | `capture_meeting`, `add_meeting`, `add_meeting_notes` | `content` (string) | Same optional params as `capture_plan` **except** `doc_type` is omitted and always `meeting`. These three names are **aliases** of one implementation (any `doc_type` in params is ignored). |
 | `process_meeting` | One of `thought_id` (UUID) or `content` (string) | `plan_slug` (when `content` is provided), `meeting_skill_id` (int), `force_rerun` (bool) |
 | `get_working_memory` | `scope_type` (`global` \| `project` \| `insights` \| `tag`), `scope_key` (string, required; `global` for global and insights scopes, project id / normalized project slug for project scope, or normalized tag key for tag scope) | — |
+| `list_projects` | — | `elixirr_client_slug` (string), `parent_project_id` (UUID) |
 | `upsert_working_memory` | `scope_type`, `scope_key`, `content` (markdown with `##` section headings) | `source_label` (string, e.g. `elixirr-sync`) — **project `scope_key` must be the IdeaTub project UUID**, not a metadata slug |
 | `list_working_memory_versions` | `scope_type`, `scope_key` | `include_compactions` (bool), `page` (int), `per_page` (int, max 50) |
 | `get_working_memory_version` | `version_id` (UUID) | — |
@@ -270,9 +272,10 @@ Example calls:
 {"jsonrpc":"2.0","method":"process_meeting","params":{"content":"Speaker A: ...","plan_slug":"2026-04-15-weekly-sync"},"id":9}
 {"jsonrpc":"2.0","method":"get_working_memory","params":{"scope_type":"global","scope_key":"global"},"id":10}
 {"jsonrpc":"2.0","method":"get_working_memory","params":{"scope_type":"tag","scope_key":"ai"},"id":11}
-{"jsonrpc":"2.0","method":"upsert_working_memory","params":{"scope_type":"project","scope_key":"019e0705-5591-73e9-be2e-0fb9c86b269a","content":"## Current Focus\n\n- Ship the fix.","source_label":"elixirr-sync"},"id":12}
-{"jsonrpc":"2.0","method":"list_working_memory_versions","params":{"scope_type":"project","scope_key":"019e0705-5591-73e9-be2e-0fb9c86b269a","page":1,"per_page":20},"id":13}
-{"jsonrpc":"2.0","method":"get_working_memory_version","params":{"version_id":"uuid-of-version"},"id":14}
+{"jsonrpc":"2.0","method":"list_projects","params":{"elixirr_client_slug":"dezeen"},"id":12}
+{"jsonrpc":"2.0","method":"upsert_working_memory","params":{"scope_type":"project","scope_key":"019e0705-5591-73e9-be2e-0fb9c86b269a","content":"## Current Focus\n\n- Ship the fix.","source_label":"elixirr-sync"},"id":13}
+{"jsonrpc":"2.0","method":"list_working_memory_versions","params":{"scope_type":"project","scope_key":"019e0705-5591-73e9-be2e-0fb9c86b269a","page":1,"per_page":20},"id":14}
+{"jsonrpc":"2.0","method":"get_working_memory_version","params":{"version_id":"uuid-of-version"},"id":15}
 ```
 
 #### Get working memory response shape
