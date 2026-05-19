@@ -88,8 +88,36 @@ class MemoryScopesIndexTest extends TestCase
         $html = (string) $response->getContent();
 
         $response->assertOk();
-        $this->assertSectionHeadingsInOrder($html, ['Global', 'Insights', 'Projects']);
+        $this->assertSectionHeadingsInOrder($html, ['Global', 'Insights', 'Other projects']);
         $response->assertSeeInOrder(['Project Beta Newer', 'Project Alpha Older']);
+    }
+
+    public function test_clients_section_nests_subprojects(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = $this->createUser();
+        $root = Project::factory()->elixirrClientRoot('dezeen')->for($user)->create();
+        $child = Project::factory()->elixirrChild($root, 'foo')->for($user)->create();
+
+        $this->createMemory($user, [
+            'scope_type' => 'project',
+            'scope_key' => $root->id,
+            'last_refreshed_at' => now()->subDay(),
+        ]);
+        $this->createMemory($user, [
+            'scope_type' => 'project',
+            'scope_key' => $child->id,
+            'last_refreshed_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('memory.scopes.index'));
+        $html = (string) $response->getContent();
+
+        $response->assertOk();
+        $this->assertSectionHeadingsInOrder($html, ['Clients']);
+        $response->assertSeeInOrder(['Dezeen', 'Foo']);
+        $response->assertSee('ml-6', false);
+        $response->assertSee(route('idea.stream', ['tag' => TagSlug::from('client:dezeen')]), false);
     }
 
     public function test_updating_badge(): void
@@ -142,7 +170,6 @@ class MemoryScopesIndexTest extends TestCase
         $response->assertSee('Unavailable project', false);
         $response->assertSee(route('projects.index'), false);
     }
-
 
     public function test_tag_section_shows_canonical_label_and_bounded_thought_queries(): void
     {
