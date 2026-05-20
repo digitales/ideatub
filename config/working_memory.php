@@ -64,6 +64,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Composer chat completion token budget
+    |--------------------------------------------------------------------------
+    |
+    | Working-memory compose uses researchFromPromptCompletion (not research.max_tokens).
+    | When the provider returns finish_reason=length, one retry uses composer_max_tokens_length_retry.
+    |
+    */
+
+    'composer_max_tokens' => (int) env('WORKING_MEMORY_COMPOSER_MAX_TOKENS', 4096),
+    'composer_max_tokens_length_retry' => (int) env('WORKING_MEMORY_COMPOSER_MAX_TOKENS_LENGTH_RETRY', 8192),
+
+    /*
+    |--------------------------------------------------------------------------
     | LLM JSON decode failure logging
     |--------------------------------------------------------------------------
     |

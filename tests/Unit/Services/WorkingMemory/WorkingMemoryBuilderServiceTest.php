@@ -180,7 +180,12 @@ class WorkingMemoryBuilderServiceTest extends TestCase
         ]);
 
         $mock = Mockery::mock(OpenRouterService::class);
-        $mock->shouldReceive('researchFromPrompt')->once()->andReturn('not valid json');
+        $mock->shouldReceive('researchFromPromptCompletion')->once()->andReturn([
+            'content' => 'not valid json',
+            'finish_reason' => 'stop',
+            'model' => 'openai/gpt-4o-mini',
+            'max_tokens' => 4096,
+        ]);
         $this->app->instance(OpenRouterService::class, $mock);
 
         $user = User::factory()->create();
@@ -829,7 +834,12 @@ class WorkingMemoryBuilderServiceTest extends TestCase
     {
         $json = json_encode($this->validatedComposerModelPayloadForBuild());
         $mock = Mockery::mock(OpenRouterService::class);
-        $mock->shouldReceive('researchFromPrompt')->times($times)->andReturn($json);
+        $mock->shouldReceive('researchFromPromptCompletion')->times($times)->andReturn([
+            'content' => $json,
+            'finish_reason' => 'stop',
+            'model' => 'openai/gpt-4o-mini',
+            'max_tokens' => 4096,
+        ]);
         $this->app->instance(OpenRouterService::class, $mock);
     }
 
@@ -838,7 +848,20 @@ class WorkingMemoryBuilderServiceTest extends TestCase
         $good = json_encode($this->validatedComposerModelPayloadForBuild());
         $bad = json_encode($this->composerPayloadWithInvalidSectionCitations());
         $mock = Mockery::mock(OpenRouterService::class);
-        $mock->shouldReceive('researchFromPrompt')->twice()->andReturn($good, $bad);
+        $mock->shouldReceive('researchFromPromptCompletion')->twice()->andReturn(
+            [
+                'content' => $good,
+                'finish_reason' => 'stop',
+                'model' => 'openai/gpt-4o-mini',
+                'max_tokens' => 4096,
+            ],
+            [
+                'content' => $bad,
+                'finish_reason' => 'stop',
+                'model' => 'openai/gpt-4o-mini',
+                'max_tokens' => 4096,
+            ],
+        );
         $this->app->instance(OpenRouterService::class, $mock);
     }
 
@@ -846,7 +869,12 @@ class WorkingMemoryBuilderServiceTest extends TestCase
     {
         $json = json_encode($this->composerPayloadWithInvalidSectionCitations());
         $mock = Mockery::mock(OpenRouterService::class);
-        $mock->shouldReceive('researchFromPrompt')->once()->andReturn($json);
+        $mock->shouldReceive('researchFromPromptCompletion')->once()->andReturn([
+            'content' => $json,
+            'finish_reason' => 'stop',
+            'model' => 'openai/gpt-4o-mini',
+            'max_tokens' => 4096,
+        ]);
         $this->app->instance(OpenRouterService::class, $mock);
     }
 

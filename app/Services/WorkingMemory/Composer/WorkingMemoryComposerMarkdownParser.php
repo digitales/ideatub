@@ -27,7 +27,7 @@ final class WorkingMemoryComposerMarkdownParser
             return null;
         }
 
-        if (! preg_match('/^##\s+/m', $trimmed)) {
+        if (! self::looksLikeStructuredComposeMarkdown($trimmed, $sectionLookup)) {
             return null;
         }
 
@@ -37,8 +37,9 @@ final class WorkingMemoryComposerMarkdownParser
         }
 
         $matchedSections = 0;
+        $pattern = self::sectionBlockPattern($sectionLookup);
 
-        if (! preg_match_all('/^##\s+(.+?)\s*\r?\n(.*?)(?=^##\s+|\z)/ms', $trimmed, $matches, PREG_SET_ORDER)) {
+        if (! preg_match_all($pattern, $trimmed, $matches, PREG_SET_ORDER)) {
             return null;
         }
 
@@ -76,6 +77,59 @@ final class WorkingMemoryComposerMarkdownParser
             'structured_sections' => $structured,
             'references' => [],
         ];
+    }
+
+    /**
+     * @param  array<string, string>  $sectionLookup
+     */
+    private static function looksLikeStructuredComposeMarkdown(string $text, array $sectionLookup): bool
+    {
+        $delimiter = self::sectionHeadingPrefixPattern($sectionLookup);
+
+        return preg_match('/'.$delimiter.'/mi', $text) === 1;
+    }
+
+    /**
+     * @param  array<string, string>  $sectionLookup
+     */
+    private static function sectionBlockPattern(array $sectionLookup): string
+    {
+        $heading = self::sectionHeadingPrefixPattern($sectionLookup);
+        $next = self::sectionHeadingLookaheadPattern($sectionLookup);
+
+        return '/'.$heading.'(.*?)(?='.$next.')/ms';
+    }
+
+    /**
+     * Matches `## Current Focus` or `**Current Focus**` at line start (optional trailing spaces).
+     *
+     * @param  array<string, string>  $sectionLookup
+     */
+    private static function sectionHeadingPrefixPattern(array $sectionLookup): string
+    {
+        $names = array_map(
+            static fn (string $name): string => preg_quote($name, '/'),
+            array_values($sectionLookup),
+        );
+
+        $alternation = implode('|', $names);
+
+        return '(?:^##\s+|^\*\*)('.$alternation.')(?:\*\*)?\s*(?:\r?\n|$)';
+    }
+
+    /**
+     * @param  array<string, string>  $sectionLookup
+     */
+    private static function sectionHeadingLookaheadPattern(array $sectionLookup): string
+    {
+        $names = array_map(
+            static fn (string $name): string => preg_quote($name, '/'),
+            array_values($sectionLookup),
+        );
+
+        $alternation = implode('|', $names);
+
+        return '(?:^##\s+|^\*\*)(?:'.$alternation.')(?:\*\*)?\s*(?:\r?\n|$)|\z';
     }
 
     /**

@@ -287,7 +287,28 @@ class OpenRouterService
         string $userPrompt,
         ?string $modelOverride = null,
         ?float $temperatureOverride = null,
+        ?int $maxTokensOverride = null,
     ): string {
+        return $this->researchFromPromptCompletion(
+            $userPrompt,
+            $modelOverride,
+            $temperatureOverride,
+            $maxTokensOverride,
+        )['content'];
+    }
+
+    /**
+     * @return array{content: string, finish_reason: string|null, model: string, max_tokens: int}
+     *
+     * @throws RequestException On HTTP errors
+     * @throws \RuntimeException If OPENROUTER_API_KEY is not set or response missing content
+     */
+    public function researchFromPromptCompletion(
+        string $userPrompt,
+        ?string $modelOverride = null,
+        ?float $temperatureOverride = null,
+        ?int $maxTokensOverride = null,
+    ): array {
         $userPrompt = trim($userPrompt);
         if ($userPrompt === '') {
             throw new \RuntimeException('Research prompt is empty.');
@@ -306,32 +327,83 @@ class OpenRouterService
                 config('services.openrouter.metadata_model', 'openai/gpt-4o-mini')
             );
 
-        $payload = [
-            'model' => $model,
-            'messages' => [
-                ['role' => 'user', 'content' => $userPrompt],
-            ],
-            'max_tokens' => config('research.max_tokens', 2048),
-        ];
+        $maxTokens = $maxTokensOverride ?? (int) config('research.max_tokens', 2048);
+        $maxTokens = max(1, $maxTokens);
+        $lengthRetryMaxTokens = max($maxTokens, (int) config('working_memory.composer_max_tokens_length_retry', 8192));
+        $retriedForLength = false;
 
-        if ($temperatureOverride !== null) {
-            $payload['temperature'] = $temperatureOverride;
+        while (true) {
+            $payload = [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+                'max_tokens' => $maxTokens,
+            ];
+
+            if ($temperatureOverride !== null) {
+                $payload['temperature'] = $temperatureOverride;
+            }
+
+            $response = $this->sendChatCompletionRequest(
+                $payload,
+                $apiKey,
+                (int) config('services.openrouter.chat_timeout_seconds', 60),
+            );
+
+            $response->throw();
+
+            $finishReason = $this->extractChatFinishReason($response);
+            $content = $response->json('choices.0.message.content');
+
+            if ($content === null || $content === '') {
+                Log::error('OpenRouter chat completion missing message content.', [
+                    'model' => $model,
+                    'max_tokens' => $maxTokens,
+                    'finish_reason' => $finishReason,
+                    'body_preview' => Str::limit($response->body(), 800),
+                ]);
+                throw new \RuntimeException(
+                    'OpenRouter research note response missing choices[0].message.content.'
+                    .($finishReason !== null ? ' finish_reason='.$finishReason : '')
+                );
+            }
+
+            if (
+                ! $retriedForLength
+                && $finishReason === 'length'
+                && $lengthRetryMaxTokens > $maxTokens
+            ) {
+                $retriedForLength = true;
+                $maxTokens = $lengthRetryMaxTokens;
+                Log::warning('OpenRouter chat completion retrying after finish_reason=length.', [
+                    'model' => $model,
+                    'retry_max_tokens' => $maxTokens,
+                ]);
+
+                continue;
+            }
+
+            return [
+                'content' => (string) $content,
+                'finish_reason' => $finishReason,
+                'model' => $model,
+                'max_tokens' => $maxTokens,
+            ];
+        }
+    }
+
+    private function extractChatFinishReason(Response $response): ?string
+    {
+        $finishReason = $response->json('choices.0.finish_reason');
+
+        if (! is_string($finishReason)) {
+            return null;
         }
 
-        $response = $this->sendChatCompletionRequest(
-            $payload,
-            $apiKey,
-            (int) config('services.openrouter.chat_timeout_seconds', 60),
-        );
+        $trimmed = trim($finishReason);
 
-        $response->throw();
-
-        $content = $response->json('choices.0.message.content');
-        if ($content === null || $content === '') {
-            throw new \RuntimeException('OpenRouter research note response missing choices[0].message.content.');
-        }
-
-        return (string) $content;
+        return $trimmed !== '' ? $trimmed : null;
     }
 
     /**

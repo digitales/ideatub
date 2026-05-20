@@ -11,15 +11,29 @@ use Tests\TestCase;
 
 final class WorkingMemoryAiAuthorServiceTest extends TestCase
 {
+    /**
+     * @return array{content: string, finish_reason: string|null, model: string, max_tokens: int}
+     */
+    private function completion(string $content, ?string $finishReason = 'stop'): array
+    {
+        return [
+            'content' => $content,
+            'finish_reason' => $finishReason,
+            'model' => 'openai/gpt-4o-mini',
+            'max_tokens' => 4096,
+        ];
+    }
+
     #[Test]
     public function it_calls_openrouter_with_composer_prompt_and_returns_parsed_json(): void
     {
         $promptBuilder = new WorkingMemoryComposerPromptBuilder;
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')
+        $openRouter->shouldReceive('researchFromPromptCompletion')
             ->once()
-            ->withArgs(fn (string $prompt, ?string $model = null, ?float $temperature = null): bool => str_contains($prompt, '## Working memory composition task'))
-            ->andReturn(json_encode([
+            ->withArgs(fn (string $prompt, ?string $model = null, ?float $temperature = null, ?int $maxTokens = null): bool => str_contains($prompt, '## Working memory composition task')
+                && $maxTokens === 4096)
+            ->andReturn($this->completion(json_encode([
                 'summary_markdown' => "# Working memory\n## Current Focus\n- Ship DEZ-2819 fix.",
                 'structured_sections' => [
                     'Current Focus' => [[
@@ -30,7 +44,7 @@ final class WorkingMemoryAiAuthorServiceTest extends TestCase
                     ]],
                 ],
                 'references' => [['type' => 'thought', 'url' => '/thoughts/t1', 'label' => 'DEZ-2819']],
-            ]));
+            ])));
 
         $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
 
@@ -60,7 +74,7 @@ final class WorkingMemoryAiAuthorServiceTest extends TestCase
     {
         $promptBuilder = new WorkingMemoryComposerPromptBuilder;
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')->andReturn('not json');
+        $openRouter->shouldReceive('researchFromPromptCompletion')->andReturn($this->completion('not json', 'stop'));
 
         $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
 
@@ -81,6 +95,44 @@ final class WorkingMemoryAiAuthorServiceTest extends TestCase
     }
 
     #[Test]
+    public function it_parses_bold_markdown_sections_when_model_ignores_json_contract(): void
+    {
+        $markdown = <<<'MD'
+# Working Memory Snapshot
+
+**Current Focus**
+Finalize the April 14th meeting.
+
+**Active Priorities**
+1. Confirm the meeting time with Nicola.
+MD;
+
+        $promptBuilder = new WorkingMemoryComposerPromptBuilder;
+        $openRouter = Mockery::mock(OpenRouterService::class);
+        $openRouter->shouldReceive('researchFromPromptCompletion')->once()->andReturn($this->completion($markdown));
+
+        $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
+
+        $result = $service->authorFromEvidence([
+            'scope_type' => 'global',
+            'scope_key' => 'global',
+            'generated_at' => '2026-05-07T10:00:00Z',
+            'signals' => [[
+                'thought_id' => 't1',
+                'content' => 'Meeting on April 14th.',
+                'created_at' => '2026-05-07T09:00:00Z',
+                'references' => [['type' => 'thought', 'url' => '/thoughts/t1', 'label' => 'Meeting note']],
+            ]],
+            'compactions' => [],
+            'section_candidates' => [],
+            'section_bundles' => [],
+        ]);
+
+        $this->assertNotEmpty($result['structured_sections']['Current Focus']);
+        $this->assertCount(1, $result['structured_sections']['Active Priorities']);
+    }
+
+    #[Test]
     public function it_parses_markdown_section_headings_when_model_ignores_json_contract(): void
     {
         $markdown = <<<'MD'
@@ -94,7 +146,7 @@ MD;
 
         $promptBuilder = new WorkingMemoryComposerPromptBuilder;
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')->once()->andReturn($markdown);
+        $openRouter->shouldReceive('researchFromPromptCompletion')->once()->andReturn($this->completion($markdown));
 
         $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
 
@@ -129,16 +181,16 @@ MD;
 
         $promptBuilder = new WorkingMemoryComposerPromptBuilder;
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')
+        $openRouter->shouldReceive('researchFromPromptCompletion')
             ->once()
-            ->withArgs(function (string $prompt, ?string $model, ?float $temperature): bool {
-                return $model === 'openai/gpt-4o-mini-test' && $temperature === 0.42;
+            ->withArgs(function (string $prompt, ?string $model, ?float $temperature, ?int $maxTokens): bool {
+                return $model === 'openai/gpt-4o-mini-test' && $temperature === 0.42 && $maxTokens === 4096;
             })
-            ->andReturn(json_encode([
+            ->andReturn($this->completion(json_encode([
                 'summary_markdown' => '',
                 'structured_sections' => [],
                 'references' => [],
-            ]));
+            ])));
 
         $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
 
@@ -163,14 +215,14 @@ MD;
 
         $promptBuilder = new WorkingMemoryComposerPromptBuilder;
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')
+        $openRouter->shouldReceive('researchFromPromptCompletion')
             ->once()
-            ->withArgs(fn (string $prompt, ?string $model, ?float $temperature): bool => $model === null && $temperature === null)
-            ->andReturn(json_encode([
+            ->withArgs(fn (string $prompt, ?string $model, ?float $temperature, ?int $maxTokens): bool => $model === null && $temperature === null && $maxTokens === 4096)
+            ->andReturn($this->completion(json_encode([
                 'summary_markdown' => '',
                 'structured_sections' => [],
                 'references' => [],
-            ]));
+            ])));
 
         $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
 
@@ -191,7 +243,7 @@ MD;
         $promptBuilder = new WorkingMemoryComposerPromptBuilder;
         $openRouter = Mockery::mock(OpenRouterService::class);
         $payload = $this->sampleComposerPayloadWithAllSections('Ship working-memory section coverage update.');
-        $openRouter->shouldReceive('researchFromPrompt')->once()->andReturn(json_encode($payload));
+        $openRouter->shouldReceive('researchFromPromptCompletion')->once()->andReturn($this->completion(json_encode($payload)));
 
         $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
 
@@ -251,7 +303,7 @@ MD;
     {
         $promptBuilder = new WorkingMemoryComposerPromptBuilder;
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')->once()->andReturn(json_encode([
+        $openRouter->shouldReceive('researchFromPromptCompletion')->once()->andReturn($this->completion(json_encode([
             'summary_markdown' => "# Working memory synthesis\n\n## Current Focus\n- Direct coverage item\n- Bundle-backed coverage item",
             'structured_sections' => [
                 'Current Focus' => [
@@ -318,7 +370,7 @@ MD;
             'references' => [
                 ['type' => 'thought', 'url' => 'https://ideatub.test/thoughts/10', 'label' => '10'],
             ],
-        ]));
+        ])));
 
         $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
 
@@ -378,7 +430,7 @@ MD;
     {
         $promptBuilder = new WorkingMemoryComposerPromptBuilder;
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')->once()->andReturn(json_encode([
+        $openRouter->shouldReceive('researchFromPromptCompletion')->once()->andReturn($this->completion(json_encode([
             'summary_markdown' => '# Summary',
             'structured_sections' => [
                 'Current Focus' => [[
@@ -434,7 +486,7 @@ MD;
                 ]],
             ],
             'references' => [],
-        ]));
+        ])));
 
         $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
 
@@ -494,7 +546,7 @@ MD;
     {
         $promptBuilder = new WorkingMemoryComposerPromptBuilder;
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')->once()->andReturn(json_encode([
+        $openRouter->shouldReceive('researchFromPromptCompletion')->once()->andReturn($this->completion(json_encode([
             'summary_markdown' => '# Summary',
             'structured_sections' => [
                 'Current Focus' => [[
@@ -550,7 +602,7 @@ MD;
                 ]],
             ],
             'references' => [],
-        ]));
+        ])));
 
         $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
 

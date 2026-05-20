@@ -5,7 +5,6 @@ namespace Tests\Unit\Services\WorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\WorkingMemory;
-use App\Models\WorkingMemoryVersion;
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -55,15 +54,20 @@ final class WorkingMemoryBuilderServiceDiagnosticsTest extends TestCase
         $compactionUrl = "/memory/project/dezeen/compactions/{$compaction->id}";
 
         $openRouter = Mockery::mock(OpenRouterService::class);
-        $openRouter->shouldReceive('researchFromPrompt')->andReturn(json_encode([
-            'summary_markdown' => "# WM\n## Current Focus\n- Ship DEZ-2819 [1].",
-            'structured_sections' => array_fill_keys(
-                ['Current Focus', 'Active Priorities', 'Recent Changes', 'Open Questions', 'Risks / Blockers', 'Next Actions', 'Latest Signals', 'Source Notes'],
-                [['text' => 'Ship DEZ-2819 [1].', 'importance' => 1, 'fallback_mode' => 'direct',
-                  'citations' => [['type' => 'compaction', 'url' => $compactionUrl, 'label' => 'compaction:meeting']]]]
-            ),
-            'references' => [['type' => 'compaction', 'url' => $compactionUrl, 'label' => 'compaction:meeting']],
-        ]));
+        $openRouter->shouldReceive('researchFromPromptCompletion')->andReturn([
+            'content' => json_encode([
+                'summary_markdown' => "# WM\n## Current Focus\n- Ship DEZ-2819 [1].",
+                'structured_sections' => array_fill_keys(
+                    ['Current Focus', 'Active Priorities', 'Recent Changes', 'Open Questions', 'Risks / Blockers', 'Next Actions', 'Latest Signals', 'Source Notes'],
+                    [['text' => 'Ship DEZ-2819 [1].', 'importance' => 1, 'fallback_mode' => 'direct',
+                        'citations' => [['type' => 'compaction', 'url' => $compactionUrl, 'label' => 'compaction:meeting']]]]
+                ),
+                'references' => [['type' => 'compaction', 'url' => $compactionUrl, 'label' => 'compaction:meeting']],
+            ]),
+            'finish_reason' => 'stop',
+            'model' => 'openai/gpt-4o-mini',
+            'max_tokens' => 4096,
+        ]);
         $this->app->instance(OpenRouterService::class, $openRouter);
 
         /** @var WorkingMemoryBuilderService $builder */

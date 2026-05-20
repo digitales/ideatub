@@ -34,6 +34,21 @@ final class LlmDecodeFailureLogContextTest extends TestCase
     }
 
     #[Test]
+    public function it_includes_finish_reason_and_model_in_completion_metadata(): void
+    {
+        $result = LlmDecodeFailureLogContext::withCompletionMetadata(
+            ['scope_type' => 'global'],
+            'length',
+            'openai/gpt-4o-mini',
+            4096,
+        );
+
+        $this->assertSame('length', $result['finish_reason']);
+        $this->assertSame('openai/gpt-4o-mini', $result['model']);
+        $this->assertSame(4096, $result['max_tokens']);
+    }
+
+    #[Test]
     public function it_skips_preview_when_max_chars_is_zero_or_negative(): void
     {
         config([

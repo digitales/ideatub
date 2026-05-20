@@ -425,6 +425,38 @@ class OpenRouterServiceTest extends TestCase
     }
 
     #[Test]
+    public function research_from_prompt_completion_retries_with_higher_max_tokens_when_finish_reason_is_length(): void
+    {
+        Config::set('working_memory.composer_max_tokens_length_retry', 8192);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/chat/completions' => Http::sequence()
+                ->push([
+                    'choices' => [[
+                        'message' => ['content' => 'Partial output'],
+                        'finish_reason' => 'length',
+                    ]],
+                ], 200)
+                ->push([
+                    'choices' => [[
+                        'message' => ['content' => 'Full output after retry'],
+                        'finish_reason' => 'stop',
+                    ]],
+                ], 200),
+        ]);
+
+        $result = $this->service->researchFromPromptCompletion('Prompt body', null, null, 4096);
+
+        $this->assertSame('Full output after retry', $result['content']);
+        $this->assertSame('stop', $result['finish_reason']);
+        $this->assertSame(8192, $result['max_tokens']);
+        $recorded = Http::recorded();
+        $this->assertCount(2, $recorded);
+        $this->assertSame(4096, $recorded[0][0]['max_tokens']);
+        $this->assertSame(8192, $recorded[1][0]['max_tokens']);
+    }
+
+    #[Test]
     public function research_from_prompt_omits_temperature_when_no_override_is_provided(): void
     {
         Http::fake([

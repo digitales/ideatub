@@ -53,4 +53,38 @@ MD;
 
         $this->assertNull(WorkingMemoryComposerMarkdownParser::parse($raw, self::SECTIONS));
     }
+
+    #[Test]
+    public function it_parses_bold_section_labels_with_numbered_and_bullet_lists(): void
+    {
+        $raw = <<<'MD'
+# Working Memory Snapshot for IdeaTub
+
+**Current Focus**
+The team is focused on confirming meetings for April 14th.
+
+**Active Priorities**
+1. Confirm the specific time for the meeting on April 14th with Nicola.
+2. Address the ISIO cost modeller project.
+
+**Recent Changes**
+- The meeting with Abby, Ross, and Nicola has been confirmed for April 14th after 10 AM.
+- Charles will cover Arno's responsibilities during his absence.
+
+**Open Questions**
+What is the final agenda for April 14th?
+MD;
+
+        $parsed = WorkingMemoryComposerMarkdownParser::parse($raw, self::SECTIONS);
+
+        $this->assertNotNull($parsed);
+        $this->assertStringContainsString('**Current Focus**', $parsed['summary_markdown']);
+        $this->assertNotEmpty($parsed['structured_sections']['Current Focus']);
+        $this->assertCount(2, $parsed['structured_sections']['Active Priorities']);
+        $this->assertCount(2, $parsed['structured_sections']['Recent Changes']);
+        $this->assertSame(
+            'What is the final agenda for April 14th?',
+            $parsed['structured_sections']['Open Questions'][0]['text'],
+        );
+    }
 }

@@ -48,15 +48,25 @@ final class WorkingMemoryAiAuthorService
      */
     public function authorFromEvidence(array $evidencePack): array
     {
+        $finishReason = null;
+        $composeModel = null;
+        $composeMaxTokens = null;
+
         try {
             $prompt = $this->promptBuilder->build($evidencePack);
             $model = (string) config('working_memory.authoring_composer_model', '');
             $temperature = config('working_memory.authoring_composer_temperature');
-            $raw = $this->openRouter->researchFromPrompt(
+            $maxTokens = max(1, (int) config('working_memory.composer_max_tokens', 4096));
+            $completion = $this->openRouter->researchFromPromptCompletion(
                 $prompt,
                 $model !== '' ? $model : null,
                 is_numeric($temperature) ? (float) $temperature : null,
+                $maxTokens,
             );
+            $raw = $completion['content'];
+            $finishReason = $completion['finish_reason'];
+            $composeModel = $completion['model'];
+            $composeMaxTokens = $completion['max_tokens'];
             $decoded = LlmJsonDecoder::decode($raw);
 
             if ($decoded === null) {
@@ -69,22 +79,44 @@ final class WorkingMemoryAiAuthorService
                     Log::info('WorkingMemoryAiAuthorService: parsed markdown compose output (JSON contract fallback).', [
                         'scope_type' => $evidencePack['scope_type'] ?? null,
                         'scope_key' => $evidencePack['scope_key'] ?? null,
+                        'finish_reason' => $finishReason,
                     ]);
                 } else {
-                    Log::warning('WorkingMemoryAiAuthorService: model returned non-JSON output.', LlmDecodeFailureLogContext::withOptionalRawPreview([
-                        'scope_type' => $evidencePack['scope_type'] ?? null,
-                        'scope_key' => $evidencePack['scope_key'] ?? null,
-                    ], (string) $raw));
+                    Log::warning(
+                        'WorkingMemoryAiAuthorService: model returned non-JSON output.',
+                        LlmDecodeFailureLogContext::withOptionalRawPreview(
+                            LlmDecodeFailureLogContext::withCompletionMetadata([
+                                'scope_type' => $evidencePack['scope_type'] ?? null,
+                                'scope_key' => $evidencePack['scope_key'] ?? null,
+                            ], $finishReason, $composeModel, $composeMaxTokens),
+                            (string) $raw,
+                        ),
+                    );
 
                     return $this->emptyOutput();
                 }
             }
 
+            if ($finishReason === 'length') {
+                Log::warning(
+                    'WorkingMemoryAiAuthorService: compose completed with finish_reason=length after retry budget.',
+                    LlmDecodeFailureLogContext::withCompletionMetadata([
+                        'scope_type' => $evidencePack['scope_type'] ?? null,
+                        'scope_key' => $evidencePack['scope_key'] ?? null,
+                    ], $finishReason, $composeModel, $composeMaxTokens),
+                );
+            }
+
             return $this->normalizeOutput($decoded);
         } catch (Throwable $e) {
-            Log::warning('WorkingMemoryAiAuthorService: authoring failed.', [
-                'message' => $e->getMessage(),
-            ]);
+            Log::warning(
+                'WorkingMemoryAiAuthorService: authoring failed.',
+                LlmDecodeFailureLogContext::withCompletionMetadata([
+                    'message' => $e->getMessage(),
+                    'scope_type' => $evidencePack['scope_type'] ?? null,
+                    'scope_key' => $evidencePack['scope_key'] ?? null,
+                ], $finishReason, $composeModel, $composeMaxTokens),
+            );
 
             return $this->emptyOutput();
         }
