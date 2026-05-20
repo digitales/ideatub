@@ -98,7 +98,10 @@ class WorkingMemoryBuilderService
                         $buildDiagnostics,
                         $evidencePack,
                     );
-                } elseif (($validation['failure_type'] ?? null) === 'soft') {
+                } elseif (
+                    ($validation['failure_type'] ?? null) === 'soft'
+                    || $this->shouldUseLegacyFallbackForHardValidation($validation)
+                ) {
                     [$payload, $summaryMarkdown] = $this->legacyPayloadAndSummary($normalizedScopeType, $thoughts);
                     $authoringStatus = 'fallback';
                     $validationError = (string) ($validation['message'] ?? 'AI-authored output failed validation.');
@@ -665,6 +668,31 @@ class WorkingMemoryBuilderService
     {
         return (bool) config('features.working_memory_ai_authored')
             && (bool) config('working_memory.authoring_enabled');
+    }
+
+    /**
+     * Empty AI compose output (e.g. non-JSON model response) hard-fails as "missing sections".
+     * Use legacy assembler instead of throwing so incremental refresh still writes a version.
+     *
+     * @param  array<string, mixed>  $validation
+     */
+    private function shouldUseLegacyFallbackForHardValidation(array $validation): bool
+    {
+        if (($validation['failure_type'] ?? null) !== 'hard') {
+            return false;
+        }
+
+        $message = (string) ($validation['message'] ?? '');
+        if (str_starts_with($message, 'Missing required sections:')) {
+            return true;
+        }
+
+        $reasonCodes = $validation['diagnostics']['reason_codes'] ?? null;
+        if (! is_array($reasonCodes) || $reasonCodes === []) {
+            return false;
+        }
+
+        return array_values(array_unique($reasonCodes)) === ['empty_required_section'];
     }
 
     /**

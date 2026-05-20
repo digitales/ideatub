@@ -172,6 +172,36 @@ class WorkingMemoryBuilderServiceTest extends TestCase
     }
 
     #[Test]
+    public function empty_sections_from_non_json_compose_uses_legacy_fallback_without_exception(): void
+    {
+        config([
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+        ]);
+
+        $mock = Mockery::mock(OpenRouterService::class);
+        $mock->shouldReceive('researchFromPrompt')->once()->andReturn('not valid json');
+        $this->app->instance(OpenRouterService::class, $mock);
+
+        $user = User::factory()->create();
+
+        Thought::factory()->count(3)->create([
+            'user_id' => $user->id,
+            'content' => 'Incremental refresh corpus for fallback path.',
+            'metadata' => ['tags' => ['wm']],
+        ]);
+
+        $version = app(WorkingMemoryBuilderService::class)
+            ->buildIncremental($user->id, 'global', 'global');
+
+        $this->assertSame('fallback', $version->authoring_status);
+        $this->assertStringContainsString('Missing required sections:', (string) $version->validation_error);
+        $this->assertNull($version->structured_sections_json);
+        $this->assertStringContainsString('## Executive summary', $version->summary_markdown);
+        $this->assertGreaterThan(0, $version->workingMemory->versions()->count());
+    }
+
+    #[Test]
     public function soft_validation_failure_falls_back_to_legacy_summary_and_tracks_validation_error(): void
     {
         config([

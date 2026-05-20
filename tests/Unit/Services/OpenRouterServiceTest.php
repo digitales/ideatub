@@ -157,8 +157,69 @@ class OpenRouterServiceTest extends TestCase
         $firstRequest = $recorded[0][0];
         $secondRequest = $recorded[1][0];
 
-        $this->assertSame(20000, mb_strlen((string) $firstRequest['input']));
-        $this->assertLessThan(mb_strlen((string) $firstRequest['input']), mb_strlen((string) $secondRequest['input']));
+        $this->assertSame(6144, mb_strlen((string) $firstRequest['input']));
+        $this->assertSame(4096, mb_strlen((string) $secondRequest['input']));
+    }
+
+    #[Test]
+    public function embed_retries_after_http_400_context_limit_error(): void
+    {
+        $vector = array_fill(0, 3, 0.5);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/embeddings' => Http::sequence()
+                ->push([
+                    'error' => [
+                        'message' => "Invalid 'input': maximum context length is 8192 tokens.",
+                    ],
+                ], 400)
+                ->push([
+                    'data' => [
+                        ['embedding' => $vector],
+                    ],
+                ], 200),
+        ]);
+
+        $result = $this->service->embed(str_repeat('x', 20000));
+
+        $this->assertSame($vector, $result);
+        $this->assertCount(2, Http::recorded());
+    }
+
+    #[Test]
+    public function embed_retries_with_aggressive_truncation_when_input_is_already_below_char_cap(): void
+    {
+        Config::set('services.openrouter.embedding_max_input_chars', 24000);
+        $vector = array_fill(0, 3, 0.5);
+        $input = str_repeat('x', 5000);
+
+        Http::fake([
+            'https://openrouter.ai/api/v1/embeddings' => Http::sequence()
+                ->push([
+                    'error' => [
+                        'message' => "Invalid 'input': maximum context length is 8192 tokens.",
+                    ],
+                ], 200)
+                ->push([
+                    'error' => [
+                        'message' => "Invalid 'input': maximum context length is 8192 tokens.",
+                    ],
+                ], 200)
+                ->push([
+                    'data' => [
+                        ['embedding' => $vector],
+                    ],
+                ], 200),
+        ]);
+
+        $result = $this->service->embed($input);
+
+        $this->assertSame($vector, $result);
+        $recorded = Http::recorded();
+        $this->assertCount(3, $recorded);
+        $this->assertSame(5000, mb_strlen((string) $recorded[0][0]['input']));
+        $this->assertSame(4096, mb_strlen((string) $recorded[1][0]['input']));
+        $this->assertSame(3072, mb_strlen((string) $recorded[2][0]['input']));
     }
 
     #[Test]

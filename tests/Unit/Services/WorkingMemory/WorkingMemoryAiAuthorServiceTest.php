@@ -81,6 +81,45 @@ final class WorkingMemoryAiAuthorServiceTest extends TestCase
     }
 
     #[Test]
+    public function it_parses_markdown_section_headings_when_model_ignores_json_contract(): void
+    {
+        $markdown = <<<'MD'
+## Current Focus
+Finalize the April 14th meeting between Abby, Ross, and Nicola.
+
+## Active Priorities
+1. Confirm the meeting time for April 14th.
+2. Monitor the ISIO cost modeller project.
+MD;
+
+        $promptBuilder = new WorkingMemoryComposerPromptBuilder;
+        $openRouter = Mockery::mock(OpenRouterService::class);
+        $openRouter->shouldReceive('researchFromPrompt')->once()->andReturn($markdown);
+
+        $service = new WorkingMemoryAiAuthorService($promptBuilder, $openRouter);
+
+        $result = $service->authorFromEvidence([
+            'scope_type' => 'global',
+            'scope_key' => 'global',
+            'generated_at' => '2026-05-07T10:00:00Z',
+            'signals' => [[
+                'thought_id' => 't1',
+                'content' => 'Meeting on April 14th.',
+                'created_at' => '2026-05-07T09:00:00Z',
+                'references' => [['type' => 'thought', 'url' => '/thoughts/t1', 'label' => 'Meeting note']],
+            ]],
+            'compactions' => [],
+            'section_candidates' => [],
+            'section_bundles' => [],
+        ]);
+
+        $this->assertStringContainsString('## Current Focus', $result['summary_markdown']);
+        $this->assertNotEmpty($result['structured_sections']['Current Focus']);
+        $this->assertCount(2, $result['structured_sections']['Active Priorities']);
+        $this->assertSame('/thoughts/t1', $result['references'][0]['url']);
+    }
+
+    #[Test]
     public function it_threads_authoring_composer_model_and_temperature_overrides_to_open_router(): void
     {
         config([

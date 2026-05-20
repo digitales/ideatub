@@ -87,9 +87,11 @@ Soft degradation: existing working memory content remains served; this is a refr
 | **Job failure** | One `RefreshWorkingMemoryIncremental` job processes **multiple scopes serially**, each potentially waiting up to **~90s** on OpenRouter (live); cumulative time exceeds worker/job timeout → permanent failure after 3 tries. |
 | **Config** | AI authoring is correctly enabled; incident is not “flags off”. Unset composer model → `gpt-4o-mini`; unset preview flag → no decode visibility. |
 
-**Not yet confirmed from production** (preview logging off by default):
+**Confirmed from production** (`raw_preview` 2026-05-20): model returned **markdown** with `## Current Focus`, `## Active Priorities`, etc., not the JSON object the prompt requests. Content was usable; `LlmJsonDecoder` returned null and the pipeline discarded it.
 
-- Prose-only / refusal vs markdown-fenced JSON vs **truncated JSON** (`research.max_tokens` default 2048 shared by `researchFromPrompt`).
+**Other causes still possible**:
+
+- Prose-only / refusal vs **truncated JSON** (`research.max_tokens` default 2048 shared by `researchFromPrompt`).
 - Oversized evidence pack for global scope (`authoring_max_prompt_input_chars` default 60000) leading to truncation mid-object.
 - Composer model choice (`WORKING_MEMORY_COMPOSER_MODEL` / `WORKING_MEMORY_AUTHORING_MODEL`) JSON adherence on live.
 
@@ -121,7 +123,8 @@ Soft degradation: existing working memory content remains served; this is a refr
 ### Engineering follow-up (if recurrent)
 
 - [x] Per-scope dispatch: `RefreshWorkingMemoryIncremental` fans out to `RefreshWorkingMemoryIncrementalScope` (default timeout 600s via `WORKING_MEMORY_INCREMENTAL_SCOPE_JOB_TIMEOUT_SECONDS`).
-- [ ] Treat composer decode failure like soft validation (legacy fallback without throwing) instead of hard-fail on empty sections.
+- [x] Empty-section hard validation (non-JSON compose) uses legacy fallback inline — no `build failed, attempting fallback` exception path for that case (`shouldUseLegacyFallbackForHardValidation`).
+- [x] `WorkingMemoryComposerMarkdownParser` — when compose returns markdown `##` sections (same shape as `summary_markdown` in the JSON contract), parse into `structured_sections` and attach evidence references for citation validation.
 - [ ] Dedicated `max_tokens` for working-memory composer (not shared `research.max_tokens`).
 - [ ] Sample `raw_preview` on decode failure in production behind config (already implemented; ensure ops know the flag).
 

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -31,7 +32,7 @@ class OpenRouterService
 
         $model = config('services.openrouter.embedding_model', 'openai/text-embedding-3-small');
         $input = $this->truncateEmbeddingInput($text, $model);
-        $retriedForContextLimit = false;
+        $contextLimitRetryPass = 0;
 
         while (true) {
             $response = Http::withToken($apiKey)
@@ -42,24 +43,37 @@ class OpenRouterService
                     'model' => $model,
                 ]);
 
-            $response->throw();
-
-            $providerError = $response->json('error.message');
-            if (is_string($providerError) && trim($providerError) !== '') {
+            $providerError = $this->extractEmbeddingsProviderErrorMessage($response);
+            if ($providerError !== null) {
                 $tokenLimit = $this->extractContextLimitTokens($providerError);
-                if (! $retriedForContextLimit && $tokenLimit !== null) {
-                    $retryInput = $this->truncateEmbeddingInputForTokenLimit($text, $tokenLimit);
-                    if (mb_strlen($retryInput) < mb_strlen($input)) {
-                        $retriedForContextLimit = true;
-                        $input = $retryInput;
-                        Log::warning('OpenRouter embedding retrying after provider context-limit error.', [
-                            'model' => $model,
-                            'provider_error' => $providerError,
-                            'token_limit' => $tokenLimit,
-                            'retry_chars' => mb_strlen($input),
-                        ]);
-                        continue;
+                if ($contextLimitRetryPass < 2 && $tokenLimit !== null) {
+                    $contextLimitRetryPass++;
+                    $retryMode = $contextLimitRetryPass === 1 ? 'retry' : 'aggressive';
+                    $retryInput = $this->truncateEmbeddingInputForTokenLimit($text, $tokenLimit, $retryMode);
+                    if (mb_strlen($retryInput) >= mb_strlen($input)) {
+                        $retryInput = $this->truncateEmbeddingInputForTokenLimit($text, $tokenLimit, 'aggressive');
                     }
+                    $input = $retryInput;
+                    Log::warning('OpenRouter embedding retrying after provider context-limit error.', [
+                        'model' => $model,
+                        'status' => $response->status(),
+                        'provider_error' => $providerError,
+                        'token_limit' => $tokenLimit,
+                        'retry_pass' => $contextLimitRetryPass,
+                        'retry_chars' => mb_strlen($input),
+                    ]);
+
+                    continue;
+                }
+
+                if ($response->failed()) {
+                    Log::error('OpenRouter embeddings HTTP request failed.', [
+                        'status' => $response->status(),
+                        'model' => $model,
+                        'error_message' => $providerError,
+                        'body_preview' => Str::limit($response->body(), 800),
+                    ]);
+                    $response->throw();
                 }
 
                 Log::error('OpenRouter embeddings response contained error payload.', [
@@ -69,6 +83,15 @@ class OpenRouterService
                     'body_preview' => Str::limit($response->body(), 800),
                 ]);
                 throw new \RuntimeException('OpenRouter embeddings request failed: '.$providerError);
+            }
+
+            if ($response->failed()) {
+                Log::error('OpenRouter embeddings HTTP request failed.', [
+                    'status' => $response->status(),
+                    'model' => $model,
+                    'body_preview' => Str::limit($response->body(), 800),
+                ]);
+                $response->throw();
             }
 
             $embedding = $response->json('data.0.embedding');
@@ -88,19 +111,41 @@ class OpenRouterService
     private function truncateEmbeddingInput(string $text, string $model): string
     {
         $maxChars = (int) config('services.openrouter.embedding_max_input_chars', 24_000);
-        if ($maxChars <= 0 || mb_strlen($text) <= $maxChars) {
-            return $text;
+        if ($maxChars > 0 && mb_strlen($text) > $maxChars) {
+            $text = mb_substr($text, 0, $maxChars);
+            Log::warning('OpenRouter embedding input truncated to configured character limit.', [
+                'model' => $model,
+                'max_chars' => $maxChars,
+                'truncated_chars' => mb_strlen($text),
+            ]);
         }
 
-        $truncated = mb_substr($text, 0, $maxChars);
-        Log::warning('OpenRouter embedding input truncated to configured character limit.', [
-            'model' => $model,
-            'max_chars' => $maxChars,
-            'original_chars' => mb_strlen($text),
-            'truncated_chars' => mb_strlen($truncated),
-        ]);
+        $maxTokens = (int) config('services.openrouter.embedding_max_tokens', 8192);
+        if ($maxTokens > 0) {
+            $tokenCapped = $this->truncateEmbeddingInputForTokenLimit($text, $maxTokens, 'proactive');
+            if (mb_strlen($tokenCapped) < mb_strlen($text)) {
+                Log::warning('OpenRouter embedding input truncated to proactive token budget.', [
+                    'model' => $model,
+                    'max_tokens' => $maxTokens,
+                    'original_chars' => mb_strlen($text),
+                    'truncated_chars' => mb_strlen($tokenCapped),
+                ]);
+            }
 
-        return $truncated;
+            return $tokenCapped;
+        }
+
+        return $text;
+    }
+
+    private function extractEmbeddingsProviderErrorMessage(Response $response): ?string
+    {
+        $message = $response->json('error.message');
+        if (is_string($message) && trim($message) !== '') {
+            return trim($message);
+        }
+
+        return null;
     }
 
     private function extractContextLimitTokens(string $providerError): ?int
@@ -114,15 +159,30 @@ class OpenRouterService
         return $tokens > 0 ? $tokens : null;
     }
 
-    private function truncateEmbeddingInputForTokenLimit(string $text, int $tokenLimit): string
+    /**
+     * @param  'proactive'|'retry'|'aggressive'  $mode
+     */
+    private function truncateEmbeddingInputForTokenLimit(string $text, int $tokenLimit, string $mode = 'retry'): string
     {
-        $charsPerToken = (float) config('services.openrouter.embedding_chars_per_token', 2.0);
         $safetyMargin = (float) config('services.openrouter.embedding_token_safety_margin', 0.75);
 
-        $estimatedSafeChars = (int) floor($tokenLimit * $charsPerToken * $safetyMargin);
-        $estimatedSafeChars = max(1_000, min($estimatedSafeChars, mb_strlen($text)));
+        [$charsPerToken, $safetyMargin] = match ($mode) {
+            'proactive' => [
+                (float) config('services.openrouter.embedding_proactive_chars_per_token', 1.0),
+                $safetyMargin,
+            ],
+            'retry' => [1.0, min($safetyMargin, 0.5)],
+            'aggressive' => [0.75, min($safetyMargin, 0.5)],
+            default => [
+                (float) config('services.openrouter.embedding_chars_per_token', 2.0),
+                $safetyMargin,
+            ],
+        };
 
-        return mb_substr($text, 0, $estimatedSafeChars);
+        $estimatedSafeChars = (int) floor($tokenLimit * $charsPerToken * $safetyMargin);
+        $estimatedSafeChars = max(1_000, $estimatedSafeChars);
+
+        return mb_substr($text, 0, min($estimatedSafeChars, mb_strlen($text)));
     }
 
     /**
@@ -507,7 +567,7 @@ PROMPT;
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function sendChatCompletionRequest(array $payload, string $apiKey, int $timeoutSeconds): \Illuminate\Http\Client\Response
+    private function sendChatCompletionRequest(array $payload, string $apiKey, int $timeoutSeconds): Response
     {
         $retryTimes = (int) config('services.openrouter.chat_retry_times', 2);
         $retrySleepMs = (int) config('services.openrouter.chat_retry_sleep_ms', 250);
