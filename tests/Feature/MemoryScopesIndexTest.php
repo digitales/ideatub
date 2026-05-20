@@ -238,6 +238,30 @@ class MemoryScopesIndexTest extends TestCase
 
     }
 
+    public function test_duplicate_project_scope_keys_for_same_project_show_once(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = $this->createUser();
+        $project = Project::factory()->for($user)->create(['title' => 'Dezeen']);
+
+        $this->createMemory($user, [
+            'scope_type' => 'project',
+            'scope_key' => $project->id,
+            'last_refreshed_at' => now()->subHour(),
+        ], 'fallback');
+        $this->createMemory($user, [
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+            'last_refreshed_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->get(route('memory.scopes.index'));
+        $html = (string) $response->getContent();
+
+        $response->assertOk();
+        $this->assertSame(1, substr_count($html, route('projects.memory.show', $project)));
+    }
+
     private function createUser(): User
     {
         /** @var User $user */

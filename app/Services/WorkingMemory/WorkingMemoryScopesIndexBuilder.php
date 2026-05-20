@@ -65,6 +65,7 @@ final class WorkingMemoryScopesIndexBuilder
         $tagMemories = $this->sortByRefresh($memories->where('scope_type', 'tag'));
 
         $projects = $this->projectsFor($userId, $projectMemories);
+        $projectMemories = $this->dedupeProjectMemories($projectMemories, $projects);
 
         $tagCanonicalBySlug = [];
         if ($tagMemories->isNotEmpty()) {
@@ -323,6 +324,76 @@ final class WorkingMemoryScopesIndexBuilder
         return $memories
             ->sortByDesc(fn (WorkingMemory $memory): Carbon => $memory->last_refreshed_at ?? Carbon::create(1970, 1, 1))
             ->values();
+    }
+
+    /**
+     * Collapse slug + UUID (and other aliases) that resolve to the same project into one row.
+     *
+     * @param  Collection<int, WorkingMemory>  $projectMemories
+     * @param  Collection<string, Project>  $projects
+     * @return Collection<int, WorkingMemory>
+     */
+    private function dedupeProjectMemories(Collection $projectMemories, Collection $projects): Collection
+    {
+        if ($projectMemories->count() < 2) {
+            return $projectMemories;
+        }
+
+        /** @var array<string, WorkingMemory> $winners */
+        $winners = [];
+
+        foreach ($projectMemories as $memory) {
+            $key = $this->projectMemoryDedupeKey($memory, $projects);
+            $existing = $winners[$key] ?? null;
+
+            if ($existing === null || $this->shouldPreferProjectMemory($memory, $existing)) {
+                $winners[$key] = $memory;
+            }
+        }
+
+        return $this->sortByRefresh(collect(array_values($winners)));
+    }
+
+    /**
+     * @param  Collection<string, Project>  $projects
+     */
+    private function projectMemoryDedupeKey(WorkingMemory $memory, Collection $projects): string
+    {
+        $scopeKey = Str::lower((string) $memory->scope_key);
+        $project = $projects->get($scopeKey);
+
+        if ($project !== null) {
+            return 'project:'.Str::lower((string) $project->getKey());
+        }
+
+        return 'orphan:'.$scopeKey;
+    }
+
+    private function shouldPreferProjectMemory(WorkingMemory $candidate, WorkingMemory $incumbent): bool
+    {
+        $candidateRefreshed = $candidate->last_refreshed_at ?? Carbon::create(1970, 1, 1);
+        $incumbentRefreshed = $incumbent->last_refreshed_at ?? Carbon::create(1970, 1, 1);
+
+        if ($candidateRefreshed->gt($incumbentRefreshed)) {
+            return true;
+        }
+
+        if ($candidateRefreshed->lt($incumbentRefreshed)) {
+            return false;
+        }
+
+        $candidateKey = (string) $candidate->scope_key;
+        $incumbentKey = (string) $incumbent->scope_key;
+
+        if (Str::isUuid($candidateKey) && ! Str::isUuid($incumbentKey)) {
+            return true;
+        }
+
+        if (! Str::isUuid($candidateKey) && Str::isUuid($incumbentKey)) {
+            return false;
+        }
+
+        return false;
     }
 
     /**
