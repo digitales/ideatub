@@ -130,6 +130,7 @@ MD;
 
         $this->assertNotEmpty($result['structured_sections']['Current Focus']);
         $this->assertCount(1, $result['structured_sections']['Active Priorities']);
+        $this->assertSame('/thoughts/t1', $result['structured_sections']['Current Focus'][0]['citations'][0]['url']);
     }
 
     #[Test]
@@ -169,6 +170,7 @@ MD;
         $this->assertNotEmpty($result['structured_sections']['Current Focus']);
         $this->assertCount(2, $result['structured_sections']['Active Priorities']);
         $this->assertSame('/thoughts/t1', $result['references'][0]['url']);
+        $this->assertSame('/thoughts/t1', $result['structured_sections']['Active Priorities'][0]['citations'][0]['url']);
     }
 
     #[Test]

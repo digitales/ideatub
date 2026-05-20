@@ -692,7 +692,14 @@ class WorkingMemoryBuilderService
             return false;
         }
 
-        return array_values(array_unique($reasonCodes)) === ['empty_required_section'];
+        $uniqueReasonCodes = array_values(array_unique($reasonCodes));
+
+        if ($uniqueReasonCodes === ['empty_required_section']) {
+            return true;
+        }
+
+        return $uniqueReasonCodes === ['missing_citation']
+            && str_contains($message, 'resolvable citations');
     }
 
     /**

@@ -172,6 +172,67 @@ class WorkingMemoryBuilderServiceTest extends TestCase
     }
 
     #[Test]
+    public function markdown_compose_with_evidence_references_validates_without_exception(): void
+    {
+        config([
+            'features.working_memory_ai_authored' => true,
+            'working_memory.authoring_enabled' => true,
+            'working_memory.citation_min_coverage' => 1.0,
+        ]);
+
+        $markdown = <<<'MD'
+## Current Focus
+- Focus line.
+
+## Active Priorities
+- Priorities line.
+
+## Recent Changes
+- Changes line.
+
+## Open Questions
+- Questions line?
+
+## Risks / Blockers
+- Risks line.
+
+## Next Actions
+- Actions line.
+
+## Latest Signals
+- Signals line.
+
+## Source Notes
+- Source notes line.
+MD;
+
+        $mock = Mockery::mock(OpenRouterService::class);
+        $mock->shouldReceive('researchFromPromptCompletion')->once()->andReturn([
+            'content' => $markdown,
+            'finish_reason' => 'stop',
+            'model' => 'openai/gpt-4o-mini',
+            'max_tokens' => 4096,
+        ]);
+        $this->app->instance(OpenRouterService::class, $mock);
+
+        $user = User::factory()->create();
+
+        Thought::factory()->count(3)->create([
+            'user_id' => $user->id,
+            'content' => 'Incremental refresh corpus for markdown compose path.',
+            'metadata' => ['tags' => ['wm']],
+        ]);
+
+        $version = app(WorkingMemoryBuilderService::class)
+            ->buildIncremental($user->id, 'global', 'global');
+
+        $this->assertSame('validated', $version->authoring_status);
+        $this->assertNull($version->validation_error);
+        $this->assertIsArray($version->structured_sections_json);
+        $this->assertNotEmpty($version->structured_sections_json['Current Focus'] ?? []);
+    }
+
+    #[Test]
     public function empty_sections_from_non_json_compose_uses_legacy_fallback_without_exception(): void
     {
         config([

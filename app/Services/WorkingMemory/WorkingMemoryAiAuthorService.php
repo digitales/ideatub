@@ -76,6 +76,7 @@ final class WorkingMemoryAiAuthorService
                         is_array($decoded['references'] ?? null) ? $decoded['references'] : [],
                         $this->referencesFromEvidencePack($evidencePack),
                     );
+                    $decoded = $this->attachDefaultCitationsFromReferences($decoded);
                     Log::info('WorkingMemoryAiAuthorService: parsed markdown compose output (JSON contract fallback).', [
                         'scope_type' => $evidencePack['scope_type'] ?? null,
                         'scope_key' => $evidencePack['scope_key'] ?? null,
@@ -273,6 +274,96 @@ final class WorkingMemoryAiAuthorService
         }
 
         return $evidenceReferences;
+    }
+
+    /**
+     * Markdown compose items ship with explicit empty citations; attach evidence refs so
+     * WorkingMemoryOutputValidator can resolve them (same as implicit default-reference fallback).
+     *
+     * @param  array<string, mixed>  $decoded
+     * @return array<string, mixed>
+     */
+    private function attachDefaultCitationsFromReferences(array $decoded): array
+    {
+        $references = $this->normalizeCitations($decoded['references'] ?? []);
+        if ($references === []) {
+            return $decoded;
+        }
+
+        $sections = $decoded['structured_sections'] ?? null;
+        if (! is_array($sections)) {
+            return $decoded;
+        }
+
+        foreach ($sections as $section => $items) {
+            if (! is_array($items)) {
+                continue;
+            }
+
+            $normalizedItems = [];
+            foreach ($items as $item) {
+                if (is_string($item)) {
+                    $text = trim($item);
+                    if ($text === '') {
+                        continue;
+                    }
+
+                    $normalizedItems[] = [
+                        'text' => $text,
+                        'importance' => 1,
+                        'fallback_mode' => 'direct',
+                        'citations' => $this->citationsForItemText($text, $references),
+                    ];
+
+                    continue;
+                }
+
+                if (! is_array($item)) {
+                    continue;
+                }
+
+                $text = trim((string) ($item['text'] ?? ''));
+                if ($text === '') {
+                    continue;
+                }
+
+                $existing = $this->normalizeCitations($item['citations'] ?? null);
+                if ($existing === []) {
+                    $item['citations'] = $this->citationsForItemText($text, $references);
+                }
+
+                $normalizedItems[] = $item;
+            }
+
+            $sections[$section] = $normalizedItems;
+        }
+
+        $decoded['structured_sections'] = $sections;
+
+        return $decoded;
+    }
+
+    /**
+     * @param  array<int, array{type: string, url: string, label: string}>  $references
+     * @return array<int, array{type: string, url: string, label: string}>
+     */
+    private function citationsForItemText(string $text, array $references): array
+    {
+        if ($references === [] || ! preg_match_all('/\[(\d+)\]/', $text, $matches)) {
+            return $references !== [] ? [$references[0]] : [];
+        }
+
+        $citations = [];
+        foreach ($matches[1] as $rawIndex) {
+            $index = (int) $rawIndex - 1;
+            if ($index < 0 || $index >= count($references)) {
+                return [];
+            }
+
+            $citations[] = $references[$index];
+        }
+
+        return $this->normalizeCitations($citations);
     }
 
     private function emptyOutput(): array
