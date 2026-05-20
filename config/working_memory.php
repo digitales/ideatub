@@ -93,6 +93,19 @@ return [
 
     'meeting_refresh_delay_seconds' => (int) env('WORKING_MEMORY_MEETING_REFRESH_DELAY_SECONDS', 60),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Incremental refresh scope job timeout (seconds)
+    |--------------------------------------------------------------------------
+    |
+    | Each affected scope is refreshed in its own queue job (dispatched from
+    | RefreshWorkingMemoryIncremental). Set high enough for one OpenRouter compose
+    | call (chat timeout + retries). Worker --timeout must be >= this value.
+    |
+    */
+
+    'incremental_scope_job_timeout_seconds' => (int) env('WORKING_MEMORY_INCREMENTAL_SCOPE_JOB_TIMEOUT_SECONDS', 600),
+
     'compaction_retention' => [
         'meeting' => (int) env('WORKING_MEMORY_RETAIN_MEETING', 50),
         'weekly-digest' => (int) env('WORKING_MEMORY_RETAIN_WEEKLY_DIGEST', 12),
