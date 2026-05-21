@@ -898,11 +898,16 @@ Alpine.data('thoughtContentEditor', ({
     });
   },
 
+  inlineEditMinHeightPx() {
+    return this.detailMarkdownRead ? 192 : 128;
+  },
+
   resizeTextarea() {
     const textarea = this.$refs.editTextarea;
     if (!textarea || this.focusOverlayOpen) return;
     textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
+    const next = Math.max(textarea.scrollHeight, this.inlineEditMinHeightPx());
+    textarea.style.height = `${next}px`;
   },
 
   toggleFocus() {

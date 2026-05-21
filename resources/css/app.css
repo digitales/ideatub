@@ -160,7 +160,7 @@
 
   .ideatub-focus-shell {
     /* Full viewport overlay (explicit CSS so focus mode does not rely on Alpine :class utilities). */
-    @apply fixed z-50 flex flex-col items-center bg-white p-6;
+    @apply fixed z-50 flex flex-col items-center overflow-y-auto bg-white p-6;
     inset: 0;
     width: 100vw;
     max-width: 100vw;
@@ -176,11 +176,19 @@
   }
 
   .ideatub-focus-panel {
-    @apply mx-auto flex w-full max-w-3xl flex-1 flex-col min-h-0 rounded-xl bg-white p-6 shadow-sm;
+    @apply mx-auto flex w-full max-w-3xl flex-1 flex-col min-h-0 max-h-[calc(100vh-3rem)] rounded-xl bg-white p-6 shadow-sm;
   }
 
   .ideatub-focus-textarea {
-    @apply flex-1 min-h-0 rounded-lg border border-slate-200 bg-white p-3;
+    @apply flex-1 min-h-0 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3;
+  }
+
+  .ideatub-thought-edit-inline {
+    @apply min-h-[8rem];
+  }
+
+  .ideatub-thought-edit-inline-detail {
+    @apply min-h-[12rem];
   }
 }
 

@@ -52,16 +52,31 @@
             <div
                 x-show="focusOverlayOpen"
                 x-cloak
-                @click="focusOverlayOpen = false; document.body.style.overflow = ''"
+                @click="toggleFocus()"
                 class="ideatub-focus-backdrop"
                 aria-hidden="true"
             ></div>
-            <div :class="focusOverlayOpen ? 'max-w-4xl w-full mx-auto flex flex-col flex-1 min-h-0' : ''" :role="focusOverlayOpen ? 'dialog' : null" :aria-modal="focusOverlayOpen ? 'true' : null" :aria-label="focusOverlayOpen ? 'Edit thought' : null">
-                <textarea x-ref="editTextarea" x-model="draftContent" rows="4" @input="resizeTextarea()" class="{{ $editorClass }} resize-none overflow-hidden" :class="focusOverlayOpen ? 'ideatub-focus-textarea overflow-auto' : ''"></textarea>
-                <p x-show="error" x-text="error" class="text-[11px] text-red-600 mt-1"></p>
-                <div class="flex items-center gap-2 mt-2">
+            <div
+                :class="focusOverlayOpen ? 'ideatub-focus-panel' : ''"
+                :role="focusOverlayOpen ? 'dialog' : null"
+                :aria-modal="focusOverlayOpen ? 'true' : null"
+                :aria-label="focusOverlayOpen ? 'Edit thought' : null"
+            >
+                <textarea
+                    x-ref="editTextarea"
+                    x-model="draftContent"
+                    rows="{{ $detailMarkdownRead ? 10 : 4 }}"
+                    @input="resizeTextarea()"
+                    @keydown.meta.enter.prevent="saveEdit()"
+                    @keydown.ctrl.enter.prevent="saveEdit()"
+                    class="{{ $editorClass }} resize-none overflow-hidden"
+                    :class="focusOverlayOpen ? 'ideatub-focus-textarea' : ($detailMarkdownRead ? 'ideatub-thought-edit-inline-detail' : 'ideatub-thought-edit-inline')"
+                ></textarea>
+                <p x-show="error" x-text="error" class="text-[11px] text-red-600 mt-1 shrink-0"></p>
+                <div class="mt-2 flex shrink-0 flex-wrap items-center gap-2">
                     <button type="button" @click="saveEdit()" :disabled="saveDisabled" class="text-[11px] font-medium text-white px-2 py-1 rounded bg-memory-violet disabled:opacity-50">Save</button>
                     <button type="button" @click="cancelEdit()" :disabled="saving" class="text-[11px] font-medium text-slate-brand hover:text-deep-indigo">Cancel</button>
+                    <span class="text-[11px] text-slate-brand/50">⌘ + Enter to save</span>
                     <button type="button" x-show="!focusOverlayOpen" @click="toggleFocus()" class="text-[11px] font-medium text-slate-brand hover:text-deep-indigo ml-auto">Focus</button>
                     <button type="button" x-show="focusOverlayOpen" x-cloak @click="toggleFocus()" class="text-[11px] font-medium text-slate-brand hover:text-deep-indigo ml-auto">Close</button>
                 </div>
@@ -123,16 +138,31 @@
                 <div
                     x-show="focusOverlayOpen"
                     x-cloak
-                    @click="focusOverlayOpen = false; document.body.style.overflow = ''"
+                    @click="toggleFocus()"
                     class="ideatub-focus-backdrop"
                     aria-hidden="true"
                 ></div>
-                <div :class="focusOverlayOpen ? 'max-w-4xl w-full mx-auto flex flex-col flex-1 min-h-0' : ''" :role="focusOverlayOpen ? 'dialog' : null" :aria-modal="focusOverlayOpen ? 'true' : null" :aria-label="focusOverlayOpen ? 'Edit thought' : null">
-                    <textarea x-ref="editTextarea" x-model="draftContent" rows="4" @input="resizeTextarea()" class="{{ $editorClass }} resize-none overflow-hidden" :class="focusOverlayOpen ? 'ideatub-focus-textarea overflow-auto' : ''"></textarea>
-                    <p x-show="error" x-text="error" class="text-[11px] text-red-600 mt-1"></p>
-                    <div class="flex items-center gap-2 mt-2">
+                <div
+                    :class="focusOverlayOpen ? 'ideatub-focus-panel' : ''"
+                    :role="focusOverlayOpen ? 'dialog' : null"
+                    :aria-modal="focusOverlayOpen ? 'true' : null"
+                    :aria-label="focusOverlayOpen ? 'Edit thought' : null"
+                >
+                    <textarea
+                        x-ref="editTextarea"
+                        x-model="draftContent"
+                        rows="4"
+                        @input="resizeTextarea()"
+                        @keydown.meta.enter.prevent="saveEdit()"
+                        @keydown.ctrl.enter.prevent="saveEdit()"
+                        class="{{ $editorClass }} resize-none overflow-hidden"
+                        :class="focusOverlayOpen ? 'ideatub-focus-textarea' : 'ideatub-thought-edit-inline'"
+                    ></textarea>
+                    <p x-show="error" x-text="error" class="text-[11px] text-red-600 mt-1 shrink-0"></p>
+                    <div class="mt-2 flex shrink-0 flex-wrap items-center gap-2">
                         <button type="button" @click="saveEdit()" :disabled="saveDisabled" class="text-[11px] font-medium text-white px-2 py-1 rounded bg-memory-violet disabled:opacity-50">Save</button>
                         <button type="button" @click="cancelEdit()" :disabled="saving" class="text-[11px] font-medium text-slate-brand hover:text-deep-indigo">Cancel</button>
+                        <span class="text-[11px] text-slate-brand/50">⌘ + Enter to save</span>
                         <button type="button" x-show="!focusOverlayOpen" @click="toggleFocus()" class="text-[11px] font-medium text-slate-brand hover:text-deep-indigo ml-auto">Focus</button>
                         <button type="button" x-show="focusOverlayOpen" x-cloak @click="toggleFocus()" class="text-[11px] font-medium text-slate-brand hover:text-deep-indigo ml-auto">Close</button>
                     </div>
