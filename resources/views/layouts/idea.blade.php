@@ -28,7 +28,7 @@
 
 <body class="ideatub-app ideatub-shell font-sans antialiased">
 
-    <div x-data="ideaShortcuts()" data-query="{{e(old('q', $query ?? ''))}}" data-idea-index-url="{{e(route('idea.index'))}}" @keydown.window="handleKey($event)" @ideatub-open-shortcuts.window="shortcutsOpen = true">
+    <div x-data="ideaShortcuts()" data-query="{{e(old('q', $query ?? ''))}}" data-idea-index-url="{{e(route('idea.index'))}}" data-is-home-page="{{ request()->routeIs('idea.index') ? '1' : '0' }}" @keydown.window="handleKey($event)" @ideatub-open-shortcuts.window="shortcutsOpen = true">
         @php
             $inboxCount = (int) ($inboxActionableCount ?? 0);
         @endphp
@@ -224,8 +224,11 @@
                 <table class="w-full text-sm text-deep-indigo">
                     <tbody class="divide-y divide-memory-violet/10">
                         <tr>
-                            <td class="py-1.5">Focus capture</td>
+                            <td class="py-1.5">Quick capture</td>
                             <td class="py-1.5 text-right text-slate-brand font-medium">⌘/ or Ctrl+/</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5 pl-4 text-slate-brand/80" colspan="2">Home: focus capture · Elsewhere: open capture modal</td>
                         </tr>
                         <tr>
                             <td class="py-1.5">Open search</td>
@@ -259,6 +262,51 @@
                 </button>
             </div>
         </div>
+
+        @unless (request()->routeIs('idea.index'))
+            @php
+                $globalInitialContent = '';
+                $globalForceVideoMode = false;
+                $globalImportUploadsEnabled = (bool) config('features.file_upload', false)
+                    && \Illuminate\Support\Facades\Route::has('imports.quick')
+                    && ! app(\App\Services\DemoMode::class)->enabled();
+            @endphp
+            <div
+                id="ideatub-global-capture"
+                x-show="captureOpen"
+                x-cloak
+                x-transition.opacity
+                @ideatub-open-capture.window="openGlobalCapture()"
+                @ideatub-capture-saved.window="closeGlobalCaptureAfterSave()"
+                @keydown.escape.window="handleGlobalCaptureEscape()"
+                @click.self="closeGlobalCapture()"
+                class="ideatub-modal-backdrop"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="global-capture-title"
+            >
+                <div class="ideatub-modal-panel max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden" @click.stop>
+                    <div class="flex items-center justify-between gap-3 px-5 pt-5 pb-3 border-b border-memory-violet/10 shrink-0">
+                        <h2 id="global-capture-title" class="text-lg font-semibold text-deep-indigo">Capture thought</h2>
+                        <button
+                            type="button"
+                            class="text-sm font-medium text-slate-brand hover:text-deep-indigo"
+                            @click="closeGlobalCapture()"
+                        >Close</button>
+                    </div>
+                    <div class="overflow-y-auto px-5 py-4 min-h-0 flex-1" x-ref="globalCaptureMount">
+                        @include('idea.partials.capture_box', [
+                            'placement' => 'global',
+                            'initialContent' => $globalInitialContent,
+                            'forceHomeVideoMode' => $globalForceVideoMode,
+                            'importUploadsEnabled' => $globalImportUploadsEnabled,
+                            'replyingTo' => null,
+                            'replyingToPreview' => null,
+                        ])
+                    </div>
+                </div>
+            </div>
+        @endunless
     </div>
 
     @auth

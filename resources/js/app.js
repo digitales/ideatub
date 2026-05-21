@@ -98,6 +98,7 @@ Alpine.data('captureBox', () => ({
 
   init() {
     this._rootEl = this.$el;
+    this.placement = this._rootEl?.dataset?.placement === 'global' ? 'global' : 'inline';
     this.importEnabled =
       (this._rootEl?.dataset?.fileUpload === '1' && !!this._rootEl?.dataset?.importQuickUrl) ||
       false;
@@ -370,12 +371,22 @@ Alpine.data('captureBox', () => ({
       this.fetchDrafts();
 
       if (data.thought) {
+        if (this.placement === 'global') {
+          this.$dispatch('ideatub-capture-saved');
+          setTimeout(() => { this.message = ''; }, 4000);
+          return;
+        }
         if (data.thought.parent_id) {
           this.appendCommentToParent(data.thought);
         } else {
           window.location = (this._rootEl && this._rootEl.dataset.ideaIndexUrl) || window.location.pathname;
         }
       } else {
+        if (this.placement === 'global') {
+          this.$dispatch('ideatub-capture-saved');
+          setTimeout(() => { this.message = ''; }, 4000);
+          return;
+        }
         // Server may have returned HTML (e.g. redirect); refresh so the list updates
         window.location = (this._rootEl && this._rootEl.dataset.ideaIndexUrl) || window.location.pathname;
       }
@@ -471,6 +482,11 @@ Alpine.data('captureBox', () => ({
       this.messageType = 'success';
       this.fetchDrafts();
 
+      if (this.placement === 'global') {
+        this.$dispatch('ideatub-capture-saved');
+        setTimeout(() => { this.message = ''; }, 4000);
+        return;
+      }
       const target = data.redirect || (this._rootEl && this._rootEl.dataset.ideaIndexUrl) || window.location.pathname;
       window.location = target;
 
@@ -633,12 +649,47 @@ Alpine.data('ideaShortcuts', () => ({
   searching: false,
   query: '',
   shortcutsOpen: false,
+  captureOpen: false,
+  isHomePage: false,
   ideaIndexUrl: '',
 
   init() {
     const el = this.$el;
     if (el?.dataset?.query !== undefined) this.query = el.dataset.query;
     if (el?.dataset?.ideaIndexUrl !== undefined) this.ideaIndexUrl = el.dataset.ideaIndexUrl;
+    if (el?.dataset?.isHomePage !== undefined) {
+      this.isHomePage = el.dataset.isHomePage === '1';
+    }
+  },
+
+  openGlobalCapture() {
+    if (this.shortcutsOpen) this.shortcutsOpen = false;
+    this.captureOpen = true;
+    this.$nextTick(() => {
+      document.getElementById('global-capture-content')?.focus();
+    });
+  },
+
+  closeGlobalCapture() {
+    this.captureOpen = false;
+  },
+
+  closeGlobalCaptureAfterSave() {
+    setTimeout(() => {
+      this.captureOpen = false;
+    }, 1500);
+  },
+
+  handleGlobalCaptureEscape() {
+    if (!this.captureOpen) return;
+    const mount = this.$refs.globalCaptureMount;
+    const root = mount?.querySelector('[data-placement="global"]');
+    const data = root && typeof Alpine !== 'undefined' ? Alpine.$data(root) : null;
+    if (data?.focusOverlayOpen) {
+      data.closeFocusOverlay();
+      return;
+    }
+    this.closeGlobalCapture();
   },
 
   handleKey(e) {
@@ -648,6 +699,7 @@ Alpine.data('ideaShortcuts', () => ({
     if (e.key === 'Escape') {
       if (this.shortcutsOpen) this.shortcutsOpen = false;
       else if (this.searching) this.searching = false;
+      else if (this.captureOpen) this.handleGlobalCaptureEscape();
       else if (window.location.search.includes('parent_id') && this.ideaIndexUrl)
         window.location = this.ideaIndexUrl;
       e.preventDefault();
@@ -661,7 +713,12 @@ Alpine.data('ideaShortcuts', () => ({
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === '/') {
-      this.$dispatch('focus-capture');
+      if (this.shortcutsOpen) this.shortcutsOpen = false;
+      if (this.isHomePage) {
+        this.$dispatch('focus-capture');
+      } else {
+        this.openGlobalCapture();
+      }
       e.preventDefault();
       return;
     }

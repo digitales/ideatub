@@ -11,7 +11,8 @@
         <h2 class="text-lg font-semibold text-deep-indigo mb-4">Keyboard shortcuts</h2>
         <table class="w-full text-sm text-deep-indigo">
             <tbody class="divide-y divide-memory-violet/10">
-                <tr><td class="py-2">Focus capture</td><td class="py-2 text-right text-slate-brand font-medium">⌘/ or Ctrl+/</td></tr>
+                <tr><td class="py-2">Quick capture</td><td class="py-2 text-right text-slate-brand font-medium">⌘/ or Ctrl+/</td></tr>
+                <tr><td class="py-2 pl-4 text-slate-brand/80" colspan="2">Home: focus capture box · Elsewhere: open capture modal</td></tr>
                 <tr><td class="py-2">Open search</td><td class="py-2 text-right text-slate-brand font-medium">⌘K or Ctrl+K</td></tr>
                 <tr><td class="py-2">Move down / up thought</td><td class="py-2 text-right text-slate-brand font-medium">j / k</td></tr>
                 <tr><td class="py-2">Open reply</td><td class="py-2 text-right text-slate-brand font-medium">Enter</td></tr>
