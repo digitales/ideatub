@@ -785,28 +785,55 @@ class Thought extends Model implements Commentable
             return false;
         }
 
-        $metadata = $this->metadata;
-        $typeRaw = is_array($metadata) ? ($metadata['type'] ?? null) : null;
-        if (! is_string($typeRaw)) {
+        if ($this->resolveShareableDocumentTypeKey() === null) {
             return false;
-        }
-        $normalized = mb_strtolower(trim($typeRaw));
-        if ($normalized === '') {
-            return false;
-        }
-        if ($normalized === 'video') {
-            return false;
-        }
-
-        $extraTypes = ['decision', 'dev', 'support', 'spec'];
-        if (! in_array($normalized, $extraTypes, true)) {
-            $navKey = ThoughtTypeNavigation::normalizeTypeKey($typeRaw);
-            if (! in_array($navKey, ['research', 'plan', 'meeting'], true)) {
-                return false;
-            }
         }
 
         return self::query()->whereKey($this->id)->visibleInStream()->exists();
+    }
+
+    /**
+     * Resolve shareable long-form doc type from metadata.type, or from capture source when MCP
+     * sets source to doc_type without metadata.type (see ThoughtCaptureService::applyDocTypeToMetadata).
+     */
+    private function resolveShareableDocumentTypeKey(): ?string
+    {
+        $extraTypes = ['decision', 'dev', 'support', 'spec'];
+        $navTypes = ['research', 'plan', 'meeting'];
+
+        $metadata = $this->metadata;
+        $typeRaw = is_array($metadata) ? ($metadata['type'] ?? null) : null;
+        if (is_string($typeRaw) && trim($typeRaw) !== '') {
+            return $this->normalizeShareableDocumentTypeKey($typeRaw, $extraTypes, $navTypes);
+        }
+
+        $source = is_string($this->source) ? trim($this->source) : '';
+        if ($source === '') {
+            return null;
+        }
+
+        return $this->normalizeShareableDocumentTypeKey($source, $extraTypes, $navTypes);
+    }
+
+    /**
+     * @param  list<string>  $extraTypes
+     * @param  list<string>  $navTypes
+     */
+    private function normalizeShareableDocumentTypeKey(string $raw, array $extraTypes, array $navTypes): ?string
+    {
+        $normalized = mb_strtolower(trim($raw));
+        if ($normalized === '' || $normalized === 'video') {
+            return null;
+        }
+        if (in_array($normalized, $extraTypes, true)) {
+            return $normalized;
+        }
+        $navKey = ThoughtTypeNavigation::normalizeTypeKey($raw);
+        if (in_array($navKey, $navTypes, true)) {
+            return $navKey;
+        }
+
+        return null;
     }
 
     /**

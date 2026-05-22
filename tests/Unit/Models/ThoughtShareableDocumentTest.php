@@ -162,4 +162,35 @@ class ThoughtShareableDocumentTest extends TestCase
         ]);
         $this->assertFalse($noType->isShareableDocumentRoot());
     }
+
+    public function test_mcp_capture_source_without_metadata_type_is_shareable(): void
+    {
+        $user = User::factory()->create();
+
+        foreach (['plan', 'research', 'meeting', 'decision', 'dev', 'support', 'spec'] as $docType) {
+            $thought = Thought::factory()->create([
+                'user_id' => $user->id,
+                'parent_id' => null,
+                'source' => $docType,
+                'metadata' => ['tags' => ["{$docType}:example-slug"]],
+            ]);
+            $this->assertTrue(
+                $thought->isShareableDocumentRoot(),
+                "Expected shareable for MCP source {$docType} without metadata.type"
+            );
+        }
+    }
+
+    public function test_non_shareable_metadata_type_is_not_overridden_by_plan_source(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'source' => 'plan',
+            'metadata' => ['type' => 'idea'],
+        ]);
+
+        $this->assertFalse($thought->isShareableDocumentRoot());
+    }
 }

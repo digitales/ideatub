@@ -251,6 +251,23 @@ class ThoughtShowPageTest extends TestCase
         $response->assertDontSee(route('shared-research.index', ['create' => $thought->id], false), false);
     }
 
+    public function test_mcp_plan_detail_shows_share_block_when_metadata_type_missing(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'source' => 'plan',
+            'metadata' => ['tags' => ['plan:employment-situation-summary']],
+            'content' => 'Employment Situation Summary',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $response->assertOk();
+        $response->assertSee('data-document-share', false);
+        $response->assertSee('Share', false);
+    }
+
     public function test_shareable_document_detail_shows_shared_badge_when_link_exists(): void
     {
         $owner = User::factory()->create();

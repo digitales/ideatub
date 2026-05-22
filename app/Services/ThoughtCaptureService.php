@@ -291,15 +291,20 @@ class ThoughtCaptureService
     }
 
     /**
-     * Set metadata.type for doc types that use a Stream collection filtered on metadata (not source).
+     * Set metadata.type for MCP capture_plan doc types (Stream typed collections filter on metadata).
      *
      * @param  array<string, mixed>  $metadata
      * @return array<string, mixed>
      */
     private function applyDocTypeToMetadata(array $metadata, ?string $docType): array
     {
-        if ($docType === 'meeting') {
-            $metadata['type'] = 'meeting';
+        if ($docType === null || $docType === '') {
+            return $metadata;
+        }
+
+        $allowed = ['plan', 'research', 'meeting', 'decision', 'dev', 'support', 'spec'];
+        if (in_array($docType, $allowed, true)) {
+            $metadata['type'] = $docType;
         }
 
         return $metadata;
