@@ -26,30 +26,11 @@
         x-transition
         class="absolute right-0 top-full mt-0.5 py-1 min-w-[8rem] rounded-lg border border-memory-violet/15 bg-white shadow-lg z-10"
     >
-        @if ($isRootThought && $documentShareEligible)
-            @if ($share)
-                <a
-                    href="{{ url(route('shared-research.show', $share->token)) }}"
-                    target="_blank"
-                    rel="noopener"
-                    class="block px-3 py-1.5 text-[12px] text-memory-violet hover:bg-memory-violet/5 rounded"
-                >Open link</a>
-                <button
-                    type="button"
-                    data-copy-url="{{ $share ? e(url(route('shared-research.show', $share->token))) : '' }}"
-                    @click="navigator.clipboard.writeText($el.getAttribute('data-copy-url')); $el.textContent='Copied!'; setTimeout(() => { $el.textContent='Copy link'; }, 1500)"
-                    class="w-full text-left px-3 py-1.5 text-[12px] text-slate-brand hover:bg-slate-brand/5 rounded"
-                >Copy link</button>
-                <a
-                    href="{{ route('shared-research.index', ['share' => $share->id]) }}"
-                    class="block px-3 py-1.5 text-[12px] text-slate-brand hover:bg-slate-brand/5 rounded"
-                >Manage</a>
-            @else
-                <a
-                    href="{{ route('shared-research.index', ['create' => $thought->id]) }}"
-                    class="block px-3 py-1.5 text-[12px] text-slate-brand hover:bg-slate-brand/5 rounded"
-                >Share</a>
-            @endif
+        @if ($isRootThought && $documentShareEligible && $share)
+            <a
+                href="{{ route('shared-research.index', ['share' => $share->id]) }}"
+                class="block px-3 py-1.5 text-[12px] text-slate-brand hover:bg-slate-brand/5 rounded"
+            >Manage share</a>
         @endif
         <button
             type="button"

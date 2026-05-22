@@ -6,6 +6,7 @@ use App\Models\CapturedInboundEmail;
 use App\Models\EmailSenderRule;
 use App\Models\ImportedEmail;
 use App\Models\MailAccount;
+use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\DemoMode;
@@ -243,8 +244,32 @@ class ThoughtShowPageTest extends TestCase
 
         $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
         $response->assertOk();
-        $response->assertSee(route('shared-research.index', ['create' => $thought->id], false), false);
-        $response->assertSee('Create share link', false);
+        $response->assertSee('data-document-share', false);
+        $response->assertSee('name="return_to"', false);
+        $response->assertSee(route('shared-research.store'), false);
+        $response->assertSee('Share', false);
+        $response->assertDontSee(route('shared-research.index', ['create' => $thought->id], false), false);
+    }
+
+    public function test_shareable_document_detail_shows_shared_badge_when_link_exists(): void
+    {
+        $owner = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $owner->id,
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'research'],
+            'content' => 'Research root already shared',
+        ]);
+        ResearchShare::factory()->create([
+            'user_id' => $owner->id,
+            'thought_id' => $thought->id,
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('thoughts.show', $thought));
+        $response->assertOk();
+        $response->assertSee('Shared', false);
+        $response->assertSee('Copy link', false);
     }
 
     public function test_non_shareable_detail_hides_document_share_block(): void

@@ -553,8 +553,30 @@ class ThoughtTypePagesTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('idea.stream'));
         $response->assertOk();
-        $response->assertSee(route('shared-research.index', ['create' => $eligible->id], false), false);
+        $response->assertSee('data-document-share', false);
+        $response->assertSee('Share', false);
+        $response->assertDontSee(route('shared-research.index', ['create' => $eligible->id], false), false);
         $response->assertDontSee(route('shared-research.index', ['create' => $plain->id], false), false);
+    }
+
+    public function test_main_stream_shows_shared_badge_when_document_already_shared(): void
+    {
+        $user = User::factory()->create();
+        $eligible = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Shared plan root',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'plan'],
+        ]);
+        \App\Models\ResearchShare::factory()->create([
+            'user_id' => $user->id,
+            'thought_id' => $eligible->id,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream'));
+        $response->assertOk();
+        $response->assertSee('Shared', false);
     }
 
     private function assertThoughtBadgeLink(TestResponse $response, string $label, string $href): void

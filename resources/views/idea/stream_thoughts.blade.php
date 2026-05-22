@@ -5,7 +5,15 @@
         @if ($card->isVideoThought()) data-thought-kind="video" @endif
         class="ideatub-surface relative mb-3 px-4 py-4 transition hover:ring-memory-violet/20 dark:hover:ring-violet-400/30 @if ($card->isVideoThought()) border-l-[3px] border-l-rose-400/80 dark:border-l-rose-400/70 @endif"
     >
-        <div class="absolute top-3 right-3">
+        <div class="absolute top-3 right-3 flex items-center gap-2">
+            @if ($card->editable() && $card->documentShareEligible())
+                @include('idea.partials.document_share_widget', [
+                    'thought' => $card->thought(),
+                    'share' => $card->share(),
+                    'returnTo' => url()->current(),
+                    'placement' => 'card',
+                ])
+            @endif
             @include('idea.partials.thought_card_actions', [
                 'thought' => $card->thought(),
                 'editable' => $card->editable(),
@@ -13,7 +21,7 @@
                 'documentShareEligible' => $card->documentShareEligible(),
             ])
         </div>
-        <div class="pr-8 min-w-0">
+        <div class="{{ ($card->editable() && $card->documentShareEligible()) ? 'pr-28' : 'pr-8' }} min-w-0">
             @include('idea.partials.editable_thought_content', [
                 'thought' => $card->thought(),
                 'editable' => $card->editable(),
