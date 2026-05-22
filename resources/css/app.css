@@ -358,6 +358,46 @@ html.dark {
     @apply prose-invert;
   }
 
+  /*
+   * Typography prose-*:text-* modifiers set color on child elements directly;
+   * .text-deep-indigo on the container does not apply. Remap for dark readability.
+   */
+.dark .ideatub-app .prose[class~='prose-p:text-deep-indigo'] :where(p) {
+    @apply text-gray-300;
+  }
+
+.dark .ideatub-app .prose[class~='prose-p:text-slate-brand'] :where(p) {
+    @apply text-gray-400;
+  }
+
+.dark .ideatub-app .prose[class~='prose-headings:text-deep-indigo'] :where(h1, h2, h3, h4, h5, h6) {
+    @apply text-gray-100;
+  }
+
+.dark .ideatub-app .prose[class~='prose-li:text-slate-brand'] :where(li) {
+    @apply text-gray-400;
+  }
+
+.dark .ideatub-app .prose[class~='prose-strong:text-deep-indigo'] :where(strong) {
+    @apply text-gray-100;
+  }
+
+.dark .ideatub-app .prose[class~='prose-code:text-deep-indigo'] :where(code) {
+    @apply text-gray-200;
+  }
+
+.dark .ideatub-app .prose[class~='prose-th:text-deep-indigo'] :where(th) {
+    @apply text-gray-100;
+  }
+
+.dark .ideatub-app .prose[class~='prose-td:text-slate-brand'] :where(td) {
+    @apply text-gray-400;
+  }
+
+.dark .ideatub-app .prose[class~='prose-a:text-memory-violet'] :where(a) {
+    @apply text-violet-300;
+  }
+
 .dark .ideatub-app .bg-amber-50\/95 {
     @apply border-amber-500/30 bg-amber-950/40 text-amber-100;
   }

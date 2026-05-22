@@ -8,7 +8,7 @@
         <p class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80">{{ $project->title }}</p>
         <a href="{{ route('shared-projects.hub', $token) }}" class="text-sm font-medium text-memory-violet hover:underline">Back to hub</a>
     </div>
-    <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-p:text-deep-indigo prose-p:leading-relaxed text-[14px] md:text-[15px]">
+    <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-headings:font-semibold prose-headings:tracking-tight prose-p:text-deep-indigo prose-p:leading-relaxed prose-li:text-slate-brand prose-strong:text-deep-indigo prose-a:text-memory-violet prose-a:no-underline hover:prose-a:underline text-[14px] md:text-[15px]">
         {!! $contentHtml !!}
     </div>
 </div>

@@ -15,7 +15,7 @@
     @forelse ($blocks as $block)
         <article class="border-t border-memory-violet/10 pt-8 first:border-t-0 first:pt-0">
             <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-brand/50 mb-3">Thought</p>
-            <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-p:text-deep-indigo prose-p:leading-relaxed text-[14px] md:text-[15px]">
+            <div class="prose prose-sm prose-slate max-w-none prose-headings:text-deep-indigo prose-headings:font-semibold prose-headings:tracking-tight prose-p:text-deep-indigo prose-p:leading-relaxed prose-li:text-slate-brand prose-strong:text-deep-indigo prose-a:text-memory-violet prose-a:no-underline hover:prose-a:underline text-[14px] md:text-[15px]">
                 {!! $block->content_html !!}
             </div>
         </article>
