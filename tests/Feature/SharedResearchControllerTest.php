@@ -209,6 +209,70 @@ class SharedResearchControllerTest extends TestCase
         $this->assertNull(ResearchShare::where('thought_id', $thought->id)->first());
     }
 
+    public function test_store_with_return_to_redirects_to_thought_detail(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Plan for return_to',
+            'parent_id' => null,
+            'source' => 'web',
+            'metadata' => ['type' => 'plan'],
+        ]);
+        $returnTo = route('thoughts.show', $thought);
+
+        $response = $this->actingAs($user)->post(route('shared-research.store'), [
+            'thought_id' => $thought->id,
+            'return_to' => $returnTo,
+            '_token' => csrf_token(),
+        ]);
+
+        $share = ResearchShare::where('thought_id', $thought->id)->first();
+        $this->assertNotNull($share);
+        $response->assertRedirect($returnTo);
+        $response->assertSessionHas('success', 'Share link created.');
+        $response->assertSessionHas('document_share_url', url(route('shared-research.show', $share->token)));
+    }
+
+    public function test_store_with_invalid_return_to_falls_back_to_index(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create(['user_id' => $user->id] + self::SHAREABLE_ROOT);
+
+        $response = $this->actingAs($user)->post(route('shared-research.store'), [
+            'thought_id' => $thought->id,
+            'return_to' => 'https://evil.example/phish',
+            '_token' => csrf_token(),
+        ]);
+
+        $share = ResearchShare::where('thought_id', $thought->id)->first();
+        $this->assertNotNull($share);
+        $response->assertRedirect(route('shared-research.index', ['share' => $share->id]));
+    }
+
+    public function test_store_already_shared_with_return_to_redirects_back_with_error(): void
+    {
+        $user = User::factory()->create();
+        $thought = Thought::factory()->create(['user_id' => $user->id] + self::SHAREABLE_ROOT);
+        ResearchShare::create([
+            'user_id' => $user->id,
+            'thought_id' => $thought->id,
+            'token' => ResearchShare::generateToken(),
+            'password_hash' => null,
+            'expires_at' => null,
+        ]);
+        $returnTo = route('thoughts.show', $thought);
+
+        $response = $this->actingAs($user)->post(route('shared-research.store'), [
+            'thought_id' => $thought->id,
+            'return_to' => $returnTo,
+            '_token' => csrf_token(),
+        ]);
+
+        $response->assertRedirect($returnTo);
+        $response->assertSessionHas('error', 'This document is already shared; manage it below.');
+    }
+
     public function test_store_second_create_for_same_thought_redirects_with_already_shared(): void
     {
         $user = User::factory()->create();

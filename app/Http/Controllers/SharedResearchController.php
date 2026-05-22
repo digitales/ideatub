@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ResearchShare;
 use App\Models\Thought;
+use App\Support\SharedResearch\DocumentShareReturnTo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
@@ -72,9 +73,10 @@ class SharedResearchController extends Controller
             ->visibleInStream()
             ->exists();
 
+        $returnTo = DocumentShareReturnTo::resolve($request->input('return_to'));
+
         if (! $isVisibleInStream) {
-            return redirect()
-                ->route('shared-research.index')
+            return $this->redirectAfterStoreAttempt($returnTo)
                 ->withErrors([
                     'thought_id' => 'Only visible top-level thoughts can be shared.',
                 ])
@@ -82,8 +84,7 @@ class SharedResearchController extends Controller
         }
 
         if (! $thought->isShareableDocumentRoot()) {
-            return redirect()
-                ->route('shared-research.index')
+            return $this->redirectAfterStoreAttempt($returnTo)
                 ->withErrors([
                     'thought_id' => 'Only long-form capture documents (plans, specs, meetings, research, etc.) can be shared. Video, email, and Jira items cannot.',
                 ])
@@ -91,8 +92,7 @@ class SharedResearchController extends Controller
         }
 
         if (ResearchShare::where('thought_id', $thought->id)->exists()) {
-            return redirect()
-                ->route('shared-research.index')
+            return $this->redirectAfterStoreAttempt($returnTo)
                 ->with('error', 'This document is already shared; manage it below.');
         }
 
@@ -104,9 +104,26 @@ class SharedResearchController extends Controller
             'expires_at' => $request->input('expires_at'),
         ]);
 
+        $shareUrl = url(route('shared-research.show', $share->token));
+
+        if ($returnTo !== null) {
+            return redirect()->to($returnTo)
+                ->with('success', 'Share link created.')
+                ->with('document_share_url', $shareUrl);
+        }
+
         return redirect()
             ->route('shared-research.index', ['share' => $share->id])
             ->with('success', 'Link created. Copy below.');
+    }
+
+    private function redirectAfterStoreAttempt(?string $returnTo): RedirectResponse
+    {
+        if ($returnTo !== null) {
+            return redirect()->to($returnTo);
+        }
+
+        return redirect()->route('shared-research.index');
     }
 
     /**
