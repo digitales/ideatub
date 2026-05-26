@@ -55,9 +55,7 @@ class ProjectController extends Controller
     {
         $this->authorize('view', $project);
 
-        $project->load(['thoughts' => function ($q) {
-            $q->orderByPivot('sort_order');
-        }]);
+        $project->load(['thoughts' => fn ($q) => $project->orderMembersForDisplay($q)]);
         $project->thoughts->loadMissing('parent');
 
         $memberIds = $project->thoughts->pluck('id')->all();

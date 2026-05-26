@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\ProjectShare;
 use App\Models\Thought;
+use App\Support\SafeCommonMarkConverter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
-use App\Support\SafeCommonMarkConverter;
 use Illuminate\View\View;
 
 class SharedProjectViewController extends Controller
@@ -92,7 +92,7 @@ class SharedProjectViewController extends Controller
     private function renderHub(ProjectShare $share): View
     {
         $project = $share->project;
-        $project->load(['thoughts' => fn ($q) => $q->orderByPivot('sort_order')]);
+        $project->load(['thoughts' => fn ($q) => $project->orderMembersForDisplay($q)]);
         $share->load('user');
 
         $converter = SafeCommonMarkConverter::make();
@@ -112,7 +112,7 @@ class SharedProjectViewController extends Controller
     private function renderReadAll(ProjectShare $share): View
     {
         $project = $share->project;
-        $thoughts = $project->thoughts()->orderByPivot('sort_order')->get();
+        $thoughts = $project->orderMembersForDisplay($project->thoughts())->get();
         $converter = SafeCommonMarkConverter::make();
 
         $blocks = $thoughts->map(function (Thought $thought) use ($converter) {

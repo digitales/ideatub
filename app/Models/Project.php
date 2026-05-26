@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Contracts\Commentable;
 use App\Models\Concerns\HasComments;
 use App\Support\Comments\ShareContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -67,6 +68,20 @@ class Project extends Model implements Commentable
             ->withPivot('sort_order')
             ->withTimestamps()
             ->orderByPivot('sort_order');
+    }
+
+    /**
+     * Display order for member lists: newest thought update first.
+     *
+     * @param  Builder|BelongsToMany<Thought, $this>  $query
+     * @return Builder|BelongsToMany<Thought, $this>
+     */
+    public function orderMembersForDisplay(Builder|BelongsToMany $query): Builder|BelongsToMany
+    {
+        return $query
+            ->reorder()
+            ->orderByDesc('thoughts.updated_at')
+            ->orderBy('thoughts.id');
     }
 
     /**
