@@ -82,6 +82,30 @@ test('projects index shows zero ideas when project has no members', function () 
         ->assertSee('0 ideas', false);
 });
 
+test('project show members are ordered by thought updated_at descending', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->create(['user_id' => $user->id]);
+
+    $older = Thought::factory()->create([
+        'user_id' => $user->id,
+        'content' => 'Older member content',
+        'updated_at' => now()->subHour(),
+    ]);
+    $newer = Thought::factory()->create([
+        'user_id' => $user->id,
+        'content' => 'Newer member content',
+        'updated_at' => now(),
+    ]);
+
+    $project->thoughts()->attach($newer->id, ['sort_order' => 1]);
+    $project->thoughts()->attach($older->id, ['sort_order' => 0]);
+
+    $this->actingAs($user)
+        ->get(route('projects.show', $project))
+        ->assertOk()
+        ->assertSeeInOrder(['Newer member content', 'Older member content'], false);
+});
+
 test('projects index counts only top-level thoughts linked to project', function () {
     $user = User::factory()->create();
     $project = Project::factory()->create(['user_id' => $user->id, 'title' => 'Grouped project']);

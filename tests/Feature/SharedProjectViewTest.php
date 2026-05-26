@@ -47,6 +47,66 @@ class SharedProjectViewTest extends TestCase
         $response->assertSee('Read all', false);
     }
 
+    public function test_hub_members_are_ordered_by_updated_at_desc(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $older = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Shared older',
+            'updated_at' => now()->subHour(),
+        ]);
+        $newer = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Shared newer',
+            'updated_at' => now(),
+        ]);
+
+        $project->thoughts()->attach($older->id, ['sort_order' => 0]);
+        $project->thoughts()->attach($newer->id, ['sort_order' => 1]);
+
+        $share = ProjectShare::create([
+            'user_id' => $user->id,
+            'project_id' => $project->id,
+            'token' => ProjectShare::generateToken(),
+        ]);
+
+        $this->get(route('shared-projects.hub', $share->token))
+            ->assertOk()
+            ->assertSeeInOrder(['Shared newer', 'Shared older'], false);
+    }
+
+    public function test_read_all_members_are_ordered_by_updated_at_desc(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $older = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => '## Older'.PHP_EOL.PHP_EOL.'Older body',
+            'updated_at' => now()->subHour(),
+        ]);
+        $newer = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => '## Newer'.PHP_EOL.PHP_EOL.'Newer body',
+            'updated_at' => now(),
+        ]);
+
+        $project->thoughts()->attach($older->id, ['sort_order' => 0]);
+        $project->thoughts()->attach($newer->id, ['sort_order' => 1]);
+
+        $share = ProjectShare::create([
+            'user_id' => $user->id,
+            'project_id' => $project->id,
+            'token' => ProjectShare::generateToken(),
+        ]);
+
+        $this->get(route('shared-projects.read', $share->token))
+            ->assertOk()
+            ->assertSeeInOrder(['Newer body', 'Older body'], false);
+    }
+
     public function test_read_all_renders_member_content(): void
     {
         $user = User::factory()->create();
