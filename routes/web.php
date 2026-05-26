@@ -190,6 +190,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/stream/plans', [IdeaController::class, 'streamPlans'])->name('idea.stream.plans');
     Route::get('/stream/meetings', [IdeaController::class, 'streamMeetings'])->name('idea.stream.meetings');
     Route::get('/stream/articles', [IdeaController::class, 'streamArticles'])->name('idea.stream.articles');
+    Route::get('/stream/videos', [IdeaController::class, 'streamVideos'])->name('idea.stream.videos');
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
 
     Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');

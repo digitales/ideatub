@@ -931,6 +931,33 @@ class IdeaController extends Controller
     }
 
     /**
+     * Video thoughts matching metadata.type video (top-level roots).
+     */
+    public function streamVideos(Request $request): View|JsonResponse
+    {
+        $request->validate(['page' => 'nullable|integer|min:1']);
+        $page = (int) $request->input('page', 1);
+
+        $thoughts = Thought::query()
+            ->where('user_id', auth()->id())
+            ->visibleInStream()
+            ->topLevel()
+            ->matchingCanonicalMetadataType('video')
+            ->with(['childThoughts' => fn ($q) => $q->orderBy('created_at')])
+            ->orderByDesc('created_at')
+            ->paginate(self::STREAM_PAGE_SIZE, ['*'], 'page', $page);
+
+        return $this->streamCollectionResponse(
+            $request,
+            $thoughts,
+            'video',
+            fn (LengthAwarePaginator $thoughts) => $thoughts->isNotEmpty()
+                ? $thoughts->first()->created_at->toIso8601String()
+                : null
+        );
+    }
+
+    /**
      * Shared HTML/JSON response for typed stream collection pages.
      *
      * @param  callable(LengthAwarePaginator<int, Thought>): string|null  $latestForAjax

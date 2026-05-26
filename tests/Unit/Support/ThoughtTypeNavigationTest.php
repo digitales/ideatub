@@ -10,7 +10,25 @@ class ThoughtTypeNavigationTest extends TestCase
 {
     public function test_ordered_nav_types_match_spec(): void
     {
-        $this->assertSame(['jira', 'email', 'research', 'plan', 'meeting', 'article'], ThoughtTypeNavigation::orderedNavTypes());
+        $this->assertSame(
+            ['jira', 'email', 'research', 'plan', 'meeting', 'article', 'video'],
+            ThoughtTypeNavigation::orderedNavTypes()
+        );
+    }
+
+    public function test_ordered_stream_nav_types_excludes_jira_and_includes_video(): void
+    {
+        $this->assertSame(
+            ['email', 'research', 'plan', 'meeting', 'article', 'video'],
+            ThoughtTypeNavigation::orderedStreamNavTypes()
+        );
+    }
+
+    public function test_show_in_stream_nav_for_jira_and_video(): void
+    {
+        $this->assertFalse(ThoughtTypeNavigation::showInStreamNav('jira'));
+        $this->assertTrue(ThoughtTypeNavigation::showInStreamNav('video'));
+        $this->assertTrue(ThoughtTypeNavigation::showInStreamNav('email'));
     }
 
     public function test_collection_labels(): void
@@ -21,6 +39,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('Plans', ThoughtTypeNavigation::collectionLabel('plan'));
         $this->assertSame('Meetings', ThoughtTypeNavigation::collectionLabel('meeting'));
         $this->assertSame('Articles', ThoughtTypeNavigation::collectionLabel('article'));
+        $this->assertSame('Videos', ThoughtTypeNavigation::collectionLabel('video'));
     }
 
     public function test_thought_display_labels(): void
@@ -31,6 +50,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('Plan', ThoughtTypeNavigation::thoughtDisplayLabel('plan'));
         $this->assertSame('Meeting', ThoughtTypeNavigation::thoughtDisplayLabel('meeting'));
         $this->assertSame('Article', ThoughtTypeNavigation::thoughtDisplayLabel('article'));
+        $this->assertSame('Video', ThoughtTypeNavigation::thoughtDisplayLabel('video'));
     }
 
     public function test_aliases_normalize(): void
@@ -69,6 +89,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertTrue(ThoughtTypeNavigation::isAvailable('plan'));
         $this->assertTrue(ThoughtTypeNavigation::isAvailable('meeting'));
         $this->assertTrue(ThoughtTypeNavigation::isAvailable('article'));
+        $this->assertTrue(ThoughtTypeNavigation::isAvailable('video'));
     }
 
     public function test_route_names_per_type(): void
@@ -79,6 +100,7 @@ class ThoughtTypeNavigationTest extends TestCase
         $this->assertSame('idea.stream.plans', ThoughtTypeNavigation::routeName('plan'));
         $this->assertSame('idea.stream.meetings', ThoughtTypeNavigation::routeName('meeting'));
         $this->assertSame('idea.stream.articles', ThoughtTypeNavigation::routeName('article'));
+        $this->assertSame('idea.stream.videos', ThoughtTypeNavigation::routeName('video'));
     }
 
     public function test_resolve_thought_to_type_key_from_source_and_metadata(): void
@@ -100,6 +122,12 @@ class ThoughtTypeNavigationTest extends TestCase
 
         $article = new Thought(['source' => 'article', 'metadata' => null]);
         $this->assertSame('article', ThoughtTypeNavigation::resolveThoughtToTypeKey($article));
+
+        $video = new Thought(['source' => 'video', 'metadata' => ['type' => 'video']]);
+        $this->assertSame('video', ThoughtTypeNavigation::resolveThoughtToTypeKey($video));
+
+        $videoMetaOnly = new Thought(['source' => 'web', 'metadata' => ['type' => 'video']]);
+        $this->assertSame('video', ThoughtTypeNavigation::resolveThoughtToTypeKey($videoMetaOnly));
     }
 
     public function test_resolve_normalizes_metadata_type_aliases(): void

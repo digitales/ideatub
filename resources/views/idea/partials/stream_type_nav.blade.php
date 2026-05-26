@@ -18,7 +18,7 @@
             class="inline-flex shrink-0 items-center {{ $tabClass($active === 'all') }}"
             @if ($active === 'all') aria-current="page" @endif
         >All thoughts</a>
-        @foreach (ThoughtTypeNavigation::orderedNavTypes() as $typeKey)
+        @foreach (ThoughtTypeNavigation::orderedStreamNavTypes() as $typeKey)
             @continue(! ThoughtTypeNavigation::isAvailable($typeKey))
 
             @php

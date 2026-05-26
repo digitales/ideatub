@@ -176,6 +176,11 @@
                                     </span>
                                 @endif
                             </a>
+                            @if(\App\Support\ThoughtTypeNavigation::isAvailable('jira'))
+                                <a href="{{ route('idea.stream.jira') }}" data-testid="account-menu-jira-link" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
+                                    Jira
+                                </a>
+                            @endif
                             <a href="{{route('shared-research.index')}}" class="block px-4 py-2 text-sm text-slate-brand hover:text-deep-indigo hover:bg-memory-violet/5 transition-colors">
                                 Shared documents
                             </a>

@@ -12,7 +12,7 @@ final class ThoughtTypeNavigation
     /**
      * Single source of truth for canonical keys, labels, route names, and accepted stored aliases.
      *
-     * @var array<string, array{collection_label: string, thought_label: string, route_name: string, stored_values: list<string>}>
+     * @var array<string, array{collection_label: string, thought_label: string, route_name: string, stored_values: list<string>, show_in_stream_nav?: bool}>
      */
     private const TYPE_DEFINITIONS = [
         'jira' => [
@@ -20,6 +20,7 @@ final class ThoughtTypeNavigation
             'thought_label' => 'Jira',
             'route_name' => 'idea.stream.jira',
             'stored_values' => ['jira'],
+            'show_in_stream_nav' => false,
         ],
         'email' => [
             'collection_label' => 'Emails',
@@ -51,6 +52,13 @@ final class ThoughtTypeNavigation
             'route_name' => 'idea.stream.articles',
             'stored_values' => ['article', 'articles'],
         ],
+        'video' => [
+            'collection_label' => 'Videos',
+            'thought_label' => 'Video',
+            'route_name' => 'idea.stream.videos',
+            'stored_values' => ['video'],
+            'show_in_stream_nav' => true,
+        ],
     ];
 
     /**
@@ -59,6 +67,27 @@ final class ThoughtTypeNavigation
     public static function orderedNavTypes(): array
     {
         return array_keys(self::TYPE_DEFINITIONS);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function orderedStreamNavTypes(): array
+    {
+        return array_values(array_filter(
+            self::orderedNavTypes(),
+            fn (string $key): bool => self::showInStreamNav($key)
+        ));
+    }
+
+    public static function showInStreamNav(string $canonicalType): bool
+    {
+        $key = self::normalizeTypeKey($canonicalType);
+        if ($key === null || ! isset(self::TYPE_DEFINITIONS[$key])) {
+            return false;
+        }
+
+        return self::TYPE_DEFINITIONS[$key]['show_in_stream_nav'] ?? true;
     }
 
     public static function collectionLabel(string $canonicalType): string
@@ -151,6 +180,9 @@ final class ThoughtTypeNavigation
         if ($sourceKey === 'article') {
             return 'article';
         }
+        if ($sourceKey === 'video') {
+            return 'video';
+        }
 
         $metadata = $thought->metadata;
         $typeRaw = is_array($metadata) ? ($metadata['type'] ?? null) : null;
@@ -163,6 +195,9 @@ final class ThoughtTypeNavigation
         }
         if ($metaType === 'meeting') {
             return 'meeting';
+        }
+        if ($metaType === 'video') {
+            return 'video';
         }
 
         return null;

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ResearchShare;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\OpenRouterService;
@@ -297,6 +298,46 @@ class ThoughtTypePagesTest extends TestCase
         $response->assertSee('No meetings yet.', false);
     }
 
+    public function test_videos_type_page_shows_only_video_roots(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'YouTube capture',
+            'parent_id' => null,
+            'source' => 'video',
+            'metadata' => ['type' => 'video', 'video_id' => 'vid001', 'tags' => []],
+        ]);
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Plain note',
+            'parent_id' => null,
+            'source' => 'web',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.videos'));
+
+        $response->assertOk();
+        $response->assertSee('Videos', false);
+        $response->assertSee('YouTube capture');
+        $response->assertDontSee('Plain note');
+    }
+
+    public function test_videos_stream_shows_empty_state_when_no_matching_thoughts_exist(): void
+    {
+        $user = User::factory()->create();
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Other',
+            'parent_id' => null,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.videos'));
+
+        $response->assertOk();
+        $response->assertSee('No videos yet.', false);
+    }
+
     public function test_disabled_jira_type_is_not_available_in_navigation_mapping(): void
     {
         config(['services.jira.enabled' => false]);
@@ -569,7 +610,7 @@ class ThoughtTypePagesTest extends TestCase
             'source' => 'web',
             'metadata' => ['type' => 'plan'],
         ]);
-        \App\Models\ResearchShare::factory()->create([
+        ResearchShare::factory()->create([
             'user_id' => $user->id,
             'thought_id' => $eligible->id,
         ]);

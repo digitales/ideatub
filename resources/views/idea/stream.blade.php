@@ -63,6 +63,8 @@
                         No plans yet.
                     @elseif($__collectionKey === 'meeting')
                         No meetings yet.
+                    @elseif($__collectionKey === 'video')
+                        No videos yet. <a href="{{ route('idea.index') }}" class="text-memory-violet hover:underline">Capture a video from the home page</a>.
                     @elseif($tag)
                         No thoughts with tag ‘{{e($tag)}}’. <a href="{{route('idea.stream')}}" class="text-memory-violet hover:underline">All thoughts</a>
                     @else

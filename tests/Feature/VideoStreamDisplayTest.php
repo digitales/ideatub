@@ -62,6 +62,35 @@ class VideoStreamDisplayTest extends TestCase
         $response->assertDontSee('View formatted', false);
     }
 
+    public function test_videos_stream_page_renders_video_cards_like_all_thoughts_stream(): void
+    {
+        $user = User::factory()->create();
+        $canonical = 'https://www.youtube.com/watch?v=streamVidVideosTab01';
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'source' => 'video',
+            'content' => 'YouTube: '.$canonical,
+            'metadata' => [
+                'type' => 'video',
+                'video_id' => 'streamVidVideosTab01',
+                'video_url' => $canonical,
+                'transcript_status' => VideoCaptureService::TRANSCRIPT_STATUS_PENDING,
+                'transcript_source' => VideoCaptureService::TRANSCRIPT_SOURCE_NONE,
+                'tags' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->get(route('idea.stream.videos'));
+
+        $response->assertOk();
+        $response->assertSee('Videos', false);
+        $response->assertSee('data-thought-kind="video"', false);
+        $response->assertSee('Fetching transcript', false);
+        $response->assertSee($canonical, false);
+    }
+
     public function test_stream_video_card_shows_view_research_when_latest_research_is_linked(): void
     {
         $user = User::factory()->create();

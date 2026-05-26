@@ -43,14 +43,25 @@ class StreamPageTest extends TestCase
         $this->assertStreamTypeNav($response, route('idea.stream'));
     }
 
-    public function test_typed_stream_page_marks_active_type_navigation_option(): void
+    public function test_jira_stream_page_does_not_mark_jira_tab_in_type_navigation(): void
     {
         $user = User::factory()->create();
 
         $response = $this->actingAs($user)->get(route('idea.stream.jira'));
 
         $response->assertOk();
-        $this->assertStreamTypeNav($response, route('idea.stream.jira'));
+        $response->assertSee('Jira', false);
+        $this->assertStreamTypeNav($response, null);
+    }
+
+    public function test_videos_stream_page_marks_active_type_navigation_option(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('idea.stream.videos'));
+
+        $response->assertOk();
+        $this->assertStreamTypeNav($response, route('idea.stream.videos'));
     }
 
     public function test_meetings_stream_page_marks_active_type_navigation_option(): void
@@ -530,7 +541,7 @@ class StreamPageTest extends TestCase
         $this->assertStringContainsString('requestEdit()', $normal->getContent());
     }
 
-    private function assertStreamTypeNav(TestResponse $response, string $activeHref): void
+    private function assertStreamTypeNav(TestResponse $response, ?string $activeHref): void
     {
         $response->assertSee('data-testid="stream-type-nav"', false);
 
@@ -541,19 +552,24 @@ class StreamPageTest extends TestCase
         $nav = $navNodes->item(0);
         $expectedLinks = [
             'All thoughts' => route('idea.stream'),
-            'Jira' => route('idea.stream.jira'),
             'Emails' => route('idea.stream.emails'),
             'Research' => route('idea.stream.research'),
             'Plans' => route('idea.stream.plans'),
             'Meetings' => route('idea.stream.meetings'),
+            'Articles' => route('idea.stream.articles'),
+            'Videos' => route('idea.stream.videos'),
         ];
 
         foreach ($expectedLinks as $label => $href) {
             $link = $xpath->query(".//a[@href='{$href}' and normalize-space(.)='{$label}']", $nav)->item(0);
 
             $this->assertNotNull($link, sprintf('Missing stream type nav link for [%s].', $label));
-            $this->assertSame($href === $activeHref ? 'page' : '', $link->getAttribute('aria-current'));
+            $expectedCurrent = $activeHref !== null && $href === $activeHref ? 'page' : '';
+            $this->assertSame($expectedCurrent, $link->getAttribute('aria-current'));
         }
+
+        $jiraLink = $xpath->query(".//a[@href='".route('idea.stream.jira')."']", $nav)->item(0);
+        $this->assertNull($jiraLink, 'Jira must not appear in stream type nav.');
     }
 
     private function xpathFromResponse(TestResponse $response): DOMXPath
