@@ -28,11 +28,22 @@ class Project extends Model implements Commentable
         'user_id',
         'title',
         'description',
+        'working_memory_auto_update',
         'context_thought_id',
         'parent_project_id',
         'elixirr_client_slug',
         'elixirr_project_slug',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'working_memory_auto_update' => 'boolean',
+        ];
+    }
 
     public function user(): BelongsTo
     {

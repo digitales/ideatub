@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Jobs\RefreshWorkingMemoryIncremental;
 use App\Jobs\SynthesizeMeetingCompactionJob;
+use App\Jobs\WorkingMemoryRebuildJob;
 use App\Models\Thought;
 
 class ThoughtObserver
@@ -22,6 +23,7 @@ class ThoughtObserver
         }
 
         RefreshWorkingMemoryIncremental::dispatch($thought->id);
+        $this->dispatchAutoRebuildForThought($thought);
     }
 
     public function updated(Thought $thought): void
@@ -50,6 +52,7 @@ class ThoughtObserver
         }
 
         RefreshWorkingMemoryIncremental::dispatch($thought->id);
+        $this->dispatchAutoRebuildForThought($thought);
     }
 
     private function isMeetingThought(Thought $thought): bool
@@ -75,6 +78,17 @@ class ThoughtObserver
 
         if ($delaySeconds > 0) {
             $dispatch->delay(now()->addSeconds($delaySeconds));
+        }
+
+        $this->dispatchAutoRebuildForThought($thought);
+    }
+
+    private function dispatchAutoRebuildForThought(Thought $thought): void
+    {
+        $thought->loadMissing('projects:id');
+
+        foreach ($thought->projects as $project) {
+            WorkingMemoryRebuildJob::dispatch((string) $project->id);
         }
     }
 }

@@ -308,6 +308,7 @@ class OpenRouterService
         ?string $modelOverride = null,
         ?float $temperatureOverride = null,
         ?int $maxTokensOverride = null,
+        ?string $systemPrompt = null,
     ): array {
         $userPrompt = trim($userPrompt);
         if ($userPrompt === '') {
@@ -333,11 +334,16 @@ class OpenRouterService
         $retriedForLength = false;
 
         while (true) {
+            $messages = [];
+            $trimmedSystemPrompt = is_string($systemPrompt) ? trim($systemPrompt) : '';
+            if ($trimmedSystemPrompt !== '') {
+                $messages[] = ['role' => 'system', 'content' => $trimmedSystemPrompt];
+            }
+            $messages[] = ['role' => 'user', 'content' => $userPrompt];
+
             $payload = [
                 'model' => $model,
-                'messages' => [
-                    ['role' => 'user', 'content' => $userPrompt],
-                ],
+                'messages' => $messages,
                 'max_tokens' => $maxTokens,
             ];
 

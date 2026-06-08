@@ -173,4 +173,24 @@ return [
 
     'compaction_validation_enforced' => (bool) env('WORKING_MEMORY_COMPACTION_VALIDATION_ENFORCED', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Auto-rebuild on project thought changes
+    |--------------------------------------------------------------------------
+    |
+    | When enabled per project, thought saves enqueue WorkingMemoryRebuildJob which
+    | synthesizes working memory via LLM and upserts with an auto-rebuild label.
+    |
+    */
+
+    'auto_rebuild_source_label_prefix' => env('WORKING_MEMORY_AUTO_REBUILD_SOURCE_LABEL_PREFIX', 'auto-rebuild'),
+
+    'auto_rebuild_debounce_minutes' => (int) env('WORKING_MEMORY_AUTO_REBUILD_DEBOUNCE_MINUTES', 30),
+
+    'auto_rebuild_thought_limit' => (int) env('WORKING_MEMORY_AUTO_REBUILD_THOUGHT_LIMIT', 20),
+
+    'auto_rebuild_model' => env('WORKING_MEMORY_AUTO_REBUILD_MODEL', 'claude-sonnet-4-20250514'),
+
+    'auto_rebuild_max_tokens' => (int) env('WORKING_MEMORY_AUTO_REBUILD_MAX_TOKENS', 2000),
+
 ];

@@ -12,6 +12,7 @@ Route::delete('/mcp', [McpController::class, 'destroy']);
 // REST API for Custom GPT Actions (OAuth Bearer only)
 Route::middleware('auth.oauth.bearer')->group(function (): void {
     Route::get('/projects', [ProjectsApiController::class, 'index']);
+    Route::patch('/projects/{project}', [ProjectsApiController::class, 'update']);
 });
 
 Route::middleware('auth.oauth.bearer')->prefix('thoughts')->group(function (): void {

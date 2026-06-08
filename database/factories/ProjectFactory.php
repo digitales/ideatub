@@ -19,6 +19,7 @@ class ProjectFactory extends Factory
             'user_id' => User::factory(),
             'title' => fake()->sentence(3),
             'description' => fake()->optional()->paragraph(),
+            'working_memory_auto_update' => true,
         ];
     }
 

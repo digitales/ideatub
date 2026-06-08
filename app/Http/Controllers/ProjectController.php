@@ -115,13 +115,19 @@ class ProjectController extends Controller
      */
     private function projectAttributesFromRequest(StoreProjectRequest|UpdateProjectRequest $request): array
     {
-        return [
+        $attributes = [
             'title' => $request->validated('title'),
             'description' => $request->validated('description'),
             'elixirr_client_slug' => $request->validated('elixirr_client_slug'),
             'elixirr_project_slug' => $request->validated('elixirr_project_slug'),
             'parent_project_id' => $request->validated('parent_project_id'),
         ];
+
+        if ($request->has('working_memory_auto_update')) {
+            $attributes['working_memory_auto_update'] = $request->boolean('working_memory_auto_update');
+        }
+
+        return $attributes;
     }
 
     /**

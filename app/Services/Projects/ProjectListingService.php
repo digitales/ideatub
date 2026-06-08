@@ -14,6 +14,7 @@ final class ProjectListingService
      *     elixirr_project_slug: ?string,
      *     parent_project_id: ?string,
      *     context_thought_id: ?string,
+     *     working_memory_auto_update: bool,
      * }>}
      */
     public function forUser(int $userId, ?string $elixirrClientSlug, ?string $parentProjectId): array
@@ -41,6 +42,7 @@ final class ProjectListingService
             'context_thought_id' => $project->context_thought_id !== null
                 ? (string) $project->context_thought_id
                 : null,
+            'working_memory_auto_update' => (bool) $project->working_memory_auto_update,
         ])->values()->all();
 
         return ['data' => $data];

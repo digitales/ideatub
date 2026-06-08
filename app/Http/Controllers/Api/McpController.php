@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\RunVideoResearch;
 use App\Jobs\SyncUserJiraActivity;
+use App\Models\Project;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserMcpKey;
@@ -17,6 +18,7 @@ use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
 use App\Services\Projects\ProjectListingService;
 use App\Services\Projects\ProjectPinnedContextPayload;
+use App\Services\Projects\ProjectSettingsService;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
@@ -54,6 +56,7 @@ class McpController extends Controller
         private WorkingMemoryDedupeFamilyResolver $workingMemoryDedupeFamilyResolver,
         private WorkingMemorySnapshotDedupeService $workingMemorySnapshotDedupeService,
         private ProjectPinnedContextPayload $projectPinnedContextPayload,
+        private ProjectSettingsService $projectSettingsService,
     ) {}
 
     /**
@@ -130,6 +133,7 @@ class McpController extends Controller
             'capture_article',
             'get_working_memory',
             'list_projects',
+            'update_project_settings',
             'list_working_memory_versions',
             'get_working_memory_version',
             'get_compaction',
@@ -601,13 +605,28 @@ class McpController extends Controller
             ],
             [
                 'name' => 'list_projects',
-                'description' => 'List IdeaTub projects for Elixirr scope discovery. Returns project UUIDs, titles, elixirr_client_slug, elixirr_project_slug, and parent_project_id for mapping working memory scopes.',
+                'description' => 'List IdeaTub projects for Elixirr scope discovery. Returns project UUIDs, titles, elixirr_client_slug, elixirr_project_slug, parent_project_id, context_thought_id, and working_memory_auto_update for mapping working memory scopes.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
                         'elixirr_client_slug' => ['type' => 'string', 'description' => 'Filter to projects for this Elixirr client slug'],
                         'parent_project_id' => ['type' => 'string', 'description' => 'Filter to child projects of this parent project UUID'],
                     ],
+                ],
+            ],
+            [
+                'name' => 'update_project_settings',
+                'description' => 'Update project settings such as working memory auto-rebuild. Requires the IdeaTub project UUID.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'project_id' => ['type' => 'string', 'description' => 'IdeaTub project UUID'],
+                        'working_memory_auto_update' => [
+                            'type' => 'boolean',
+                            'description' => 'When true, new project thoughts enqueue automatic working memory rebuilds.',
+                        ],
+                    ],
+                    'required' => ['project_id'],
                 ],
             ],
             [
@@ -894,6 +913,7 @@ class McpController extends Controller
             'capture_article' => $this->captureArticle($params),
             'get_working_memory' => $this->getWorkingMemory($params),
             'list_projects' => $this->listProjects($params),
+            'update_project_settings' => $this->updateProjectSettings($params),
             'list_working_memory_versions' => $this->listWorkingMemoryVersions($params),
             'get_working_memory_version' => $this->getWorkingMemoryVersion($params),
             'get_compaction' => $this->getCompaction($params),
@@ -960,6 +980,46 @@ class McpController extends Controller
             isset($params['elixirr_client_slug']) ? (string) $params['elixirr_client_slug'] : null,
             isset($params['parent_project_id']) ? (string) $params['parent_project_id'] : null,
         );
+    }
+
+    /**
+     * update_project_settings: Toggle project-level working memory auto-rebuild.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array{data: array{id: string, title: string, working_memory_auto_update: bool}}
+     */
+    private function updateProjectSettings(array $params): array
+    {
+        $v = Validator::make($params, [
+            'project_id' => 'required|uuid',
+            'working_memory_auto_update' => 'sometimes|boolean',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        /** @var array{project_id: string, working_memory_auto_update?: bool} $validated */
+        $validated = $v->validated();
+
+        $project = Project::query()->find($validated['project_id']);
+        if ($project === null) {
+            throw new ModelNotFoundException('Project not found.');
+        }
+
+        $attributes = [];
+        if (array_key_exists('working_memory_auto_update', $validated)) {
+            $attributes['working_memory_auto_update'] = (bool) $validated['working_memory_auto_update'];
+        }
+
+        $updated = $this->projectSettingsService->updateForUser((int) auth()->id(), $project, $attributes);
+
+        return [
+            'data' => [
+                'id' => (string) $updated->id,
+                'title' => $updated->title,
+                'working_memory_auto_update' => (bool) $updated->working_memory_auto_update,
+            ],
+        ];
     }
 
     /**

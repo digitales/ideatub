@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Jobs\RefreshWorkingMemoryIncremental;
+use App\Jobs\WorkingMemoryRebuildJob;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class ProjectThought extends Pivot
@@ -18,10 +19,12 @@ class ProjectThought extends Pivot
     {
         static::created(static function (ProjectThought $pivot): void {
             self::dispatchRefreshForThoughtId((string) $pivot->thought_id);
+            WorkingMemoryRebuildJob::dispatch((string) $pivot->project_id);
         });
 
         static::deleted(static function (ProjectThought $pivot): void {
             self::dispatchRefreshForThoughtId((string) $pivot->thought_id);
+            WorkingMemoryRebuildJob::dispatch((string) $pivot->project_id);
         });
 
         static::updated(static function (ProjectThought $pivot): void {

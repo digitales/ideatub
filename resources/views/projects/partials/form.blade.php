@@ -82,5 +82,27 @@
         @error('parent_project_id')
             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
         @enderror
+    <div>
+        <label class="flex items-start gap-3 cursor-pointer">
+            <input
+                type="hidden"
+                name="working_memory_auto_update"
+                value="0"
+            />
+            <input
+                type="checkbox"
+                name="working_memory_auto_update"
+                value="1"
+                @checked(old('working_memory_auto_update', $project->working_memory_auto_update))
+                class="mt-1 rounded border-memory-violet/30 text-memory-violet focus:ring-memory-violet/30"
+            />
+            <span>
+                <span class="block text-[11px] font-semibold tracking-[0.08em] uppercase text-memory-violet/80">Auto-update working memory</span>
+                <span class="block text-xs text-slate-brand/70 mt-1">When enabled, new project thoughts trigger an automatic working memory rebuild.</span>
+            </span>
+        </label>
+        @error('working_memory_auto_update')
+            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+        @enderror
     </div>
 </div>
