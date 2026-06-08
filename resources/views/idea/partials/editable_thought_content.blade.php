@@ -4,6 +4,7 @@
     $editorClass = $editorClass ?? 'w-full text-[13.5px] text-deep-indigo leading-relaxed rounded-lg border border-memory-violet/20 focus:border-memory-violet focus:ring-memory-violet/20';
     $previewMaxLength = $previewMaxLength ?? null;
     $previewMode = (bool) ($previewMode ?? false);
+    $previewLineClamp = $previewLineClamp ?? 'line-clamp-[15]';
     $thoughtPreviewKey = 'thought-preview-'.$thought->id;
     $viewHref = $viewHref ?? null;
     $viewLinkClass = $viewLinkClass ?? '';
@@ -93,7 +94,7 @@
                                 x-ref="previewRegion"
                                 data-thought-preview-region="{{ $thoughtPreviewKey }}"
                                 class="{{ $displayClass }}"
-                                :class="previewExpanded ? '' : 'line-clamp-[15]'"
+                                :class="previewExpanded ? '' : @js($previewLineClamp)"
                                 x-text="content"
                             ></p>
                         </a>
@@ -103,7 +104,7 @@
                             x-ref="previewRegion"
                             data-thought-preview-region="{{ $thoughtPreviewKey }}"
                             class="{{ $displayClass }}"
-                            :class="previewExpanded ? '' : 'line-clamp-[15]'"
+                            :class="previewExpanded ? '' : @js($previewLineClamp)"
                             x-text="content"
                         ></p>
                     @endif
