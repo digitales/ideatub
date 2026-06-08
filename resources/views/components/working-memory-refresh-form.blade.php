@@ -26,18 +26,20 @@
             {{ $buttonLabel }}
         </button>
         @if ($showForceButton)
-            <label class="inline-flex items-center gap-1.5 text-xs text-slate-brand">
-                <input type="checkbox" name="fresh_start" value="1" class="rounded border-slate-300 text-memory-violet focus:ring-memory-violet/30">
-                Start fresh
-            </label>
-            <button
-                type="submit"
-                name="force"
-                value="1"
-                class="inline-flex items-center justify-center gap-2 {{ $forceButtonClass }}"
-            >
-                {{ $forceButtonLabel }}
-            </button>
+            <div class="inline-flex flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/80 px-2 py-1">
+                <label class="inline-flex items-center gap-1.5 text-xs text-slate-brand">
+                    <input type="checkbox" name="fresh_start" value="1" class="rounded border-slate-300 text-memory-violet focus:ring-memory-violet/30">
+                    Start fresh
+                </label>
+                <button
+                    type="submit"
+                    name="force"
+                    value="1"
+                    class="inline-flex items-center justify-center gap-2 {{ $forceButtonClass }}"
+                >
+                    {{ $forceButtonLabel }}
+                </button>
+            </div>
         @endif
     </div>
 </form>

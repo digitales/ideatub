@@ -336,6 +336,9 @@
     @endauth
 
     @stack('scripts')
+    @if (config('features.working_memory_ui') && request()->routeIs('projects.show'))
+        <script src="https://ui.sh/ui-picker.js"></script>
+    @endif
 </body>
 
 </html>

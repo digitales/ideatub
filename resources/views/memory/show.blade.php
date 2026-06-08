@@ -59,90 +59,20 @@
 
 @component('idea.partials.detail_layout_shell', ['twoColumn' => true])
     @slot('header')
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="min-w-0">
-                <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">Working memory</h1>
-                <p class="text-sm text-slate-brand mt-1">
-                    @if ($isTag)
-                        {{ $scopeTitle ?? 'Tag' }} — synthesized from captures with this tag.
-                    @elseif ($isProject)
-                        {{ $scopeTitle ?? ($project->title ?? 'Project') }} — synthesized from captures linked to this project.
-                    @else
-                        Global scope — synthesized from your captures.
-                    @endif
-                </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $freshnessClasses }}">
-                    {{ $freshness }}
-                </span>
-                @if (($baseline_build_type ?? '') === 'external')
-                    <span class="inline-flex items-center rounded-full border border-memory-violet/30 bg-memory-violet/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-memory-violet">
-                        Synced from agent
-                    </span>
-                @endif
-                @if ($isProject && ! empty($project))
-                    <a
-                        href="{{ route('projects.show', $project) }}"
-                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
-                    >
-                        Project page
-                    </a>
-                @endif
-                @if ($isTag && ! empty($tagSlugQuery ?? null))
-                    <a
-                        href="{{ route('idea.stream', ['tag' => $tagSlugQuery]) }}"
-                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
-                    >
-                        Tag page
-                    </a>
-                @endif
-                @if (! $isTag && (! $isProject || ! empty($project)))
-                    <a
-                        href="{{ $isProject && ! empty($project) ? route('projects.memory.versions', $project) : route('memory.versions') }}"
-                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
-                    >
-                        History
-                    </a>
-                @endif
-                @if ($externalProtected)
-                    <div class="flex flex-col items-end gap-2 max-w-sm">
-                        <p class="text-xs text-slate-brand text-right">
-                            This memory is synced from your agent. Re-run your agent sync to update it.
-                        </p>
-                        @include('components.working-memory-refresh-form', [
-                            'action' => $refreshAction,
-                            'buttonClass' => 'text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors',
-                            'hiddenFields' => $isTag ? ['tag' => $tagRefreshScopeKey] : [],
-                            'showForceButton' => $aiAuthoringEnabled,
-                            'forceButtonClass' => 'text-xs font-medium text-slate-brand hover:text-deep-indigo px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors',
-                        ])
-                    </div>
-                @else
-                    @include('components.working-memory-refresh-form', [
-                        'action' => $refreshAction,
-                        'buttonClass' => 'text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors',
-                        'hiddenFields' => $isTag ? ['tag' => $tagRefreshScopeKey] : [],
-                    ])
-                @endif
-                @if (! $isProject && ! $isTag && config('features.working_memory_ui'))
-                    <a
-                        href="{{ route('memory.scopes.index') }}"
-                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
-                    >
-                        All memories
-                    </a>
-                @endif
-                @if (! $isProject && ! $isTag && config('features.working_memory_insights'))
-                    <a
-                        href="{{ route('memory.insights') }}"
-                        class="text-xs font-medium text-memory-violet hover:text-memory-violet/80 px-3 py-1.5 rounded-lg border border-memory-violet/20 hover:bg-memory-violet/5 transition-colors"
-                    >
-                        Insights
-                    </a>
-                @endif
-            </div>
-        </div>
+        @include('memory.partials.show_header', [
+            'isProject' => $isProject,
+            'isTag' => $isTag,
+            'project' => $project ?? null,
+            'scopeTitle' => $scopeTitle ?? null,
+            'tagSlugQuery' => $tagSlugQuery ?? null,
+            'tagRefreshScopeKey' => $tagRefreshScopeKey,
+            'freshness' => $freshness,
+            'freshnessClasses' => $freshnessClasses,
+            'baseline_build_type' => $baseline_build_type ?? null,
+            'externalProtected' => $externalProtected,
+            'refreshAction' => $refreshAction,
+            'aiAuthoringEnabled' => $aiAuthoringEnabled,
+        ])
     @endslot
 
     @slot('main')
