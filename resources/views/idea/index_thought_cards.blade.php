@@ -4,7 +4,7 @@
         data-index="{{ $loop->index }}"
         data-reply-href="{{ $card->replyHref() }}"
         :class="{ 'ring-2 ring-memory-violet ring-offset-2': selectedThoughtIndex === {{ $card->currentReplyableIndex() }} }"
-        class="relative rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all"
+        class="relative rounded-xl border border-memory-violet/15 bg-white/80 px-4 py-3.5 mb-2.5 hover:border-memory-violet/20 hover:shadow-[0_2px_12px_rgba(109,106,247,0.08)] transition-all"
     >
         <div class="absolute top-3 right-3">
             @include('idea.partials.thought_card_actions', [

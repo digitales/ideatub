@@ -3,6 +3,7 @@
     $initialContent = $initialContent ?? '';
     $forceHomeVideoMode = $forceHomeVideoMode ?? false;
     $importUploadsEnabled = $importUploadsEnabled ?? false;
+    $fullWidth = $fullWidth ?? false;
     $noChunkingFieldId = $placement === 'global' ? 'no_chunking_global' : 'no_chunking';
 @endphp
     <div
@@ -40,7 +41,7 @@
 
         <div
             class="w-full"
-            :class="focusOverlayOpen ? 'ideatub-focus-panel' : 'max-w-[600px]'"
+            :class="focusOverlayOpen ? 'ideatub-focus-panel' : '{{ $fullWidth ? '' : 'max-w-[600px]' }}'"
             :role="focusOverlayOpen ? 'dialog' : null"
             :aria-modal="focusOverlayOpen ? 'true' : null"
             :aria-label="focusOverlayOpen ? 'Capture thought' : null"

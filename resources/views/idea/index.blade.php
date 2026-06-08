@@ -3,7 +3,11 @@
 @section('title', $query ? 'Search — IdeaTub' : 'IdeaTub')
 
 @section('content')
-<div class="max-w-2xl mx-auto px-6 pt-10 pb-20">
+@php
+    $isDashboard = ! $query && ! empty($morningBrief);
+    $containerClass = $isDashboard ? 'max-w-6xl' : 'max-w-2xl';
+@endphp
+<div class="{{ $containerClass }} mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-20">
 
     {{-- Flash messages --}}
     @if (session('success'))
@@ -20,8 +24,15 @@
     @if ($query)
         <p class="text-center text-[11px] font-semibold tracking-[0.12em] uppercase text-memory-violet mb-2.5">Search</p>
         <h1 class="text-center text-[28px] font-semibold text-deep-indigo leading-snug mb-9">Find a memory</h1>
-    @elseif (! empty($morningBrief))
-        @include('idea.partials.morning_brief', ['morningBrief' => $morningBrief])
+    @elseif ($isDashboard)
+        <header class="mb-6 lg:mb-8 flex flex-wrap items-start justify-between gap-4">
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-memory-violet/90 mb-1">Morning brief</p>
+                <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-deep-indigo leading-snug">{{ $morningBrief->greeting }}</h1>
+                <p class="mt-1 text-sm text-slate-brand/80 max-w-[42ch]">Pick up where you left off, or capture something new.</p>
+            </div>
+            @includeWhen(config('features.working_memory_ui'), 'idea.partials.working_memory_home_strip', ['variant' => 'compact'])
+        </header>
     @else
         @include('idea.partials.page_shell_header', [
             'eyebrow' => 'Your thinking space',
@@ -31,7 +42,9 @@
         ])
     @endif
 
-    @includeWhen(config('features.working_memory_ui'), 'idea.partials.working_memory_home_strip')
+    @if (! $isDashboard)
+        @includeWhen(config('features.working_memory_ui'), 'idea.partials.working_memory_home_strip')
+    @endif
 
     {{-- Capture box (initial content in data attr to avoid @json breaking the x-data attribute) --}}
     @php
@@ -42,78 +55,72 @@
             && \Illuminate\Support\Facades\Route::has('imports.quick')
             && ! app(\App\Services\DemoMode::class)->enabled();
     @endphp
-    @include('idea.partials.capture_box', [
-        'placement' => 'inline',
-        'initialContent' => $initialContent,
-        'forceHomeVideoMode' => $forceHomeVideoMode,
-        'importUploadsEnabled' => $importUploadsEnabled,
-        'replyingTo' => $replyingTo ?? null,
-        'replyingToPreview' => $replyingToPreview ?? null,
-    ])
 
-    {{-- Thoughts list --}}
-    <div
-        x-data="{
-            selectedThoughtIndex: 0,
-            handleThoughtNav(detail) {
-                if (!detail || !detail.direction) return;
-                const cards = this.$el.querySelectorAll('[data-reply-href]');
-                const max = Math.max(0, cards.length - 1);
-                if (detail.direction === 'next') this.selectedThoughtIndex = Math.min(this.selectedThoughtIndex + 1, max);
-                else this.selectedThoughtIndex = Math.max(this.selectedThoughtIndex - 1, 0);
-                const card = cards[this.selectedThoughtIndex];
-                if (card) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            },
-            handleThoughtReply() {
-                const cards = this.$el.querySelectorAll('[data-reply-href]');
-                const card = cards[this.selectedThoughtIndex];
-                const href = card?.dataset?.replyHref;
-                if (href) window.location.href = href;
-            }
-        }"
-        @thought-nav.window="handleThoughtNav($event.detail)"
-        @thought-reply.window="handleThoughtReply()"
-    >
-    <div id="search-results" class="flex items-center justify-between mt-9 mb-3.5 scroll-mt-[5rem]" role="region" aria-label="{{ $query ? 'Search results' : 'Recent thoughts' }}">
-        <span class="text-[11px] font-semibold tracking-[0.1em] uppercase text-slate-brand/50">
-            @if ($query)
-                Results for "{{ e($query) }}"
-            @else
-                Recent thoughts
-            @endif
-        </span>
-        <span class="text-[11px] text-slate-brand/30">{{ $thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator ? $thoughts->total() : count($thoughts) }} stored</span>
-    </div>
-    @if (!$thoughts->isEmpty())
-        <p class="text-[11px] text-slate-brand/40 mb-2">j / k to move · Enter to reply</p>
-    @endif
+    @if ($isDashboard && $morningBrief->hasCards())
+        <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-8 lg:items-start">
+            {{-- Sidebar: quick actions (desktop right, mobile after capture) --}}
+            <aside class="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 mb-6 lg:mb-0 lg:sticky lg:top-24 self-start">
+                @include('idea.partials.morning_brief', ['morningBrief' => $morningBrief, 'variant' => 'sidebar'])
+            </aside>
 
-    @if (!$thoughts->isEmpty())
-        <div id="index-thoughts-list"
-            @if(!$query) data-index-refetch-url="{{ route('idea.index') }}"
-                data-index-since="{{ $thoughts->first()->created_at->toIso8601String() }}"
-            @endif>
-            @include('idea.index_thought_cards', ['cards' => $cards])
+            {{-- Main: capture --}}
+            <div class="order-1 lg:order-none lg:col-start-1 lg:row-start-1 min-w-0">
+                @include('idea.partials.capture_box', [
+                    'placement' => 'inline',
+                    'initialContent' => $initialContent,
+                    'forceHomeVideoMode' => $forceHomeVideoMode,
+                    'importUploadsEnabled' => $importUploadsEnabled,
+                    'replyingTo' => $replyingTo ?? null,
+                    'replyingToPreview' => $replyingToPreview ?? null,
+                    'fullWidth' => true,
+                ])
+            </div>
+
+            {{-- Main: thoughts feed --}}
+            <div class="order-3 lg:order-none lg:col-start-1 lg:row-start-2 min-w-0 mt-6 lg:mt-8">
+                @include('idea.partials.index_thoughts_section', [
+                    'query' => $query,
+                    'thoughts' => $thoughts,
+                    'cards' => $cards,
+                ])
+            </div>
+        </div>
+    @elseif ($isDashboard)
+        <div class="max-w-3xl">
+            @include('idea.partials.capture_box', [
+                'placement' => 'inline',
+                'initialContent' => $initialContent,
+                'forceHomeVideoMode' => $forceHomeVideoMode,
+                'importUploadsEnabled' => $importUploadsEnabled,
+                'replyingTo' => $replyingTo ?? null,
+                'replyingToPreview' => $replyingToPreview ?? null,
+                'fullWidth' => true,
+            ])
+        </div>
+
+        <div class="mt-8">
+            @include('idea.partials.index_thoughts_section', [
+                'query' => $query,
+                'thoughts' => $thoughts,
+                'cards' => $cards,
+            ])
         </div>
     @else
-        <div class="rounded-xl border border-memory-violet/10 bg-white/50 px-4 py-8 text-center text-sm text-slate-brand/50">
-            @if ($query)
-                No thoughts match your search. Try different words or capture a new one above.
-            @else
-                No thoughts yet. What are you thinking?
-            @endif
-        </div>
-    @endif
+        @include('idea.partials.capture_box', [
+            'placement' => 'inline',
+            'initialContent' => $initialContent,
+            'forceHomeVideoMode' => $forceHomeVideoMode,
+            'importUploadsEnabled' => $importUploadsEnabled,
+            'replyingTo' => $replyingTo ?? null,
+            'replyingToPreview' => $replyingToPreview ?? null,
+        ])
 
-    {{-- Search: infinite scroll sentinel; non-search or single-page: pagination links --}}
-    @if ($query && $thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator && $thoughts->hasMorePages())
-        <div id="index-load-more-sentinel" class="h-4 mt-4" data-index-search-url="{{ route('idea.index', ['q' => $query]) }}" data-index-total="{{ $thoughts->total() }}"></div>
-    @elseif($thoughts instanceof \Illuminate\Pagination\LengthAwarePaginator && $thoughts->hasMorePages())
-        <div class="text-center pt-4">
-            {{ $thoughts->links('pagination.idea') }}
-        </div>
+        @include('idea.partials.index_thoughts_section', [
+            'query' => $query,
+            'thoughts' => $thoughts,
+            'cards' => $cards,
+        ])
     @endif
-    </div>
 
 </div>
 
