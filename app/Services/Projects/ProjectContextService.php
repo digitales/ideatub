@@ -4,6 +4,7 @@ namespace App\Services\Projects;
 
 use App\Models\Project;
 use App\Models\Thought;
+use App\Services\ProjectMembershipService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
