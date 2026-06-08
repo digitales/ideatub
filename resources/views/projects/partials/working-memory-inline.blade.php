@@ -2,13 +2,16 @@
     $payload = is_array($workingMemoryPayload ?? null) ? $workingMemoryPayload : null;
     $refreshAction = route('working-memory.refresh.project', $project);
     $hasPayload = $payload !== null;
+    $navBtnClass = 'inline-flex items-center rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet transition-colors hover:bg-memory-violet/5 hover:text-memory-violet/80';
+    $actionBtnClass = $navBtnClass;
+    $forceBtnClass = 'inline-flex items-center rounded-lg border border-deep-indigo/[0.08] px-3 py-1.5 text-xs font-medium text-slate-brand transition-colors hover:bg-white hover:text-deep-indigo';
 
     if ($hasPayload) {
         $freshness = $payload['freshness_state'] ?? 'stale';
         $freshnessClasses = match ($freshness) {
-            'fresh' => 'bg-neural-teal/15 text-neural-teal',
-            'degraded' => 'bg-amber-50 text-amber-900',
-            default => 'bg-slate-100 text-slate-600',
+            'fresh' => 'bg-neural-teal/15 text-neural-teal border-neural-teal/30',
+            'degraded' => 'bg-amber-50 text-amber-900 border-amber-200/80',
+            default => 'bg-slate-100 text-slate-600 border-slate-200',
         };
         $structuredSections = is_array($payload['structured_sections'] ?? null) ? $payload['structured_sections'] : [];
         $authoringStatus = $payload['authoring_status'] ?? null;
@@ -22,8 +25,9 @@
             : null;
         $sectionCount = count($structuredSections);
         $sectionCountLabel = $sectionCount === 1 ? '1 section' : $sectionCount.' sections';
+        $isExternal = ($payload['baseline_build_type'] ?? '') === 'external';
         $externalProtected = false;
-        if (($payload['baseline_build_type'] ?? '') === 'external'
+        if ($isExternal
             && ($authoringStatus ?? '') === 'external'
             && ! empty($payload['canonical_created_at'])) {
             $protectDays = max(0, (int) config('working_memory.external_protect_days', 14));
@@ -57,67 +61,74 @@
     };
 @endphp
 
-<section>
-    <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+<section class="ideatub-surface px-5 py-5 sm:px-6">
+    <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div class="min-w-0">
             <h2 class="text-lg font-semibold text-deep-indigo">Working memory</h2>
             @if ($hasPayload)
-                <p class="mt-1 text-sm text-slate-brand/70">
+                <p class="mt-1 text-sm text-slate-brand/70 max-w-[48ch]">
                     {{ $sectionCountLabel }}
                     @if ($lastRefreshedDisplay)
-                        · last refreshed {{ $lastRefreshedDisplay }}
-                    @endif
-                    @if (($payload['baseline_build_type'] ?? '') === 'external')
-                        · synced from agent
+                        · refreshed {{ $lastRefreshedDisplay }}
                     @endif
                 </p>
             @else
-                <p class="mt-1 text-sm text-slate-brand/70">Not built yet for this project.</p>
+                <p class="mt-1 text-sm text-slate-brand/70 max-w-[48ch]">Not built yet for this project.</p>
             @endif
         </div>
-        <div class="flex flex-wrap items-center gap-2 text-xs shrink-0">
-            @if ($hasPayload)
-                <span class="rounded-full px-2.5 py-1 font-semibold uppercase tracking-wide {{ $freshnessClasses }}">
+
+        @if ($hasPayload)
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] {{ $freshnessClasses }}">
                     {{ $freshness }}
                 </span>
-                @if (($payload['baseline_build_type'] ?? '') === 'external')
-                    <span class="rounded-full border border-memory-violet/30 bg-memory-violet/10 px-2.5 py-1 font-semibold uppercase tracking-wide text-memory-violet">
+                @if ($isExternal)
+                    <span class="inline-flex items-center rounded-full border border-memory-violet/30 bg-memory-violet/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-memory-violet">
                         Synced from agent
                     </span>
                 @endif
-            @endif
-            @if ($hasPayload && $externalProtected)
-                <div class="flex flex-col items-end gap-2 max-w-sm">
-                    <p class="text-xs text-slate-brand text-right">
-                        Synced from your agent. Re-run your agent sync to update it.
-                    </p>
-                    @include('components.working-memory-refresh-form', [
-                        'action' => $refreshAction,
-                        'formClass' => 'inline',
-                        'buttonClass' => 'font-medium text-memory-violet hover:underline bg-transparent border-0 p-0 cursor-pointer',
-                        'buttonLabel' => 'Refresh',
-                        'showForceButton' => $aiAuthoringEnabled,
-                        'forceButtonClass' => 'font-medium text-slate-brand hover:text-deep-indigo',
-                    ])
-                </div>
-            @else
-                @include('components.working-memory-refresh-form', [
-                    'action' => $refreshAction,
-                    'formClass' => 'inline',
-                    'buttonClass' => 'font-medium text-memory-violet hover:underline bg-transparent border-0 p-0 cursor-pointer',
-                    'buttonLabel' => 'Refresh',
-                ])
-            @endif
+            </div>
+        @endif
+    </div>
+
+    @if ($hasPayload && $externalProtected)
+        <div class="mt-4 rounded-xl border border-memory-violet/20 bg-memory-violet/5 px-4 py-3">
+            <p class="text-sm text-slate-brand">
+                Synced from your agent. Re-run your agent sync to update it, or rebuild in IdeaTub below.
+            </p>
+        </div>
+    @endif
+
+    <div class="mt-4 flex flex-col gap-3 border-t border-deep-indigo/[0.06] pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <nav class="flex flex-wrap items-center gap-2" aria-label="Working memory actions">
             @if ($hasPayload)
-                <span class="text-slate-brand/30" aria-hidden="true">·</span>
-                <a href="{{ route('projects.memory.versions', $project) }}" class="font-medium text-memory-violet hover:underline">History</a>
+                <a href="{{ route('projects.memory.versions', $project) }}" class="{{ $navBtnClass }}">
+                    History
+                </a>
+                <a href="{{ route('projects.memory.show', $project) }}" class="{{ $navBtnClass }}">
+                    Full page
+                </a>
+            @else
+                <a href="{{ route('projects.memory.show', $project) }}" class="{{ $navBtnClass }}">
+                    Open memory page
+                </a>
             @endif
+        </nav>
+
+        <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+            @include('components.working-memory-refresh-form', [
+                'action' => $refreshAction,
+                'buttonClass' => $actionBtnClass,
+                'buttonLabel' => 'Refresh',
+                'showForceButton' => ($hasPayload && $externalProtected && $aiAuthoringEnabled),
+                'forceButtonClass' => $forceBtnClass,
+            ])
         </div>
     </div>
 
     @if ($hasPayload)
         @if ($renderStructuredSections)
-            <div class="space-y-3">
+            <div class="mt-5 space-y-3">
                 @foreach ($structuredSections as $sectionTitle => $sectionItems)
                     @php
                         $title = trim((string) $sectionTitle);
@@ -127,7 +138,7 @@
 
                     <div class="rounded-xl bg-deep-indigo/[0.03] px-4 py-4 sm:px-5 ring-1 ring-deep-indigo/[0.05]">
                         <h3 class="text-sm font-semibold text-deep-indigo">{{ $title }}</h3>
-                        <ul class="mt-2 space-y-1.5 text-sm text-slate-brand list-none pl-0">
+                        <ul class="mt-2 space-y-2 text-sm text-slate-brand list-none pl-0">
                             @include('memory.partials.structured_section_items', [
                                 'items' => $items,
                                 'isSafeCitationUrl' => $isSafeReferenceUrl,
@@ -137,7 +148,7 @@
                 @endforeach
             </div>
         @else
-            <div class="rounded-xl bg-deep-indigo/[0.03] px-4 py-4 sm:px-5 ring-1 ring-deep-indigo/[0.05] prose prose-sm max-w-none text-slate-brand">
+            <div class="mt-5 rounded-xl bg-deep-indigo/[0.03] px-4 py-4 sm:px-5 ring-1 ring-deep-indigo/[0.05] prose prose-sm max-w-none text-slate-brand">
                 @include('memory.partials.structured_sections_content', [
                     'structured_sections' => $structuredSections,
                     'authoring_status' => $authoringStatus,
@@ -225,14 +236,9 @@
             </div>
         </details>
     @else
-        <div class="rounded-xl border border-dashed border-deep-indigo/10 px-6 py-8 text-center">
+        <div class="mt-5 rounded-xl border border-dashed border-deep-indigo/10 px-6 py-8 text-center">
             <p class="text-sm text-slate-brand/70 max-w-md mx-auto">
-                Refresh to build working memory from thoughts linked to this project, or open the dedicated memory page.
-            </p>
-            <p class="mt-4">
-                <a href="{{ route('projects.memory.show', $project) }}" class="text-sm font-medium text-memory-violet hover:underline">
-                    Open working memory page
-                </a>
+                Refresh to build working memory from thoughts linked to this project.
             </p>
         </div>
     @endif
