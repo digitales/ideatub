@@ -58,7 +58,10 @@
                 ])
             @endif
 
-            @includeWhen(config('features.working_memory_ui'), 'projects.partials.working-memory-inline-preview')
+            @includeWhen(config('features.working_memory_ui'), 'projects.partials.working-memory-inline', [
+                'project' => $project,
+                'workingMemoryPayload' => $workingMemoryPayload ?? null,
+            ])
 
             <section class="ideatub-surface px-5 py-5 sm:px-6">
                 <div class="flex flex-wrap items-end justify-between gap-3 mb-1">
@@ -220,8 +223,6 @@
                 </template>
             </section>
             @endif
-
-            @includeWhen(config('features.working_memory_ui'), 'projects.partials.working-memory-module', ['project' => $project])
         </aside>
     </div>
 </div>

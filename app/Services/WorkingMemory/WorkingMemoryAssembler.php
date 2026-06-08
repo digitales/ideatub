@@ -443,6 +443,62 @@ class WorkingMemoryAssembler
      *     canonical_version_id: string,
      *     canonical_created_at: string|null,
      *     source_label: string|null
+     * }|null
+     */
+    public function forScopeWhenBuilt(int $userId, string $scopeType, string $scopeKey): ?array
+    {
+        [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);
+
+        $memory = WorkingMemory::query()
+            ->where('user_id', $userId)
+            ->where('scope_type', $normalizedScopeType)
+            ->where('scope_key', $normalizedScopeKey)
+            ->with('latestVersion')
+            ->first();
+
+        if ($memory === null) {
+            return null;
+        }
+
+        $latestAuthoritative = $memory->versions()
+            ->whereIn('build_type', ['consolidated', 'external'])
+            ->whereNull('superseded_at')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($latestAuthoritative === null) {
+            return null;
+        }
+
+        return $this->payloadFromPersistedMemory($memory);
+    }
+
+    /**
+     * @return array{
+     *     scope_type: string,
+     *     scope_key: string,
+     *     freshness_state: string,
+     *     confidence_score: float,
+     *     summary_markdown: string,
+     *     key_concepts: array<int, array{title: string}>,
+     *     active_threads: array<int, array<string, string>>,
+     *     open_questions: array<int, array<string, string>>,
+     *     next_actions: array<int, array<string, string>>,
+     *     structured_sections: array<string, array<int, array<string, mixed>>>,
+     *     references: array<int, array{type: string, url: string, label: string}>,
+     *     section_references: array<string, array<int, array<string, mixed>>>,
+     *     citation_coverage: float|null,
+     *     authoring_status: string|null,
+     *     validation_error: string|null,
+     *     build_diagnostics: array{required_items: int, cited_items: int, reason_codes: array<int, string>}|null,
+     *     last_refreshed_at: string|null,
+     *     effective_consolidation_window_days: int,
+     *     baseline_build_type: string,
+     *     overlay_deltas: array<int, array{label: string, detail: string, since: string|null}>,
+     *     input_count: int,
+     *     canonical_version_id: string,
+     *     canonical_created_at: string|null,
+     *     source_label: string|null
      * }
      */
     private function payloadFromPersistedMemory(WorkingMemory $memory): array

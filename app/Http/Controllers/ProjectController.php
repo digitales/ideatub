@@ -6,6 +6,7 @@ use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Project;
 use App\Models\Thought;
+use App\Services\WorkingMemory\WorkingMemoryAssembler;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
@@ -51,7 +52,7 @@ class ProjectController extends Controller
             ->with('success', 'Project created.');
     }
 
-    public function show(Project $project): View
+    public function show(Project $project, WorkingMemoryAssembler $workingMemoryAssembler): View
     {
         $this->authorize('view', $project);
 
@@ -72,11 +73,21 @@ class ProjectController extends Controller
             ->limit(100)
             ->get(['id', 'content']);
 
+        $workingMemoryPayload = null;
+        if (config('features.working_memory_ui')) {
+            $workingMemoryPayload = $workingMemoryAssembler->forScopeWhenBuilt(
+                (int) auth()->id(),
+                'project',
+                (string) $project->getKey()
+            );
+        }
+
         return view('projects.show', [
             'project' => $project,
             'contextThought' => $contextThought,
             'memberThoughts' => $memberThoughts,
             'thoughtOptions' => $thoughtOptions,
+            'workingMemoryPayload' => $workingMemoryPayload,
         ]);
     }
 

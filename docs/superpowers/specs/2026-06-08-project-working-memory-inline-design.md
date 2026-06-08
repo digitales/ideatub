@@ -1,6 +1,6 @@
 # Design: Project working memory inline on project detail page
 
-**Status:** Approved (brainstorming)  
+**Status:** Approved — implemented  
 **Date:** 2026-06-08
 
 ## Relationship to other specs
@@ -25,10 +25,10 @@ Show **full project-scoped working memory** on the project detail page main colu
 | Content scope | **Full inline** — all eight structured sections (Current Focus, Active Priorities, Recent Changes, Open Questions, Risks / Blockers, Next Actions, Latest Signals, Source Notes) |
 | Placement | **Main column**, between pinned context thought (if any) and the Contents section |
 | Metadata | **Collapsible Details panel** below the eight sections in the main column (not in the right sidebar) |
-| Visual treatment | **Accent panel** — violet left accent border, subtle gradient header, star icon, nested white content well for sections; compact stat grid inside collapsed Details |
-| Sidebar stub | **Remove** `projects/partials/working-memory-module` from the project show sidebar (refresh and history move into the accent panel header) |
+| Visual treatment | **Stacked wells** — open section header (title + freshness + refresh/history links); each of the eight sections in its own subtle well card (`bg-deep-indigo/[0.03]`, light ring); collapsible **Details & metadata** panel below the stack |
+| Sidebar stub | **Remove** `projects/partials/working-memory-module` from the project show sidebar (refresh and history move into the stacked-wells header) |
 | Dedicated memory page | **Keep** `/projects/{id}/memory` unchanged for history and full two-column detail view |
-| First visit / no build | **No synchronous auto-build** on project page load; show empty accent panel with refresh CTA (matches prior sidebar behavior). Dedicated memory page may still auto-build via existing `forScope()` behavior. |
+| First visit / no build | **No synchronous auto-build** on project page load; show empty stacked-wells block with refresh CTA (matches prior sidebar behavior). Dedicated memory page may still auto-build via existing `forScope()` behavior. |
 | Feature flag | Gated behind existing `FEATURE_WORKING_MEMORY_UI` / `config('features.working_memory_ui')` |
 
 ## Non-goals
@@ -47,13 +47,15 @@ Main column                          Sidebar
 ─────────────────────────────────    ─────────────
 [Pinned context thought — optional]
 
-┌ Working memory (accent panel) ─┐   Add thought
-│ Header: icon, title, freshness │   Import markdown
-│ Refresh · History              │   (no WM stub)
-│ ┌ white well: 8 sections ────┐ │
-│ └────────────────────────────┘ │
-│ ▸ Show details (collapsed)     │
-└────────────────────────────────┘
+┌ Working memory (stacked wells) ──┐   Add thought
+│ Title · subtitle · fresh · links │   Import markdown
+│ ┌ Current Focus ───────────────┐ │   (no WM stub)
+│ └──────────────────────────────┘ │
+│ ┌ Active Priorities ───────────┐ │
+│ └──────────────────────────────┘ │
+│ … (six more section wells) …     │
+│ ▸ Details & metadata (collapsed) │
+└──────────────────────────────────┘
 
 Contents (member thoughts list)
 ```
@@ -95,13 +97,16 @@ Web `MemoryController@showProject` uses `WorkingMemoryAssembler::forScope()` dir
 
 `resources/views/projects/partials/working-memory-inline.blade.php`
 
-Accent panel markup (approved UI exploration option **Accent panel**):
+Stacked wells markup (approved UI exploration option **Stacked wells**):
 
-- Outer: `rounded-2xl border border-memory-violet/20 border-l-[4px] border-l-memory-violet bg-gradient-to-br from-memory-violet/[0.06] via-white/95 to-white` with light shadow
-- Header row: star icon in violet well, "Working memory" title, inline freshness + source summary line, Refresh (shared refresh form) and History link (`projects.memory.versions`)
-- Content well: `rounded-xl bg-white/85 ring-1` containing `@include('memory.partials.structured_sections_content', …)` with uppercase violet section headings (as in approved mock)
-- References row below well when `references` non-empty (reuse memory/show pill pattern)
-- Collapsed `<details>` "Show details" with compact 4-stat grid (confidence, inputs, source, build type); expanded state includes full metadata from `memory.partials.details_card` or equivalent fields
+- **Header row:** `h2` "Working memory", subtitle line (`Eight sections · last refreshed {relative time}` or source/freshness when external), right-aligned freshness pill + Refresh (shared refresh form as text-style control) + History link
+- **Section stack:** `space-y-3` loop over `structured_sections`; each section is a well:
+  - Container: `rounded-xl bg-deep-indigo/[0.03] px-4 py-4 sm:px-5 ring-1 ring-deep-indigo/[0.05]`
+  - Title: `text-sm font-semibold text-deep-indigo`
+  - Items: `@include('memory.partials.structured_section_items', …)` in a `ul` with `list-disc pl-5`
+- **Fallback:** when structured sections are empty/unvalidated, render a single well with `@include('memory.partials.structured_sections_content', …)` or `summary_markdown` via safe-markdown
+- **References row** below the stack when `references` non-empty (reuse memory/show pill pattern)
+- **Details:** `<details class="mt-4 rounded-xl ring-1 ring-deep-indigo/[0.08] bg-white/70">` with summary "Details & metadata"; expanded body uses `memory.partials.details_card` (full metadata grid)
 
 ### Project show integration
 
@@ -126,7 +131,8 @@ Remove sidebar include of `working-memory-module`.
 
 When `workingMemoryPayload` is `null`:
 
-- Render the same accent panel shell with muted copy: "Working memory not built yet for this project."
+- Render the stacked-wells header with muted subtitle: "Not built yet for this project."
+- Single dashed well or centered message inside the stack area
 - Show `@include('components.working-memory-refresh-form')` with project refresh action
 - Optional link: "Open working memory page" → `projects.memory.show` (triggers build on that route if user prefers)
 
@@ -163,7 +169,7 @@ No new routes. Existing routes used:
 
 ### Add
 
-- **Built memory:** Seed project-scoped `WorkingMemory` + version with `structured_sections_json`; GET `projects.show` asserts section headings (e.g. "Current Focus") and accent panel title.
+- **Built memory:** Seed project-scoped `WorkingMemory` + version with `structured_sections_json`; GET `projects.show` asserts section headings inside well cards (e.g. "Current Focus") and "Working memory" title.
 - **Not built:** GET `projects.show` with no working memory row asserts empty-state copy and refresh form; assert no `buildConsolidated` side effect during request (no new version created).
 - **Feature flag off:** With `working_memory_ui` false, assert neither inline block nor sidebar stub appears.
 
@@ -176,13 +182,13 @@ No new routes. Existing routes used:
 ## Implementation notes
 
 - Prefer extracting shared header/actions (freshness badges, refresh, history) into a small partial if `memory/show` and inline partial duplicate logic; keep scope minimal — inline panel first, DRY second pass if duplication exceeds ~30 lines.
-- Section heading styling in the accent well uses uppercase violet labels; ensure `prose-memory-list-headings` and Tailwind prose overrides match the approved mock without breaking the dedicated memory page prose.
+- Stacked wells iterate `structured_sections` per well rather than a single prose article; reuse `structured_section_items` for bullets and citations within each well.
 
 ## Success criteria
 
 1. Authenticated project owner sees full eight-section working memory on `/projects/{id}` when memory is built.
 2. Details metadata available via collapsed panel below sections.
-3. Refresh and history accessible from accent panel header.
+3. Refresh and history accessible from stacked-wells header.
 4. Sidebar working memory stub removed.
 5. Project page load does not trigger synchronous memory build when none exists.
 6. `/projects/{id}/memory` continues to work for history and deep links.
