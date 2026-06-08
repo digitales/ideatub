@@ -76,7 +76,9 @@ final class WorkingMemoryAiAuthorService
                         is_array($decoded['references'] ?? null) ? $decoded['references'] : [],
                         $this->referencesFromEvidencePack($evidencePack),
                     );
-                    $decoded = $this->attachDefaultCitationsFromReferences($decoded);
+                    if (config('working_memory.authoring_mode', 'judgment_first') === 'strict') {
+                        $decoded = $this->attachDefaultCitationsFromReferences($decoded);
+                    }
                     Log::info('WorkingMemoryAiAuthorService: parsed markdown compose output (JSON contract fallback).', [
                         'scope_type' => $evidencePack['scope_type'] ?? null,
                         'scope_key' => $evidencePack['scope_key'] ?? null,

@@ -337,6 +337,55 @@ class WorkingMemoryAssembler
      *     source_label: string|null
      * }
      */
+    /**
+     * @return array{
+     *     version_id: string,
+     *     build_type: string,
+     *     created_at: string|null,
+     *     source_label: string|null,
+     *     summary_markdown: string
+     * }|null
+     */
+    public function canonicalBaselineForAuthoring(int $userId, string $scopeType, string $scopeKey): ?array
+    {
+        [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);
+
+        $memory = WorkingMemory::query()
+            ->where('user_id', $userId)
+            ->where('scope_type', $normalizedScopeType)
+            ->where('scope_key', $normalizedScopeKey)
+            ->first();
+
+        if ($memory === null) {
+            return null;
+        }
+
+        $canonical = $memory->versions()
+            ->whereIn('build_type', ['consolidated', 'external'])
+            ->whereNull('superseded_at')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (! $canonical instanceof WorkingMemoryVersion) {
+            return null;
+        }
+
+        $summary = trim((string) $canonical->summary_markdown);
+        if ($summary === '') {
+            return null;
+        }
+
+        return [
+            'version_id' => (string) $canonical->id,
+            'build_type' => (string) $canonical->build_type,
+            'created_at' => $canonical->created_at?->toIso8601String(),
+            'source_label' => is_array($canonical->build_diagnostics_json)
+                ? ($canonical->build_diagnostics_json['source_label'] ?? null)
+                : null,
+            'summary_markdown' => $summary,
+        ];
+    }
+
     public function forScope(int $userId, string $scopeType, string $scopeKey): array
     {
         [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);

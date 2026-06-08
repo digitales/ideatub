@@ -319,6 +319,86 @@ class HelpController extends Controller
         ]);
     }
 
+    /**
+     * @return array<string, array{label: string, file: string}>
+     */
+    private static function workingMemoryAuthoringCatalog(): array
+    {
+        return [
+            'core' => ['label' => 'Core authoring spec', 'file' => 'working-memory-authoring-core.md'],
+            'agent' => ['label' => 'Agent MCP wrapper', 'file' => 'working-memory-authoring-agent.md'],
+        ];
+    }
+
+    private static function workingMemoryAuthoringPromptAbsolutePath(string $file): string
+    {
+        $allowed = array_column(self::workingMemoryAuthoringCatalog(), 'file');
+        if (! in_array($file, $allowed, true)) {
+            abort(404);
+        }
+
+        return resource_path('prompts/'.$file);
+    }
+
+    public function workingMemoryAuthoringIndex(): View
+    {
+        $prompts = [];
+        foreach (self::workingMemoryAuthoringCatalog() as $slug => $meta) {
+            $path = resource_path('prompts/'.$meta['file']);
+            $prompts[] = [
+                'slug' => $slug,
+                'label' => $meta['label'],
+                'filename' => $meta['file'],
+                'missing' => ! File::isFile($path),
+            ];
+        }
+
+        return view('help-working-memory-authoring', [
+            'prompts' => $prompts,
+        ]);
+    }
+
+    public function workingMemoryAuthoringShow(string $prompt): View
+    {
+        $catalog = self::workingMemoryAuthoringCatalog();
+        if (! isset($catalog[$prompt])) {
+            abort(404);
+        }
+        $file = $catalog[$prompt]['file'];
+        $path = self::workingMemoryAuthoringPromptAbsolutePath($file);
+        if (! File::isFile($path)) {
+            abort(404);
+        }
+        $raw = File::get($path);
+        $forDisplay = MarkdownDisplayHelper::stripPreambleForMarkdownDisplay($raw);
+        $converter = SafeCommonMarkConverter::make();
+        $bodyHtml = $converter->convert($forDisplay)->getContent();
+
+        return view('help-working-memory-authoring-prompt', [
+            'promptSlug' => $prompt,
+            'promptLabel' => $catalog[$prompt]['label'],
+            'filename' => $file,
+            'bodyHtml' => $bodyHtml,
+        ]);
+    }
+
+    public function workingMemoryAuthoringDownload(string $prompt): BinaryFileResponse
+    {
+        $catalog = self::workingMemoryAuthoringCatalog();
+        if (! isset($catalog[$prompt])) {
+            abort(404);
+        }
+        $file = $catalog[$prompt]['file'];
+        $path = self::workingMemoryAuthoringPromptAbsolutePath($file);
+        if (! File::isFile($path)) {
+            abort(404);
+        }
+
+        return response()->download($path, $file, [
+            'Content-Type' => 'text/markdown; charset=UTF-8',
+        ]);
+    }
+
     public function index(): View
     {
         $cursorRulePath = base_path('.cursor/rules/ideatub-sync-docs.mdc');

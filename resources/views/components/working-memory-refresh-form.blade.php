@@ -26,6 +26,10 @@
             {{ $buttonLabel }}
         </button>
         @if ($showForceButton)
+            <label class="inline-flex items-center gap-1.5 text-xs text-slate-brand">
+                <input type="checkbox" name="fresh_start" value="1" class="rounded border-slate-300 text-memory-violet focus:ring-memory-violet/30">
+                Start fresh
+            </label>
             <button
                 type="submit"
                 name="force"

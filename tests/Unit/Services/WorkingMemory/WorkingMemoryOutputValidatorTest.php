@@ -8,6 +8,15 @@ use Tests\TestCase;
 
 class WorkingMemoryOutputValidatorTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('working_memory.authoring_mode', 'judgment_first');
+        config()->set('working_memory.citation_required_sections', []);
+        config()->set('working_memory.citation_min_coverage', 0);
+    }
+
     #[Test]
     public function missing_required_sections_fail_validation(): void
     {
@@ -32,6 +41,7 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     #[Test]
     public function configured_required_sections_are_enforced(): void
     {
+        config()->set('working_memory.authoring_mode', 'strict');
         config()->set('working_memory.citation_required_sections', ['Current Focus', 'Team Notes']);
 
         $payload = $this->validStructuredPayload();
@@ -45,8 +55,9 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     }
 
     #[Test]
-    public function configured_required_sections_allow_excluding_source_notes(): void
+    public function configured_required_sections_allow_excluding_source_notes_from_citation_checks(): void
     {
+        config()->set('working_memory.authoring_mode', 'strict');
         config()->set('working_memory.citation_required_sections', [
             'Current Focus',
             'Active Priorities',
@@ -62,8 +73,9 @@ class WorkingMemoryOutputValidatorTest extends TestCase
 
         $result = app(WorkingMemoryOutputValidator::class)->validate($payload);
 
-        $this->assertTrue($result['ok']);
-        $this->assertNull($result['failure_type']);
+        $this->assertFalse($result['ok']);
+        $this->assertSame('hard', $result['failure_type']);
+        $this->assertStringContainsString('Source Notes', (string) $result['message']);
     }
 
     #[Test]
@@ -113,8 +125,10 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     }
 
     #[Test]
-    public function low_coverage_returns_soft_failure(): void
+    public function low_coverage_returns_soft_failure_in_strict_mode(): void
     {
+        config()->set('working_memory.authoring_mode', 'strict');
+        config()->set('working_memory.citation_required_sections', WorkingMemoryOutputValidator::REQUIRED_SECTION_KEYS);
         $payload = $this->validStructuredPayload();
 
         $result = app(WorkingMemoryOutputValidator::class)->validate($payload, 1.01);
@@ -126,8 +140,10 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     }
 
     #[Test]
-    public function exact_coverage_threshold_boundary_passes_validation(): void
+    public function exact_coverage_threshold_boundary_passes_validation_in_strict_mode(): void
     {
+        config()->set('working_memory.authoring_mode', 'strict');
+        config()->set('working_memory.citation_required_sections', WorkingMemoryOutputValidator::REQUIRED_SECTION_KEYS);
         $payload = $this->validStructuredPayload();
 
         $result = app(WorkingMemoryOutputValidator::class)->validate($payload, 1.0);
@@ -138,16 +154,15 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     }
 
     #[Test]
-    public function diagnostics_include_required_and_cited_item_counts(): void
+    public function diagnostics_include_required_item_counts_in_judgment_first_mode(): void
     {
-        $payload = $this->validStructuredPayload();
+        $payload = $this->validStructuredPayloadWithoutCitations();
 
         $result = app(WorkingMemoryOutputValidator::class)->validate($payload);
 
         $this->assertTrue($result['ok']);
-        $this->assertSame(8, $result['diagnostics']['required_items'] ?? null);
-        $this->assertSame(8, $result['diagnostics']['cited_items'] ?? null);
-        $this->assertSame([], $result['diagnostics']['reason_codes'] ?? null);
+        $this->assertSame(0, $result['diagnostics']['required_items'] ?? null);
+        $this->assertSame(0, $result['diagnostics']['cited_items'] ?? null);
     }
 
     #[Test]
@@ -158,12 +173,26 @@ class WorkingMemoryOutputValidatorTest extends TestCase
         $this->assertTrue($result['ok']);
         $this->assertNull($result['failure_type']);
         $this->assertNull($result['message']);
-        $this->assertSame(100.0, $result['coveragePercent']);
+        $this->assertNull($result['coveragePercent']);
     }
 
     #[Test]
-    public function required_item_without_citation_is_counted_and_rejected(): void
+    public function required_item_without_citation_passes_in_judgment_first_mode(): void
     {
+        $payload = $this->validStructuredPayload();
+        $payload['structured_sections']['Next Actions'][0]['citations'] = [];
+
+        $result = app(WorkingMemoryOutputValidator::class)->validate($payload, 1.0);
+
+        $this->assertTrue($result['ok']);
+        $this->assertNull($result['failure_type']);
+    }
+
+    #[Test]
+    public function required_item_without_citation_is_rejected_in_strict_mode(): void
+    {
+        config()->set('working_memory.authoring_mode', 'strict');
+        config()->set('working_memory.citation_required_sections', WorkingMemoryOutputValidator::REQUIRED_SECTION_KEYS);
         $payload = $this->validStructuredPayload();
         $payload['structured_sections']['Next Actions'][0]['citations'] = [];
 
@@ -172,13 +201,13 @@ class WorkingMemoryOutputValidatorTest extends TestCase
         $this->assertFalse($result['ok']);
         $this->assertSame('hard', $result['failure_type']);
         $this->assertContains('missing_citation', $result['diagnostics']['reason_codes'] ?? []);
-        $this->assertSame(8, $result['diagnostics']['required_items'] ?? null);
-        $this->assertSame(7, $result['diagnostics']['cited_items'] ?? null);
     }
 
     #[Test]
     public function bundle_fallback_item_counts_as_cited_when_urls_are_valid(): void
     {
+        config()->set('working_memory.authoring_mode', 'strict');
+        config()->set('working_memory.citation_required_sections', WorkingMemoryOutputValidator::REQUIRED_SECTION_KEYS);
         $payload = $this->validStructuredPayload();
         $payload['structured_sections']['Risks / Blockers'][0]['fallback_mode'] = 'section_bundle';
         $payload['structured_sections']['Risks / Blockers'][0]['citations'] = [[
@@ -196,8 +225,22 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     }
 
     #[Test]
-    public function it_soft_fails_when_compactions_exist_but_payload_does_not_cite_any(): void
+    public function it_ignores_unused_compaction_check_in_judgment_first_mode(): void
     {
+        $payload = $this->validStructuredPayloadWithoutCitations();
+
+        $validator = new WorkingMemoryOutputValidator;
+
+        $result = $validator->validate($payload, null, compactionCountInScope: 3);
+
+        $this->assertTrue($result['ok']);
+    }
+
+    #[Test]
+    public function it_soft_fails_when_compactions_exist_but_payload_does_not_cite_any_in_strict_mode(): void
+    {
+        config()->set('working_memory.authoring_mode', 'strict');
+        config()->set('working_memory.citation_required_sections', WorkingMemoryOutputValidator::REQUIRED_SECTION_KEYS);
         $thoughtUrl = 'https://ideatub.test/thoughts/abc-123';
         $payload = [
             'summary_markdown' => '# WM',
@@ -275,6 +318,8 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     #[Test]
     public function diagnostics_expose_compaction_cited_items_resolving_bracket_markers(): void
     {
+        config()->set('working_memory.authoring_mode', 'strict');
+        config()->set('working_memory.citation_required_sections', WorkingMemoryOutputValidator::REQUIRED_SECTION_KEYS);
         $thoughtUrl = 'https://ideatub.test/thoughts/abc-123';
         $compactionUrl = '/memory/project/dezeen/compactions/v-1';
 
@@ -336,8 +381,9 @@ class WorkingMemoryOutputValidatorTest extends TestCase
     }
 
     #[Test]
-    public function it_accepts_a_required_sections_override_replacing_the_config_default(): void
+    public function it_accepts_a_citation_sections_override_in_strict_mode(): void
     {
+        config()->set('working_memory.authoring_mode', 'strict');
         config()->set('working_memory.citation_required_sections', [
             'Active Priorities',
             'Open Questions',
@@ -347,6 +393,12 @@ class WorkingMemoryOutputValidatorTest extends TestCase
         $payload = [
             'summary_markdown' => '# WM',
             'structured_sections' => [
+                'Current Focus' => [[
+                    'text' => 'Focus',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [],
+                ]],
                 'Active Priorities' => [[
                     'text' => 'P',
                     'importance' => 1,
@@ -367,8 +419,8 @@ class WorkingMemoryOutputValidatorTest extends TestCase
                         'label' => 't-2',
                     ]],
                 ]],
-                'Latest Signals' => [[
-                    'text' => 'S',
+                'Recent Changes' => [[
+                    'text' => 'R',
                     'importance' => 3,
                     'fallback_mode' => 'direct',
                     'citations' => [[
@@ -376,6 +428,34 @@ class WorkingMemoryOutputValidatorTest extends TestCase
                         'url' => 'https://example.com/t-3',
                         'label' => 't-3',
                     ]],
+                ]],
+                'Risks / Blockers' => [[
+                    'text' => 'Risk',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [],
+                ]],
+                'Next Actions' => [[
+                    'text' => 'Act',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [],
+                ]],
+                'Latest Signals' => [[
+                    'text' => 'S',
+                    'importance' => 3,
+                    'fallback_mode' => 'direct',
+                    'citations' => [[
+                        'type' => 'thought',
+                        'url' => 'https://example.com/t-4',
+                        'label' => 't-4',
+                    ]],
+                ]],
+                'Source Notes' => [[
+                    'text' => 'Notes',
+                    'importance' => 1,
+                    'fallback_mode' => 'direct',
+                    'citations' => [],
                 ]],
             ],
             'references' => [],
@@ -390,15 +470,12 @@ class WorkingMemoryOutputValidatorTest extends TestCase
 
         $this->assertTrue($diagnostics['ok']);
         $this->assertNull($diagnostics['failure_type']);
-        $this->assertStringNotContainsString('Recent Changes', (string) ($diagnostics['message'] ?? ''));
-        $this->assertStringNotContainsString('Latest Signals', (string) ($diagnostics['message'] ?? ''));
-        $this->assertStringNotContainsString('Active Priorities', (string) ($diagnostics['message'] ?? ''));
-        $this->assertStringNotContainsString('Open Questions', (string) ($diagnostics['message'] ?? ''));
     }
 
     #[Test]
-    public function it_hard_fails_for_missing_overridden_required_sections(): void
+    public function it_hard_fails_for_missing_overridden_citation_sections_in_strict_mode(): void
     {
+        config()->set('working_memory.authoring_mode', 'strict');
         config()->set('working_memory.citation_required_sections', [
             'Active Priorities',
             'Open Questions',
@@ -408,6 +485,7 @@ class WorkingMemoryOutputValidatorTest extends TestCase
         $payload = [
             'summary_markdown' => '# WM',
             'structured_sections' => [
+                'Current Focus' => [['text' => 'Focus', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []]],
                 'Active Priorities' => [[
                     'text' => 'P',
                     'importance' => 1,
@@ -418,6 +496,12 @@ class WorkingMemoryOutputValidatorTest extends TestCase
                         'label' => 't-1',
                     ]],
                 ]],
+                'Recent Changes' => [['text' => 'R', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []]],
+                'Open Questions' => [['text' => 'Q', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []]],
+                'Risks / Blockers' => [['text' => 'Risk', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []]],
+                'Next Actions' => [['text' => 'Act', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []]],
+                'Latest Signals' => [['text' => 'Sig', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []]],
+                'Source Notes' => [['text' => 'Notes', 'importance' => 1, 'fallback_mode' => 'direct', 'citations' => []]],
             ],
             'references' => [],
         ];
@@ -431,36 +515,21 @@ class WorkingMemoryOutputValidatorTest extends TestCase
 
         $this->assertFalse($diagnostics['ok']);
         $this->assertSame('hard', $diagnostics['failure_type']);
-        $this->assertStringContainsString('Open Questions', (string) ($diagnostics['message'] ?? ''));
-        $this->assertStringContainsString('Latest Signals', (string) ($diagnostics['message'] ?? ''));
-        $this->assertStringNotContainsString('Recent Changes', (string) ($diagnostics['message'] ?? ''));
+        $this->assertStringContainsString('Citation-required', (string) ($diagnostics['message'] ?? ''));
+        $this->assertContains('missing_citation', $diagnostics['diagnostics']['reason_codes'] ?? []);
     }
 
     #[Test]
-    public function it_treats_empty_required_sections_override_as_no_required_sections(): void
+    public function it_treats_empty_citation_sections_override_as_no_citation_sections(): void
     {
+        config()->set('working_memory.authoring_mode', 'strict');
         config()->set('working_memory.citation_required_sections', [
             'Active Priorities',
             'Open Questions',
             'Recent Changes',
         ]);
 
-        $payload = [
-            'summary_markdown' => '# WM',
-            'structured_sections' => [
-                'Latest Signals' => [[
-                    'text' => 'Signal',
-                    'importance' => 1,
-                    'fallback_mode' => 'direct',
-                    'citations' => [[
-                        'type' => 'thought',
-                        'url' => 'https://example.com/t-1',
-                        'label' => 't-1',
-                    ]],
-                ]],
-            ],
-            'references' => [],
-        ];
+        $payload = $this->validStructuredPayloadWithoutCitations();
 
         $diagnostics = app(WorkingMemoryOutputValidator::class)->validate(
             $payload,
@@ -471,15 +540,51 @@ class WorkingMemoryOutputValidatorTest extends TestCase
 
         $this->assertTrue($diagnostics['ok']);
         $this->assertNull($diagnostics['failure_type']);
+    }
 
-        $message = (string) ($diagnostics['message'] ?? '');
-        foreach (['Active Priorities', 'Open Questions', 'Recent Changes'] as $configuredSection) {
-            $this->assertStringNotContainsString(
-                $configuredSection,
-                $message,
-                "Empty override should not hard-fail for [{$configuredSection}]."
-            );
-        }
+    #[Test]
+    public function empty_source_notes_fails_when_evidence_requires_them(): void
+    {
+        $payload = $this->validStructuredPayloadWithoutCitations();
+        $payload['structured_sections']['Source Notes'] = [];
+
+        $result = app(WorkingMemoryOutputValidator::class)->validate($payload, null, 0, null, true);
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('Source Notes', (string) $result['message']);
+    }
+
+    /**
+     * @return array{
+     *     summary_markdown: string,
+     *     structured_sections: array<string, array<int, array<string, mixed>>>,
+     *     references: array<int, array{url: string, label: string}>
+     * }
+     */
+    private function validStructuredPayloadWithoutCitations(): array
+    {
+        $makeItem = fn (string $text): array => [
+            'id' => 'item-'.md5($text),
+            'text' => $text,
+            'importance' => 50,
+            'fallback_mode' => 'direct',
+            'citations' => [],
+        ];
+
+        return [
+            'summary_markdown' => '# Working memory synthesis',
+            'structured_sections' => [
+                'Current Focus' => [$makeItem('Roll out the integration endpoint')],
+                'Active Priorities' => [$makeItem('Stabilize section rendering for detail cards')],
+                'Recent Changes' => [$makeItem('Added deterministic authoring scaffold')],
+                'Open Questions' => [$makeItem('Do we tighten citation threshold for project scopes?')],
+                'Risks / Blockers' => [$makeItem('Validator integration hook is still pending')],
+                'Next Actions' => [$makeItem('Wire validator into builder flow and measure coverage')],
+                'Latest Signals' => [$makeItem('Research packet landed with new requirements')],
+                'Source Notes' => [$makeItem('Spec notes and implementation links')],
+            ],
+            'references' => [],
+        ];
     }
 
     /**

@@ -1,0 +1,15 @@
+---
+description: Refresh IdeaTub working memory via MCP using the judgment-first authoring prompts.
+globs:
+alwaysApply: false
+---
+
+# Working memory authoring
+
+When the user asks to refresh or update working memory:
+
+1. Read `resources/prompts/working-memory-authoring-core.md` and `resources/prompts/working-memory-authoring-agent.md`.
+2. Follow the agent wrapper workflow: `get_working_memory` (unless `fresh_start`) → `search_thoughts` → synthesize → `upsert_working_memory`.
+3. Project `scope_key` must be the IdeaTub project UUID, not a slug.
+
+Help: `/help/working-memory-authoring`

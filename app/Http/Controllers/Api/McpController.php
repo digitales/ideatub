@@ -589,7 +589,7 @@ class McpController extends Controller
             ],
             [
                 'name' => 'get_working_memory',
-                'description' => 'Return global, project, insights, or tag working memory snapshot with canonical sections, references, section_references, and diagnostics. Section/reference URLs may be IdeaTub-relative routes (for example /stream?...) or safe source URLs.',
+                'description' => 'Return global, project, insights, or tag working memory. Read this first when refreshing memory — it is the synthesis baseline unless fresh_start is used.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
@@ -651,7 +651,7 @@ class McpController extends Controller
             ],
             [
                 'name' => 'upsert_working_memory',
-                'description' => 'Persist externally-authored working memory markdown as the canonical online working memory for a scope. The markdown should contain ## headings for the standard sections: Current Focus, Active Priorities, Recent Changes, Open Questions, Risks / Blockers, Next Actions, Latest Signals, Source Notes.',
+                'description' => 'Persist judgment-first working memory markdown as the canonical external version. Use ## headings for: Current Focus, Active Priorities, Recent Changes, Open Questions, Risks / Blockers, Next Actions, Latest Signals, Source Notes. See resources/prompts/working-memory-authoring-agent.md.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
@@ -662,15 +662,19 @@ class McpController extends Controller
                         ],
                         'scope_key' => [
                             'type' => 'string',
-                            'description' => 'Scope identifier (e.g. "dezeen" for project scope, "global" for global scope).',
+                            'description' => 'Scope identifier. Project scope requires the IdeaTub project UUID, not a metadata slug.',
                         ],
                         'content' => [
                             'type' => 'string',
-                            'description' => 'Full working memory markdown content with ## section headings.',
+                            'description' => 'Full working memory markdown with ## section headings per the authoring spec.',
                         ],
                         'source_label' => [
                             'type' => 'string',
-                            'description' => 'Optional origin identifier (e.g. "elixirr-sync").',
+                            'description' => 'Optional origin identifier (e.g. "elixirr-sync", "cursor-sync").',
+                        ],
+                        'fresh_start' => [
+                            'type' => 'boolean',
+                            'description' => 'When true, records that this upsert was a cold rewrite without prior memory as baseline.',
                         ],
                     ],
                     'required' => ['scope_type', 'scope_key', 'content'],
@@ -1067,15 +1071,19 @@ class McpController extends Controller
             'content' => 'required|string|min:1',
             'source_label' => 'nullable|string|max:191',
             'strict_content_hash' => 'sometimes|boolean',
+            'fresh_start' => 'sometimes|boolean',
         ]);
         if ($v->fails()) {
             throw new \InvalidArgumentException($v->errors()->first());
         }
 
-        /** @var array{scope_type: string, scope_key: string, content: string, source_label: ?string, strict_content_hash?: bool} $validated */
+        /** @var array{scope_type: string, scope_key: string, content: string, source_label: ?string, strict_content_hash?: bool, fresh_start?: bool} $validated */
         $validated = $v->validated();
 
         $strictContentHash = filter_var($params['strict_content_hash'] ?? false, FILTER_VALIDATE_BOOL);
+        $freshStart = array_key_exists('fresh_start', $validated)
+            ? filter_var($validated['fresh_start'], FILTER_VALIDATE_BOOL)
+            : null;
 
         $result = $this->workingMemoryUpsertService->upsert(
             (int) auth()->id(),
@@ -1084,6 +1092,7 @@ class McpController extends Controller
             $validated['content'],
             $validated['source_label'] ?? null,
             $strictContentHash,
+            $freshStart,
         );
 
         $version = $result->version;

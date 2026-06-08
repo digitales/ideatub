@@ -52,7 +52,46 @@ final class WorkingMemoryComposerPromptBuilderTest extends TestCase
         $this->assertStringContainsString('Source Notes', $prompt);
         $this->assertStringContainsString('compaction:meeting', $prompt);
         $this->assertStringContainsString('DEZ-2819', $prompt);
+        $this->assertStringContainsString('Authoring spec (canonical)', $prompt);
+        $this->assertStringContainsString('Prior canonical memory', $prompt);
+        $this->assertStringContainsString('judgment-first', $prompt);
         $this->assertStringContainsString('Return JSON', $prompt);
+    }
+
+    #[Test]
+    public function it_renders_prior_memory_and_fresh_start_instructions(): void
+    {
+        $builder = new WorkingMemoryComposerPromptBuilder;
+
+        $withPrior = $builder->build([
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+            'generated_at' => '2026-06-08T10:00:00Z',
+            'fresh_start' => false,
+            'prior_memory' => [
+                'version_id' => 'v-1',
+                'build_type' => 'external',
+                'created_at' => '2026-06-01T09:00:00Z',
+                'source_label' => 'elixirr-sync',
+                'summary_markdown' => "## Current Focus\nPrior focus text.",
+            ],
+            'signals' => [],
+            'compactions' => [],
+        ]);
+
+        $this->assertStringContainsString('version:v-1', $withPrior);
+        $this->assertStringContainsString('Prior focus text', $withPrior);
+
+        $fresh = $builder->build([
+            'scope_type' => 'project',
+            'scope_key' => 'dezeen',
+            'generated_at' => '2026-06-08T10:00:00Z',
+            'fresh_start' => true,
+            'signals' => [],
+            'compactions' => [],
+        ]);
+
+        $this->assertStringContainsString('Fresh start requested', $fresh);
     }
 
     #[Test]

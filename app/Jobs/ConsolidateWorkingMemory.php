@@ -27,6 +27,7 @@ class ConsolidateWorkingMemory implements ShouldQueue
         private readonly string $scopeType,
         private readonly string $scopeKey,
         public bool $force = false,
+        public bool $freshStart = false,
     ) {}
 
     public function handle(WorkingMemoryBuilderService $builderService): void
@@ -46,7 +47,12 @@ class ConsolidateWorkingMemory implements ShouldQueue
             return;
         }
 
-        $builderService->buildConsolidated($this->userId, $this->scopeType, $this->scopeKey);
+        $builderService->buildConsolidated(
+            $this->userId,
+            $this->scopeType,
+            $this->scopeKey,
+            $this->freshStart,
+        );
     }
 
     public function failed(Throwable $exception): void

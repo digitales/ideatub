@@ -10,15 +10,14 @@
             ? ucfirst((string) ($wmProject->freshness_state ?? 'unknown')).($wmProject->last_refreshed_at ? ' · refreshed '.$wmProject->last_refreshed_at->diffForHumans() : '')
             : 'Not built yet for this project.';
     @endphp
-    <section class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-5 mb-8">
-        <h2 class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-3">Working memory</h2>
-        <p class="text-sm text-slate-brand mb-3">{{ $wmProjectStatusLine }}</p>
+    <section class="ideatub-surface px-5 py-5">
+        <h2 class="text-sm font-semibold text-deep-indigo">Working memory</h2>
+        <p class="mt-1 text-xs text-slate-brand/70">{{ $wmProjectStatusLine }}</p>
         @include('components.working-memory-refresh-form', [
             'action' => route('working-memory.refresh.project', $project),
-            'formClass' => 'mb-3',
-            'buttonClass' => 'rounded-lg bg-memory-violet px-3 py-2 text-sm font-medium text-white hover:bg-memory-violet/90',
+            'formClass' => 'mt-4 mb-3',
+            'buttonClass' => 'ideatub-btn-primary w-full px-3 py-2 text-sm',
         ])
-        <p class="text-xs text-slate-brand/80 mb-3">Queues a consolidated rebuild.</p>
         <a href="{{ route('projects.memory.show', $project) }}" class="text-sm font-medium text-memory-violet hover:underline">Open project working memory</a>
     </section>
 @endauth

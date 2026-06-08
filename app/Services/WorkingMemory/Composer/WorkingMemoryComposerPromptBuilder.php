@@ -2,6 +2,7 @@
 
 namespace App\Services\WorkingMemory\Composer;
 
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 class WorkingMemoryComposerPromptBuilder
@@ -18,7 +19,7 @@ class WorkingMemoryComposerPromptBuilder
     ];
 
     private const PROMOTION_RULES = <<<'TEXT'
-Promotion guidance per source type:
+Evidence promotion hints:
 - compaction:meeting → Recent Changes, Next Actions, Risks / Blockers, Open Questions
 - compaction:weekly-digest → Latest Signals, Active Priorities, Recent Changes
 - compaction:topic-digest → Active Priorities, Open Questions, Latest Signals
@@ -32,6 +33,14 @@ TEXT;
      *     scope_type: string,
      *     scope_key: string,
      *     generated_at: string,
+     *     fresh_start?: bool,
+     *     prior_memory?: array{
+     *         version_id: string,
+     *         build_type: string,
+     *         created_at: string|null,
+     *         source_label: string|null,
+     *         summary_markdown: string
+     *     }|null,
      *     signals: array<int, array{
      *         thought_id: string|null,
      *         content: string,
@@ -51,21 +60,33 @@ TEXT;
     {
         $maxChars = (int) config('working_memory.authoring_max_prompt_input_chars', 60000);
         $sections = implode(', ', self::REQUIRED_SECTIONS);
+        $freshStart = (bool) ($evidencePack['fresh_start'] ?? false);
 
+        $coreSpec = trim($this->loadCoreSpec());
+        $priorBlock = $freshStart
+            ? "_Fresh start requested — do not treat prior memory as baseline._\n\nSynthesize from evidence only."
+            : $this->renderPriorMemory($evidencePack['prior_memory'] ?? null);
         $compactionBlock = $this->renderCompactions($evidencePack['compactions'] ?? []);
         $signalBlock = $this->renderSignals($evidencePack['signals'] ?? []);
 
         $payload = <<<TEXT
 ## Working memory composition task
 
-You are composing a decision-grade working-memory snapshot for IdeaTub.
+You are composing an opinionated, judgment-first working-memory snapshot for IdeaTub — a synthesis of what matters now, not a summary of raw inputs.
 
 Scope: {$evidencePack['scope_type']} / {$evidencePack['scope_key']}
 Generated at: {$evidencePack['generated_at']}
 
 Required sections (in this order): {$sections}
 
+## Authoring spec (canonical)
+
+{$coreSpec}
+
 {$this->promotionRules()}
+
+## Prior canonical memory (baseline)
+{$priorBlock}
 
 ## Compactions (preferred evidence)
 {$compactionBlock}
@@ -78,39 +99,68 @@ Required sections (in this order): {$sections}
 Return JSON with this exact shape (no Markdown fences):
 
 {
-  "summary_markdown": "<full markdown rendering with all required sections as `## <section>` headings, narrative bullet prose under each>",
+  "summary_markdown": "<full markdown with all required sections as `## <section>` headings>",
   "structured_sections": {
     "Current Focus": [
       {
-        "text": "<single bullet, narrative prose>",
+        "text": "<narrative prose with judgment and specificity>",
         "importance": 1,
         "fallback_mode": "direct",
-        "citations": [
-          {"type": "thought|compaction|source", "url": "<exact url from evidence>", "label": "<exact label from evidence>"}
-        ]
+        "citations": []
       }
     ],
     ...
   },
   "references": [
-    {"type": "thought|compaction|source", "url": "<exact url>", "label": "<exact label>"}
+    {"type": "thought|compaction|source", "url": "<url when known>", "label": "<label>"}
   ]
 }
 
 Rules:
-- Every bullet in a required section MUST have at least one citation taken verbatim from the evidence above.
-- Do not invent URLs or labels. Use only the URLs and labels provided in compaction or signal references.
-- Prefer compaction citations when both a compaction and its source thought are available.
-- Source Notes should list each unique cited reference once.
-- Write in concise decision-grade prose, not stub bullets. Aim for 1–3 sentence bullets that name people, IDs, dates, and concrete state.
+- Write with judgment. Revise the prior baseline when present; preserve accumulated context unless evidence contradicts it.
+- Be specific: name people, IDs, dates, and concrete state — no placeholders or generic questions.
+- Citations are optional on section bullets. Source Notes must list key sources from the evidence above (dates and slugs where known).
+- When citing, use only URLs and labels from the evidence blocks. Do not invent links.
+- Prefer compaction evidence for meeting and digest signals when available.
 TEXT;
 
         return Str::limit($payload, $maxChars, '');
     }
 
+    private function loadCoreSpec(): string
+    {
+        $path = resource_path('prompts/working-memory-authoring-core.md');
+
+        return File::isFile($path) ? (string) File::get($path) : '';
+    }
+
     private function promotionRules(): string
     {
         return self::PROMOTION_RULES;
+    }
+
+    /**
+     * @param  array{
+     *     version_id?: string,
+     *     build_type?: string,
+     *     created_at?: string|null,
+     *     source_label?: string|null,
+     *     summary_markdown?: string
+     * }|null  $priorMemory
+     */
+    private function renderPriorMemory(?array $priorMemory): string
+    {
+        if ($priorMemory === null || trim((string) ($priorMemory['summary_markdown'] ?? '')) === '') {
+            return '_No prior canonical memory for this scope — synthesize from evidence._';
+        }
+
+        $versionId = $priorMemory['version_id'] ?? 'unknown';
+        $buildType = $priorMemory['build_type'] ?? 'unknown';
+        $createdAt = $priorMemory['created_at'] ?? 'unknown';
+        $sourceLabel = $priorMemory['source_label'] ?? 'none';
+        $body = trim((string) $priorMemory['summary_markdown']);
+
+        return "version:{$versionId} ({$buildType}, {$createdAt}, source: {$sourceLabel})\n\n{$body}";
     }
 
     /**

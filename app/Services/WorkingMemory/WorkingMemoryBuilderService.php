@@ -27,17 +27,17 @@ class WorkingMemoryBuilderService
         private readonly ProjectScopeMatcher $projectScopeMatcher,
     ) {}
 
-    public function buildConsolidated(int $userId, string $scopeType, string $scopeKey): WorkingMemoryVersion
+    public function buildConsolidated(int $userId, string $scopeType, string $scopeKey, bool $freshStart = false): WorkingMemoryVersion
     {
-        return $this->build($userId, $scopeType, $scopeKey, 'consolidated');
+        return $this->build($userId, $scopeType, $scopeKey, 'consolidated', $freshStart);
     }
 
-    public function buildIncremental(int $userId, string $scopeType, string $scopeKey): WorkingMemoryVersion
+    public function buildIncremental(int $userId, string $scopeType, string $scopeKey, bool $freshStart = false): WorkingMemoryVersion
     {
-        return $this->build($userId, $scopeType, $scopeKey, 'incremental');
+        return $this->build($userId, $scopeType, $scopeKey, 'incremental', $freshStart);
     }
 
-    private function build(int $userId, string $scopeType, string $scopeKey, string $buildType): WorkingMemoryVersion
+    private function build(int $userId, string $scopeType, string $scopeKey, string $buildType, bool $freshStart = false): WorkingMemoryVersion
     {
         [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);
 
@@ -68,14 +68,18 @@ class WorkingMemoryBuilderService
                     $userId,
                     $normalizedScopeType,
                     $normalizedScopeKey,
-                    $thoughts
+                    $thoughts,
+                    $freshStart,
                 );
 
                 $authoredOutput = $this->aiAuthorService->authorFromEvidence($evidencePack);
+                $hasEvidence = $this->evidencePackHasSources($evidencePack);
                 $validation = $this->outputValidator->validate(
                     $authoredOutput,
-                    (float) config('working_memory.citation_min_coverage', 0.90),
-                    count(is_array($evidencePack['compactions'] ?? null) ? $evidencePack['compactions'] : [])
+                    (float) config('working_memory.citation_min_coverage', 0),
+                    count(is_array($evidencePack['compactions'] ?? null) ? $evidencePack['compactions'] : []),
+                    null,
+                    $hasEvidence,
                 );
 
                 $buildDiagnostics = $validation['diagnostics'] ?? null;
@@ -829,5 +833,19 @@ class WorkingMemoryBuilderService
             'raw_thought_inputs_count' => count($signals),
             'compaction_coverage_ratio' => $coverageRatio,
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $evidencePack
+     */
+    private function evidencePackHasSources(array $evidencePack): bool
+    {
+        $signals = is_array($evidencePack['signals'] ?? null) ? $evidencePack['signals'] : [];
+        $compactions = is_array($evidencePack['compactions'] ?? null) ? $evidencePack['compactions'] : [];
+        $prior = is_array($evidencePack['prior_memory'] ?? null) ? $evidencePack['prior_memory'] : null;
+
+        return $signals !== []
+            || $compactions !== []
+            || ($prior !== null && trim((string) ($prior['summary_markdown'] ?? '')) !== '');
     }
 }

@@ -35,8 +35,20 @@ return [
     'insights_model_enabled' => env('WORKING_MEMORY_INSIGHTS_MODEL_ENABLED', false),
 
     'authoring_enabled' => env('WORKING_MEMORY_AUTHORING_ENABLED', false),
-    'citation_min_coverage' => (float) env('WORKING_MEMORY_CITATION_MIN_COVERAGE', 1.00),
-    'citation_required_sections' => [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authoring mode
+    |--------------------------------------------------------------------------
+    |
+    | judgment_first: structure + Source Notes when evidence exists; citations
+    | optional on other sections. strict: legacy per-bullet citation enforcement.
+    |
+    */
+
+    'authoring_mode' => env('WORKING_MEMORY_AUTHORING_MODE', 'judgment_first'),
+
+    'structure_required_sections' => [
         'Current Focus',
         'Active Priorities',
         'Recent Changes',
@@ -46,6 +58,23 @@ return [
         'Latest Signals',
         'Source Notes',
     ],
+
+    'citation_min_coverage' => (float) env('WORKING_MEMORY_CITATION_MIN_COVERAGE', 0),
+
+    'citation_required_sections' => env('WORKING_MEMORY_AUTHORING_MODE', 'judgment_first') === 'strict'
+        ? [
+            'Current Focus',
+            'Active Priorities',
+            'Recent Changes',
+            'Open Questions',
+            'Risks / Blockers',
+            'Next Actions',
+            'Latest Signals',
+            'Source Notes',
+        ]
+        : [],
+
+    'upsert_validate_sections' => filter_var(env('WORKING_MEMORY_UPSERT_VALIDATE_SECTIONS', false), FILTER_VALIDATE_BOOL),
     'authoring_model' => env('WORKING_MEMORY_AUTHORING_MODEL', 'openrouter/auto'),
 
     'authoring_composer_model' => env('WORKING_MEMORY_COMPOSER_MODEL', env('WORKING_MEMORY_AUTHORING_MODEL', env('OPENROUTER_METADATA_MODEL', 'openai/gpt-4o-mini'))),

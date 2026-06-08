@@ -76,6 +76,7 @@ class WorkingMemoryRefreshController extends Controller
     {
         [$normalizedType, $normalizedKey] = app(WorkingMemoryScopeNormalizer::class)->normalize($scopeType, $scopeKey);
         $force = $request->boolean('force');
+        $freshStart = $request->boolean('fresh_start');
 
         if (app(WorkingMemoryExternalGuard::class)->shouldSkipConsolidatedBuild(
             (int) $request->user()->id,
@@ -91,6 +92,7 @@ class WorkingMemoryRefreshController extends Controller
             $normalizedType,
             $normalizedKey,
             force: $force,
+            freshStart: $freshStart,
         );
 
         return true;

@@ -12,6 +12,10 @@ final class WorkingMemoryEvidencePackBuilder
 {
     private const MAX_SIGNALS = 60;
 
+    public function __construct(
+        private readonly WorkingMemoryAssembler $assembler,
+    ) {}
+
     /** @var list<string> */
     private const SECTION_NAMES = [
         'Current Focus',
@@ -46,7 +50,7 @@ final class WorkingMemoryEvidencePackBuilder
      *     section_bundles: array<string, array<int, array{type: string, url: string, label: string}>>
      * }
      */
-    public function build(int $userId, string $scopeType, string $scopeKey, Collection $thoughts): array
+    public function build(int $userId, string $scopeType, string $scopeKey, Collection $thoughts, bool $freshStart = false): array
     {
         $normalizedScopeType = Str::of($scopeType)->trim()->lower()->toString();
         $normalizedScopeKey = Str::of($scopeKey)->trim()->lower()->toString();
@@ -71,11 +75,16 @@ final class WorkingMemoryEvidencePackBuilder
             ->all();
 
         $compactions = $this->loadCompactions($userId, $normalizedScopeType, $normalizedScopeKey);
+        $priorMemory = $freshStart
+            ? null
+            : $this->assembler->canonicalBaselineForAuthoring($userId, $normalizedScopeType, $normalizedScopeKey);
 
         return [
             'scope_type' => $normalizedScopeType,
             'scope_key' => $normalizedScopeKey,
             'generated_at' => now()->toIso8601String(),
+            'fresh_start' => $freshStart,
+            'prior_memory' => $priorMemory,
             'signals' => $signals,
             'compactions' => $compactions,
             'section_candidates' => $this->buildSectionCandidates($selectedThoughts),

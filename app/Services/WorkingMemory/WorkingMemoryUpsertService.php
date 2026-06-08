@@ -44,10 +44,15 @@ class WorkingMemoryUpsertService
         string $markdown,
         ?string $sourceLabel = null,
         bool $strictContentHash = false,
+        ?bool $freshStart = null,
     ): WorkingMemoryUpsertResult {
         $trimmed = trim($markdown);
         if ($trimmed === '') {
             throw new InvalidArgumentException('Working memory content must not be empty.');
+        }
+
+        if (config('working_memory.upsert_validate_sections', false)) {
+            $this->assertKnownSectionsPresent($trimmed);
         }
 
         [$normalizedScopeType, $normalizedScopeKey] = $this->scopeNormalizer->normalize($scopeType, $scopeKey);
@@ -75,6 +80,9 @@ class WorkingMemoryUpsertService
                 $sourceLabel,
                 null,
                 $dedupeFamily,
+                null,
+                null,
+                $freshStart,
             );
 
             return new WorkingMemoryUpsertResult(
@@ -98,6 +106,7 @@ class WorkingMemoryUpsertService
             $sourceLabel,
             $fingerprintHash,
             $dedupeFamily,
+            $freshStart,
         ): WorkingMemoryUpsertResult {
             $memory = WorkingMemory::query()->firstOrCreate(
                 [
@@ -136,6 +145,7 @@ class WorkingMemoryUpsertService
                 $dedupeFamily,
                 $memory,
                 $sections,
+                $freshStart,
             );
 
             $supersededVersionId = null;
@@ -182,6 +192,7 @@ class WorkingMemoryUpsertService
         string $dedupeFamily,
         ?WorkingMemory $existingMemory = null,
         ?array $preparsedSections = null,
+        ?bool $freshStart = null,
     ): WorkingMemoryVersion {
         $memory = $existingMemory ?? WorkingMemory::query()->firstOrCreate(
             [
@@ -202,6 +213,7 @@ class WorkingMemoryUpsertService
         $diagnostics = array_filter([
             'source_label' => $sourceLabel,
             'dedupe_family' => $dedupeFamily,
+            'fresh_start' => $freshStart === true ? true : null,
         ], fn ($v) => $v !== null && $v !== '');
 
         $version = $memory->versions()->create([
@@ -340,5 +352,21 @@ class WorkingMemoryUpsertService
         }
 
         return $refs;
+    }
+
+    private function assertKnownSectionsPresent(string $markdown): void
+    {
+        $missing = [];
+        foreach (self::KNOWN_SECTIONS as $section) {
+            if (! preg_match('/^##\s+'.preg_quote($section, '/').'\s*$/m', $markdown)) {
+                $missing[] = $section;
+            }
+        }
+
+        if ($missing !== []) {
+            throw new InvalidArgumentException(
+                'Working memory markdown is missing required sections: '.implode(', ', $missing)
+            );
+        }
     }
 }

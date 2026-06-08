@@ -45,6 +45,19 @@ curl -H "Authorization: Bearer <OAUTH_TOKEN>" \
 
 **Corpus growth (phases 2–3):** Require **`capture_meeting`** after local meeting notes and **`capture_plan`** after automation outputs. Bulk-import Slack/automation markdown with `php artisan working-memory:import-captures` (see in-app **`/help/working-memory-corpus-sync`**). Enable AI consolidation only for scopes without fresh external memory (`FEATURE_WORKING_MEMORY_AI_AUTHORED`, `WORKING_MEMORY_AUTHORING_ENABLED`).
 
+## IdeaTub: Refresh working memory
+
+When the user wants to update working memory for a project or scope, follow **`resources/prompts/working-memory-authoring-agent.md`** (read **`working-memory-authoring-core.md`** for section schema and judgment rules). In-app help: **`/help/working-memory-authoring`**.
+
+Workflow:
+
+1. Unless `fresh_start` is true, **`get_working_memory`** for the scope (baseline).
+2. **`search_thoughts`** for recent signals.
+3. Synthesize eight sections: Current Focus, Active Priorities, Recent Changes, Open Questions, Risks / Blockers, Next Actions, Latest Signals, Source Notes.
+4. **`upsert_working_memory`** with full markdown (`scope_key` = project UUID for project scope; optional `source_label`, e.g. `cursor-sync`).
+
+Use **`fresh_start: true`** only when rewriting without prior memory as baseline.
+
 ## IdeaTub: Sync docs via capture_plan
 
 When the user wants to sync this document (or other plan/decision/dev/support/spec markdown) to IdeaTub, use the MCP tool **capture_plan** with:
