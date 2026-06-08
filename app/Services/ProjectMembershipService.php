@@ -30,6 +30,10 @@ class ProjectMembershipService
 
     public function removeThought(Project $project, Thought $thought): void
     {
+        if ((string) $project->context_thought_id === (string) $thought->id) {
+            $project->update(['context_thought_id' => null]);
+        }
+
         $project->thoughts()->detach($thought->id);
         $this->normalizeSortOrder($project);
     }

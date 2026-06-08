@@ -33,6 +33,14 @@
 
     @includeWhen(config('features.working_memory_ui'), 'projects.partials.working-memory-module', ['project' => $project])
 
+    @if (! empty($contextThought))
+        @include('projects.partials.context-thought', [
+            'project' => $project,
+            'contextThought' => $contextThought,
+            'editable' => true,
+        ])
+    @endif
+
     <section class="rounded-2xl border border-memory-violet/20 bg-white/80 backdrop-blur p-5 mb-8">
         <h2 class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-4">Add thought</h2>
         <form method="POST" action="{{ route('projects.thoughts.store', $project) }}" class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-stretch">
@@ -162,24 +170,31 @@
 
     <section>
         <h2 class="text-[11px] font-semibold tracking-[0.1em] uppercase text-memory-violet/80 mb-3">Members</h2>
-        @if ($project->thoughts->isEmpty())
+        @if (($memberThoughts ?? $project->thoughts)->isEmpty() && empty($contextThought))
             <p class="text-sm text-slate-brand/70">No thoughts in this project yet.</p>
         @else
             <ul class="space-y-2">
-                @foreach ($project->thoughts as $thought)
+                @foreach ($memberThoughts ?? $project->thoughts as $thought)
                     <li class="flex items-start justify-between gap-3 rounded-xl border border-memory-violet/10 bg-white/60 px-4 py-3">
-                        <a href="{{ $thought->ideaTubViewUrl() }}" class="text-sm text-deep-indigo hover:text-memory-violet line-clamp-3">
+                        <a href="{{ $thought->ideaTubViewUrl() }}" class="text-sm text-deep-indigo hover:text-memory-violet line-clamp-3 min-w-0">
                             @if ($thought->isMicrositeDocumentLayout())
                                 {{ \App\Support\Research\MicrositePageLabel::forThought($thought) }}
                             @else
                             {{ \Illuminate\Support\Str::limit($thought->content, 200) }}
                             @endif
                         </a>
-                        <form method="POST" action="{{ route('projects.thoughts.destroy', [$project, $thought]) }}">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="text-xs text-slate-brand hover:text-red-600 shrink-0">Remove</button>
-                        </form>
+                        <div class="flex shrink-0 flex-col items-end gap-1">
+                            <form method="POST" action="{{ route('projects.context.store', $project) }}">
+                                @csrf
+                                <input type="hidden" name="thought_id" value="{{ $thought->id }}">
+                                <button type="submit" class="text-xs font-medium text-neural-teal hover:underline" title="Pin as project context">Pin as context</button>
+                            </form>
+                            <form method="POST" action="{{ route('projects.thoughts.destroy', [$project, $thought]) }}">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-xs text-slate-brand hover:text-red-600">Remove</button>
+                            </form>
+                        </div>
                     </li>
                 @endforeach
             </ul>

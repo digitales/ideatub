@@ -13,6 +13,7 @@ final class ProjectListingService
      *     elixirr_client_slug: ?string,
      *     elixirr_project_slug: ?string,
      *     parent_project_id: ?string,
+     *     context_thought_id: ?string,
      * }>}
      */
     public function forUser(int $userId, ?string $elixirrClientSlug, ?string $parentProjectId): array
@@ -36,6 +37,9 @@ final class ProjectListingService
             'elixirr_project_slug' => $project->elixirr_project_slug,
             'parent_project_id' => $project->parent_project_id !== null
                 ? (string) $project->parent_project_id
+                : null,
+            'context_thought_id' => $project->context_thought_id !== null
+                ? (string) $project->context_thought_id
                 : null,
         ])->values()->all();
 

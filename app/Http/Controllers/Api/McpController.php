@@ -16,6 +16,7 @@ use App\Services\Meetings\MeetingService;
 use App\Services\OAuthMcpJwtService;
 use App\Services\OpenRouterService;
 use App\Services\Projects\ProjectListingService;
+use App\Services\Projects\ProjectPinnedContextPayload;
 use App\Services\ResearchService;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
@@ -52,6 +53,7 @@ class McpController extends Controller
         private WorkingMemoryVersionCatalog $workingMemoryVersionCatalog,
         private WorkingMemoryDedupeFamilyResolver $workingMemoryDedupeFamilyResolver,
         private WorkingMemorySnapshotDedupeService $workingMemorySnapshotDedupeService,
+        private ProjectPinnedContextPayload $projectPinnedContextPayload,
     ) {}
 
     /**
@@ -923,10 +925,13 @@ class McpController extends Controller
         /** @var array{scope_type: string, scope_key: string} $validated */
         $validated = $v->validated();
 
-        return $this->workingMemoryAssembler->forScope(
-            (int) auth()->id(),
-            $validated['scope_type'],
-            $validated['scope_key']
+        return $this->projectPinnedContextPayload->mergeIntoWorkingMemoryPayload(
+            $this->workingMemoryAssembler->forScope(
+                (int) auth()->id(),
+                $validated['scope_type'],
+                $validated['scope_key']
+            ),
+            (int) auth()->id()
         );
     }
 

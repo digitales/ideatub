@@ -55,10 +55,14 @@ class ProjectController extends Controller
     {
         $this->authorize('view', $project);
 
-        $project->load(['thoughts' => fn ($q) => $project->orderMembersForDisplay($q)]);
+        $project->load(['thoughts' => fn ($q) => $project->orderMembersForDisplay($q), 'contextThought']);
         $project->thoughts->loadMissing('parent');
 
+        $contextThought = $project->contextThought;
         $memberIds = $project->thoughts->pluck('id')->all();
+        $memberThoughts = $project->thoughts->reject(
+            fn (Thought $thought) => $contextThought !== null && (string) $thought->id === (string) $contextThought->id
+        )->values();
 
         $thoughtOptions = Thought::query()
             ->where('user_id', auth()->id())
@@ -70,6 +74,8 @@ class ProjectController extends Controller
 
         return view('projects.show', [
             'project' => $project,
+            'contextThought' => $contextThought,
+            'memberThoughts' => $memberThoughts,
             'thoughtOptions' => $thoughtOptions,
         ]);
     }

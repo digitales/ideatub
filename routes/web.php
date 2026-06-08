@@ -40,6 +40,7 @@ use App\Http\Controllers\OAuthWellKnownController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\ProfileSettingsController;
+use App\Http\Controllers\ProjectContextController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectGraphController;
 use App\Http\Controllers\ProjectShareController;
@@ -239,6 +240,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
     Route::post('/projects/{project}/thoughts', [ProjectThoughtController::class, 'store'])->name('projects.thoughts.store');
     Route::delete('/projects/{project}/thoughts/{thought}', [ProjectThoughtController::class, 'destroy'])->name('projects.thoughts.destroy');
+    Route::post('/projects/{project}/context', [ProjectContextController::class, 'store'])->name('projects.context.store');
+    Route::delete('/projects/{project}/context', [ProjectContextController::class, 'destroy'])->name('projects.context.destroy');
     Route::get('/projects/{project}/graph', [ProjectGraphController::class, 'show'])->name('projects.graph');
     Route::get('/projects/{project}/graph/data', [ProjectGraphController::class, 'data'])->name('projects.graph.data');
 

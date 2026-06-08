@@ -92,8 +92,13 @@ class SharedProjectViewController extends Controller
     private function renderHub(ProjectShare $share): View
     {
         $project = $share->project;
-        $project->load(['thoughts' => fn ($q) => $project->orderMembersForDisplay($q)]);
+        $project->load(['thoughts' => fn ($q) => $project->orderMembersForDisplay($q), 'contextThought']);
         $share->load('user');
+
+        $contextThought = $project->contextThought;
+        $memberThoughts = $project->thoughts->reject(
+            fn (Thought $thought) => $contextThought !== null && (string) $thought->id === (string) $contextThought->id
+        )->values();
 
         $converter = SafeCommonMarkConverter::make();
         $descriptionHtml = $project->description
@@ -103,6 +108,8 @@ class SharedProjectViewController extends Controller
         return view('shared_projects.hub', [
             'share' => $share,
             'project' => $project,
+            'contextThought' => $contextThought,
+            'memberThoughts' => $memberThoughts,
             'descriptionHtml' => $descriptionHtml,
             'sharedBy' => $share->user,
             'token' => $share->token,

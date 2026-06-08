@@ -28,6 +28,7 @@ class Project extends Model implements Commentable
         'user_id',
         'title',
         'description',
+        'context_thought_id',
         'parent_project_id',
         'elixirr_client_slug',
         'elixirr_project_slug',
@@ -36,6 +37,14 @@ class Project extends Model implements Commentable
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<Thought, $this>
+     */
+    public function contextThought(): BelongsTo
+    {
+        return $this->belongsTo(Thought::class, 'context_thought_id');
     }
 
     public function parent(): BelongsTo

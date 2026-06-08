@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Thought;
 use App\Services\OpenRouterService;
+use App\Services\Projects\ProjectPinnedContextPayload;
 use App\Services\ThoughtCaptureService;
 use App\Services\ThoughtSearchService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
@@ -22,6 +23,7 @@ class ThoughtsApiController extends Controller
         private ThoughtSearchService $searchService,
         private WorkingMemoryAssembler $workingMemoryAssembler,
         private WorkingMemoryVersionCatalog $workingMemoryVersionCatalog,
+        private ProjectPinnedContextPayload $projectPinnedContextPayload,
     ) {}
 
     /**
@@ -133,6 +135,7 @@ class ThoughtsApiController extends Controller
 
         try {
             $payload = $this->workingMemoryAssembler->forScope((int) auth()->id(), $validated['scope_type'], $validated['scope_key']);
+            $payload = $this->projectPinnedContextPayload->mergeIntoWorkingMemoryPayload($payload, (int) auth()->id());
         } catch (\InvalidArgumentException $e) {
             return response()->json(['error' => 'validation_error', 'message' => $e->getMessage()], 422);
         }
