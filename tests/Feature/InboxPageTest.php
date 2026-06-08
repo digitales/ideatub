@@ -141,6 +141,27 @@ class InboxPageTest extends TestCase
         $response->assertSee('<li>Second item</li>', false);
     }
 
+    public function test_weekly_revisit_body_does_not_render_breakout_headings(): void
+    {
+        $user = User::factory()->create();
+
+        InboxItem::factory()->create([
+            'user_id' => $user->id,
+            'generator_type' => 'weekly_revisit',
+            'title' => 'Weekly revisit',
+            'dedupe_key' => 'weekly-revisit',
+            'body' => "Review these older ideas:\n- Lantern Opportunity Research\n\n## Opportunity Summary\n\nOne focused opportunity.\n- Idea: look into migration",
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('inbox.index'));
+
+        $response->assertOk();
+        $response->assertDontSee('<h2>Opportunity Summary</h2>', false);
+        $response->assertSee('Opportunity Summary One focused opportunity.', false);
+        $response->assertSee('<li>Idea: look into migration</li>', false);
+    }
+
     public function test_inbox_shows_manage_sender_rules_link_when_sender_policy_enabled(): void
     {
         Config::set('services.email_sender_policy.enabled', true);

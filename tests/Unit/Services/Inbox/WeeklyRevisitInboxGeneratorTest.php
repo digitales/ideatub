@@ -80,4 +80,23 @@ class WeeklyRevisitInboxGeneratorTest extends TestCase
             $candidates[0]['body']
         );
     }
+
+    #[Test]
+    public function strips_markdown_headings_from_idea_bullets(): void
+    {
+        $user = User::factory()->create();
+        UserPreference::set($user, 'ideas_to_revisit_limit', 3);
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => "## Opportunity Summary\n\nOne focused opportunity.",
+            'metadata' => ['type' => 'idea', 'completed' => false, 'logged_date' => '2025-01-01'],
+        ]);
+
+        $generator = app(WeeklyRevisitInboxGenerator::class);
+        $candidates = $generator->generate($user);
+
+        $this->assertStringNotContainsString('##', $candidates[0]['body']);
+        $this->assertStringContainsString('- Opportunity Summary One focused opportunity.', $candidates[0]['body']);
+    }
 }

@@ -50,8 +50,14 @@
                         <p class="text-xs text-slate-brand/60">{{ $item->generated_at?->diffForHumans() }}</p>
                     </div>
 
-                    <div class="prose prose-sm mt-3 max-w-none text-slate-brand prose-headings:text-deep-indigo prose-p:text-slate-brand prose-strong:text-deep-indigo prose-li:text-slate-brand">
-                        <x-safe-markdown :markdown="$item->body ?? ''" />
+                    @php
+                        $inboxBody = $item->body ?? '';
+                        if (($item->generator_type ?? '') === 'weekly_revisit') {
+                            $inboxBody = \App\Support\Inbox\WeeklyRevisitBodyFormatter::sanitizeStoredBody($inboxBody);
+                        }
+                    @endphp
+                    <div class="prose-memory-list-headings prose prose-sm mt-3 max-w-none text-slate-brand prose-headings:text-deep-indigo prose-p:text-slate-brand prose-strong:text-deep-indigo prose-li:text-slate-brand">
+                        <x-safe-markdown :markdown="$inboxBody" />
                     </div>
 
                     @if (($item->generator_type ?? '') === 'email_sender_review')

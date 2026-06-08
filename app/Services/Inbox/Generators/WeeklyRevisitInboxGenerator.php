@@ -5,6 +5,7 @@ namespace App\Services\Inbox\Generators;
 use App\Models\User;
 use App\Services\IdeasToRevisitService;
 use App\Services\Inbox\Contracts\InboxGenerator;
+use App\Support\Inbox\WeeklyRevisitBodyFormatter;
 
 class WeeklyRevisitInboxGenerator implements InboxGenerator
 {
@@ -21,7 +22,7 @@ class WeeklyRevisitInboxGenerator implements InboxGenerator
         }
 
         $lines = $ideas
-            ->map(fn ($idea) => '- '.$this->formatIdeaContent($idea->content))
+            ->map(fn ($idea) => '- '.WeeklyRevisitBodyFormatter::formatIdeaPreview($idea->content))
             ->implode("\n");
 
         return [[
@@ -34,10 +35,5 @@ class WeeklyRevisitInboxGenerator implements InboxGenerator
                 'idea_ids' => $ideas->pluck('id')->all(),
             ],
         ]];
-    }
-
-    private function formatIdeaContent(string $content): string
-    {
-        return trim((string) preg_replace('/\s+/u', ' ', $content));
     }
 }
