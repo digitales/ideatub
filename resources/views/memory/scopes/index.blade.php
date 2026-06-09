@@ -3,98 +3,90 @@
 @section('title', 'All memories — IdeaTub')
 
 @section('content')
-<div class="max-w-3xl mx-auto px-6 pt-12 pb-24">
-    <div class="mb-8">
-        <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">All memories</h1>
-        <p class="text-sm text-slate-brand mt-1">Every working memory scope currently saved for your account.</p>
-    </div>
+@php
+    $navBtnClass = 'inline-flex items-center rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet transition-colors hover:bg-memory-violet/5 hover:text-memory-violet/80';
+
+    $scopeCount = collect($sections ?? [])
+        ->sum(function (array $section): int {
+            if (($section['key'] ?? '') === 'clients') {
+                return collect($section['groups'] ?? [])->sum(fn (array $group): int => count($group['rows'] ?? []));
+            }
+
+            return count($section['rows'] ?? []);
+        });
+@endphp
+
+<div class="mx-auto w-full max-w-4xl px-6 pb-24 pt-12 md:px-8">
+    <header class="mb-8">
+        <p class="mb-2 text-[11px] font-semibold tracking-[0.14em] uppercase text-memory-violet/90">Working memory</p>
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="min-w-0">
+                <h1 class="text-[28px] font-semibold tracking-tight text-deep-indigo">All memories</h1>
+                <p class="mt-1.5 max-w-[48ch] text-sm text-slate-brand">
+                    Every scope with saved working memory — global, projects, tags, and insights.
+                </p>
+            </div>
+            <nav class="flex shrink-0 flex-wrap items-center gap-2" aria-label="Working memory navigation">
+                <a href="{{ route('memory.show') }}" class="{{ $navBtnClass }}">
+                    Global memory
+                </a>
+                @if (config('features.working_memory_insights'))
+                    <a href="{{ route('memory.insights') }}" class="{{ $navBtnClass }}">
+                        Insights
+                    </a>
+                @endif
+            </nav>
+        </div>
+    </header>
 
     @if (empty($sections))
-        <section class="rounded-xl border border-memory-violet/15 bg-white/70 backdrop-blur px-6 py-8 shadow-[0_2px_16px_rgba(109,106,247,0.06)] text-deep-indigo">
-            <h2 class="text-lg font-semibold">No saved memories yet</h2>
-            <p class="mt-2 text-sm text-slate-brand">Open your global working memory to start building context from recent activity.</p>
-            <a
-                href="{{ route('memory.show') }}"
-                class="mt-5 inline-flex items-center rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet hover:bg-memory-violet/5 transition-colors"
-            >
+        <div class="ideatub-surface-muted px-6 py-10 text-center">
+            <h2 class="text-lg font-semibold text-deep-indigo">No saved memories yet</h2>
+            <p class="mx-auto mt-2 max-w-[40ch] text-sm text-slate-brand">
+                Open your global working memory to start building context from recent activity.
+            </p>
+            <a href="{{ route('memory.show') }}" class="{{ $navBtnClass }} mt-5">
                 Open global working memory
             </a>
-        </section>
+        </div>
     @else
-        <div class="space-y-8">
+        <p class="mb-8 text-sm text-slate-brand">
+            <span class="font-medium text-deep-indigo tabular-nums">{{ $scopeCount }}</span>
+            {{ $scopeCount === 1 ? 'scope' : 'scopes' }}
+            across
+            <span class="font-medium text-deep-indigo tabular-nums">{{ count($sections) }}</span>
+            {{ count($sections) === 1 ? 'section' : 'sections' }}
+        </p>
+
+        <div class="flex flex-col gap-10">
             @foreach ($sections as $section)
-                <section>
-                    <h2 class="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-slate-brand">{{ $section['title'] }}</h2>
-                    <ul class="space-y-2">
-                        @php
-                            $rows = ($section['key'] ?? '') === 'clients'
-                                ? collect($section['groups'] ?? [])->flatMap(fn ($group) => $group['rows'])->all()
-                                : ($section['rows'] ?? []);
-                        @endphp
-                        @foreach ($rows as $row)
-                            @php
-                                $badge = $row['badge'] ?? null;
-                                $badgeClass = match ($badge) {
-                                    'Updating' => 'border-teal-300/60 bg-teal-50 text-teal-700',
-                                    'Fallback' => 'border-amber-300/70 bg-amber-50 text-amber-700',
-                                    default => 'border-slate-200 bg-slate-50 text-slate-600',
-                                };
-                                $freshness = $row['freshness'] ?? null;
-                                $refreshed = $row['refreshed'] ?? null;
-                                $meta = collect([
-                                    $freshness !== null ? ucfirst($freshness) : null,
-                                    $refreshed !== null ? "Refreshed {$refreshed}" : null,
-                                ])->filter()->implode(' · ');
-                                $indentClass = ($row['depth'] ?? 0) === 1 ? 'ml-6' : '';
-                            @endphp
-                            <li class="{{ $indentClass }}">
-                                @if (! empty($row['href']))
-                                    <a
-                                        href="{{ $row['href'] }}"
-                                        aria-label="{{ $row['aria_label'] }}"
-                                        class="block rounded-xl border border-memory-violet/15 bg-white/70 backdrop-blur px-5 py-4 shadow-[0_2px_16px_rgba(109,106,247,0.05)] transition-colors hover:border-memory-violet/30 hover:bg-white text-deep-indigo"
-                                    >
-                                        <div class="flex items-start justify-between gap-4">
-                                            <div>
-                                                <div class="font-medium">{{ $row['title'] }}</div>
-                                                @if ($meta !== '')
-                                                    <div class="mt-1 text-sm text-slate-brand">{{ $meta }}</div>
-                                                @endif
-                                            </div>
-                                            @if ($badge !== null)
-                                                <span class="shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium {{ $badgeClass }}">{{ $badge }}</span>
-                                            @endif
-                                        </div>
-                                    </a>
-                                    @if (! empty($row['stream_href']))
-                                        <div class="-mt-2 px-5 pb-3">
-                                            <a
-                                                href="{{ $row['stream_href'] }}"
-                                                class="text-sm text-memory-violet hover:underline"
-                                            >Stream</a>
-                                        </div>
-                                    @endif
-                                @else
-                                    <div
-                                        aria-label="{{ $row['aria_label'] }}"
-                                        class="rounded-xl border border-memory-violet/15 bg-white/70 backdrop-blur px-5 py-4 shadow-[0_2px_16px_rgba(109,106,247,0.05)] text-deep-indigo"
-                                    >
-                                        <div class="flex items-start justify-between gap-4">
-                                            <div>
-                                                <div class="font-medium">{{ $row['title'] }}</div>
-                                                @if ($meta !== '')
-                                                    <div class="mt-1 text-sm text-slate-brand">{{ $meta }}</div>
-                                                @endif
-                                            </div>
-                                            @if ($badge !== null)
-                                                <span class="shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium {{ $badgeClass }}">{{ $badge }}</span>
-                                            @endif
+                <section aria-labelledby="memory-section-{{ $section['key'] }}">
+                    <h2 id="memory-section-{{ $section['key'] }}" class="mb-4 text-sm font-semibold text-deep-indigo">
+                        {{ $section['title'] }}
+                    </h2>
+
+                    @if (($section['key'] ?? '') === 'clients')
+                        <div class="flex flex-col gap-8">
+                            @foreach ($section['groups'] ?? [] as $group)
+                                <div>
+                                    <h3 class="mb-2 text-sm font-medium text-slate-brand">
+                                        {{ $group['client_title'] }}
+                                    </h3>
+                                    <div class="-mx-6 -my-2 overflow-x-auto whitespace-nowrap sm:-mx-8">
+                                        <div class="inline-block min-w-full px-6 py-2 align-middle sm:px-8">
+                                            @include('memory.partials.scopes_table', ['rows' => $group['rows'] ?? []])
                                         </div>
                                     </div>
-                                @endif
-                            </li>
-                        @endforeach
-                    </ul>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="-mx-6 -my-2 overflow-x-auto whitespace-nowrap sm:-mx-8">
+                            <div class="inline-block min-w-full px-6 py-2 align-middle sm:px-8">
+                                @include('memory.partials.scopes_table', ['rows' => $section['rows'] ?? []])
+                            </div>
+                        </div>
+                    @endif
                 </section>
             @endforeach
         </div>

@@ -10,7 +10,7 @@
 <nav
     data-testid="stream-type-nav"
     aria-label="Stream type"
-    class="mb-6 overflow-x-auto -mx-1 px-1 pb-1"
+    class="overflow-x-auto -mx-1 px-1 pb-1"
 >
     <div class="ideatub-segment-track min-w-full sm:min-w-0">
         <a

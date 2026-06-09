@@ -116,7 +116,8 @@ class MemoryScopesIndexTest extends TestCase
         $response->assertOk();
         $this->assertSectionHeadingsInOrder($html, ['Clients']);
         $response->assertSeeInOrder(['Dezeen', 'Foo']);
-        $response->assertSee('ml-6', false);
+        $response->assertSee('pl-8', false);
+        $response->assertSee('Stream', false);
         $response->assertSee(route('idea.stream', ['tag' => TagSlug::from('client:dezeen')]), false);
     }
 

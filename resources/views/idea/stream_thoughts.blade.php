@@ -3,7 +3,7 @@
         data-thought-id="{{ $card->thought()->id }}"
         data-stream-card
         @if ($card->isVideoThought()) data-thought-kind="video" @endif
-        class="ideatub-surface relative mb-3 px-4 py-4 transition hover:ring-memory-violet/20 dark:hover:ring-violet-400/30 @if ($card->isVideoThought()) border-l-[3px] border-l-rose-400/80 dark:border-l-rose-400/70 @endif"
+        class="ideatub-surface relative px-4 py-4 transition hover:ring-memory-violet/20 dark:hover:ring-violet-400/30 @if ($card->isVideoThought()) border-l-[3px] border-l-rose-400/80 dark:border-l-rose-400/70 @endif"
     >
         <div class="absolute top-3 right-3 flex items-center gap-2">
             @if ($card->editable() && $card->documentShareEligible())
@@ -89,13 +89,13 @@
                 </div>
             @endif
 
-            <div class="mt-2 flex min-w-0 items-center gap-2 flex-wrap">
-                @if($card->showViewFormattedLink())
-                    <a href="{{ route('idea.research.show', $card->thought()) }}" class="text-[10.5px] font-medium text-memory-violet hover:underline">View formatted</a>
-                @endif
-                <span class="text-[10.5px] text-slate-brand/40">{{ $card->activityAtHuman() }}</span>
+            <div class="mt-3 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-deep-indigo/[0.06] pt-3 dark:border-white/10">
+                <span class="text-sm text-slate-brand/50 sm:text-xs">{{ $card->activityAtHuman() }}</span>
                 @include('idea.partials.thought_type_badge', ['thought' => $card->thought()])
                 @include('idea.partials.email_newsletter_research_status', ['newsletterResearchStatus' => $card->newsletterResearchStatus()])
+                @if($card->showViewFormattedLink())
+                    <a href="{{ route('idea.research.show', $card->thought()) }}" class="text-sm font-medium text-memory-violet hover:underline sm:text-xs">View formatted</a>
+                @endif
                 @include('idea.partials.thought_tag_row', ['thought' => $card->thought(), 'editable' => $card->editable()])
             </div>
 

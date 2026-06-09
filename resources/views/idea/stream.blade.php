@@ -20,15 +20,23 @@
                     ? 'Filtered view of your captured thoughts.'
                     : 'Everything you have captured, newest first.');
         @endphp
-        <div data-stream-layout="{{ $streamLayout }}" class="mx-auto px-6 pt-10 pb-20 {{ $streamLayout === 'grid' ? 'max-w-[1400px]' : 'max-w-2xl' }}">
+        <div
+            x-data="streamLayout('{{ $streamLayout }}')"
+            x-init="applyLayout()"
+            data-stream-layout="{{ $streamLayout }}"
+            class="mx-auto w-full max-w-7xl px-6 pt-10 pb-20"
+        >
             @include('idea.partials.page_shell_header', [
                 'eyebrow' => $tag ? 'Tagged stream' : 'Stream',
                 'title' => $__streamTitle,
                 'subtitle' => $__streamSubtitle,
+                'actions' => $thoughts->isEmpty() ? null : view('idea.partials.stream_layout_toggle'),
             ])
 
             @if (! $tag)
-                @include('idea.partials.stream_type_nav', ['active' => $__collectionKey ?? 'all'])
+                <div class="stream-chrome">
+                    @include('idea.partials.stream_type_nav', ['active' => $__collectionKey ?? 'all'])
+                </div>
             @endif
 
             @if($tag)
@@ -73,49 +81,21 @@
                     @endif
                 </div>
             @else
-                <div x-data="streamLayout('{{ $streamLayout }}')" x-init="applyLayout()">
-                    <div class="ideatub-surface-frosted mb-4 flex items-center justify-between gap-3 px-3 py-2">
-                        <p class="text-xs text-slate-brand/55 tabular-nums" id="stream-count-line">
-                            Showing <span id="stream-showing-count" class="font-medium text-deep-indigo/80">{{$thoughts->count()}}</span> of <span id="stream-total-count" class="font-medium text-deep-indigo/80">{{$thoughts->total()}}</span> thoughts
-                        </p>
-                        <div class="ideatub-segment-track gap-0.5 p-0.5" role="group" aria-label="Layout">
-                            <button
-                                type="button"
-                                data-testid="layout-toggle-list"
-                                @click="setLayout('list')"
-                                :class="layout === 'list' ? 'ideatub-segment-tab-active' : 'ideatub-segment-tab'"
-                                class="p-1.5"
-                                aria-label="List layout"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
-                            <button
-                                type="button"
-                                data-testid="layout-toggle-grid"
-                                @click="setLayout('grid')"
-                                :class="layout === 'grid' ? 'ideatub-segment-tab-active' : 'ideatub-segment-tab'"
-                                class="p-1.5"
-                                aria-label="Grid layout"
-                            >
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
-                                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                                    <rect x="14" y="3" width="7" height="7" rx="1" />
-                                    <rect x="3" y="14" width="7" height="7" rx="1" />
-                                    <rect x="14" y="14" width="7" height="7" rx="1" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div id="stream-thoughts-list"
-                        :class="layout === 'grid' ? 'grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4 items-start' : ''"
+                <div :class="layout === 'list' ? 'mx-auto max-w-2xl' : ''">
+                    <p class="mb-4 text-base text-slate-brand/55 tabular-nums sm:text-sm" id="stream-count-line">
+                        Showing <span id="stream-showing-count" class="font-medium text-deep-indigo/80">{{ $thoughts->count() }}</span> of <span id="stream-total-count" class="font-medium text-deep-indigo/80">{{ $thoughts->total() }}</span> thoughts
+                    </p>
+                    <div
+                        id="stream-thoughts-list"
+                        class="{{ $streamLayout === 'grid' ? 'stream-feed--grid' : 'stream-feed--list' }}"
+                        :class="layout === 'grid' ? 'stream-feed--grid' : 'stream-feed--list'"
                         data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
-                        data-stream-since="{{ $streamSince }}">
+                        data-stream-since="{{ $streamSince }}"
+                    >
                         @include('idea.stream_thoughts', ['cards' => $cards])
                     </div>
                     @if($thoughts->hasMorePages())
-                        <div id="stream-load-more-sentinel" class="h-4 mt-4" data-stream-base-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}" data-stream-total="{{$thoughts->total()}}"></div>
+                        <div id="stream-load-more-sentinel" class="mt-4 h-4" data-stream-base-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}" data-stream-total="{{ $thoughts->total() }}"></div>
                     @endif
                 </div>
             @endif
@@ -240,16 +220,7 @@
                             }).catch(function() {});
                         },
                         applyLayout() {
-                            var container = this.$el.closest('[data-stream-layout]');
-                            if (!container) return;
-                            container.setAttribute('data-stream-layout', this.layout);
-                            if (this.layout === 'grid') {
-                                container.classList.remove('max-w-2xl');
-                                container.classList.add('max-w-[1400px]');
-                            } else {
-                                container.classList.remove('max-w-[1400px]');
-                                container.classList.add('max-w-2xl');
-                            }
+                            this.$el.setAttribute('data-stream-layout', this.layout);
                             this.$nextTick(function() { streamLayoutCheckOverflow(); });
                         },
                     };
@@ -266,35 +237,6 @@
                     });
                 }
                 </script>
-                <style>
-                [data-stream-layout="grid"] [data-stream-card] {
-                    max-height: 450px;
-                    overflow: hidden;
-                    position: relative;
-                    content-visibility: auto;
-                    contain-intrinsic-size: auto 200px;
-                }
-                [data-stream-layout="grid"] [data-stream-card][data-expanded] {
-                    max-height: none;
-                    overflow: visible;
-                }
-                [data-stream-layout="grid"] [data-stream-card]:not([data-expanded])::after {
-                    content: '';
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    right: 0;
-                    height: 3rem;
-                    background: linear-gradient(to top, rgba(255,255,255,0.95), transparent);
-                    pointer-events: none;
-                }
-                [data-stream-layout="grid"] [data-stream-card] .mb-2:last-child {
-                    margin-bottom: 0;
-                }
-                .stream-card-expand {
-                    display: none;
-                }
-                </style>
             @endif
         @endpush
 @endsection

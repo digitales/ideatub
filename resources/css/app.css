@@ -190,6 +190,57 @@
   .ideatub-thought-edit-inline-detail {
     @apply min-h-[12rem];
   }
+
+  .stream-chrome {
+    @apply sticky z-10 -mx-1 mb-6 px-1 pb-2 pt-1;
+    top: calc(env(safe-area-inset-top, 0px) + 3.25rem);
+    background: linear-gradient(
+      to bottom,
+      rgba(238, 242, 255, 0.92) 0%,
+      rgba(238, 242, 255, 0.88) 70%,
+      transparent 100%
+    );
+  }
+
+  .stream-feed--list {
+    @apply flex flex-col gap-3;
+  }
+
+  .stream-feed--grid {
+    @apply grid grid-cols-1 items-start gap-4 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))];
+  }
+
+  [data-stream-layout='grid'] [data-stream-card] {
+    max-height: 450px;
+    overflow: hidden;
+    position: relative;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 200px;
+  }
+
+  [data-stream-layout='grid'] [data-stream-card][data-expanded] {
+    max-height: none;
+    overflow: visible;
+  }
+
+  [data-stream-layout='grid'] [data-stream-card]:not([data-expanded])::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3rem;
+    background: linear-gradient(to top, rgb(255 255 255 / 0.95), transparent);
+    pointer-events: none;
+  }
+
+  [data-stream-layout='grid'] [data-stream-card] .mb-2:last-child {
+    margin-bottom: 0;
+  }
+
+  .stream-card-expand {
+    display: none;
+  }
 }
 
 html.dark {
@@ -281,6 +332,19 @@ html.dark {
 
 .dark .ideatub-focus-textarea {
     @apply border-white/10 bg-gray-900 text-gray-100 placeholder:text-gray-500;
+  }
+
+.dark .stream-chrome {
+    background: linear-gradient(
+      to bottom,
+      rgb(3 7 18 / 0.95) 0%,
+      rgb(3 7 18 / 0.9) 70%,
+      transparent 100%
+    );
+  }
+
+.dark [data-stream-layout='grid'] [data-stream-card]:not([data-expanded])::after {
+    background: linear-gradient(to top, rgb(17 24 39 / 0.95), transparent);
   }
 
 .dark .ideatub-app input[class*='bg-white'],
