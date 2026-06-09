@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Thought;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Single place to create a thought or chunked thoughts (root + sections).
@@ -128,8 +129,8 @@ class ThoughtCaptureService
         ?array $ideaMetadata = null,
         bool $skipAiMetadata = false,
     ): Thought {
-        $embedding = $this->openRouter->embed($content);
-        $rawMetadata = $skipAiMetadata ? [] : $this->openRouter->extractMetadata($content);
+        $embedding = $this->embedOrNull($content, 'thought');
+        $rawMetadata = $skipAiMetadata ? [] : $this->extractMetadataOrEmpty($content);
         $metadata = Thought::normalizeMetadataTags($rawMetadata);
         $metadata = $this->sanitiser->sanitise($metadata);
         $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
@@ -183,7 +184,7 @@ class ThoughtCaptureService
         bool $skipAiMetadata = false,
     ): array {
         $sections = $this->chunkingService->splitAtHeadings($content);
-        $rawMetadata = $skipAiMetadata ? [] : $this->openRouter->extractMetadata($content);
+        $rawMetadata = $skipAiMetadata ? [] : $this->extractMetadataOrEmpty($content);
         $metadata = Thought::normalizeMetadataTags($rawMetadata);
         $metadata = $this->sanitiser->sanitise($metadata);
         $tags = isset($metadata['tags']) && is_array($metadata['tags']) ? $metadata['tags'] : [];
@@ -217,7 +218,7 @@ class ThoughtCaptureService
             'section_title' => $sections[0]['title'],
             'section_index' => 0,
         ]);
-        $rootEmbedding = $this->openRouter->embed($rootContent);
+        $rootEmbedding = $this->embedOrNull($rootContent, 'chunked_root');
         $root = Thought::create([
             'content' => $rootContent,
             'embedding' => $rootEmbedding,
@@ -242,7 +243,7 @@ class ThoughtCaptureService
 
         foreach (array_slice($sections, 1) as $index => $section) {
             $sectionContent = $section['content'];
-            $sectionEmbedding = $this->openRouter->embed($sectionContent);
+            $sectionEmbedding = $this->embedOrNull($sectionContent, 'chunked_section');
             $sectionMeta = array_merge($baseSource, [
                 'section_title' => $section['title'],
                 'section_index' => $index + 1,
@@ -265,6 +266,43 @@ class ThoughtCaptureService
             'section_ids' => $sectionIds,
             'count' => count($sectionIds),
         ];
+    }
+
+    /**
+     * Embed for search; on OpenRouter failure persist without blocking capture (embedding column is nullable).
+     *
+     * @return array<int, float>|null
+     */
+    private function embedOrNull(string $text, string $context): ?array
+    {
+        try {
+            return $this->openRouter->embed($text);
+        } catch (\Throwable $e) {
+            Log::warning('ThoughtCaptureService: OpenRouter embed failed; continuing without embedding.', [
+                'context' => $context,
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractMetadataOrEmpty(string $text): array
+    {
+        try {
+            return $this->openRouter->extractMetadata($text);
+        } catch (\Throwable $e) {
+            Log::warning('ThoughtCaptureService: OpenRouter extractMetadata failed; continuing without AI metadata.', [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     /**

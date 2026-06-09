@@ -55,4 +55,40 @@ class ThoughtCaptureServiceTest extends TestCase
         $this->assertFalse($thought->metadata['completed']);
         $this->assertSame('2025-03-14', $thought->metadata['logged_date']);
     }
+
+    #[Test]
+    public function create_persists_thought_when_openrouter_embed_fails(): void
+    {
+        $user = User::factory()->create();
+
+        $openRouter = Mockery::mock(OpenRouterService::class);
+        $openRouter->shouldReceive('embed')
+            ->once()
+            ->with('My idea')
+            ->andThrow(new \RuntimeException('OPENROUTER_API_KEY is not set.'));
+        $openRouter->shouldReceive('extractMetadata')
+            ->once()
+            ->with('My idea')
+            ->andReturn(['tags' => ['nthdesigns']]);
+
+        $chunking = new ThoughtChunkingService;
+        $sanitiser = new MetadataSanitiser;
+        $service = new ThoughtCaptureService($openRouter, $chunking, $sanitiser);
+
+        $result = $service->create([
+            'content' => 'My idea',
+            'user_id' => $user->id,
+            'source' => 'mcp',
+            'idea_metadata' => [
+                'type' => 'idea',
+                'completed' => false,
+                'logged_date' => '2026-06-09',
+            ],
+        ]);
+
+        $thought = $result['thought'];
+        $this->assertNull($thought->embedding);
+        $this->assertSame('idea', $thought->metadata['type']);
+        $this->assertSame('2026-06-09', $thought->metadata['logged_date']);
+    }
 }
