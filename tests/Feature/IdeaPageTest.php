@@ -523,7 +523,7 @@ class IdeaPageTest extends TestCase
         $this->assertStringContainsString('Ideas', $text);
         $this->assertStringContainsString('Stream', $text);
         $this->assertStringContainsString('Help', $text);
-        $this->assertStringContainsString('Keyboard shortcuts', $text);
+        $this->assertStringNotContainsString('Keyboard shortcuts', $text);
         $this->assertStringNotContainsString('Inbox', $text);
         $this->assertStringNotContainsString('Ideas to revisit', $text);
         $this->assertStringNotContainsString('Types', $text);
@@ -598,7 +598,7 @@ class IdeaPageTest extends TestCase
         $this->assertContains('Ideas', $labels);
         $this->assertContains('Stream', $labels);
         $this->assertContains('Help', $labels);
-        $this->assertContains('Keyboard shortcuts', $labels);
+        $this->assertNotContains('Keyboard shortcuts', $labels);
         $this->assertNotContains('Types', $labels);
         $this->assertNotContains('Jira', $labels);
         $this->assertNotContains('Emails', $labels);

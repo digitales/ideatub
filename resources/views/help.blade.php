@@ -19,6 +19,7 @@
         {{-- Keyboard shortcuts --}}
         <section id="shortcuts" class="scroll-mt-24">
             <h2 class="text-xl font-semibold tracking-tight text-deep-indigo text-balance mb-4">Keyboard shortcuts</h2>
+            <p class="text-sm/6 text-slate-brand mb-4">Press <x-help.kbd>?</x-help.kbd> anywhere in the app to open a quick-reference overlay with these shortcuts.</p>
             <div class="ideatub-surface px-5 py-5 sm:px-6">
                 <div class="-mx-4 -my-2 overflow-x-auto whitespace-nowrap sm:-mx-6">
                     <div class="inline-block min-w-full px-4 py-2 align-middle sm:px-6">

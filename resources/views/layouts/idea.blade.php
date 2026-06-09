@@ -94,9 +94,6 @@
                 <a href="{{route('help')}}" class="{{$navLinkClass}}">
                     Help
                 </a>
-                <button type="button" @click="shortcutsOpen = true" class="{{$navLinkClass}}">
-                    Keyboard shortcuts
-                </button>
             </div>
 
             {{-- Right: compact / overflow + search + avatar --}}
@@ -131,9 +128,6 @@
                         <a href="{{route('help')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                             Help
                         </a>
-                        <button type="button" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false; $dispatch('ideatub-open-shortcuts')">
-                            Keyboard shortcuts
-                        </button>
                     </div>
                 </div>
 
@@ -209,6 +203,7 @@
 
         {{-- Shortcut palette (modal) --}}
         <div x-show="shortcutsOpen"
+            x-cloak
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="opacity-0"
             x-transition:enter-end="opacity-100"
