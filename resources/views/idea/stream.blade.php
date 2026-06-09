@@ -87,8 +87,6 @@
                     </p>
                     <div
                         id="stream-thoughts-list"
-                        class="{{ $streamLayout === 'grid' ? 'stream-feed--grid' : 'stream-feed--list' }}"
-                        :class="layout === 'grid' ? 'stream-feed--grid' : 'stream-feed--list'"
                         data-stream-refetch-url="{{ $__typedStreamRouteName ? route($__typedStreamRouteName) : ($tagSlug ? route('idea.stream', ['tag' => $tagSlug]) : route('idea.stream')) }}?page=1"
                         data-stream-since="{{ $streamSince }}"
                     >
@@ -207,6 +205,7 @@
                     return {
                         layout: initial || 'list',
                         setLayout(mode) {
+                            if (this.layout === mode) return;
                             this.layout = mode;
                             this.applyLayout();
                             fetch('{{ route("stream.layout.store") }}', {
@@ -221,6 +220,13 @@
                         },
                         applyLayout() {
                             this.$el.setAttribute('data-stream-layout', this.layout);
+                            if (this.layout === 'list') {
+                                this.$el.querySelectorAll('[data-stream-card][data-expanded]').forEach(function(card) {
+                                    card.removeAttribute('data-expanded');
+                                    var btn = card.querySelector('.stream-card-expand');
+                                    if (btn) btn.textContent = 'Read more';
+                                });
+                            }
                             this.$nextTick(function() { streamLayoutCheckOverflow(); });
                         },
                     };

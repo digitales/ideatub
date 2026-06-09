@@ -202,11 +202,11 @@
     );
   }
 
-  .stream-feed--list {
+  [data-stream-layout='list'] #stream-thoughts-list {
     @apply flex flex-col gap-3;
   }
 
-  .stream-feed--grid {
+  [data-stream-layout='grid'] #stream-thoughts-list {
     @apply grid grid-cols-1 items-start gap-4 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))];
   }
 

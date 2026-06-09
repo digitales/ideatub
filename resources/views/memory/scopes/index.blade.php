@@ -50,7 +50,7 @@
             </a>
         </div>
     @else
-        <p class="mb-8 text-sm text-slate-brand">
+        <p class="mb-8 rounded-2xl bg-white/70 px-4 py-3 text-sm text-slate-brand ring-1 ring-deep-indigo/[0.06]">
             <span class="font-medium text-deep-indigo tabular-nums">{{ $scopeCount }}</span>
             {{ $scopeCount === 1 ? 'scope' : 'scopes' }}
             across
@@ -58,35 +58,35 @@
             {{ count($sections) === 1 ? 'section' : 'sections' }}
         </p>
 
-        <div class="flex flex-col gap-10">
+        <div class="flex flex-col gap-6">
             @foreach ($sections as $section)
                 <section aria-labelledby="memory-section-{{ $section['key'] }}">
-                    <h2 id="memory-section-{{ $section['key'] }}" class="mb-4 text-sm font-semibold text-deep-indigo">
-                        {{ $section['title'] }}
-                    </h2>
+                    <div class="ideatub-surface overflow-hidden">
+                        <div class="border-b border-deep-indigo/[0.06] px-5 py-3.5">
+                            <h2 id="memory-section-{{ $section['key'] }}" class="text-sm font-semibold text-deep-indigo">
+                                {{ $section['title'] }}
+                            </h2>
+                        </div>
 
-                    @if (($section['key'] ?? '') === 'clients')
-                        <div class="flex flex-col gap-8">
-                            @foreach ($section['groups'] ?? [] as $group)
-                                <div>
-                                    <h3 class="mb-2 text-sm font-medium text-slate-brand">
-                                        {{ $group['client_title'] }}
-                                    </h3>
-                                    <div class="-mx-6 -my-2 overflow-x-auto whitespace-nowrap sm:-mx-8">
-                                        <div class="inline-block min-w-full px-6 py-2 align-middle sm:px-8">
+                        @if (($section['key'] ?? '') === 'clients')
+                            <div class="divide-y divide-deep-indigo/[0.06]">
+                                @foreach ($section['groups'] ?? [] as $group)
+                                    <div class="px-5 py-4">
+                                        <h3 class="mb-3 text-sm font-medium text-slate-brand">
+                                            {{ $group['client_title'] }}
+                                        </h3>
+                                        <div class="overflow-x-auto">
                                             @include('memory.partials.scopes_table', ['rows' => $group['rows'] ?? []])
                                         </div>
                                     </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="-mx-6 -my-2 overflow-x-auto whitespace-nowrap sm:-mx-8">
-                            <div class="inline-block min-w-full px-6 py-2 align-middle sm:px-8">
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="overflow-x-auto px-5 py-4">
                                 @include('memory.partials.scopes_table', ['rows' => $section['rows'] ?? []])
                             </div>
-                        </div>
-                    @endif
+                        @endif
+                    </div>
                 </section>
             @endforeach
         </div>
