@@ -21,6 +21,9 @@ yarn-error.log
 /bootstrap/cache/*
 !/bootstrap/cache/.gitkeep
 /database/database.sqlite
-/storage
+/storage/*.key
+/storage/pail
+/storage/data
 /storage/app/oauth-mcp-*.pem
+*.log
 .superpowers/
