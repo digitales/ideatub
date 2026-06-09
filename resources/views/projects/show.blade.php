@@ -1,6 +1,11 @@
 @extends('layouts.idea')
 
-@section('title', $project->title.' — Project — IdeaTub')
+@php
+    $projectShow = \App\View\Presenters\Projects\ProjectShowPresenter::fromProject($project);
+    $demoModeOn = app(\App\Services\DemoMode::class)->enabled();
+@endphp
+
+@section('title', $projectShow->pageTitle().' — Project — IdeaTub')
 
 @section('content')
 @php
@@ -19,10 +24,10 @@
         <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-memory-violet/90 mb-2">Project</p>
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="min-w-0 max-w-[52ch]">
-                <h1 class="text-3xl font-semibold tracking-tight text-deep-indigo">{{ $project->title }}</h1>
-                @if ($project->description)
+                <h1 class="text-3xl font-semibold tracking-tight text-deep-indigo">{{ $projectShow->pageTitle() }}</h1>
+                @if ($projectShow->descriptionMarkdown())
                     <div class="mt-3 prose prose-sm max-w-none text-slate-brand">
-                        <x-safe-markdown :markdown="$project->description" />
+                        <x-safe-markdown :markdown="$projectShow->descriptionMarkdown()" />
                     </div>
                 @endif
                 <p class="mt-4 text-sm text-slate-brand/65">
@@ -54,11 +59,11 @@
                 @include('projects.partials.context-thought', [
                     'project' => $project,
                     'contextThought' => $contextThought,
-                    'editable' => true,
+                    'editable' => ! $demoModeOn,
                 ])
             @endif
 
-            @includeWhen(config('features.working_memory_ui'), 'projects.partials.working-memory-inline', [
+            @includeWhen(config('features.working_memory_ui') && ! $demoModeOn, 'projects.partials.working-memory-inline', [
                 'project' => $project,
                 'workingMemoryPayload' => $workingMemoryPayload ?? null,
             ])
@@ -94,6 +99,7 @@
         </div>
 
         <aside class="min-w-0 space-y-6 lg:sticky lg:top-6">
+            @if (! $demoModeOn)
             <section class="ideatub-surface px-5 py-5">
                 <h2 class="text-sm font-semibold text-deep-indigo">Add thought</h2>
                 <p class="mt-1 text-xs text-slate-brand/70">Link an existing top-level thought to this project.</p>
@@ -222,6 +228,7 @@
                     </div>
                 </template>
             </section>
+            @endif
             @endif
         </aside>
     </div>

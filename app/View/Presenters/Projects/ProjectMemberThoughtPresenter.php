@@ -5,10 +5,14 @@ namespace App\View\Presenters\Projects;
 use App\Models\Thought;
 use App\Support\Research\MicrositePageLabel;
 use App\Support\ThoughtTypeNavigation;
+use App\View\Presenters\Concerns\ObfuscatesDemoText;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 final class ProjectMemberThoughtPresenter
 {
+    use ObfuscatesDemoText;
+
     private function __construct(
         private readonly Thought $thought,
     ) {}
@@ -31,17 +35,29 @@ final class ProjectMemberThoughtPresenter
     public function title(): string
     {
         if ($this->thought->isMicrositeDocumentLayout()) {
-            return MicrositePageLabel::forThought($this->thought);
+            return $this->obfuscatedOrRaw(
+                MicrositePageLabel::forThought($this->thought),
+                'thought_content',
+                'project_member_thought_presenter.title',
+            );
         }
 
         $content = ltrim((string) $this->thought->content);
         if (preg_match('/^#+\s+(.+)$/m', $content, $matches)) {
-            return trim($matches[1]);
+            return $this->obfuscatedOrRaw(
+                trim($matches[1]),
+                'thought_content',
+                'project_member_thought_presenter.title',
+            );
         }
 
         $plain = trim(preg_replace('/[#*_`>\[\]()!-]/', '', Str::before($content, "\n")) ?? $content);
 
-        return Str::limit($plain !== '' ? $plain : $content, 120);
+        return $this->obfuscatedOrRaw(
+            Str::limit($plain !== '' ? $plain : $content, 120),
+            'thought_content',
+            'project_member_thought_presenter.title',
+        );
     }
 
     public function excerpt(): ?string
@@ -68,7 +84,11 @@ final class ProjectMemberThoughtPresenter
             $plain = trim(Str::after($plain, $this->title()));
         }
 
-        return $plain !== '' ? Str::limit($plain, 160) : null;
+        return $plain !== '' ? $this->obfuscatedOrRaw(
+            Str::limit($plain, 160),
+            'thought_content',
+            'project_member_thought_presenter.excerpt',
+        ) : null;
     }
 
     public function typeLabel(): ?string
@@ -98,5 +118,21 @@ final class ProjectMemberThoughtPresenter
     public function updatedAtHuman(): string
     {
         return $this->thought->updated_at->diffForHumans();
+    }
+
+    private function obfuscatedOrRaw(string $value, string $context, string $boundary): string
+    {
+        try {
+            return $this->demoText($value, $context) ?? '';
+        } catch (\Throwable $e) {
+            Log::warning('Demo obfuscation failed for project member thought presenter field.', [
+                'boundary' => $boundary,
+                'context' => $context,
+                'thought_id' => $this->thought->id,
+                'exception' => $e::class,
+            ]);
+
+            return 'Demo content hidden';
+        }
     }
 }

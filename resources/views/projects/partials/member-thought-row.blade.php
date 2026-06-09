@@ -25,6 +25,7 @@
             @endif
         </a>
 
+        @if (! app(\App\Services\DemoMode::class)->enabled())
         <div class="flex shrink-0 items-center gap-1 pt-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
             <form method="POST" action="{{ route('projects.context.store', $project) }}">
                 @csrf
@@ -48,5 +49,6 @@
                 </button>
             </form>
         </div>
+        @endif
     </div>
 </li>

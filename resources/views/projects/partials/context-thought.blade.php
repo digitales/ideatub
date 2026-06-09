@@ -1,6 +1,7 @@
 @php
     $editable = $editable ?? true;
     $contextLabel = $contextLabel ?? 'Project context';
+    $contextPresenter = \App\View\Presenters\Projects\ProjectContextThoughtPresenter::fromThought($contextThought);
 @endphp
 <section class="rounded-2xl border-2 border-neural-teal/35 bg-gradient-to-br from-neural-teal/8 via-white/90 to-memory-violet/5 backdrop-blur p-5 mb-8 shadow-[0_4px_24px_rgba(42,140,140,0.12)]">
     <div class="flex items-start justify-between gap-3 mb-4">
@@ -25,13 +26,13 @@
     </div>
 
     <a href="{{ $contextThoughtUrl ?? $contextThought->ideaTubViewUrl() }}" class="group block rounded-xl border border-neural-teal/20 bg-white/80 px-4 py-3 hover:border-neural-teal/40 hover:bg-white transition-colors">
-        @if ($contextThought->isMicrositeDocumentLayout())
+        @if ($contextPresenter->isMicrositeLayout())
             <p class="text-sm font-medium text-deep-indigo group-hover:text-neural-teal">
-                {{ \App\Support\Research\MicrositePageLabel::forThought($contextThought) }}
+                {{ $contextPresenter->displayLabel() }}
             </p>
         @else
             <div class="prose prose-sm max-w-none text-deep-indigo line-clamp-6">
-                <x-safe-markdown :markdown="$contextThought->content" />
+                <x-safe-markdown :markdown="$contextPresenter->markdown()" />
             </div>
         @endif
         <p class="mt-2 text-xs font-medium text-neural-teal group-hover:underline">Open full thought</p>
