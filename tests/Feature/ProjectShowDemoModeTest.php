@@ -39,6 +39,7 @@ class ProjectShowDemoModeTest extends TestCase
         ]);
         $member = Thought::factory()->for($user)->create([
             'content' => "# MEMBER_ROW_TITLE_SECRET\n\nMEMBER_ROW_EXCERPT_SECRET",
+            'metadata' => ['type' => 'plan'],
         ]);
         $project->update(['context_thought_id' => $context->id]);
         $project->thoughts()->attach($member->id, ['sort_order' => 0]);
@@ -79,6 +80,9 @@ class ProjectShowDemoModeTest extends TestCase
 
         $response->assertSee('Contents', false);
         $response->assertSee('1 idea', false);
+        $response->assertSee('Plan', false);
+        $response->assertSee($member->ideaTubViewUrl(), false);
+        $response->assertSee('Updated', false);
         $response->assertDontSee('Add thought', false);
         $response->assertDontSee('Import markdown', false);
         $response->assertDontSee('Pin as context', false);
