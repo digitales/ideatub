@@ -1,0 +1,1 @@
+<kbd {{ $attributes->merge(['class' => 'inline-flex items-center rounded-md bg-deep-indigo/[0.06] px-1.5 py-0.5 font-mono text-xs text-slate-brand tabular-nums ring-1 ring-deep-indigo/[0.06]']) }}>{{ $slot }}</kbd>
