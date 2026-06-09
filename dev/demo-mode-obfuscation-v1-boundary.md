@@ -10,6 +10,7 @@ Concise handoff for what demo mode v1 covers versus known exclusions. See `docs/
 - Incomplete ideas (`idea.ideas`): idea body and research snippet rows; AJAX `html` fragments.
 - Completed ideas (`idea.completed`): list excerpts; date labels remain real.
 - Private research page (`idea.research.show`): research root/section bodies, related email subject, and editorial link summary narrative fields; URLs, counts, and status labels remain real.
+- Project index (`projects.index`): card titles and description excerpts via `ProjectShowPresenter`; "New project" actions hidden in demo mode.
 - Project show (`projects.show`): project title/description, pinned context body, member row title/excerpt; sidebar add/import and pin/remove hidden; working memory inline block hidden (not obfuscated).
 
 ## Intentional v1 exclusions / gaps
@@ -19,7 +20,7 @@ Concise handoff for what demo mode v1 covers versus known exclusions. See `docs/
 - **Export, email, PDF, and similar outbound surfaces** not using the covered Blade presenters.
 - **ImportedEmail.summary**: not rendered on the covered v1 pages; obfuscation for it is deferred until a covered surface displays it (per implementation plan).
 - **Any Blade route or client prop path** that still reads raw narrative `Thought` / email fields outside the covered presenter-backed pages above remains out of scope until listed here and tested.
-- **Project index, graph, edit**: titles and descriptions still raw until follow-up slices.
+- **Project graph, edit**: titles and descriptions still raw until follow-up slices.
 
 ## Operational
 

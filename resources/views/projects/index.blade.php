@@ -3,6 +3,9 @@
 @section('title', 'Projects — IdeaTub')
 
 @section('content')
+@php
+    $demoModeOn = app(\App\Services\DemoMode::class)->enabled();
+@endphp
 <div class="max-w-7xl mx-auto px-6 pt-10 pb-20 w-full">
     @if (session('success'))
         <div class="mb-6 rounded-2xl bg-neural-teal/10 px-4 py-3 text-sm text-neural-teal ring-1 ring-neural-teal/20">
@@ -17,22 +20,29 @@
                 <h1 class="text-3xl font-semibold tracking-tight text-deep-indigo">Projects</h1>
                 <p class="mt-1.5 text-sm text-slate-brand max-w-[48ch]">Group ideas, notes, and plans by client or initiative.</p>
             </div>
-            <a href="{{ route('projects.create') }}" class="ideatub-btn-primary shrink-0 gap-2">
-                New project
-            </a>
+            @if (! $demoModeOn)
+                <a href="{{ route('projects.create') }}" class="ideatub-btn-primary shrink-0 gap-2">
+                    New project
+                </a>
+            @endif
         </div>
     </header>
 
     @if ($projects->isEmpty())
         <div class="ideatub-surface-muted px-6 py-12 text-center">
             <p class="text-sm text-slate-brand/70 max-w-sm mx-auto">No projects yet. Create one to group ideas, notes, and plans.</p>
-            <a href="{{ route('projects.create') }}" class="ideatub-btn-primary mt-5 gap-2">
-                New project
-            </a>
+            @if (! $demoModeOn)
+                <a href="{{ route('projects.create') }}" class="ideatub-btn-primary mt-5 gap-2">
+                    New project
+                </a>
+            @endif
         </div>
     @else
         <ul class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" role="list">
             @foreach ($projects as $project)
+                @php
+                    $projectCard = \App\View\Presenters\Projects\ProjectShowPresenter::fromProject($project);
+                @endphp
                 <li class="min-w-0">
                     <a href="{{ route('projects.show', $project) }}" class="ideatub-surface group flex h-full flex-col p-5 transition hover:ring-memory-violet/25 dark:hover:ring-violet-400/30">
                         <div class="flex items-start gap-3">
@@ -42,9 +52,9 @@
                                 </svg>
                             </span>
                             <div class="min-w-0 flex-1">
-                                <span class="font-semibold text-deep-indigo group-hover:text-memory-violet transition-colors line-clamp-1">{{ $project->title }}</span>
-                                @if ($project->description)
-                                    <p class="mt-1.5 text-sm text-slate-brand/65 line-clamp-2 leading-relaxed">{{ \Illuminate\Support\Str::limit(strip_tags($project->description), 140) }}</p>
+                                <span class="font-semibold text-deep-indigo group-hover:text-memory-violet transition-colors line-clamp-1">{{ $projectCard->pageTitle() }}</span>
+                                @if ($projectCard->descriptionMarkdown())
+                                    <p class="mt-1.5 text-sm text-slate-brand/65 line-clamp-2 leading-relaxed">{{ \Illuminate\Support\Str::limit(strip_tags($projectCard->descriptionMarkdown()), 140) }}</p>
                                 @endif
                             </div>
                         </div>
