@@ -41,7 +41,7 @@
             </a>
 
             {{-- Search overlay (shown when searching) --}}
-            <form x-show="searching" x-transition method="GET" action="{{route('idea.index')}}" class="ideatub-nav-search-overlay" @click.away="searching = false">
+            <form x-show="searching" x-cloak x-transition method="GET" action="{{route('idea.index')}}" class="ideatub-nav-search-overlay" @click.away="searching = false">
                 <div class="flex flex-col w-full max-w-lg mx-auto gap-4">
                     <div class="flex items-center gap-3">
                         <svg class="w-4 h-4 text-neural-teal flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -154,7 +154,7 @@
                                 </span>
                             @endif
                         </button>
-                        <div x-show="open" x-transition @click.away="open = false" class="ideatub-dropdown">
+                        <div x-show="open" x-cloak x-transition @click.away="open = false" class="ideatub-dropdown">
                             <div class="border-b border-memory-violet/10 px-4 py-3 dark:border-white/10">
                                 <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-memory-violet/80 mb-2">Appearance</p>
                                 <x-appearance-control :appearance="$appearance ?? 'system'" :compact="true" />
