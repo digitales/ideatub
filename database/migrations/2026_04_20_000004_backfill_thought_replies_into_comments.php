@@ -20,6 +20,7 @@ return new class extends Migration
             FROM thoughts t
             WHERE t.parent_id IS NOT NULL
               AND (t.source_metadata IS NULL OR t.source_metadata->>'section_index' IS NULL)
+              AND (t.source_metadata IS NULL OR t.source_metadata->>'document_layout' IS DISTINCT FROM 'microsite')
               AND (t.metadata IS NULL OR t.metadata->>'video_section_type' IS NULL)
               AND (t.metadata IS NULL OR t.metadata->>'migrated_to_comment' IS DISTINCT FROM 'true')
               AND NOT EXISTS (
@@ -39,6 +40,7 @@ return new class extends Migration
             )::json
             WHERE parent_id IS NOT NULL
               AND (source_metadata IS NULL OR source_metadata->>'section_index' IS NULL)
+              AND (source_metadata IS NULL OR source_metadata->>'document_layout' IS DISTINCT FROM 'microsite')
               AND (metadata IS NULL OR metadata->>'video_section_type' IS NULL)
               AND (metadata IS NULL OR metadata->>'migrated_to_comment' IS DISTINCT FROM 'true')
         SQL);

@@ -22,9 +22,10 @@ final class MicrositeInAppPathHelper
         }
 
         return (string) preg_replace_callback(
-            '/href="(\?page=)([^"]*)"/',
+            '/href="(\?page=)([^"#]*)([^"]*)"/',
             function (array $m) use ($root) {
                 $page = rawurldecode((string) $m[2]);
+                $fragSuffix = (string) $m[3];
                 $url = $page === '' || $page === '0'
                     ? route('idea.research.show', $root, true)
                     : route('idea.research.page', [
@@ -32,7 +33,7 @@ final class MicrositeInAppPathHelper
                         'page' => $page,
                     ], true);
 
-                return 'href="'.e($url).'"';
+                return 'href="'.e($url.$fragSuffix).'"';
             },
             $html
         );

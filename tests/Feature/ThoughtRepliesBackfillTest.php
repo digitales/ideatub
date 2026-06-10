@@ -53,4 +53,42 @@ class ThoughtRepliesBackfillTest extends TestCase
         // Section is NOT migrated.
         $this->assertNotNull(Thought::find($section->id));
     }
+
+    public function test_microsite_child_pages_are_not_backfilled_or_hidden(): void
+    {
+        $user = User::factory()->create();
+        $root = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => null,
+            'content' => '# Index',
+            'metadata' => ['type' => 'research'],
+            'source_metadata' => [
+                'document_layout' => 'microsite',
+                'page_path_segment' => 'index',
+                'import_order' => 0,
+            ],
+        ]);
+        $page = Thought::factory()->create([
+            'user_id' => $user->id,
+            'parent_id' => $root->id,
+            'content' => '# Executive summary',
+            'metadata' => ['type' => 'research'],
+            'source_metadata' => [
+                'document_layout' => 'microsite',
+                'page_path_segment' => '01-executive-summary',
+                'import_order' => 1,
+                'microsite_root_id' => (string) $root->id,
+            ],
+        ]);
+
+        Artisan::call('comments:backfill-thought-replies');
+
+        $this->assertDatabaseMissing('comments', [
+            'commentable_id' => $root->id,
+            'content' => '# Executive summary',
+            'import_source' => 'thought_reply_backfill',
+        ]);
+        $this->assertNotNull(Thought::find($page->id));
+        $this->assertNotSame(true, data_get(Thought::find($page->id)?->metadata, 'migrated_to_comment'));
+    }
 }
