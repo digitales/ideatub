@@ -4,14 +4,18 @@ namespace App\Services\Commitments;
 
 use App\Models\CommitmentItem;
 use App\Models\Project;
-use App\Models\Thought;
 use App\Models\User;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
+use App\Services\WorkingMemory\WorkingMemoryLegacyRowCitationResolver;
 use Illuminate\Support\Str;
 
 final class CommitmentExtractor
 {
+    public function __construct(
+        private readonly WorkingMemoryLegacyRowCitationResolver $citationResolver,
+    ) {}
+
     public function fromMeetingCompaction(WorkingMemoryVersion $version): int
     {
         if ($version->build_type !== 'compaction:meeting') {
@@ -105,6 +109,7 @@ final class CommitmentExtractor
             dedupeKey: $dedupeKey,
             memory: null,
             version: null,
+            sourceThoughtId: null,
             externalKey: $issueKey,
             externalUrl: $url !== '' ? $url : null,
             sourceData: [
@@ -114,9 +119,6 @@ final class CommitmentExtractor
         ) ? 1 : 0;
     }
 
-    /**
-     * @param  mixed  $sectionEntries
-     */
     private function upsertSectionItems(
         int $userId,
         string $type,
@@ -138,6 +140,7 @@ final class CommitmentExtractor
 
             $hash = substr(hash('sha256', $text), 0, 16);
             $dedupeKey = $dedupePrefix.':'.$hash;
+            $sourceThoughtId = $this->sourceThoughtIdFromEntry($entry);
 
             if ($this->upsertOpenItem(
                 userId: $userId,
@@ -147,6 +150,7 @@ final class CommitmentExtractor
                 dedupeKey: $dedupeKey,
                 memory: $memory,
                 version: $version,
+                sourceThoughtId: $sourceThoughtId,
                 externalKey: null,
                 externalUrl: null,
                 sourceData: ['section_index' => $index],
@@ -166,6 +170,7 @@ final class CommitmentExtractor
         string $dedupeKey,
         ?WorkingMemory $memory,
         ?WorkingMemoryVersion $version,
+        ?string $sourceThoughtId,
         ?string $externalKey,
         ?string $externalUrl,
         ?array $sourceData,
@@ -207,6 +212,7 @@ final class CommitmentExtractor
             'project_id' => $projectId,
             'scope_type' => $memory?->scope_type,
             'scope_key' => $memory?->scope_key,
+            'source_thought_id' => $sourceThoughtId,
             'source_version_id' => $version?->id,
             'external_key' => $externalKey,
             'external_url' => $externalUrl,
@@ -229,5 +235,21 @@ final class CommitmentExtractor
         }
 
         return '';
+    }
+
+    private function sourceThoughtIdFromEntry(mixed $entry): ?string
+    {
+        if (! is_array($entry)) {
+            return null;
+        }
+
+        $citations = $entry['citations'] ?? [];
+        if (! is_array($citations)) {
+            return null;
+        }
+
+        $link = $this->citationResolver->resolvePrimaryThought($citations);
+
+        return $link['thought_id'] ?? null;
     }
 }

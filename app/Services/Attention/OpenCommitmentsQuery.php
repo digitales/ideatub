@@ -4,12 +4,13 @@ namespace App\Services\Attention;
 
 use App\DataTransferObjects\AttentionItemData;
 use App\Models\CommitmentItem;
+use App\Services\WorkingMemory\WorkingMemoryLegacyRowCitationResolver;
 use Illuminate\Support\Str;
 
 final class OpenCommitmentsQuery
 {
     public function __construct(
-        private readonly AttentionScopeResolver $scopeResolver,
+        private readonly WorkingMemoryLegacyRowCitationResolver $citationResolver,
     ) {}
 
     /**
@@ -22,20 +23,22 @@ final class OpenCommitmentsQuery
         $items = CommitmentItem::query()
             ->forUser($userId)
             ->open()
-            ->with('project')
+            ->with(['project', 'sourceVersion'])
             ->orderByDesc('opened_at')
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get();
 
         return $items->map(function (CommitmentItem $item): AttentionItemData {
-            $href = $item->external_url
-                ?? ($item->source_thought_id !== null
-                    ? route('thoughts.show', ['thought' => $item->source_thought_id])
-                    : route('pulse.show'));
+            $sourceThoughtId = $this->resolveSourceThoughtId($item);
 
-            if ($item->scope_type === 'project' && $item->scope_key !== null && $item->project !== null) {
+            $href = $item->external_url;
+            if ($href === null && $sourceThoughtId !== null) {
+                $href = route('thoughts.show', ['thought' => $sourceThoughtId]);
+            } elseif ($href === null && $item->scope_type === 'project' && $item->project !== null) {
                 $href = route('projects.memory.show', $item->project);
+            } elseif ($href === null) {
+                $href = route('pulse.show');
             }
 
             return new AttentionItemData(
@@ -49,13 +52,63 @@ final class OpenCommitmentsQuery
                     'scope_key' => $item->scope_key,
                     'external_key' => $item->external_key,
                 ],
-                sourceRef: $item->source_version_id !== null
-                    ? ['type' => 'working_memory_version', 'id' => (string) $item->source_version_id]
-                    : ($item->source_thought_id !== null
-                        ? ['type' => 'thought', 'id' => (string) $item->source_thought_id]
+                sourceRef: $sourceThoughtId !== null
+                    ? ['type' => 'thought', 'id' => $sourceThoughtId]
+                    : ($item->source_version_id !== null
+                        ? ['type' => 'working_memory_version', 'id' => (string) $item->source_version_id]
                         : null),
                 commitmentId: (string) $item->id,
             );
         })->all();
+    }
+
+    private function resolveSourceThoughtId(CommitmentItem $item): ?string
+    {
+        if ($item->source_thought_id !== null) {
+            return (string) $item->source_thought_id;
+        }
+
+        if (! in_array($item->type, ['wm_open_question', 'wm_next_action'], true)) {
+            return null;
+        }
+
+        $version = $item->sourceVersion;
+        if ($version === null) {
+            return null;
+        }
+
+        $sections = $version->structured_sections_json ?? [];
+        if (! is_array($sections)) {
+            return null;
+        }
+
+        $section = $item->type === 'wm_open_question' ? 'Open Questions' : 'Next Actions';
+        $entries = $sections[$section] ?? [];
+        if (! is_array($entries)) {
+            return null;
+        }
+
+        $title = trim($item->title);
+        foreach ($entries as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $text = trim((string) ($entry['text'] ?? ''));
+            if ($text === '' || ($text !== $title && ! str_starts_with($text, $title))) {
+                continue;
+            }
+
+            $citations = $entry['citations'] ?? [];
+            if (! is_array($citations)) {
+                continue;
+            }
+
+            $link = $this->citationResolver->resolvePrimaryThought($citations);
+
+            return $link['thought_id'] ?? null;
+        }
+
+        return null;
     }
 }

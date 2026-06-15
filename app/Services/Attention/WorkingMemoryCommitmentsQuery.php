@@ -5,12 +5,15 @@ namespace App\Services\Attention;
 use App\DataTransferObjects\AttentionItemData;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
+use App\Services\WorkingMemory\WorkingMemoryLegacyRowCitationResolver;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 final class WorkingMemoryCommitmentsQuery
 {
     public function __construct(
         private readonly AttentionScopeResolver $scopeResolver,
+        private readonly WorkingMemoryLegacyRowCitationResolver $citationResolver,
     ) {}
 
     /**
@@ -52,22 +55,33 @@ final class WorkingMemoryCommitmentsQuery
             $projectItems = [];
 
             foreach (['Next Actions' => 'wm_next_action', 'Open Questions' => 'wm_open_question'] as $section => $kind) {
-                foreach ($this->sectionTexts($sections[$section] ?? []) as $text) {
+                foreach ($this->sectionEntries($sections[$section] ?? []) as $entry) {
+                    $href = $scope['href'];
+                    $sourceRef = [
+                        'type' => 'working_memory_version',
+                        'id' => (string) $canonical->id,
+                    ];
+
+                    if ($entry['thought_id'] !== null && Route::has('thoughts.show')) {
+                        $href = route('thoughts.show', ['thought' => $entry['thought_id']]);
+                        $sourceRef = [
+                            'type' => 'thought',
+                            'id' => $entry['thought_id'],
+                        ];
+                    }
+
                     $projectItems[] = new AttentionItemData(
                         kind: $kind,
                         severity: null,
-                        title: Str::limit($text, 120),
+                        title: Str::limit($entry['text'], 120),
                         subtitle: $scope['project_title'] ?? $scope['title'],
-                        href: $scope['href'],
+                        href: $href,
                         meta: [
                             'scope_type' => $memory->scope_type,
                             'scope_key' => $memory->scope_key,
                             'section' => $section,
                         ],
-                        sourceRef: [
-                            'type' => 'working_memory_version',
-                            'id' => (string) $canonical->id,
-                        ],
+                        sourceRef: $sourceRef,
                     );
                 }
             }
@@ -94,29 +108,43 @@ final class WorkingMemoryCommitmentsQuery
     }
 
     /**
-     * @return list<string>
+     * @return list<array{text: string, thought_id: string|null}>
      */
-    private function sectionTexts(mixed $entries): array
+    private function sectionEntries(mixed $entries): array
     {
         if (! is_array($entries)) {
             return [];
         }
 
-        $texts = [];
+        $parsed = [];
         foreach ($entries as $entry) {
             if (is_string($entry)) {
                 $text = trim($entry);
+                $citations = [];
             } elseif (is_array($entry)) {
                 $text = trim((string) ($entry['text'] ?? ''));
+                $citations = $entry['citations'] ?? [];
+                $citations = is_array($citations) ? $citations : [];
             } else {
                 continue;
             }
 
-            if ($text !== '') {
-                $texts[] = $text;
+            if ($text === '') {
+                continue;
             }
+
+            $thoughtId = null;
+            $link = $this->citationResolver->resolvePrimaryThought($citations);
+            if ($link !== null) {
+                $thoughtId = $link['thought_id'];
+            }
+
+            $parsed[] = [
+                'text' => $text,
+                'thought_id' => $thoughtId,
+            ];
         }
 
-        return $texts;
+        return $parsed;
     }
 }
