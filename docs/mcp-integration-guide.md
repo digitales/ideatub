@@ -37,6 +37,7 @@ Tools available:
 | `upsert_working_memory` | Persist externally-authored working memory markdown as the canonical `external` version for a scope (see [Working memory: external-first hybrid](#working-memory-external-first-hybrid)) |
 | `list_working_memory_versions` | Paginated version history for a scope (`external` and `consolidated` by default; optional compactions) |
 | `get_working_memory_version` | Full read-only payload for one version by `version_id` |
+| `get_attention_overview` | Attention Pulse overview (memory health, commitments, Jira) when `FEATURE_ATTENTION_PULSE=true`; same shape as `/pulse` |
 
 Authentication is either **per-user MCP key** (`x-ideatub-key` header; query `?key=` is discouraged—prefer header) or **OAuth** (`Authorization: Bearer` after connector login). The MCP key identifies **your user account**, not the app.
 
@@ -257,6 +258,7 @@ Use this if you are scripting against IdeaTub or building a bridge.
 | `upsert_working_memory` | `scope_type`, `scope_key`, `content` (markdown with `##` section headings) | `source_label` (string, e.g. `elixirr-sync`) — **project `scope_key` must be the IdeaTub project UUID**, not a metadata slug |
 | `list_working_memory_versions` | `scope_type`, `scope_key` | `include_compactions` (bool), `page` (int), `per_page` (int, max 50) |
 | `get_working_memory_version` | `version_id` (UUID) | — |
+| `get_attention_overview` | — (no params; requires `FEATURE_ATTENTION_PULSE`) | — |
 
 Example calls:
 
@@ -276,6 +278,7 @@ Example calls:
 {"jsonrpc":"2.0","method":"upsert_working_memory","params":{"scope_type":"project","scope_key":"019e0705-5591-73e9-be2e-0fb9c86b269a","content":"## Current Focus\n\n- Ship the fix.","source_label":"elixirr-sync"},"id":13}
 {"jsonrpc":"2.0","method":"list_working_memory_versions","params":{"scope_type":"project","scope_key":"019e0705-5591-73e9-be2e-0fb9c86b269a","page":1,"per_page":20},"id":14}
 {"jsonrpc":"2.0","method":"get_working_memory_version","params":{"version_id":"uuid-of-version"},"id":15}
+{"jsonrpc":"2.0","method":"get_attention_overview","params":{},"id":16}
 ```
 
 #### Get working memory response shape

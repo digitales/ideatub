@@ -354,6 +354,18 @@ class IdeaPageTest extends TestCase
         $response->assertSee('Go to Learn', false);
     }
 
+    public function test_attention_pulse_help_page_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.attention-pulse'));
+
+        $response->assertOk();
+        $response->assertSee('Attention Pulse', false);
+        $response->assertSee('get_attention_overview', false);
+        $response->assertSee('inbox:generate', false);
+    }
+
     public function test_research_to_decision_skills_index_renders(): void
     {
         $user = User::factory()->create();

@@ -48,6 +48,11 @@
             'title' => 'Corpus sync',
             'description' => 'Bulk-import captures into working memory.',
         ],
+        [
+            'href' => route('help.attention-pulse'),
+            'title' => 'Attention Pulse',
+            'description' => 'Memory health, commitments, and Jira follow-ups.',
+        ],
     ];
 @endphp
 

@@ -325,6 +325,7 @@ Route::middleware('auth')->group(function () {
         ->where('prompt', 'core|agent')
         ->name('help.working-memory-authoring.show');
     Route::get('/help/working-memory-authoring', [HelpController::class, 'workingMemoryAuthoringIndex'])->name('help.working-memory-authoring.index');
+    Route::get('/help/attention-pulse', [HelpController::class, 'attentionPulse'])->name('help.attention-pulse');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
 
     // MCP key management (obtain / revoke auth key for AI clients)

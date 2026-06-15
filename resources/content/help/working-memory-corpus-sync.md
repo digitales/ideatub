@@ -104,5 +104,6 @@ Weekly digest compactions (`BuildWeeklyDigestsCommand`, scheduled) compress chan
 
 ## See also
 
+- [Attention Pulse](/help/attention-pulse) — `/pulse` dashboard, Inbox generators, `get_attention_overview` MCP
 - [MCP integration guide](/help) — `capture_plan`, `capture_meeting`, `upsert_working_memory`, version history
 - External-first hybrid design: `docs/superpowers/specs/2026-05-18-working-memory-hybrid-external-first-design.md`

@@ -382,6 +382,18 @@ class HelpController extends Controller
         ]);
     }
 
+    public function attentionPulse(): View
+    {
+        $path = resource_path('content/help/attention-pulse.md');
+        $markdown = File::exists($path) ? File::get($path) : '';
+        $converter = SafeCommonMarkConverter::make();
+        $bodyHtml = $converter->convert($markdown)->getContent();
+
+        return view('help-attention-pulse', [
+            'bodyHtml' => $bodyHtml,
+        ]);
+    }
+
     public function workingMemoryAuthoringDownload(string $prompt): BinaryFileResponse
     {
         $catalog = self::workingMemoryAuthoringCatalog();

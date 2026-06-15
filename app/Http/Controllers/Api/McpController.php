@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Models\UserMcpKey;
 use App\Models\WorkingMemoryVersion;
 use App\Services\ArticleCaptureService;
+use App\Services\Attention\AttentionOverviewBuilder;
+use App\Services\Attention\AttentionOverviewSerializer;
 use App\Services\IdeasToRevisitService;
 use App\Services\McpSessionService;
 use App\Services\Meetings\MeetingService;
@@ -57,6 +59,8 @@ class McpController extends Controller
         private WorkingMemorySnapshotDedupeService $workingMemorySnapshotDedupeService,
         private ProjectPinnedContextPayload $projectPinnedContextPayload,
         private ProjectSettingsService $projectSettingsService,
+        private AttentionOverviewBuilder $attentionOverviewBuilder,
+        private AttentionOverviewSerializer $attentionOverviewSerializer,
     ) {}
 
     /**
@@ -139,6 +143,9 @@ class McpController extends Controller
             'get_compaction',
             'upsert_working_memory',
         ];
+        if (config('features.attention_pulse')) {
+            $base[] = 'get_attention_overview';
+        }
         if (config('services.jira.enabled', true)) {
             $base[] = 'sync_jira';
         }
@@ -712,6 +719,16 @@ class McpController extends Controller
                 ],
             ];
         }
+        if (config('features.attention_pulse')) {
+            $tools[] = [
+                'name' => 'get_attention_overview',
+                'description' => 'Return the Attention Pulse overview for the authenticated user: memory health, open commitments, and recent Jira activity. Same payload shape as the /pulse page.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [],
+                ],
+            ];
+        }
 
         return response()->json([
             'jsonrpc' => '2.0',
@@ -918,6 +935,7 @@ class McpController extends Controller
             'get_working_memory_version' => $this->getWorkingMemoryVersion($params),
             'get_compaction' => $this->getCompaction($params),
             'upsert_working_memory' => $this->upsertWorkingMemory($params),
+            'get_attention_overview' => $this->getAttentionOverview($params),
             'sync_jira' => $this->syncJira($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
@@ -957,6 +975,27 @@ class McpController extends Controller
             ),
             (int) auth()->id()
         );
+    }
+
+    /**
+     * get_attention_overview: Pulse dashboard payload for agents (requires FEATURE_ATTENTION_PULSE).
+     *
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    private function getAttentionOverview(array $params): array
+    {
+        if (! config('features.attention_pulse')) {
+            throw new \InvalidArgumentException('Attention Pulse is not enabled.');
+        }
+
+        if ($params !== []) {
+            throw new \InvalidArgumentException('get_attention_overview does not accept parameters.');
+        }
+
+        $overview = $this->attentionOverviewBuilder->build((int) auth()->id());
+
+        return $this->attentionOverviewSerializer->toArray($overview);
     }
 
     /**
