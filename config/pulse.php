@@ -12,6 +12,8 @@ return [
 
     'max_memory_health' => (int) env('PULSE_MAX_MEMORY_HEALTH', 10),
 
+    'max_tag_memory_health' => (int) env('PULSE_MAX_TAG_MEMORY_HEALTH', 5),
+
     'max_commitments' => (int) env('PULSE_MAX_COMMITMENTS', 15),
 
     'max_jira' => (int) env('PULSE_MAX_JIRA', 15),

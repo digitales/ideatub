@@ -19,6 +19,7 @@ Optional thresholds (`config/pulse.php`):
 | `PULSE_JIRA_FOLLOW_UP_DAYS` | 3 | Inbox Jira follow-up generator window |
 | `PULSE_MEETING_ACTION_DAYS` | 30 | Meeting action items window |
 | `PULSE_MAX_MEMORY_HEALTH` | 10 | Memory health row cap |
+| `PULSE_MAX_TAG_MEMORY_HEALTH` | 5 | Individual forced-tag rows before grouping |
 | `PULSE_MAX_COMMITMENTS` | 15 | Open commitments cap |
 | `PULSE_MAX_JIRA` | 15 | Jira activity cap |
 
@@ -26,8 +27,9 @@ Optional thresholds (`config/pulse.php`):
 
 Authenticated route behind `FEATURE_ATTENTION_PULSE`. Sections (empty sections omitted):
 
-1. **Memory health** — fallback authoring, build in progress, stale freshness, old refresh, missing external sync on Elixirr client projects.
-2. **Open commitments** — durable `commitment_items` when present; otherwise Next Actions / Open Questions from validated project memory and meeting compaction Action Items.
+1. **Memory health** — global, project, and insights scopes that may need a refresh, agent sync, or consolidate.
+2. **Tag memory** — tag-scoped working memory. Ephemeral tag fallbacks (from `capture_plan` / meeting tags) collapse to one summary row; **forced tags** (Settings → Working memory) still show individually.
+3. **Open commitments** — durable `commitment_items` when present; otherwise Next Actions / Open Questions from validated project memory and meeting compaction Action Items.
 3. **Recent Jira** — deduped by issue key from Jira sync thoughts.
 
 Each row links to the relevant memory route, compaction detail, Jira URL, or project memory. Commitment rows support **Done** and **Snooze** (same patterns as Inbox).

@@ -6,14 +6,17 @@ use App\DataTransferObjects\AttentionItemData;
 use App\Models\Project;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
+use App\Services\WorkingMemory\ForcedTagResolver;
 use App\Services\WorkingMemory\WorkingMemoryScopeRowBadge;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 final class MemoryHealthAttentionQuery
 {
     public function __construct(
         private readonly AttentionScopeResolver $scopeResolver,
+        private readonly ForcedTagResolver $forcedTagResolver,
     ) {}
 
     /**
@@ -21,43 +24,91 @@ final class MemoryHealthAttentionQuery
      */
     public function forUser(int $userId): array
     {
+        $grouped = $this->groupedForUser($userId);
+
+        return array_merge($grouped['operational'], $grouped['tag']);
+    }
+
+    /**
+     * @return array{operational: list<AttentionItemData>, tag: list<AttentionItemData>}
+     */
+    public function groupedForUser(int $userId): array
+    {
         $memories = WorkingMemory::query()
             ->where('user_id', $userId)
             ->with('latestVersion')
             ->get();
 
         if ($memories->isEmpty()) {
-            return [];
+            return ['operational' => [], 'tag' => []];
         }
 
         $projectMemories = $memories->where('scope_type', 'project');
+        $tagMemories = $memories->where('scope_type', 'tag');
         $projects = $this->scopeResolver->projectsFor($userId, $projectMemories);
+        $tagProjects = $this->scopeResolver->projectsFor($userId, $tagMemories);
+
+        $forcedTags = array_fill_keys(
+            array_map(
+                static fn (string $tag): string => Str::lower($tag),
+                $this->forcedTagResolver->forUserId($userId),
+            ),
+            true,
+        );
 
         $staleDays = max(1, (int) config('pulse.memory_stale_days', 14));
         $staleCutoff = now()->subDays($staleDays);
         $externalProtectDays = max(0, (int) config('working_memory.external_protect_days', 14));
 
-        $rows = [];
+        $operationalRows = [];
+        $tagForcedRows = [];
+        $ephemeralTagFallbackCount = 0;
 
         foreach ($memories as $memory) {
-            $signals = $this->signalsFor($memory, $projects, $staleCutoff, $externalProtectDays, $userId);
+            $scopeProjects = $memory->scope_type === 'tag' ? $tagProjects : $projects;
+            $signals = $this->signalsFor($memory, $scopeProjects, $staleCutoff, $externalProtectDays, $userId);
+
+            if ($signals === []) {
+                continue;
+            }
+
+            if ($memory->scope_type === 'tag') {
+                $tagKey = Str::lower((string) $memory->scope_key);
+                $isForced = isset($forcedTags[$tagKey]);
+
+                if ($isForced) {
+                    foreach ($signals as $signal) {
+                        $tagForcedRows[] = $signal;
+                    }
+
+                    continue;
+                }
+
+                if (WorkingMemoryScopeRowBadge::label($memory) === 'Fallback') {
+                    $ephemeralTagFallbackCount++;
+                }
+
+                continue;
+            }
+
             foreach ($signals as $signal) {
-                $rows[] = $signal;
+                $operationalRows[] = $signal;
             }
         }
 
-        usort($rows, function (AttentionItemData $a, AttentionItemData $b): int {
-            $severity = $this->severityRank($a->severity) <=> $this->severityRank($b->severity);
-            if ($severity !== 0) {
-                return $severity;
-            }
+        $tagRows = $this->sortAndLimit($tagForcedRows, max(1, (int) config('pulse.max_tag_memory_health', 5)));
 
-            return strcmp((string) ($a->meta['refreshed_at'] ?? ''), (string) ($b->meta['refreshed_at'] ?? ''));
-        });
+        if ($ephemeralTagFallbackCount > 0) {
+            $tagRows[] = $this->ephemeralTagSummaryItem($ephemeralTagFallbackCount);
+        }
 
-        $limit = max(1, (int) config('pulse.max_memory_health', 10));
-
-        return array_slice($rows, 0, $limit);
+        return [
+            'operational' => $this->sortAndLimit(
+                $operationalRows,
+                max(1, (int) config('pulse.max_memory_health', 10)),
+            ),
+            'tag' => $tagRows,
+        ];
     }
 
     /**
@@ -110,6 +161,24 @@ final class MemoryHealthAttentionQuery
         return $items;
     }
 
+    private function ephemeralTagSummaryItem(int $count): AttentionItemData
+    {
+        $scopesLabel = $count === 1 ? '1 tag scope' : "{$count} tag scopes";
+
+        return new AttentionItemData(
+            kind: 'tag_memory_summary',
+            severity: 'low',
+            title: 'Ephemeral tag memory',
+            subtitle: "{$scopesLabel} in fallback — optional cleanup",
+            href: Route::has('memory.scopes.index') ? route('memory.scopes.index') : route('memory.show'),
+            meta: [
+                'tag_fallback_count' => $count,
+                'grouped' => true,
+            ],
+            sourceRef: null,
+        );
+    }
+
     /**
      * @param  array{title: string, href: string, project_id: string|null, project_title: string|null}  $scope
      */
@@ -137,6 +206,24 @@ final class MemoryHealthAttentionQuery
                 'id' => (string) $memory->id,
             ],
         );
+    }
+
+    /**
+     * @param  list<AttentionItemData>  $rows
+     * @return list<AttentionItemData>
+     */
+    private function sortAndLimit(array $rows, int $limit): array
+    {
+        usort($rows, function (AttentionItemData $a, AttentionItemData $b): int {
+            $severity = $this->severityRank($a->severity) <=> $this->severityRank($b->severity);
+            if ($severity !== 0) {
+                return $severity;
+            }
+
+            return strcmp((string) ($a->meta['refreshed_at'] ?? ''), (string) ($b->meta['refreshed_at'] ?? ''));
+        });
+
+        return array_slice($rows, 0, $limit);
     }
 
     /**

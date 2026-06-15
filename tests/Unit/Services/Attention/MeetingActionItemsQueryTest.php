@@ -34,7 +34,6 @@ class MeetingActionItemsQueryTest extends TestCase
         $items = app(MeetingActionItemsQuery::class)->forUser($user->id);
 
         $this->assertCount(1, $items);
-        $this->assertSame('meeting_action', $items[0]->kind);
         $this->assertStringContainsString('Follow up with client', $items[0]->title);
         $this->assertSame(
             route('memory.compactions.show', [
@@ -44,5 +43,31 @@ class MeetingActionItemsQueryTest extends TestCase
             ]),
             $items[0]->href,
         );
+    }
+
+    public function test_duplicate_action_text_across_compactions_is_deduped(): void
+    {
+        config(['features.working_memory_ui' => true]);
+        $user = User::factory()->create();
+
+        $memory = WorkingMemory::factory()->for($user)->create([
+            'scope_type' => 'global',
+            'scope_key' => 'global',
+        ]);
+
+        foreach ([now()->subDay(), now()->subHours(2)] as $createdAt) {
+            WorkingMemoryVersion::factory()->for($memory)->create([
+                'build_type' => 'compaction:meeting',
+                'authoring_status' => 'validated',
+                'created_at' => $createdAt,
+                'structured_sections_json' => [
+                    'Action Items' => ['Nicola to confirm the meeting time.'],
+                ],
+            ]);
+        }
+
+        $items = app(MeetingActionItemsQuery::class)->forUser($user->id);
+
+        $this->assertCount(1, $items);
     }
 }

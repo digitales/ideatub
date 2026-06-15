@@ -41,6 +41,7 @@ final class MeetingActionItemsQuery
         $projects = $this->scopeResolver->projectsFor($userId, $projectMemories);
 
         $items = [];
+        $seenActionTexts = [];
 
         foreach ($versions as $version) {
             $memory = $version->workingMemory;
@@ -53,6 +54,12 @@ final class MeetingActionItemsQuery
             $actionItems = is_array($sections) ? ($sections['Action Items'] ?? []) : [];
 
             foreach ($this->sectionTexts($actionItems) as $text) {
+                $hash = substr(hash('sha256', $text), 0, 16);
+                if (isset($seenActionTexts[$hash])) {
+                    continue;
+                }
+                $seenActionTexts[$hash] = true;
+
                 $items[] = new AttentionItemData(
                     kind: 'meeting_action',
                     severity: null,

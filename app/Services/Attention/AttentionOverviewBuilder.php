@@ -21,13 +21,23 @@ final class AttentionOverviewBuilder
     {
         $sections = [];
 
-        $memoryItems = $this->memoryHealth->forUser($userId);
-        if ($memoryItems !== []) {
+        $memoryHealth = $this->memoryHealth->groupedForUser($userId);
+
+        if ($memoryHealth['operational'] !== []) {
             $sections[] = new AttentionSectionData(
                 key: 'memory_health',
                 title: 'Memory health',
-                description: 'Working memory scopes that may need a refresh, agent sync, or consolidate.',
-                items: $memoryItems,
+                description: 'Global, project, and insights scopes that may need a refresh, agent sync, or consolidate.',
+                items: $memoryHealth['operational'],
+            );
+        }
+
+        if ($memoryHealth['tag'] !== []) {
+            $sections[] = new AttentionSectionData(
+                key: 'tag_memory_health',
+                title: 'Tag memory',
+                description: 'Tag-scoped working memory from captures and Stream filters. Forced tags show individually; other tag fallbacks are grouped.',
+                items: $memoryHealth['tag'],
             );
         }
 

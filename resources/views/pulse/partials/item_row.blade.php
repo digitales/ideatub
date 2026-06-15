@@ -9,6 +9,7 @@
 
     $kindLabel = match ($item->kind) {
         'memory_health' => 'Memory health',
+        'tag_memory_summary' => 'Tag memory',
         'meeting_action' => 'Meeting action',
         'wm_next_action' => 'Next action',
         'wm_open_question' => 'Open question',
