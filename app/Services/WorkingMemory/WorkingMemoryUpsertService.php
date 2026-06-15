@@ -35,6 +35,7 @@ class WorkingMemoryUpsertService
         private readonly WorkingMemoryContentFingerprint $fingerprint,
         private readonly WorkingMemoryDedupeFamilyResolver $familyResolver,
         private readonly WorkingMemoryVersionSuperseder $versionSuperseder,
+        private readonly WorkingMemorySyncGuardrailService $syncGuardrails,
     ) {}
 
     public function upsert(
@@ -70,6 +71,24 @@ class WorkingMemoryUpsertService
         }
 
         $dedupeFamily = $this->familyResolver->resolveForUpsert($normalizedScopeType, $normalizedScopeKey);
+        $latestExternalForGuardrail = WorkingMemory::query()
+            ->where('user_id', $userId)
+            ->where('scope_type', $normalizedScopeType)
+            ->where('scope_key', $normalizedScopeKey)
+            ->first()?->versions()
+            ->where('build_type', 'external')
+            ->whereNull('superseded_at')
+            ->orderByDesc('created_at')
+            ->first();
+
+        $this->syncGuardrails->enforce(
+            channel: 'upsert',
+            userId: $userId,
+            scopeKey: $dedupeFamily,
+            content: $trimmed,
+            previousContent: $latestExternalForGuardrail?->summary_markdown,
+            strictContentHash: $strictContentHash,
+        );
 
         if (! config('working_memory.dedupe_enabled', true)) {
             $version = $this->persistExternalVersion(

@@ -1,7 +1,11 @@
 <?php
 
+use App\Services\Inbox\Generators\JiraFollowUpInboxGenerator;
+use App\Services\Inbox\Generators\MeetingActionInboxGenerator;
 use App\Services\Inbox\Generators\NeglectedIdeaInboxGenerator;
+use App\Services\Inbox\Generators\StaleProjectMemoryGenerator;
 use App\Services\Inbox\Generators\WeeklyRevisitInboxGenerator;
+use App\Services\Inbox\Generators\WorkingMemoryFallbackGenerator;
 
 return [
     /*
@@ -23,5 +27,9 @@ return [
     'generators' => [
         WeeklyRevisitInboxGenerator::class,
         NeglectedIdeaInboxGenerator::class,
+        WorkingMemoryFallbackGenerator::class,
+        StaleProjectMemoryGenerator::class,
+        MeetingActionInboxGenerator::class,
+        JiraFollowUpInboxGenerator::class,
     ],
 ];

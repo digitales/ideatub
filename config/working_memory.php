@@ -32,6 +32,24 @@ return [
 
     'import_rate_per_minute' => (int) env('WORKING_MEMORY_IMPORT_RATE_PER_MINUTE', 50),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Working memory sync guardrails (capture/upsert)
+    |--------------------------------------------------------------------------
+    |
+    | These controls protect against runaway sync loops and oversized/low-value
+    | updates. Limits are intentionally configurable so operators can tune by
+    | environment. Set a value to 0 to disable that specific limit.
+    |
+    */
+
+    'sync_guardrails_enabled' => filter_var(env('WORKING_MEMORY_SYNC_GUARDRAILS_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'sync_min_interval_seconds' => (int) env('WORKING_MEMORY_SYNC_MIN_INTERVAL_SECONDS', 0),
+    'sync_monthly_budget_tokens' => (int) env('WORKING_MEMORY_SYNC_MONTHLY_BUDGET_TOKENS', 0),
+    'sync_max_content_chars' => (int) env('WORKING_MEMORY_SYNC_MAX_CONTENT_CHARS', 65535),
+    'sync_min_delta_ratio' => (float) env('WORKING_MEMORY_SYNC_MIN_DELTA_RATIO', 0.0),
+    'sync_token_chars_per_token' => (int) env('WORKING_MEMORY_SYNC_TOKEN_CHARS_PER_TOKEN', 4),
+
     'insights_model_enabled' => env('WORKING_MEMORY_INSIGHTS_MODEL_ENABLED', false),
 
     'authoring_enabled' => env('WORKING_MEMORY_AUTHORING_ENABLED', false),

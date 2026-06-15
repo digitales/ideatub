@@ -6,6 +6,7 @@ use App\Http\Controllers\JiraSettingsController;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\UserPreference;
+use App\Services\Commitments\CommitmentExtractor;
 use App\Services\JiraSyncService;
 use App\Services\OpenRouterService;
 use Carbon\Carbon;
@@ -39,7 +40,7 @@ class SyncUserJiraActivity implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(JiraSyncService $jiraSync, OpenRouterService $openRouter): void
+    public function handle(JiraSyncService $jiraSync, OpenRouterService $openRouter, CommitmentExtractor $commitmentExtractor): void
     {
         $user = User::find($this->userId);
         if ($user === null || $user->jiraCredential === null) {
@@ -98,6 +99,9 @@ class SyncUserJiraActivity implements ShouldQueue
                     'source' => 'jira',
                     'source_metadata' => $sourceMetadata,
                 ]);
+                if (config('features.attention_pulse')) {
+                    $commitmentExtractor->fromJiraEvent($user, $event);
+                }
                 $newCount++;
             }
 

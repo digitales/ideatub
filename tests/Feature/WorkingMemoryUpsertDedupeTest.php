@@ -55,4 +55,26 @@ MD;
         $this->assertNotNull($r1->version->superseded_at);
         $this->assertSame($r2->version->id, $r1->version->superseded_by_version_id);
     }
+
+    #[Test]
+    public function frequency_guardrail_can_block_rapid_repeat_upserts(): void
+    {
+        config([
+            'working_memory.sync_guardrails_enabled' => true,
+            'working_memory.sync_min_interval_seconds' => 3600,
+            'working_memory.sync_monthly_budget_tokens' => 0,
+            'working_memory.sync_min_delta_ratio' => 0.0,
+        ]);
+
+        $user = User::factory()->create();
+        $service = app(WorkingMemoryUpsertService::class);
+        $scopeKey = (string) Str::uuid();
+
+        $service->upsert($user->id, 'project', $scopeKey, $this->sampleMarkdown(), 'elixirr-sync');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('frequency guardrail');
+
+        $service->upsert($user->id, 'project', $scopeKey, $this->sampleMarkdown(), 'elixirr-sync');
+    }
 }

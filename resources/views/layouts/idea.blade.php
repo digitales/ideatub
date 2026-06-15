@@ -91,6 +91,11 @@
                         All memories
                     </a>
                 @endif
+                @if (config('features.attention_pulse') && \Illuminate\Support\Facades\Route::has('pulse.show'))
+                    <a href="{{route('pulse.show')}}" class="{{$navLinkClass}}">
+                        Pulse
+                    </a>
+                @endif
                 <a href="{{route('help')}}" class="{{$navLinkClass}}">
                     Help
                 </a>
@@ -122,6 +127,11 @@
                             </a>
                             <a href="{{route('memory.scopes.index')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                                 All memories
+                            </a>
+                        @endif
+                        @if (config('features.attention_pulse') && \Illuminate\Support\Facades\Route::has('pulse.show'))
+                            <a href="{{route('pulse.show')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
+                                Pulse
                             </a>
                         @endif
                         <div class="border-t border-memory-violet/10 my-1"></div>

@@ -37,6 +37,7 @@ use App\Http\Controllers\MemoryInsightsController;
 use App\Http\Controllers\MemoryScopesController;
 use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
+use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\ProfileSettingsController;
@@ -45,6 +46,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectGraphController;
 use App\Http\Controllers\ProjectShareController;
 use App\Http\Controllers\ProjectThoughtController;
+use App\Http\Controllers\PulseController;
 use App\Http\Controllers\ResearchSkillSettingsController;
 use App\Http\Controllers\Settings\ConnectedAppsController;
 use App\Http\Controllers\SharedProjectViewController;
@@ -199,6 +201,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/inbox/{inboxItem}/snooze', [InboxController::class, 'snooze'])->name('inbox.snooze');
     Route::post('/inbox/{inboxItem}/save-thought', [InboxController::class, 'saveAsThought'])->name('inbox.save-thought');
     Route::post('/inbox/{inboxItem}/email-review/action', [InboxController::class, 'applyEmailReviewAction'])->name('inbox.email-review.action');
+
+    Route::middleware('attention.pulse')->group(function () {
+        Route::get('/pulse', [PulseController::class, 'show'])->name('pulse.show');
+        Route::post('/commitments/{commitmentItem}/done', [CommitmentController::class, 'markDone'])->name('commitments.done');
+        Route::post('/commitments/{commitmentItem}/snooze', [CommitmentController::class, 'snooze'])->name('commitments.snooze');
+    });
 
     // Ideas list and store
     Route::get('/ideas', [IdeaController::class, 'ideas'])->name('idea.ideas');

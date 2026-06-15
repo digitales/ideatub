@@ -30,5 +30,6 @@ class FeaturesConfigTest extends TestCase
         $this->assertIsBool(config('features.working_memory_ui'));
         $this->assertIsBool(config('features.working_memory_insights'));
         $this->assertIsBool(config('features.working_memory_ai_authored'));
+        $this->assertIsBool(config('features.attention_pulse'));
     }
 }

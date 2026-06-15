@@ -15,6 +15,7 @@ class WorkingMemorySnapshotDedupeService
         private readonly WorkingMemoryContentFingerprint $fingerprint,
         private readonly WorkingMemoryDedupeFamilyResolver $familyResolver,
         private readonly WorkingMemorySnapshotSuperseder $snapshotSuperseder,
+        private readonly WorkingMemorySyncGuardrailService $syncGuardrails,
     ) {}
 
     /**
@@ -37,8 +38,15 @@ class WorkingMemorySnapshotDedupeService
     ): array {
         $fingerprintHash = $this->fingerprint->hash($content, $strictContentHash);
         $dedupeFamily = $this->familyResolver->resolveForCapture($planSlug, $extraTags, $project);
-
         $current = $this->findCurrentSnapshot($userId, $dedupeFamily, $fingerprintHash);
+        $this->syncGuardrails->enforce(
+            channel: 'capture',
+            userId: $userId,
+            scopeKey: $dedupeFamily,
+            content: $content,
+            previousContent: $current?->getDecodedContent(),
+            strictContentHash: $strictContentHash,
+        );
         if ($current !== null && $current->content_fingerprint === $fingerprintHash) {
             return $this->buildResponse($current, deduplicated: true, fingerprintHash: $fingerprintHash, dedupeFamily: $dedupeFamily);
         }

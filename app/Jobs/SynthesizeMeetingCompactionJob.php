@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Thought;
+use App\Services\Commitments\CommitmentExtractor;
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use App\Services\WorkingMemory\Compactions\MeetingCompactionPromptBuilder;
@@ -35,6 +36,7 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
         OpenRouterService $openRouter,
         CompactionVersionWriter $writer,
         MeetingPrimaryScopeResolver $primaryScopeResolver,
+        CommitmentExtractor $commitmentExtractor,
     ): void {
         $meeting = Thought::query()->find($this->thoughtId);
         if ($meeting === null) {
@@ -72,7 +74,7 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
                 return;
             }
 
-            $writer->write(
+            $version = $writer->write(
                 userId: $userId,
                 scopeType: $scopeType,
                 scopeKey: $scopeKey,
@@ -82,6 +84,10 @@ class SynthesizeMeetingCompactionJob implements ShouldQueue
                 references: is_array($decoded['references'] ?? null) ? $decoded['references'] : [],
                 sourceThoughtIds: [$meeting->id],
             );
+
+            if ($version !== null && config('features.attention_pulse')) {
+                $commitmentExtractor->fromMeetingCompaction($version->load('workingMemory'));
+            }
         } catch (Throwable $e) {
             Log::warning('SynthesizeMeetingCompactionJob failed.', [
                 'thought_id' => $meeting->id,

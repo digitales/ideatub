@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\Thought;
 use App\Models\WorkingMemory;
 use App\Models\WorkingMemoryVersion;
+use App\Services\Commitments\CommitmentExtractor;
 use App\Services\Projects\ProjectScopeMatcher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ class WorkingMemoryBuilderService
         private readonly WorkingMemoryOutputValidator $outputValidator,
         private readonly WorkingMemoryLegacyRowCitationResolver $legacyRowCitationResolver,
         private readonly ProjectScopeMatcher $projectScopeMatcher,
+        private readonly CommitmentExtractor $commitmentExtractor,
     ) {}
 
     public function buildConsolidated(int $userId, string $scopeType, string $scopeKey, bool $freshStart = false): WorkingMemoryVersion
@@ -142,7 +144,7 @@ class WorkingMemoryBuilderService
             $citationCoverage = null;
         }
 
-        return DB::transaction(function () use (
+        $version = DB::transaction(function () use (
             $memory,
             $buildType,
             $thoughts,
@@ -196,6 +198,12 @@ class WorkingMemoryBuilderService
 
             return $version->fresh(['workingMemory', 'inputs']);
         });
+
+        if (config('features.attention_pulse')) {
+            $this->commitmentExtractor->fromWorkingMemoryVersion($version);
+        }
+
+        return $version;
     }
 
     private function lastKnownGoodVersion(int $userId, string $scopeType, string $scopeKey): ?WorkingMemoryVersion

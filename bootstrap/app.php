@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureAppearanceInSession;
 use App\Http\Middleware\AuthenticateOAuthBearer;
 use App\Http\Middleware\CheckOperationLimit;
+use App\Http\Middleware\EnsureAttentionPulseEnabled;
 use App\Http\Middleware\EnsureWorkingMemoryInsightsEnabled;
 use App\Http\Middleware\EnsureWorkingMemoryUiEnabled;
 use App\Http\Middleware\RedirectIfAuthenticated;
@@ -42,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'postmark.inbound.secret' => ValidatePostmarkInboundSecret::class,
             'working.memory.ui' => EnsureWorkingMemoryUiEnabled::class,
             'working.memory.insights' => EnsureWorkingMemoryInsightsEnabled::class,
+            'attention.pulse' => EnsureAttentionPulseEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

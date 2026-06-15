@@ -142,4 +142,54 @@ MD;
             ->visibleInStream()
             ->count());
     }
+
+    #[Test]
+    public function low_delta_guardrail_can_reject_near_identical_capture_updates(): void
+    {
+        config([
+            'working_memory.sync_guardrails_enabled' => true,
+            'working_memory.sync_min_interval_seconds' => 0,
+            'working_memory.sync_monthly_budget_tokens' => 0,
+            'working_memory.sync_min_delta_ratio' => 0.5,
+        ]);
+
+        [$key, $user] = $this->createKeyAndUser();
+        $fakeEmbedding = array_fill(0, 1536, 0.01);
+        $this->mock(OpenRouterService::class, function ($mock) use ($fakeEmbedding): void {
+            $mock->shouldReceive('embed')->once()->andReturn($fakeEmbedding);
+            $mock->shouldReceive('extractMetadata')->once()->andReturn(['tags' => []]);
+        });
+
+        $params = [
+            'plan_slug' => 'client-working-memory-2026-05-19',
+            'project' => 'dezeen',
+            'tags' => ['working-memory', 'client:dezeen', 'scope:client'],
+            'no_chunking' => true,
+        ];
+
+        $first = $this->postJson('/api/mcp', [
+            'jsonrpc' => '2.0',
+            'method' => 'capture_plan',
+            'params' => array_merge($params, ['content' => $this->wmBody('2026-05-19T01:00:00Z')]),
+            'id' => 1,
+        ], ['x-ideatub-key' => $key]);
+        $first->assertOk();
+
+        $this->mock(OpenRouterService::class, function ($mock): void {
+            $mock->shouldReceive('embed')->never();
+            $mock->shouldReceive('extractMetadata')->never();
+        });
+
+        $second = $this->postJson('/api/mcp', [
+            'jsonrpc' => '2.0',
+            'method' => 'capture_plan',
+            'params' => array_merge($params, ['content' => $this->wmBody('2026-05-19T01:00:01Z')]),
+            'id' => 2,
+        ], ['x-ideatub-key' => $key]);
+
+        $second->assertOk();
+        $second->assertJsonPath('error.code', -32602);
+        $this->assertStringContainsString('low change delta', (string) $second->json('error.message'));
+        $this->assertSame(1, Thought::query()->where('user_id', $user->id)->visibleInStream()->count());
+    }
 }

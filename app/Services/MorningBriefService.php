@@ -8,6 +8,7 @@ use App\Models\Draft;
 use App\Models\InboxItem;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Attention\AttentionOverviewBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -15,6 +16,7 @@ class MorningBriefService
 {
     public function __construct(
         private IdeasToRevisitService $ideasToRevisitService,
+        private AttentionOverviewBuilder $attentionOverviewBuilder,
     ) {}
 
     public function forUser(User $user): MorningBriefData
@@ -53,6 +55,21 @@ class MorningBriefService
                 subtitle: 'Review and triage',
                 href: route('inbox.index'),
             );
+        }
+
+        if (config('features.attention_pulse')) {
+            $pulseCount = $this->attentionOverviewBuilder->build((int) $user->id)->totalCount();
+            if ($pulseCount > 0) {
+                $cards[] = new MorningBriefCardData(
+                    kind: 'pulse',
+                    label: 'Pulse',
+                    title: $pulseCount === 1
+                        ? '1 signal needs attention'
+                        : "{$pulseCount} signals need attention",
+                    subtitle: 'Memory, commitments, and Jira',
+                    href: route('pulse.show'),
+                );
+            }
         }
 
         $revisitCount = $this->ideasToRevisitService->countForUser($user);

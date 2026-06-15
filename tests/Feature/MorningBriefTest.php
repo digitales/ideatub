@@ -63,6 +63,31 @@ class MorningBriefTest extends TestCase
         $response->assertSee('IdeaTub roadmap', false);
     }
 
+    public function test_morning_brief_shows_pulse_card_when_enabled_and_signals_exist(): void
+    {
+        config([
+            'features.attention_pulse' => true,
+            'features.working_memory_ui' => true,
+        ]);
+
+        $user = User::factory()->create();
+        $memory = \App\Models\WorkingMemory::factory()->for($user)->create([
+            'scope_type' => 'global',
+            'scope_key' => 'global',
+        ]);
+        $version = \App\Models\WorkingMemoryVersion::factory()->for($memory)->create([
+            'authoring_status' => 'fallback',
+            'build_type' => 'consolidated',
+        ]);
+        $memory->update(['latest_version_id' => $version->id]);
+
+        $response = $this->actingAs($user)->get(route('idea.index'));
+
+        $response->assertOk();
+        $response->assertSee('signals need attention', false);
+        $response->assertSee(route('pulse.show'), false);
+    }
+
     public function test_search_mode_hides_morning_brief(): void
     {
         $user = User::factory()->create(['name' => 'Ross Tweedie']);

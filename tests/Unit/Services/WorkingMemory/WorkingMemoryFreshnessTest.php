@@ -5,6 +5,8 @@ namespace Tests\Unit\Services\WorkingMemory;
 use App\Models\Thought;
 use App\Models\User;
 use App\Models\WorkingMemory;
+use App\Services\Commitments\CommitmentExtractor;
+use App\Services\Projects\ProjectScopeMatcher;
 use App\Services\WorkingMemory\MemoryInsightsService;
 use App\Services\WorkingMemory\WorkingMemoryAiAuthorService;
 use App\Services\WorkingMemory\WorkingMemoryAssembler;
@@ -72,6 +74,8 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryAiAuthorService::class),
             app(WorkingMemoryOutputValidator::class),
             app(WorkingMemoryLegacyRowCitationResolver::class),
+            app(ProjectScopeMatcher::class),
+            app(CommitmentExtractor::class),
         );
 
         $fallbackVersion = $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -123,6 +127,8 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryAiAuthorService::class),
             app(WorkingMemoryOutputValidator::class),
             app(WorkingMemoryLegacyRowCitationResolver::class),
+            app(ProjectScopeMatcher::class),
+            app(CommitmentExtractor::class),
         );
 
         $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -173,6 +179,8 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryAiAuthorService::class),
             app(WorkingMemoryOutputValidator::class),
             app(WorkingMemoryLegacyRowCitationResolver::class),
+            app(ProjectScopeMatcher::class),
+            app(CommitmentExtractor::class),
         );
 
         $fallbackVersion = $failingBuilder->buildIncremental($user->id, 'global', 'global');
@@ -237,6 +245,8 @@ class WorkingMemoryFreshnessTest extends TestCase
             app(WorkingMemoryAiAuthorService::class),
             app(WorkingMemoryOutputValidator::class),
             app(WorkingMemoryLegacyRowCitationResolver::class),
+            app(ProjectScopeMatcher::class),
+            app(CommitmentExtractor::class),
         );
 
         $version = $failingBuilder->buildIncremental($user->id, 'global', 'global');
