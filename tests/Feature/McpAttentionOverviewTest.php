@@ -41,6 +41,32 @@ class McpAttentionOverviewTest extends TestCase
         $this->assertContains('get_attention_overview', $response->json('methods'));
     }
 
+    public function test_get_attention_overview_tool_schema_properties_is_object_not_array(): void
+    {
+        config(['features.attention_pulse' => true]);
+        [$key] = $this->validKeyAndUser();
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/list',
+            'params' => [],
+        ]);
+
+        $response->assertOk();
+        $tool = collect($response->json('result.tools'))->firstWhere('name', 'get_attention_overview');
+        $this->assertIsArray($tool);
+        $this->assertSame('object', data_get($tool, 'inputSchema.type'));
+        $this->assertStringContainsString(
+            '"name":"get_attention_overview","description"',
+            preg_replace('/\s+/', '', $response->getContent())
+        );
+        $this->assertMatchesRegularExpression(
+            '/"name":"get_attention_overview"[^}]*"inputSchema":\{"type":"object","properties":\{\}\}/',
+            preg_replace('/\s+/', '', $response->getContent())
+        );
+    }
+
     public function test_get_mcp_omits_get_attention_overview_when_feature_disabled(): void
     {
         config(['features.attention_pulse' => false]);

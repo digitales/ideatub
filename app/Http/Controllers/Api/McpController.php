@@ -725,7 +725,7 @@ class McpController extends Controller
                 'description' => 'Return the Attention Pulse overview for the authenticated user: memory health, open commitments, and recent Jira activity. Same payload shape as the /pulse page.',
                 'inputSchema' => [
                     'type' => 'object',
-                    'properties' => [],
+                    'properties' => (object) [],
                 ],
             ];
         }
