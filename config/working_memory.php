@@ -15,6 +15,21 @@ return [
 
     'consolidation_window_days' => (int) env('WORKING_MEMORY_CONSOLIDATION_WINDOW_DAYS', 180),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Compaction-primary evidence assembly
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, working memory builds compose from compactions, prior
+    | canonical memory, and uncompacted raw thoughts only — not the full corpus.
+    | Incremental jobs skip LLM compose when there is no delta.
+    |
+    */
+
+    'compaction_primary' => filter_var(env('WORKING_MEMORY_COMPACTION_PRIMARY', true), FILTER_VALIDATE_BOOL),
+
+    'uncompacted_thought_limit' => (int) env('WORKING_MEMORY_UNCOMPACTED_THOUGHT_LIMIT', 20),
+
     'external_protect_days' => (int) env('WORKING_MEMORY_EXTERNAL_PROTECT_DAYS', 14),
 
     'require_uuid_project_scope_key_for_source_labels' => ['elixirr-sync'],

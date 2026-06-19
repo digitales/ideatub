@@ -27,6 +27,8 @@ class WorkingMemoryBuilderService
         private readonly WorkingMemoryLegacyRowCitationResolver $legacyRowCitationResolver,
         private readonly ProjectScopeMatcher $projectScopeMatcher,
         private readonly CommitmentExtractor $commitmentExtractor,
+        private readonly ThoughtScopeQuery $thoughtScopeQuery,
+        private readonly UncompactedThoughtResolver $uncompactedThoughtResolver,
     ) {}
 
     public function buildConsolidated(int $userId, string $scopeType, string $scopeKey, bool $freshStart = false): WorkingMemoryVersion
@@ -70,8 +72,9 @@ class WorkingMemoryBuilderService
                     $userId,
                     $normalizedScopeType,
                     $normalizedScopeKey,
-                    $thoughts,
+                    $buildType,
                     $freshStart,
+                    $thoughts,
                 );
 
                 $authoredOutput = $this->aiAuthorService->authorFromEvidence($evidencePack);
@@ -719,6 +722,15 @@ class WorkingMemoryBuilderService
      */
     private function selectThoughts(int $userId, string $scopeType, string $scopeKey, string $buildType): Collection
     {
+        if ($this->compactionPrimaryEnabled()) {
+            return $this->uncompactedThoughtResolver->uncompactedThoughts(
+                $userId,
+                $scopeType,
+                $scopeKey,
+                $buildType,
+            );
+        }
+
         if ($scopeType === 'insights') {
             $thoughts = $this->memoryInsightsService->recentThoughtPool($userId);
         } else {
@@ -798,6 +810,11 @@ class WorkingMemoryBuilderService
         }
 
         return $scoped->take(20)->values();
+    }
+
+    private function compactionPrimaryEnabled(): bool
+    {
+        return filter_var(config('working_memory.compaction_primary', true), FILTER_VALIDATE_BOOL);
     }
 
     /**

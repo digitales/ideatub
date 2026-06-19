@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Jobs\ConsolidateWorkingMemory;
+use App\Models\Project;
 use App\Models\Thought;
 use App\Models\User;
 use App\Services\WorkingMemory\ForcedTagResolver;
@@ -134,30 +135,47 @@ class WorkingMemoryConsolidateCommand extends Command
             ['scope_type' => 'insights', 'scope_key' => 'global'],
         ]);
 
+        Project::query()
+            ->where('user_id', $userId)
+            ->orderBy('created_at')
+            ->get(['id', 'elixirr_client_slug', 'elixirr_project_slug', 'parent_project_id'])
+            ->each(function (Project $project) use ($scopes): void {
+                $scopes->push([
+                    'scope_type' => 'project',
+                    'scope_key' => (string) $project->id,
+                ]);
+
+                if ($project->isElixirrClientRoot()) {
+                    $clientSlug = Str::of((string) $project->elixirr_client_slug)->trim()->lower()->toString();
+                    if ($clientSlug !== '') {
+                        $scopes->push([
+                            'scope_type' => 'project',
+                            'scope_key' => $clientSlug,
+                        ]);
+                    }
+                }
+            });
+
         Thought::query()
             ->where('user_id', $userId)
-            ->with('projects:id')
+            ->whereNotNull('source_metadata')
+            ->select(['id', 'source_metadata'])
             ->orderByDesc('created_at')
-            ->get()
+            ->cursor()
             ->each(function (Thought $thought) use ($scopes): void {
                 $metadataProject = Str::of((string) data_get($thought->source_metadata, 'project'))
                     ->trim()
                     ->lower()
                     ->toString();
 
-                if ($metadataProject !== '') {
-                    $scopes->push([
-                        'scope_type' => 'project',
-                        'scope_key' => $metadataProject,
-                    ]);
+                if ($metadataProject === '') {
+                    return;
                 }
 
-                foreach ($thought->projects as $project) {
-                    $scopes->push([
-                        'scope_type' => 'project',
-                        'scope_key' => (string) $project->id,
-                    ]);
-                }
+                $scopes->push([
+                    'scope_type' => 'project',
+                    'scope_key' => $metadataProject,
+                ]);
             });
 
         foreach ($this->forcedTagResolver->forUserId($userId) as $forcedTag) {
