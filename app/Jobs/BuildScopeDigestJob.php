@@ -8,6 +8,7 @@ use App\Models\WorkingMemoryVersion;
 use App\Services\OpenRouterService;
 use App\Services\WorkingMemory\Compactions\CompactionVersionWriter;
 use App\Services\WorkingMemory\Compactions\ScopeDigestPromptBuilder;
+use App\Services\WorkingMemory\ThoughtScopeQuery;
 use App\Support\Json\LlmDecodeFailureLogContext;
 use App\Support\Json\LlmJsonDecoder;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -16,9 +17,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Throwable;
 
 class BuildScopeDigestJob implements ShouldQueue
@@ -42,6 +41,7 @@ class BuildScopeDigestJob implements ShouldQueue
         ScopeDigestPromptBuilder $promptBuilder,
         OpenRouterService $openRouter,
         CompactionVersionWriter $writer,
+        ThoughtScopeQuery $thoughtScopeQuery,
     ): void {
         if ($this->userId <= 0 || $this->scopeType === '' || $this->scopeKey === '') {
             return;
@@ -57,7 +57,15 @@ class BuildScopeDigestJob implements ShouldQueue
             return;
         }
 
-        $thoughts = $this->collectScopedThoughts($windowStart, $windowEnd);
+        $thoughts = $thoughtScopeQuery->forScope(
+            $this->userId,
+            $this->scopeType,
+            $this->scopeKey,
+            $windowStart,
+            200,
+        )->filter(
+            fn (Thought $thought): bool => $thought->created_at !== null && $thought->created_at->lte($windowEnd)
+        )->values();
         if ($thoughts->count() < $minThoughts) {
             return;
         }
@@ -128,31 +136,5 @@ class BuildScopeDigestJob implements ShouldQueue
             ->where('build_type', 'compaction:weekly-digest')
             ->where('created_at', '>=', $windowStart)
             ->exists();
-    }
-
-    /**
-     * @return Collection<int, Thought>
-     */
-    private function collectScopedThoughts(Carbon $windowStart, Carbon $windowEnd): Collection
-    {
-        $query = Thought::query()
-            ->where('user_id', $this->userId)
-            ->whereBetween('created_at', [$windowStart, $windowEnd])
-            ->orderByDesc('created_at')
-            ->limit(200);
-
-        if ($this->scopeType === 'project') {
-            $query->where(function ($q): void {
-                $q->where('source_metadata->project', $this->scopeKey);
-                if (Str::isUuid($this->scopeKey)) {
-                    $q->orWhereHas('projects', fn ($p) => $p->where('projects.id', $this->scopeKey));
-                }
-            });
-        } elseif ($this->scopeType === 'tag') {
-            $query->whereJsonContains('metadata->tags', $this->scopeKey);
-        }
-        // global / insights: no narrowing.
-
-        return $query->get();
     }
 }

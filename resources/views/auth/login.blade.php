@@ -5,6 +5,10 @@
 @section('content')
     <h2 class="text-xl font-semibold text-deep-indigo text-center mb-6">Sign in to IdeaTub</h2>
 
+    @if (session('error'))
+        <p class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{{ session('error') }}</p>
+    @endif
+
     <form method="POST" action="{{ route('login') }}" class="space-y-4">
         @csrf
 
@@ -78,7 +82,9 @@
     </div>
 
     <p class="mt-6 text-center text-xs text-slate-brand/50">
-        No account?
-        <a href="{{ route('register') }}" class="text-memory-violet hover:opacity-80 transition font-medium">Sign up</a>
+        @if (config('registration.enabled', true))
+            No account?
+            <a href="{{ route('register') }}" class="text-memory-violet hover:opacity-80 transition font-medium">Sign up</a>
+        @endif
     </p>
 @endsection

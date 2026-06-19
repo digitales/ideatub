@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\WorkingMemory;
+use App\Services\WorkingMemory\UncompactedThoughtResolver;
 use App\Services\WorkingMemory\WorkingMemoryBuilderService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -35,8 +36,32 @@ class RefreshWorkingMemoryIncrementalScope implements ShouldQueue
         );
     }
 
-    public function handle(WorkingMemoryBuilderService $builderService): void
-    {
+    public function handle(
+        WorkingMemoryBuilderService $builderService,
+        UncompactedThoughtResolver $uncompactedThoughtResolver,
+    ): void {
+        if (! $uncompactedThoughtResolver->shouldRunIncrementalBuild(
+            $this->userId,
+            $this->scopeType,
+            $this->scopeKey,
+        )) {
+            Log::info('RefreshWorkingMemoryIncrementalScope skipped: no compaction delta.', [
+                'user_id' => $this->userId,
+                'scope_type' => $this->scopeType,
+                'scope_key' => $this->scopeKey,
+                'thought_id' => $this->thoughtId,
+            ]);
+
+            WorkingMemory::query()
+                ->where('user_id', $this->userId)
+                ->where('scope_type', $this->scopeType)
+                ->where('scope_key', $this->scopeKey)
+                ->whereNotNull('build_started_at')
+                ->update(['build_started_at' => null]);
+
+            return;
+        }
+
         $builderService->buildIncremental($this->userId, $this->scopeType, $this->scopeKey);
     }
 

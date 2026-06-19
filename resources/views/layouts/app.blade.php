@@ -57,9 +57,11 @@
                             <a href="{{ route('login') }}" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
                                 Login
                             </a>
-                            <a href="{{ route('register') }}" class="ml-4 bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
-                                Sign Up
-                            </a>
+                            @if (config('registration.enabled', true))
+                                <a href="{{ route('register') }}" class="ml-4 bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
+                                    Sign Up
+                                </a>
+                            @endif
                         @endauth
                     </div>
                 </div>

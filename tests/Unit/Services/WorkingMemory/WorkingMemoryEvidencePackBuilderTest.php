@@ -9,12 +9,37 @@ use App\Models\WorkingMemoryVersion;
 use App\Services\WorkingMemory\WorkingMemoryEvidencePackBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class WorkingMemoryEvidencePackBuilderTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['working_memory.compaction_primary' => false]);
+    }
+
+    private function buildPack(
+        int $userId,
+        string $scopeType,
+        string $scopeKey,
+        Collection $thoughts,
+        string $buildType = 'consolidated',
+    ): array {
+        return app(WorkingMemoryEvidencePackBuilder::class)->build(
+            $userId,
+            $scopeType,
+            $scopeKey,
+            $buildType,
+            false,
+            $thoughts,
+        );
+    }
 
     #[Test]
     public function evidence_pack_signal_references_prioritize_internal_thought_permalink(): void
@@ -41,7 +66,7 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
             'created_at' => Carbon::parse('2026-05-05 11:00:00', 'UTC'),
         ]);
 
-        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+        $pack = $this->buildPack(
             $user->id,
             'global',
             'global',
@@ -80,7 +105,7 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
             'created_at' => Carbon::parse('2026-05-05 16:00:00', 'UTC'),
         ]);
 
-        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+        $pack = $this->buildPack(
             $user->id,
             'global',
             'global',
@@ -112,7 +137,7 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
             'created_at' => Carbon::parse('2026-05-05 18:00:00', 'UTC'),
         ]);
 
-        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+        $pack = $this->buildPack(
             $user->id,
             'global',
             'global',
@@ -157,7 +182,7 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
             'created_at' => Carbon::parse('2026-05-05 17:01:00', 'UTC'),
         ]);
 
-        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+        $pack = $this->buildPack(
             $user->id,
             'tag',
             'ai',
@@ -213,7 +238,7 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
 
         $allThoughts = Thought::query()->where('user_id', $user->id)->get();
 
-        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+        $pack = $this->buildPack(
             $user->id,
             'tag',
             'ai',
@@ -248,7 +273,7 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
             ->whereIn('user_id', [$selectedUser->id, $otherUser->id])
             ->get();
 
-        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+        $pack = $this->buildPack(
             $selectedUser->id,
             'global',
             'global',
@@ -277,7 +302,14 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
         $thought = Thought::factory()->create(['user_id' => $user->id]);
 
         $builder = app(WorkingMemoryEvidencePackBuilder::class);
-        $pack = $builder->build($user->id, 'project', 'dezeen', collect([$thought]));
+        $pack = $builder->build(
+            $user->id,
+            'project',
+            'dezeen',
+            'consolidated',
+            false,
+            collect([$thought]),
+        );
 
         $this->assertArrayHasKey('compactions', $pack);
         $this->assertCount(1, $pack['compactions']);
@@ -285,5 +317,46 @@ class WorkingMemoryEvidencePackBuilderTest extends TestCase
         $this->assertSame($compaction->id, $pack['compactions'][0]['version_id']);
         $this->assertStringContainsString('PHP upgrade', $pack['compactions'][0]['summary_markdown']);
         $this->assertSame('/memory/project/dezeen/compactions/'.$compaction->id, $pack['compactions'][0]['references'][0]['url'] ?? null);
+    }
+
+    #[Test]
+    public function compaction_primary_pack_uses_only_uncompacted_thoughts_as_signals(): void
+    {
+        config(['working_memory.compaction_primary' => true]);
+
+        $user = User::factory()->create();
+        $memory = WorkingMemory::factory()->create([
+            'user_id' => $user->id,
+            'scope_type' => 'global',
+            'scope_key' => 'global',
+        ]);
+
+        Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Already digested thought.',
+            'created_at' => Carbon::parse('2026-05-05 10:00:00', 'UTC'),
+        ]);
+
+        WorkingMemoryVersion::factory()->create([
+            'working_memory_id' => $memory->id,
+            'build_type' => 'compaction:weekly-digest',
+            'created_at' => Carbon::parse('2026-05-06 10:00:00', 'UTC'),
+        ]);
+
+        $fresh = Thought::factory()->create([
+            'user_id' => $user->id,
+            'content' => 'Uncompacted delta thought.',
+            'created_at' => Carbon::parse('2026-05-07 10:00:00', 'UTC'),
+        ]);
+
+        $pack = app(WorkingMemoryEvidencePackBuilder::class)->build(
+            $user->id,
+            'global',
+            'global',
+            'incremental',
+        );
+
+        $this->assertCount(1, $pack['signals']);
+        $this->assertSame((string) $fresh->id, $pack['signals'][0]['thought_id']);
     }
 }

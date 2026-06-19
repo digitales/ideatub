@@ -14,6 +14,7 @@ final class WorkingMemoryEvidencePackBuilder
 
     public function __construct(
         private readonly WorkingMemoryAssembler $assembler,
+        private readonly UncompactedThoughtResolver $uncompactedThoughtResolver,
     ) {}
 
     /** @var list<string> */
@@ -28,7 +29,7 @@ final class WorkingMemoryEvidencePackBuilder
     ];
 
     /**
-     * @param  Collection<int, Thought>  $thoughts
+     * @param  Collection<int, Thought>|null  $legacyThoughts  Full corpus collection when compaction_primary is disabled.
      * @return array{
      *     scope_type: string,
      *     scope_key: string,
@@ -50,16 +51,24 @@ final class WorkingMemoryEvidencePackBuilder
      *     section_bundles: array<string, array<int, array{type: string, url: string, label: string}>>
      * }
      */
-    public function build(int $userId, string $scopeType, string $scopeKey, Collection $thoughts, bool $freshStart = false): array
-    {
+    public function build(
+        int $userId,
+        string $scopeType,
+        string $scopeKey,
+        string $buildType = 'consolidated',
+        bool $freshStart = false,
+        ?Collection $legacyThoughts = null,
+    ): array {
         $normalizedScopeType = Str::of($scopeType)->trim()->lower()->toString();
         $normalizedScopeKey = Str::of($scopeKey)->trim()->lower()->toString();
-        $userScopedThoughts = $thoughts
-            ->filter(fn ($thought): bool => $thought instanceof Thought)
-            ->filter(fn (Thought $thought): bool => $thought->user_id === $userId)
-            ->values();
 
-        $selectedThoughts = $this->selectSignals($userScopedThoughts, $normalizedScopeType, $normalizedScopeKey);
+        $selectedThoughts = $this->resolveSignalThoughts(
+            $userId,
+            $normalizedScopeType,
+            $normalizedScopeKey,
+            $buildType,
+            $legacyThoughts,
+        );
 
         $signals = $selectedThoughts
             ->map(function (Thought $thought): array {
@@ -145,6 +154,37 @@ final class WorkingMemoryEvidencePackBuilder
                 ];
             })
             ->all();
+    }
+
+    /**
+     * @param  Collection<int, Thought>|null  $legacyThoughts
+     * @return Collection<int, Thought>
+     */
+    private function resolveSignalThoughts(
+        int $userId,
+        string $scopeType,
+        string $scopeKey,
+        string $buildType,
+        ?Collection $legacyThoughts,
+    ): Collection {
+        if ($this->compactionPrimaryEnabled()) {
+            return $this->uncompactedThoughtResolver
+                ->uncompactedThoughts($userId, $scopeType, $scopeKey, $buildType)
+                ->take(max(1, (int) config('working_memory.uncompacted_thought_limit', 20)))
+                ->values();
+        }
+
+        $userScopedThoughts = ($legacyThoughts ?? collect())
+            ->filter(fn ($thought): bool => $thought instanceof Thought)
+            ->filter(fn (Thought $thought): bool => $thought->user_id === $userId)
+            ->values();
+
+        return $this->selectSignals($userScopedThoughts, $scopeType, $scopeKey);
+    }
+
+    private function compactionPrimaryEnabled(): bool
+    {
+        return filter_var(config('working_memory.compaction_primary', true), FILTER_VALIDATE_BOOL);
     }
 
     /**

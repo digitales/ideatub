@@ -141,6 +141,10 @@ Route::post('/webhooks/postmark/inbound/{token}', [PostmarkInboundController::cl
     ->name('webhooks.postmark.inbound');
 
 // OAuth routes
+Route::middleware('guest')->group(function () {
+    Route::post('/auth/google/start', [SocialAuthController::class, 'startGoogle'])->name('auth.google.start');
+    Route::post('/auth/github/start', [SocialAuthController::class, 'startGithub'])->name('auth.github.start');
+});
 Route::get('/auth/google', [SocialAuthController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [SocialAuthController::class, 'handleGoogleCallback']);
 Route::get('/auth/github', [SocialAuthController::class, 'redirectToGithub'])->name('auth.github');

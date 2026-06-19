@@ -34,9 +34,11 @@
             A calm place to store thoughts and search them with semantic search. Use the web app or connect via MCP.
         </p>
         <div class="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <a href="{{ route('register') }}" class="inline-flex items-center px-6 py-3 rounded-lg text-sm font-medium text-white transition hover:opacity-90" style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);">
-                Get started
-            </a>
+            @if (config('registration.enabled', true))
+                <a href="{{ route('register') }}" class="inline-flex items-center px-6 py-3 rounded-lg text-sm font-medium text-white transition hover:opacity-90" style="background: linear-gradient(135deg, #6D6AF7, #2A8C8C);">
+                    Get started
+                </a>
+            @endif
             <a href="{{ route('login') }}" class="inline-flex items-center px-6 py-3 rounded-lg text-sm font-medium text-slate-brand bg-white/80 border border-memory-violet/20 hover:bg-white hover:border-memory-violet/40 transition">
                 Sign in
             </a>

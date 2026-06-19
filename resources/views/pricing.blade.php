@@ -41,9 +41,15 @@
             @auth
                 <div class="mt-8 text-center text-sm text-gray-500">Current plan</div>
             @else
-                <a href="{{ route('register') }}" class="mt-8 block w-full bg-gray-200 text-gray-900 text-center py-3 px-4 rounded-lg font-semibold hover:bg-gray-300">
-                    Get Started
-                </a>
+                @if (config('registration.enabled', true))
+                    <a href="{{ route('register') }}" class="mt-8 block w-full bg-gray-200 text-gray-900 text-center py-3 px-4 rounded-lg font-semibold hover:bg-gray-300">
+                        Get Started
+                    </a>
+                @else
+                    <a href="{{ route('login') }}" class="mt-8 block w-full bg-gray-200 text-gray-900 text-center py-3 px-4 rounded-lg font-semibold hover:bg-gray-300">
+                        Sign in
+                    </a>
+                @endif
             @endauth
         </div>
 
@@ -95,9 +101,15 @@
                     </form>
                 @endif
             @else
-                <a href="{{ route('register') }}" class="mt-8 block w-full bg-white text-indigo-600 text-center py-3 px-4 rounded-lg font-semibold hover:bg-gray-50">
-                    Get Started
-                </a>
+                @if (config('registration.enabled', true))
+                    <a href="{{ route('register') }}" class="mt-8 block w-full bg-white text-indigo-600 text-center py-3 px-4 rounded-lg font-semibold hover:bg-gray-50">
+                        Get Started
+                    </a>
+                @else
+                    <a href="{{ route('login') }}" class="mt-8 block w-full bg-white text-indigo-600 text-center py-3 px-4 rounded-lg font-semibold hover:bg-gray-50">
+                        Sign in
+                    </a>
+                @endif
             @endauth
         </div>
 
@@ -146,9 +158,15 @@
                     </form>
                 @endif
             @else
-                <a href="{{ route('register') }}" class="mt-8 block w-full bg-indigo-600 text-white text-center py-3 px-4 rounded-lg font-semibold hover:bg-indigo-700">
-                    Get Started
-                </a>
+                @if (config('registration.enabled', true))
+                    <a href="{{ route('register') }}" class="mt-8 block w-full bg-indigo-600 text-white text-center py-3 px-4 rounded-lg font-semibold hover:bg-indigo-700">
+                        Get Started
+                    </a>
+                @else
+                    <a href="{{ route('login') }}" class="mt-8 block w-full bg-indigo-600 text-white text-center py-3 px-4 rounded-lg font-semibold hover:bg-indigo-700">
+                        Sign in
+                    </a>
+                @endif
             @endauth
         </div>
     </div>

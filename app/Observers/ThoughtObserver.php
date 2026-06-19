@@ -5,7 +5,9 @@ namespace App\Observers;
 use App\Jobs\RefreshWorkingMemoryIncremental;
 use App\Jobs\SynthesizeMeetingCompactionJob;
 use App\Jobs\WorkingMemoryRebuildJob;
+use App\Models\Project;
 use App\Models\Thought;
+use App\Services\WorkingMemory\WorkingMemoryExternalGuard;
 
 class ThoughtObserver
 {
@@ -88,7 +90,21 @@ class ThoughtObserver
         $thought->loadMissing('projects:id');
 
         foreach ($thought->projects as $project) {
+            if ($this->shouldSkipAutoRebuildForProject($project, (int) $thought->user_id)) {
+                continue;
+            }
+
             WorkingMemoryRebuildJob::dispatch((string) $project->id);
         }
+    }
+
+    private function shouldSkipAutoRebuildForProject(Project $project, int $userId): bool
+    {
+        return app(WorkingMemoryExternalGuard::class)->shouldSkipConsolidatedBuild(
+            $userId,
+            'project',
+            (string) $project->id,
+            false,
+        );
     }
 }
