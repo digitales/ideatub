@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CommentController;
+use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DemoModeController;
 use App\Http\Controllers\DraftController;
@@ -37,7 +38,6 @@ use App\Http\Controllers\MemoryInsightsController;
 use App\Http\Controllers\MemoryScopesController;
 use App\Http\Controllers\OAuthServerController;
 use App\Http\Controllers\OAuthWellKnownController;
-use App\Http\Controllers\CommitmentController;
 use App\Http\Controllers\PostmarkInboundController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\ProfileSettingsController;
@@ -201,6 +201,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/stream', [IdeaController::class, 'stream'])->name('idea.stream');
 
     Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');
+    Route::post('/inbox/groups/{generatorType}/bulk', [InboxController::class, 'bulkGroupAction'])
+        ->where('generatorType', '[a-z0-9_]+')
+        ->name('inbox.groups.bulk');
     Route::post('/inbox/{inboxItem}/done', [InboxController::class, 'markDone'])->name('inbox.done');
     Route::post('/inbox/{inboxItem}/snooze', [InboxController::class, 'snooze'])->name('inbox.snooze');
     Route::post('/inbox/{inboxItem}/save-thought', [InboxController::class, 'saveAsThought'])->name('inbox.save-thought');

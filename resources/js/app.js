@@ -1131,6 +1131,12 @@ Alpine.data('inboxPage', () => ({
   activeItemId: null,
   nextCountRequestSequence: 0,
   lastAppliedCountRequestSequence: 0,
+  confirmOpen: false,
+  confirmMessage: '',
+  confirmGeneratorType: '',
+  confirmAction: '',
+  confirmTriggerButton: null,
+  groupBulkPending: false,
 
   init() {
     const raw = this.$el?.dataset?.inboxInitialCount;
@@ -1238,6 +1244,132 @@ Alpine.data('inboxPage', () => ({
       if (typeof value === 'string' && value) return value;
     }
     return '';
+  },
+
+  openGroupConfirm(generatorType, action, count, label) {
+    this.confirmGeneratorType = generatorType;
+    this.confirmAction = action;
+    this.confirmMessage = `${label} for ${count} ${count === 1 ? 'item' : 'items'}?`;
+    this.confirmOpen = true;
+  },
+
+  closeGroupConfirm() {
+    if (this.groupBulkPending) return;
+    this.confirmOpen = false;
+    this.confirmMessage = '';
+    this.confirmGeneratorType = '';
+    this.confirmAction = '';
+    this.confirmTriggerButton = null;
+  },
+
+  async confirmGroupBulk() {
+    if (!this.confirmGeneratorType || !this.confirmAction) return;
+    await this.submitGroupBulk(this.confirmGeneratorType, this.confirmAction, this.confirmTriggerButton);
+    if (!this.groupBulkPending) {
+      this.closeGroupConfirm();
+    }
+  },
+
+  async submitGroupBulk(generatorType, action, button = null) {
+    if (this.groupBulkPending) return;
+
+    const labels = this.buttonLabels(button);
+    this.groupBulkPending = true;
+    if (button) {
+      button.disabled = true;
+      this.setButtonLabel(button, labels.pending);
+    }
+
+    const requestSequence = ++this.nextCountRequestSequence;
+    let navigating = false;
+
+    const reenable = () => {
+      if (button) {
+        button.disabled = false;
+        this.setButtonLabel(button, labels.idle);
+      }
+      this.groupBulkPending = false;
+    };
+
+    const reloadCurrentPage = (message) => {
+      navigating = true;
+      if (message) {
+        this.storeReloadSuccess(message);
+      }
+      window.location.href = window.location.href;
+    };
+
+    try {
+      const body = new FormData();
+      body.set('action', action);
+      if (this.csrfToken) {
+        body.set('_token', this.csrfToken);
+      }
+
+      const res = await fetch(`/inbox/groups/${encodeURIComponent(generatorType)}/bulk`, {
+        method: 'POST',
+        body,
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(this.csrfToken ? { 'X-CSRF-TOKEN': this.csrfToken } : {}),
+        },
+      });
+
+      const ct = (res.headers.get('Content-Type') || '').toLowerCase();
+      const isJson = ct.includes('application/json');
+
+      if (res.ok && !isJson) {
+        reloadCurrentPage();
+        return;
+      }
+
+      let data = {};
+      if (isJson) {
+        try {
+          data = await res.json();
+        } catch {
+          data = {};
+        }
+      }
+
+      if (!res.ok) {
+        if (res.status === 419) {
+          this.flashError = 'Session expired. Please refresh the page and try again.';
+        } else if (res.status === 401 || res.status === 403) {
+          this.flashError = 'Please sign in again.';
+        } else if (res.status === 422) {
+          this.flashError =
+            this.firstFieldError(data.errors) ||
+            data.message ||
+            'Something went wrong. Please try again.';
+        } else {
+          this.flashError = data.message || 'Something went wrong. Please try again.';
+        }
+        this.flashSuccess = '';
+        return;
+      }
+
+      if (!data || data.ok !== true) {
+        reloadCurrentPage();
+        return;
+      }
+
+      if (this.shouldApplyCountUpdate(requestSequence)) {
+        const remainingCount = this.parseRemainingCount(data.remaining_count);
+        if (remainingCount !== null) {
+          this.applyRemainingCount(remainingCount);
+        }
+        this.lastAppliedCountRequestSequence = requestSequence;
+      }
+
+      reloadCurrentPage(data.message || 'Done.');
+    } catch {
+      this.flashError = 'Unable to complete action. Please try again.';
+      this.flashSuccess = '';
+    } finally {
+      if (!navigating) reenable();
+    }
   },
 
   buttonLabels(button) {

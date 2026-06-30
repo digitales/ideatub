@@ -6,25 +6,68 @@ use App\Models\InboxItem;
 use App\Models\User;
 use App\Services\Email\EmailReviewActionService;
 use App\Services\Inbox\InboxActionService;
+use App\Services\Inbox\InboxBulkActionService;
+use App\Services\Inbox\InboxIndexPresenter;
+use App\Support\Inbox\InboxGroupDescriptor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 class InboxController extends Controller
 {
-    public function index(): View
+    public function index(InboxIndexPresenter $presenter): View
     {
-        $items = InboxItem::query()
-            ->forUser(auth()->user())
-            ->actionable()
-            ->orderByDesc('generated_at')
-            ->paginate(20);
+        $viewModel = $presenter->present(auth()->user());
 
         return view('inbox.index', [
-            'items' => $items,
-            'inboxInitialCount' => (int) $items->total(),
+            'groups' => $viewModel['groups'],
+            'singles' => $viewModel['singles'],
+            'inboxInitialCount' => $viewModel['inboxInitialCount'],
         ]);
+    }
+
+    public function bulkGroupAction(
+        Request $request,
+        string $generatorType,
+        InboxBulkActionService $bulkActionService,
+    ): RedirectResponse|JsonResponse {
+        $allowedActions = InboxGroupDescriptor::bulkActionsFor($generatorType);
+
+        $validated = $request->validate([
+            'action' => ['required', 'string', Rule::in($allowedActions)],
+        ]);
+
+        try {
+            $clearedCount = $bulkActionService->apply(
+                $request->user(),
+                $generatorType,
+                $validated['action'],
+            );
+        } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
+            return redirect()->route('inbox.index')->with('error', $e->getMessage());
+        }
+
+        $message = InboxGroupDescriptor::bulkActionSuccessMessage($validated['action'], $clearedCount);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'message' => $message,
+                'cleared_count' => $clearedCount,
+                'remaining_count' => $this->actionableInboxCountFor($request->user()),
+            ]);
+        }
+
+        return redirect()->route('inbox.index')->with('success', $message);
     }
 
     public function markDone(Request $request, InboxItem $inboxItem, InboxActionService $actionService): RedirectResponse|JsonResponse
@@ -147,7 +190,7 @@ class InboxController extends Controller
 
         try {
             $applied = $reviewActionService->applySenderClassification($inboxItem, $request->user(), $validated['action']);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             report($e);
 
             if ($expectsJson) {

@@ -26,6 +26,37 @@
         </div>
     </div>
 
+    <div
+        x-show="confirmOpen"
+        x-cloak
+        class="fixed inset-0 z-30 flex items-center justify-center bg-deep-indigo/20 px-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="inbox-group-confirm-title"
+    >
+        <div class="w-full max-w-md rounded-2xl border border-memory-violet/20 bg-white p-6 shadow-[0_4px_24px_rgba(109,106,247,0.12)]">
+            <h2 id="inbox-group-confirm-title" class="text-lg font-semibold text-deep-indigo">Confirm bulk action</h2>
+            <p class="mt-2 text-sm text-slate-brand" x-text="confirmMessage"></p>
+            <div class="mt-6 flex flex-wrap justify-end gap-2">
+                <button
+                    type="button"
+                    class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-slate-brand"
+                    @click="closeGroupConfirm()"
+                    :disabled="groupBulkPending"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white"
+                    @click="confirmGroupBulk()"
+                    :disabled="groupBulkPending"
+                    x-text="groupBulkPending ? 'Working...' : 'Confirm'"
+                ></button>
+            </div>
+        </div>
+    </div>
+
     <div class="mb-8">
         <h1 class="text-[28px] font-semibold text-deep-indigo leading-snug">Inbox</h1>
         <p class="mt-2 text-sm text-slate-brand">Agent-generated prompts that need triage.</p>
@@ -34,97 +65,30 @@
         @endif
     </div>
 
-    @if ($items->isEmpty())
+    @if ($groups->isEmpty() && $singles->isEmpty())
         <div class="rounded-2xl border border-memory-violet/20 bg-white/80 p-8 text-sm text-slate-brand shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
             No inbox items right now.
         </div>
     @else
-        <div class="space-y-4">
-            @foreach ($items as $item)
-                <article data-inbox-item-id="{{ $item->id }}" class="rounded-2xl border border-memory-violet/20 bg-white/90 p-5 shadow-[0_4px_24px_rgba(109,106,247,0.08)]">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.1em] text-memory-violet/80">{{ str_replace('_', ' ', $item->generator_type) }}</p>
-                            <h2 class="mt-1 text-lg font-semibold text-deep-indigo">{{ $item->title }}</h2>
-                        </div>
-                        <p class="text-xs text-slate-brand/60">{{ $item->generated_at?->diffForHumans() }}</p>
-                    </div>
+        @if ($groups->isNotEmpty())
+            <div class="mb-6 space-y-4">
+                @foreach ($groups as $group)
+                    @include('inbox.partials.group', ['group' => $group])
+                @endforeach
+            </div>
+        @endif
 
-                    @php
-                        $inboxBody = $item->body ?? '';
-                        if (($item->generator_type ?? '') === 'weekly_revisit') {
-                            $inboxBody = \App\Support\Inbox\WeeklyRevisitBodyFormatter::sanitizeStoredBody($inboxBody);
-                        }
-                    @endphp
-                    <div class="prose-memory-list-headings prose prose-sm mt-3 max-w-none text-slate-brand prose-headings:text-deep-indigo prose-p:text-slate-brand prose-strong:text-deep-indigo prose-li:text-slate-brand">
-                        <x-safe-markdown :markdown="$inboxBody" />
-                    </div>
+        @if ($singles->isNotEmpty())
+            <div class="space-y-4">
+                @foreach ($singles as $item)
+                    @include('inbox.partials.item', ['item' => $item])
+                @endforeach
+            </div>
 
-                    @if (($item->generator_type ?? '') === 'email_sender_review')
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}" @submit.prevent="submitAction($event)">
-                                @csrf
-                                <input type="hidden" name="action" value="allow">
-                                <button type="submit" data-idle-label="Allow sender" data-pending-label="Allowing sender..." class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white">Allow sender</button>
-                            </form>
-
-                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}" @submit.prevent="submitAction($event)">
-                                @csrf
-                                <input type="hidden" name="action" value="ignore">
-                                <button type="submit" data-idle-label="Ignore sender" data-pending-label="Ignoring sender..." class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-brand">Ignore sender</button>
-                            </form>
-
-                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}" @submit.prevent="submitAction($event)">
-                                @csrf
-                                <input type="hidden" name="action" value="extra_process">
-                                <button type="submit" data-idle-label="Extra process sender" data-pending-label="Extra processing sender..." class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Extra process sender</button>
-                            </form>
-
-                            <form method="POST" action="{{ route('inbox.email-review.action', $item) }}" @submit.prevent="submitAction($event)">
-                                @csrf
-                                <input type="hidden" name="action" value="save_thought">
-                                <button type="submit" data-idle-label="Save as thought" data-pending-label="Saving as thought..." class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Save as thought</button>
-                            </form>
-                        </div>
-                    @elseif (($item->generator_type ?? '') === 'import_completed')
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            <form method="POST" action="{{ route('inbox.done', $item) }}" @submit.prevent="submitAction($event)">
-                                @csrf
-                                <button type="submit" data-idle-label="OK" data-pending-label="Dismissing..." class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white">OK</button>
-                            </form>
-                        </div>
-                    @else
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            <form method="POST" action="{{ route('inbox.done', $item) }}" @submit.prevent="submitAction($event)">
-                                @csrf
-                                <button type="submit" data-idle-label="Done" data-pending-label="Marking done..." class="rounded-lg bg-neural-teal px-3 py-1.5 text-xs font-medium text-white">Done</button>
-                            </form>
-
-                            <form method="POST" action="{{ route('inbox.snooze', $item) }}" @submit.prevent="submitAction($event)">
-                                @csrf
-                                <input type="hidden" name="preset" value="tomorrow">
-                                <button type="submit" data-idle-label="Tomorrow" data-pending-label="Snoozing..." class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-slate-brand">Tomorrow</button>
-                            </form>
-
-                            <form method="POST" action="{{ route('inbox.snooze', $item) }}" @submit.prevent="submitAction($event)">
-                                @csrf
-                                <input type="hidden" name="preset" value="next_week">
-                                <button type="submit" data-idle-label="Next week" data-pending-label="Snoozing..." class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-slate-brand">Next week</button>
-                            </form>
-
-                            <form method="POST" action="{{ route('inbox.save-thought', $item) }}" @submit.prevent="submitAction($event)">
-                                @csrf
-                                <button type="submit" data-idle-label="Save as thought" data-pending-label="Saving as thought..." class="rounded-lg border border-memory-violet/20 px-3 py-1.5 text-xs font-medium text-memory-violet">Save as thought</button>
-                            </form>
-                        </div>
-                    @endif
-                </article>
-            @endforeach
-        </div>
-
-        <div class="mt-8">
-            {{ $items->links() }}
-        </div>
+            <div class="mt-8">
+                {{ $singles->links() }}
+            </div>
+        @endif
     @endif
 </div>
 @endsection
