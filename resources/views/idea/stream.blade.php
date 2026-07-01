@@ -51,6 +51,11 @@
                     <a href="{{ route('memory.tag.show', ['tag' => $refreshTagSlug]) }}" class="text-[12px] font-medium text-memory-violet hover:underline">
                         Open tag working memory
                     </a>
+                    @if (config('features.memory_graph_tag'))
+                        <a href="{{ route('graph.tags', ['tag' => $tag]) }}" class="text-[12px] font-medium text-memory-violet hover:underline">
+                            View as graph
+                        </a>
+                    @endif
                     @include('components.working-memory-refresh-form', [
                         'action' => $refreshTagAction,
                         'buttonClass' => 'rounded-full border border-memory-violet/40 px-3 py-1 text-[12px] font-medium text-memory-violet transition hover:bg-memory-violet/5',

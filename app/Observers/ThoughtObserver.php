@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Jobs\ComputeSemanticLinkSuggestionsJob;
 use App\Jobs\RefreshWorkingMemoryIncremental;
 use App\Jobs\SynthesizeMeetingCompactionJob;
 use App\Jobs\WorkingMemoryRebuildJob;
@@ -26,6 +27,7 @@ class ThoughtObserver
 
         RefreshWorkingMemoryIncremental::dispatch($thought->id);
         $this->dispatchAutoRebuildForThought($thought);
+        $this->dispatchLinkSuggestions($thought);
     }
 
     public function updated(Thought $thought): void
@@ -55,6 +57,10 @@ class ThoughtObserver
 
         RefreshWorkingMemoryIncremental::dispatch($thought->id);
         $this->dispatchAutoRebuildForThought($thought);
+
+        if ($thought->wasChanged(['content'])) {
+            $this->dispatchLinkSuggestions($thought);
+        }
     }
 
     private function isMeetingThought(Thought $thought): bool
@@ -106,5 +112,14 @@ class ThoughtObserver
             (string) $project->id,
             false,
         );
+    }
+
+    private function dispatchLinkSuggestions(Thought $thought): void
+    {
+        if (! config('features.memory_graph_suggestions')) {
+            return;
+        }
+
+        ComputeSemanticLinkSuggestionsJob::dispatch($thought->id);
     }
 }

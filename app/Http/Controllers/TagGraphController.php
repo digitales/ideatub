@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\StripsMemoryGraphLayers;
-use App\Models\Project;
 use App\Services\Graph\ThoughtGraphQuery;
 use App\Services\Graph\ThoughtGraphService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-class ProjectGraphController extends Controller
+class TagGraphController extends Controller
 {
     use StripsMemoryGraphLayers;
 
@@ -18,25 +17,17 @@ class ProjectGraphController extends Controller
         private readonly ThoughtGraphService $graphs,
     ) {}
 
-    public function show(Project $project): View
+    public function show(Request $request): View
     {
-        $this->authorize('view', $project);
-
-        return view('projects.graph', [
-            'project' => $project,
+        return view('graph.tag_constellation', [
+            'tag' => $request->query('tag', ''),
             'showSemanticToggle' => config('features.memory_graph_semantic'),
         ]);
     }
 
-    public function data(Request $request, Project $project): JsonResponse
+    public function data(Request $request): JsonResponse
     {
-        $this->authorize('view', $project);
-
-        $query = ThoughtGraphQuery::forProject(
-            (int) $request->user()->id,
-            $project->id,
-            $request->query(),
-        );
+        $query = ThoughtGraphQuery::forTag((int) $request->user()->id, $request->query());
 
         return response()->json($this->graphs->build($this->stripDisabledGraphLayers($query)));
     }

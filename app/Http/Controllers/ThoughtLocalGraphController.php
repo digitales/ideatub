@@ -3,14 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\StripsMemoryGraphLayers;
-use App\Models\Project;
+use App\Models\Thought;
 use App\Services\Graph\ThoughtGraphQuery;
 use App\Services\Graph\ThoughtGraphService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-class ProjectGraphController extends Controller
+class ThoughtLocalGraphController extends Controller
 {
     use StripsMemoryGraphLayers;
 
@@ -18,23 +18,23 @@ class ProjectGraphController extends Controller
         private readonly ThoughtGraphService $graphs,
     ) {}
 
-    public function show(Project $project): View
+    public function show(Thought $thought): View
     {
-        $this->authorize('view', $project);
+        $this->authorize('view', $thought);
 
-        return view('projects.graph', [
-            'project' => $project,
+        return view('graph.thought_local', [
+            'thought' => $thought,
             'showSemanticToggle' => config('features.memory_graph_semantic'),
         ]);
     }
 
-    public function data(Request $request, Project $project): JsonResponse
+    public function data(Request $request, Thought $thought): JsonResponse
     {
-        $this->authorize('view', $project);
+        $this->authorize('view', $thought);
 
-        $query = ThoughtGraphQuery::forProject(
+        $query = ThoughtGraphQuery::forLocal(
             (int) $request->user()->id,
-            $project->id,
+            $thought->id,
             $request->query(),
         );
 

@@ -14,6 +14,7 @@ use App\Models\Thought;
 use App\Models\ThoughtCommentRead;
 use App\Models\ThoughtLink;
 use App\Models\ThoughtLinkSummary;
+use App\Models\ThoughtSuggestedLink;
 use App\Models\User;
 use App\Models\UserPreference;
 use App\Services\DemoMode;
@@ -455,6 +456,17 @@ class IdeaController extends Controller
             }
         }
 
+        $thoughtSuggestedLinks = collect();
+        if (config('features.memory_graph_suggestions')) {
+            $thoughtSuggestedLinks = ThoughtSuggestedLink::query()
+                ->where('user_id', auth()->id())
+                ->where('from_thought_id', $thought->id)
+                ->active()
+                ->with('toThought')
+                ->orderBy('distance')
+                ->get();
+        }
+
         if (app(DemoMode::class)->enabled()) {
             $obfuscator = app(DemoObfuscator::class);
             $linkTargetThoughtOptions = $linkTargetThoughtOptions->map(
@@ -496,6 +508,19 @@ class IdeaController extends Controller
 
                 return $link;
             });
+            $thoughtSuggestedLinks = $thoughtSuggestedLinks->map(function (
+                ThoughtSuggestedLink $suggestion
+            ) use ($obfuscator): ThoughtSuggestedLink {
+                $suggestion->toThought->setAttribute(
+                    'content',
+                    $obfuscator->obfuscate(
+                        $suggestion->toThought->content,
+                        'thought_detail_suggested_link'
+                    ) ?? 'Demo content hidden'
+                );
+
+                return $suggestion;
+            });
         }
 
         $detailCommentsPresenter = new ResearchCommentsPresenter(
@@ -513,6 +538,7 @@ class IdeaController extends Controller
             'thoughtIncomingLinks' => $thoughtIncomingLinks,
             'linkTargetThoughtOptions' => $linkTargetThoughtOptions,
             'linkTargetThoughtOptionsUsedGlobalFallback' => $linkTargetThoughtOptionsUsedGlobalFallback,
+            'thoughtSuggestedLinks' => $thoughtSuggestedLinks,
             'detailCommentsPresenter' => $detailCommentsPresenter,
             'researchContentComments' => ResearchContentCommentsViewData::none(),
         ]);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreThoughtLinkRequest;
 use App\Models\Thought;
 use App\Models\ThoughtLink;
+use App\Models\ThoughtSuggestedLink;
 use Illuminate\Http\RedirectResponse;
 
 class ThoughtLinkController extends Controller
@@ -24,6 +25,14 @@ class ThoughtLinkController extends Controller
             'link_type' => $linkType,
             'note' => $validated['note'] ?? null,
         ]);
+
+        if (! empty($validated['suggestion_id'])) {
+            ThoughtSuggestedLink::query()
+                ->where('id', $validated['suggestion_id'])
+                ->where('from_thought_id', $thought->id)
+                ->where('user_id', $request->user()->id)
+                ->update(['promoted_at' => now()]);
+        }
 
         return back()->with('success', 'Link added.');
     }

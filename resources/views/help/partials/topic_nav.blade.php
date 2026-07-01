@@ -53,6 +53,11 @@
             'title' => 'Attention Pulse',
             'description' => 'Memory health, commitments, and Jira follow-ups.',
         ],
+        [
+            'href' => route('help.memory-graph'),
+            'title' => 'Memory graph',
+            'description' => 'Local, project, tag, semantic, and vault graph levels.',
+        ],
     ];
 @endphp
 

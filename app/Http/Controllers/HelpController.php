@@ -394,6 +394,18 @@ class HelpController extends Controller
         ]);
     }
 
+    public function memoryGraph(): View
+    {
+        $path = resource_path('content/help/memory-graph.md');
+        $markdown = File::exists($path) ? File::get($path) : '';
+        $converter = SafeCommonMarkConverter::make();
+        $bodyHtml = $converter->convert($markdown)->getContent();
+
+        return view('help-memory-graph', [
+            'bodyHtml' => $bodyHtml,
+        ]);
+    }
+
     public function workingMemoryAuthoringDownload(string $prompt): BinaryFileResponse
     {
         $catalog = self::workingMemoryAuthoringCatalog();
