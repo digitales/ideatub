@@ -35,6 +35,20 @@
             'thoughtProjectsForDetail' => $thoughtProjectsForDetail,
             'editable' => ! app(\App\Services\DemoMode::class)->enabled(),
         ])
+
+        @if (config('features.memory_graph_local'))
+            @include('graph.partials.thought_local_graph_panel', [
+                'thought' => $thought,
+                'showSemanticToggle' => config('features.memory_graph_semantic'),
+            ])
+        @endif
+
+        @if (config('features.memory_graph_suggestions'))
+            @include('idea.partials.thought_suggested_links', [
+                'thought' => $thought,
+                'thoughtSuggestedLinks' => $thoughtSuggestedLinks,
+            ])
+        @endif
     @endslot
 
     @slot('main')

@@ -46,6 +46,7 @@ class StoreThoughtLinkRequest extends FormRequest
             ],
             'link_type' => $linkTypeRules,
             'note' => ['nullable', 'string', 'max:2000'],
+            'suggestion_id' => ['nullable', 'uuid', Rule::exists('thought_suggested_links', 'id')->where('from_thought_id', $from->id)],
         ];
     }
 }

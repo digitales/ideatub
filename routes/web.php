@@ -56,9 +56,14 @@ use App\Http\Controllers\SharedResearchViewController;
 use App\Http\Controllers\SkillSettingsController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\StreamLayoutController;
+use App\Http\Controllers\TagGraphController;
 use App\Http\Controllers\ThoughtLinkController;
+use App\Http\Controllers\ThoughtLocalGraphController;
 use App\Http\Controllers\ThoughtProjectController;
+use App\Http\Controllers\ThoughtSemanticGraphController;
+use App\Http\Controllers\ThoughtSuggestedLinkController;
 use App\Http\Controllers\ToolController;
+use App\Http\Controllers\VaultGraphController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\WorkingMemoryRefreshController;
@@ -177,6 +182,32 @@ Route::middleware('auth')->group(function () {
     // IdeaTub: primary capture — index (with optional ?q= search) and store thought
     Route::get('/', [IdeaController::class, 'index'])->name('idea.index');
     Route::get('/thoughts/{thought}', [IdeaController::class, 'show'])->name('thoughts.show');
+
+    Route::middleware('memory.graph:local')->group(function () {
+        Route::get('/thoughts/{thought}/graph', [ThoughtLocalGraphController::class, 'show'])->name('thoughts.graph');
+        Route::get('/thoughts/{thought}/graph/data', [ThoughtLocalGraphController::class, 'data'])->name('thoughts.graph.data');
+    });
+
+    Route::middleware('memory.graph:semantic')->group(function () {
+        Route::get('/thoughts/{thought}/semantic-graph', [ThoughtSemanticGraphController::class, 'show'])->name('thoughts.semantic_graph');
+        Route::get('/thoughts/{thought}/semantic-graph/data', [ThoughtSemanticGraphController::class, 'data'])->name('thoughts.semantic_graph.data');
+    });
+
+    Route::middleware('memory.graph:tag')->group(function () {
+        Route::get('/graph/tags', [TagGraphController::class, 'show'])->name('graph.tags');
+        Route::get('/graph/tags/data', [TagGraphController::class, 'data'])->name('graph.tags.data');
+    });
+
+    Route::middleware('memory.graph:vault')->group(function () {
+        Route::get('/graph', [VaultGraphController::class, 'show'])->name('graph.vault');
+        Route::get('/graph/data', [VaultGraphController::class, 'data'])->name('graph.vault.data');
+    });
+
+    Route::middleware('memory.graph:suggestions')->group(function () {
+        Route::post('/thoughts/{thought}/suggestions/{suggestion}/dismiss', [ThoughtSuggestedLinkController::class, 'dismiss'])
+            ->name('thoughts.suggestions.dismiss');
+    });
+
     Route::post('/thoughts/{thought}/links', [ThoughtLinkController::class, 'store'])->name('thoughts.links.store');
     Route::delete('/thoughts/{thought}/links/{thoughtLink}', [ThoughtLinkController::class, 'destroy'])->name('thoughts.links.destroy');
     Route::post('/thoughts/{thought}/projects', [ThoughtProjectController::class, 'store'])->name('thoughts.projects.store');
@@ -257,8 +288,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/projects/{project}/thoughts/{thought}', [ProjectThoughtController::class, 'destroy'])->name('projects.thoughts.destroy');
     Route::post('/projects/{project}/context', [ProjectContextController::class, 'store'])->name('projects.context.store');
     Route::delete('/projects/{project}/context', [ProjectContextController::class, 'destroy'])->name('projects.context.destroy');
-    Route::get('/projects/{project}/graph', [ProjectGraphController::class, 'show'])->name('projects.graph');
-    Route::get('/projects/{project}/graph/data', [ProjectGraphController::class, 'data'])->name('projects.graph.data');
+    Route::middleware('memory.graph:project')->group(function () {
+        Route::get('/projects/{project}/graph', [ProjectGraphController::class, 'show'])->name('projects.graph');
+        Route::get('/projects/{project}/graph/data', [ProjectGraphController::class, 'data'])->name('projects.graph.data');
+    });
 
     Route::prefix('learn')->name('learn.')->group(function () {
         Route::get('projects', [LearningProjectController::class, 'index'])->name('projects.index');
@@ -333,6 +366,7 @@ Route::middleware('auth')->group(function () {
         ->name('help.working-memory-authoring.show');
     Route::get('/help/working-memory-authoring', [HelpController::class, 'workingMemoryAuthoringIndex'])->name('help.working-memory-authoring.index');
     Route::get('/help/attention-pulse', [HelpController::class, 'attentionPulse'])->name('help.attention-pulse');
+    Route::get('/help/memory-graph', [HelpController::class, 'memoryGraph'])->name('help.memory-graph');
     Route::get('/help', [HelpController::class, 'index'])->name('help');
 
     // MCP key management (obtain / revoke auth key for AI clients)

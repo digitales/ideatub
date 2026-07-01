@@ -32,4 +32,15 @@ class FeaturesConfigTest extends TestCase
         $this->assertIsBool(config('features.working_memory_ai_authored'));
         $this->assertIsBool(config('features.attention_pulse'));
     }
+
+    #[Test]
+    public function memory_graph_feature_keys_exist_with_expected_defaults(): void
+    {
+        $this->assertFalse(config('features.memory_graph_local'));
+        $this->assertTrue(config('features.memory_graph_project'));
+        $this->assertFalse(config('features.memory_graph_tag'));
+        $this->assertFalse(config('features.memory_graph_semantic'));
+        $this->assertFalse(config('features.memory_graph_vault'));
+        $this->assertFalse(config('features.memory_graph_suggestions'));
+    }
 }

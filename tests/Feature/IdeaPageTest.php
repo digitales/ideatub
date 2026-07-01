@@ -366,6 +366,17 @@ class IdeaPageTest extends TestCase
         $response->assertSee('inbox:generate', false);
     }
 
+    public function test_memory_graph_help_renders(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('help.memory-graph'));
+
+        $response->assertOk();
+        $response->assertSee('Memory graph', false);
+        $response->assertSee('FEATURE_MEMORY_GRAPH_LOCAL', false);
+    }
+
     public function test_research_to_decision_skills_index_renders(): void
     {
         $user = User::factory()->create();

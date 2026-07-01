@@ -41,7 +41,9 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2 shrink-0">
-                <a href="{{ route('projects.graph', $project) }}" class="inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium text-deep-indigo ring-1 ring-deep-indigo/[0.08] bg-white hover:bg-white/80 transition">Graph</a>
+                @if (config('features.memory_graph_project'))
+                    <a href="{{ route('projects.graph', $project) }}" class="inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium text-deep-indigo ring-1 ring-deep-indigo/[0.08] bg-white hover:bg-white/80 transition">Graph</a>
+                @endif
                 <a href="{{ route('projects.shares.index', $project) }}" class="inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium text-deep-indigo ring-1 ring-deep-indigo/[0.08] bg-white hover:bg-white/80 transition">Share</a>
                 <a href="{{ route('projects.edit', $project) }}" class="inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium text-deep-indigo ring-1 ring-deep-indigo/[0.08] bg-white hover:bg-white/80 transition">Edit</a>
                 <form method="POST" action="{{ route('projects.destroy', $project) }}" class="m-0" onsubmit="return confirm('Archive this project? Thoughts stay in your library.');">

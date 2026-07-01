@@ -96,6 +96,11 @@
                         Pulse
                     </a>
                 @endif
+                @if (config('features.memory_graph_vault'))
+                    <a href="{{ route('graph.vault') }}" class="{{ $navLinkClass }}">
+                        Graph
+                    </a>
+                @endif
                 <a href="{{route('help')}}" class="{{$navLinkClass}}">
                     Help
                 </a>
@@ -132,6 +137,11 @@
                         @if (config('features.attention_pulse') && \Illuminate\Support\Facades\Route::has('pulse.show'))
                             <a href="{{route('pulse.show')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                                 Pulse
+                            </a>
+                        @endif
+                        @if (config('features.memory_graph_vault'))
+                            <a href="{{ route('graph.vault') }}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
+                                Graph
                             </a>
                         @endif
                         <div class="border-t border-memory-violet/10 my-1"></div>
