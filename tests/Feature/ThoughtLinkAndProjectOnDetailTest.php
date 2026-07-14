@@ -7,8 +7,13 @@ use App\Models\ThoughtLink;
 use App\Models\User;
 use App\Services\DemoMode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Queue::fake();
+});
 
 test('user can create and delete a thought link from detail', function () {
     $user = User::factory()->create();
