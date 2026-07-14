@@ -15,17 +15,24 @@ class ProjectMembershipService
             throw new InvalidArgumentException('Thought must belong to the project owner.');
         }
 
-        if ($project->thoughts()->whereKey($thought->id)->exists()) {
-            return;
-        }
+        DB::transaction(function () use ($project, $thought): void {
+            // Serialize concurrent attaches for this project (e.g. Octane workers).
+            // Without this, two requests can both read the same max(sort_order) and
+            // collide on project_thought_project_id_sort_order_unique.
+            Project::query()->whereKey($project->id)->lockForUpdate()->firstOrFail();
 
-        $max = DB::table('project_thought')
-            ->where('project_id', $project->id)
-            ->max('sort_order');
+            if ($project->thoughts()->whereKey($thought->id)->exists()) {
+                return;
+            }
 
-        $next = $max === null ? 0 : (int) $max + 1;
+            $max = DB::table('project_thought')
+                ->where('project_id', $project->id)
+                ->max('sort_order');
 
-        $project->thoughts()->attach($thought->id, ['sort_order' => $next]);
+            $next = $max === null ? 0 : (int) $max + 1;
+
+            $project->thoughts()->attach($thought->id, ['sort_order' => $next]);
+        });
     }
 
     public function removeThought(Project $project, Thought $thought): void
