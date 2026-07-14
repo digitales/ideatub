@@ -100,7 +100,7 @@ class ThoughtObserver
                 continue;
             }
 
-            WorkingMemoryRebuildJob::dispatch((string) $project->id);
+            WorkingMemoryRebuildJob::dispatch((string) $project->id)->afterCommit();
         }
     }
 

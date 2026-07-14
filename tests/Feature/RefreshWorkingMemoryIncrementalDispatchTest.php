@@ -183,6 +183,10 @@ final class RefreshWorkingMemoryIncrementalDispatchTest extends TestCase
         $thought = Thought::factory()->create(['user_id' => $user->id]);
         $thought->projects()->attach($project->id, ['sort_order' => 1]);
 
+        Queue::fake();
+
+        $thought->update(['content' => 'Edited content to trigger ThoughtObserver.']);
+
         Queue::assertNotPushed(WorkingMemoryRebuildJob::class);
     }
 
