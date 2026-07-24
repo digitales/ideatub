@@ -22,10 +22,31 @@ class EmailSenderRuleSettingsController extends Controller
 
     public function index(Request $request): View
     {
-        $rules = $request->user()->emailSenderRules()->orderBy('sender_email')->get();
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'action' => ['nullable', 'string'],
+        ]);
+
+        $filterAction = $this->resolvedFilterAction($request);
+        $filterQ = trim((string) ($validated['q'] ?? ''));
+
+        $query = $request->user()->emailSenderRules()->orderBy('sender_email');
+
+        if ($filterAction !== null) {
+            $query->where('action', $filterAction);
+        }
+
+        if ($filterQ !== '') {
+            $escaped = addcslashes($filterQ, '%_\\');
+            $query->whereRaw('LOWER(sender_email) LIKE ?', ['%'.mb_strtolower($escaped).'%']);
+        }
+
+        $rules = $query->paginate(25)->withQueryString();
 
         return view('settings.email-sender-rules', [
             'rules' => $rules,
+            'filterAction' => $filterAction,
+            'filterQ' => $filterQ,
         ]);
     }
 
@@ -40,7 +61,7 @@ class EmailSenderRuleSettingsController extends Controller
 
         if ($request->user()->emailSenderRules()->where('sender_email', $senderEmail)->exists()) {
             return redirect()
-                ->route('settings.email-sender-rules.index')
+                ->route('settings.email-sender-rules.index', $this->filterRedirectQuery($request))
                 ->withInput()
                 ->with('error', 'A rule for that sender email already exists.');
         }
@@ -55,7 +76,7 @@ class EmailSenderRuleSettingsController extends Controller
         }
 
         return redirect()
-            ->route('settings.email-sender-rules.index')
+            ->route('settings.email-sender-rules.index', $this->filterRedirectQuery($request))
             ->with('success', 'Sender rule added.');
     }
 
@@ -74,7 +95,7 @@ class EmailSenderRuleSettingsController extends Controller
         }
 
         return redirect()
-            ->route('settings.email-sender-rules.index')
+            ->route('settings.email-sender-rules.index', $this->filterRedirectQuery($request))
             ->with('success', 'Sender rule updated.');
     }
 
@@ -90,7 +111,46 @@ class EmailSenderRuleSettingsController extends Controller
         }
 
         return redirect()
-            ->route('settings.email-sender-rules.index')
+            ->route('settings.email-sender-rules.index', $this->filterRedirectQuery($request))
             ->with('success', 'Sender rule removed.');
+    }
+
+    /**
+     * @return array{action?: string, q?: string}
+     */
+    private function filterRedirectQuery(Request $request): array
+    {
+        $query = [];
+        $action = $this->resolvedFilterAction($request);
+        if ($action !== null) {
+            $query['action'] = $action;
+        }
+
+        $q = $this->resolvedFilterQ($request);
+        if ($q !== '') {
+            $query['q'] = $q;
+        }
+
+        return $query;
+    }
+
+    private function resolvedFilterAction(Request $request): ?string
+    {
+        $raw = $request->input('filter_action', $request->query('action'));
+        if (! is_string($raw) || $raw === '' || $raw === 'all') {
+            return null;
+        }
+
+        return EmailSenderRule::isValidAction($raw) ? $raw : null;
+    }
+
+    private function resolvedFilterQ(Request $request): string
+    {
+        $raw = $request->input('filter_q', $request->query('q', ''));
+        if (! is_string($raw)) {
+            return '';
+        }
+
+        return trim(mb_substr($raw, 0, 255));
     }
 }

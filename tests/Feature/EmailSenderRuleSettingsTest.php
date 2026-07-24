@@ -217,4 +217,203 @@ class EmailSenderRuleSettingsTest extends TestCase
             return $job->userId === $user->id && $job->senderEmail === 'remove-me@example.com';
         });
     }
+
+    public function test_settings_page_filters_rules_by_action(): void
+    {
+        $user = User::factory()->create();
+        $user->emailSenderRules()->create([
+            'sender_email' => 'allow@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+        $user->emailSenderRules()->create([
+            'sender_email' => 'ignore@example.com',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('settings.email-sender-rules.index', ['action' => EmailSenderRule::ACTION_IGNORE]))
+            ->assertOk()
+            ->assertSee('ignore@example.com')
+            ->assertDontSee('allow@example.com');
+    }
+
+    public function test_settings_page_filters_rules_by_sender_substring_case_insensitive(): void
+    {
+        $user = User::factory()->create();
+        $user->emailSenderRules()->create([
+            'sender_email' => 'newsletter@substack.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+        $user->emailSenderRules()->create([
+            'sender_email' => 'alerts@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('settings.email-sender-rules.index', ['q' => 'SUBSTACK']))
+            ->assertOk()
+            ->assertSee('newsletter@substack.com')
+            ->assertDontSee('alerts@example.com');
+    }
+
+    public function test_settings_page_combines_action_and_q_filters(): void
+    {
+        $user = User::factory()->create();
+        $user->emailSenderRules()->create([
+            'sender_email' => 'a@substack.com',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ]);
+        $user->emailSenderRules()->create([
+            'sender_email' => 'b@substack.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+        $user->emailSenderRules()->create([
+            'sender_email' => 'c@other.com',
+            'action' => EmailSenderRule::ACTION_IGNORE,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('settings.email-sender-rules.index', [
+                'action' => EmailSenderRule::ACTION_IGNORE,
+                'q' => 'substack',
+            ]))
+            ->assertOk()
+            ->assertSee('a@substack.com')
+            ->assertDontSee('b@substack.com')
+            ->assertDontSee('c@other.com');
+    }
+
+    public function test_invalid_action_query_param_is_ignored(): void
+    {
+        $user = User::factory()->create();
+        $user->emailSenderRules()->create([
+            'sender_email' => 'allow@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('settings.email-sender-rules.index', ['action' => 'not-a-real-action']))
+            ->assertOk()
+            ->assertSee('allow@example.com');
+    }
+
+    public function test_settings_page_paginates_and_preserves_filters_in_links(): void
+    {
+        $user = User::factory()->create();
+        for ($i = 0; $i < 26; $i++) {
+            $user->emailSenderRules()->create([
+                'sender_email' => sprintf('ignore-%02d@example.com', $i),
+                'action' => EmailSenderRule::ACTION_IGNORE,
+            ]);
+        }
+        $user->emailSenderRules()->create([
+            'sender_email' => 'allow@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get(route('settings.email-sender-rules.index', [
+                'action' => EmailSenderRule::ACTION_IGNORE,
+                'q' => 'example.com',
+            ]));
+
+        $response->assertOk();
+        $response->assertSee('page=2');
+        $response->assertSee('action=ignore');
+        $response->assertSee('q=example.com');
+        $response->assertDontSee('allow@example.com');
+    }
+
+    public function test_empty_filtered_state_differs_from_empty_account(): void
+    {
+        $user = User::factory()->create();
+        $user->emailSenderRules()->create([
+            'sender_email' => 'allow@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('settings.email-sender-rules.index', ['action' => EmailSenderRule::ACTION_IGNORE]))
+            ->assertOk()
+            ->assertSee('No rules match these filters.')
+            ->assertDontSee('No sender rules yet.');
+    }
+
+    public function test_store_redirect_preserves_filter_query(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('settings.email-sender-rules.store'), [
+            'sender_email' => 'new@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+            'filter_action' => EmailSenderRule::ACTION_IGNORE,
+            'filter_q' => 'substack',
+        ]);
+
+        $response->assertRedirect(route('settings.email-sender-rules.index', [
+            'action' => EmailSenderRule::ACTION_IGNORE,
+            'q' => 'substack',
+        ]));
+    }
+
+    public function test_update_redirect_preserves_filter_query(): void
+    {
+        $user = User::factory()->create();
+        $rule = $user->emailSenderRules()->create([
+            'sender_email' => 'update-me@example.com',
+            'action' => EmailSenderRule::ACTION_REVIEW,
+        ]);
+
+        $response = $this->actingAs($user)->patch(
+            route('settings.email-sender-rules.update', $rule),
+            [
+                'action' => EmailSenderRule::ACTION_EXTRA_PROCESS,
+                'filter_action' => EmailSenderRule::ACTION_REVIEW,
+                'filter_q' => 'update-me',
+            ]
+        );
+
+        $response->assertRedirect(route('settings.email-sender-rules.index', [
+            'action' => EmailSenderRule::ACTION_REVIEW,
+            'q' => 'update-me',
+        ]));
+    }
+
+    public function test_destroy_redirect_preserves_filter_query(): void
+    {
+        $user = User::factory()->create();
+        $rule = $user->emailSenderRules()->create([
+            'sender_email' => 'remove-me@example.com',
+            'action' => EmailSenderRule::ACTION_REVIEW,
+        ]);
+
+        $response = $this->actingAs($user)->delete(
+            route('settings.email-sender-rules.destroy', $rule),
+            [
+                'filter_action' => EmailSenderRule::ACTION_IGNORE,
+                'filter_q' => 'news',
+            ]
+        );
+
+        $response->assertRedirect(route('settings.email-sender-rules.index', [
+            'action' => EmailSenderRule::ACTION_IGNORE,
+            'q' => 'news',
+        ]));
+    }
+
+    public function test_store_ignores_invalid_filter_action_on_redirect(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->post(route('settings.email-sender-rules.store'), [
+            'sender_email' => 'new@example.com',
+            'action' => EmailSenderRule::ACTION_ALLOW,
+            'filter_action' => 'bogus',
+            'filter_q' => 'keep-me',
+        ]);
+
+        $response->assertRedirect(route('settings.email-sender-rules.index', [
+            'q' => 'keep-me',
+        ]));
+    }
 }
