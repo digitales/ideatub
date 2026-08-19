@@ -52,7 +52,7 @@
             <p class="text-sm text-slate-brand/70 max-w-sm mx-auto">No open prospects. Add one via the <code class="text-xs">add_prospect</code> MCP tool, or from your sourcing workflow.</p>
         </div>
     @else
-        <div class="-mx-6 -my-2 overflow-x-auto whitespace-nowrap px-6 py-2">
+        <div class="ideatub-scroll-x -mx-6 -my-2 overflow-x-auto whitespace-nowrap px-6 py-2">
             <div class="inline-block min-w-full align-middle">
                 <table class="w-full text-sm">
                     <thead>
@@ -61,7 +61,7 @@
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Role</th>
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Source</th>
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Fit</th>
-                            <th class="pb-2 pr-4 font-medium whitespace-nowrap w-full">Notes</th>
+                            <th class="pb-2 pr-4 font-medium whitespace-nowrap">Notes</th>
                             <th class="pb-2 font-medium whitespace-nowrap">Actions</th>
                         </tr>
                     </thead>

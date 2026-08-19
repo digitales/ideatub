@@ -253,6 +253,33 @@
   .stream-card-expand {
     display: none;
   }
+
+  /* Always-visible horizontal scrollbar for wide tables (e.g. job pipeline
+     prospects list): macOS/Chrome default to an overlay scrollbar that only
+     appears on interaction, which hides that off-screen columns (like row
+     actions) are reachable at all. Forcing a thin, always-on scrollbar here
+     gives a persistent visual cue instead. */
+  .ideatub-scroll-x {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(109 106 247 / 0.35) transparent;
+  }
+
+  .ideatub-scroll-x::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .ideatub-scroll-x::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .ideatub-scroll-x::-webkit-scrollbar-thumb {
+    background-color: rgb(109 106 247 / 0.35);
+    border-radius: 9999px;
+  }
+
+  .ideatub-scroll-x::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(109 106 247 / 0.55);
+  }
 }
 
 html.dark {
