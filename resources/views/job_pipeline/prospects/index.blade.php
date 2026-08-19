@@ -52,7 +52,7 @@
             <p class="text-sm text-slate-brand/70 max-w-sm mx-auto">No open prospects. Add one via the <code class="text-xs">add_prospect</code> MCP tool, or from your sourcing workflow.</p>
         </div>
     @else
-        <div class="-mx-6 -my-2 overflow-x-auto px-6 py-2">
+        <div class="-mx-6 -my-2 overflow-x-auto whitespace-nowrap px-6 py-2">
             <div class="inline-block min-w-full align-middle">
                 <table class="w-full text-sm">
                     <thead>
@@ -60,7 +60,6 @@
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Company</th>
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Role</th>
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Source</th>
-                            <th class="pb-2 pr-4 font-medium whitespace-nowrap">Score</th>
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Fit</th>
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap w-full">Notes</th>
                             <th class="pb-2 font-medium whitespace-nowrap">Actions</th>
@@ -71,6 +70,7 @@
                             <tr
                                 x-data="{
                                     notes: @js($prospect->notes ?? ''),
+                                    expanded: false,
                                     saving: false,
                                     error: '',
                                     async save() {
@@ -100,13 +100,14 @@
                                 }"
                             >
                                 <td class="py-3 pr-4 align-top font-medium text-deep-indigo whitespace-nowrap">{{ $prospect->company }}</td>
-                                <td class="py-3 pr-4 align-top text-slate-brand whitespace-nowrap">
+                                <td class="py-3 pr-4 align-top text-slate-brand">
                                     @if ($prospect->url)
-                                        <a href="{{ $prospect->url }}" target="_blank" rel="noopener noreferrer" class="hover:text-memory-violet transition-colors">
-                                            {{ $prospect->role_title }} <span aria-hidden="true">↗</span>
+                                        <a href="{{ $prospect->url }}" target="_blank" rel="noopener noreferrer" title="{{ $prospect->role_title }}" class="group flex max-w-64 items-center gap-1 hover:text-memory-violet transition-colors">
+                                            <span class="truncate">{{ $prospect->role_title }}</span>
+                                            <span aria-hidden="true" class="shrink-0">↗</span>
                                         </a>
                                     @else
-                                        {{ $prospect->role_title }}
+                                        <span title="{{ $prospect->role_title }}" class="block max-w-64 truncate">{{ $prospect->role_title }}</span>
                                     @endif
                                 </td>
                                 <td class="py-3 pr-4 align-top whitespace-nowrap">
@@ -115,20 +116,31 @@
                                     </span>
                                 </td>
                                 <td class="py-3 pr-4 align-top whitespace-nowrap">
-                                    @if ($prospect->fit_score === null)
-                                        <span class="text-slate-brand/40">—</span>
-                                    @else
-                                        {{ $prospect->fit_score }}
-                                    @endif
-                                </td>
-                                <td class="py-3 pr-4 align-top whitespace-nowrap">
-                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium {{ $fitBadgeClass($prospect->fit_score) }}">
+                                    <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium {{ $fitBadgeClass($prospect->fit_score) }}">
+                                        @if ($prospect->fit_score !== null)
+                                            <span class="font-semibold tabular-nums">{{ $prospect->fit_score }}</span>
+                                        @endif
                                         {{ $fitLabel($prospect->fit_score) }}
                                     </span>
                                 </td>
-                                <td class="py-3 pr-4 min-w-64 align-top">
-                                    <textarea x-model="notes" rows="1" class="ideatub-input w-full resize-y" @blur="save()"></textarea>
-                                    <p x-show="error" x-cloak x-text="error" class="text-[11px] text-red-600 mt-1"></p>
+                                <td class="py-3 pr-4 max-w-64 align-top">
+                                    <button
+                                        type="button"
+                                        x-show="!expanded"
+                                        @click="expanded = true; $nextTick(() => $refs.notesInput.focus())"
+                                        class="block w-full max-w-64 truncate text-left text-slate-brand hover:text-deep-indigo"
+                                        x-text="notes || '—'"
+                                    ></button>
+                                    <textarea
+                                        x-show="expanded"
+                                        x-cloak
+                                        x-ref="notesInput"
+                                        x-model="notes"
+                                        rows="3"
+                                        class="ideatub-input w-full resize-y whitespace-normal"
+                                        @blur="expanded = false; save()"
+                                    ></textarea>
+                                    <p x-show="error" x-cloak x-text="error" class="text-[11px] text-red-600 mt-1 whitespace-normal"></p>
                                 </td>
                                 <td class="py-3 align-top">
                                     <div class="flex flex-nowrap items-start gap-1.5">
