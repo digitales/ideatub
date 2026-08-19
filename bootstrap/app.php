@@ -4,6 +4,7 @@ use App\Http\Middleware\AuthenticateOAuthBearer;
 use App\Http\Middleware\CheckOperationLimit;
 use App\Http\Middleware\EnsureAppearanceInSession;
 use App\Http\Middleware\EnsureAttentionPulseEnabled;
+use App\Http\Middleware\EnsureJobSearchEnabled;
 use App\Http\Middleware\EnsureMemoryGraphFeatureEnabled;
 use App\Http\Middleware\EnsureWorkingMemoryInsightsEnabled;
 use App\Http\Middleware\EnsureWorkingMemoryUiEnabled;
@@ -45,6 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'working.memory.ui' => EnsureWorkingMemoryUiEnabled::class,
             'working.memory.insights' => EnsureWorkingMemoryInsightsEnabled::class,
             'attention.pulse' => EnsureAttentionPulseEnabled::class,
+            'job.search' => EnsureJobSearchEnabled::class,
             'memory.graph' => EnsureMemoryGraphFeatureEnabled::class,
         ]);
     })

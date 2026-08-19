@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('interactions', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUuid('application_id')->constrained('applications')->cascadeOnDelete();
+            $table->string('type', 20);
+            $table->timestamp('occurred_at');
+            $table->text('summary');
+            $table->foreignUuid('debrief_thought_id')->nullable()->constrained('thoughts')->nullOnDelete();
+            $table->timestamps();
+
+            $table->index(['application_id', 'occurred_at']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('interactions');
+    }
+};

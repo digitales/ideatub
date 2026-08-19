@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class McpController extends Controller
@@ -148,6 +149,24 @@ class McpController extends Controller
         }
         if (config('services.jira.enabled', true)) {
             $base[] = 'sync_jira';
+        }
+        if (config('features.job_search')) {
+            array_push(
+                $base,
+                'add_prospect',
+                'score_prospect',
+                'promote_prospect',
+                'create_application',
+                'update_application_stage',
+                'log_interaction',
+                'get_pipeline_status',
+                'search_applications',
+                'add_achievement',
+                'retire_achievement',
+                'get_achievements',
+                'generate_application_documents',
+                'export_application_pdf',
+            );
         }
 
         return $base;
@@ -707,6 +726,156 @@ class McpController extends Controller
                 ],
             ],
         ];
+        if (config('features.job_search')) {
+            array_push(
+                $tools,
+                [
+                    'name' => 'add_prospect',
+                    'description' => 'Add a job prospect: cheap, fire-and-forget sourcing entry, no research yet.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'company' => ['type' => 'string'],
+                            'role_title' => ['type' => 'string'],
+                            'source' => ['type' => 'string', 'enum' => \App\Models\JobProspect::SOURCES],
+                            'url' => ['type' => 'string'],
+                        ],
+                        'required' => ['company', 'role_title', 'source'],
+                    ],
+                ],
+                [
+                    'name' => 'score_prospect',
+                    'description' => 'Set a fit score and optional notes on a prospect, moving it to scored.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'prospect_id' => ['type' => 'string'],
+                            'fit_score' => ['type' => 'integer'],
+                            'notes' => ['type' => 'string'],
+                        ],
+                        'required' => ['prospect_id', 'fit_score'],
+                    ],
+                ],
+                [
+                    'name' => 'promote_prospect',
+                    'description' => 'Promote a shortlisted prospect into an Application. Defaults to researching; pass applied for the already-applied-elsewhere fast path.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'prospect_id' => ['type' => 'string'],
+                            'stage' => ['type' => 'string', 'enum' => \App\Models\Application::STAGES],
+                        ],
+                        'required' => ['prospect_id'],
+                    ],
+                ],
+                [
+                    'name' => 'create_application',
+                    'description' => 'Create an Application directly, bypassing the prospect stage, for a role that does not need sourcing.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'company' => ['type' => 'string'],
+                            'role_title' => ['type' => 'string'],
+                            'source' => ['type' => 'string'],
+                        ],
+                        'required' => ['company', 'role_title'],
+                    ],
+                ],
+                [
+                    'name' => 'update_application_stage',
+                    'description' => 'Move an Application to a new stage, optionally logging a note.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'stage' => ['type' => 'string', 'enum' => \App\Models\Application::STAGES],
+                            'note' => ['type' => 'string'],
+                        ],
+                        'required' => ['application_id', 'stage'],
+                    ],
+                ],
+                [
+                    'name' => 'log_interaction',
+                    'description' => 'Log an interaction (interview, follow_up, rejection, offer, note) against an Application.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'type' => ['type' => 'string', 'enum' => \App\Models\Interaction::TYPES],
+                            'summary' => ['type' => 'string'],
+                        ],
+                        'required' => ['application_id', 'type', 'summary'],
+                    ],
+                ],
+                [
+                    'name' => 'get_pipeline_status',
+                    'description' => 'Return all open prospects and applications grouped by stage.',
+                    'inputSchema' => ['type' => 'object', 'properties' => (object) []],
+                ],
+                [
+                    'name' => 'search_applications',
+                    'description' => 'Search applications by company or role title.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => ['query' => ['type' => 'string']],
+                        'required' => ['query'],
+                    ],
+                ],
+                [
+                    'name' => 'add_achievement',
+                    'description' => 'Add a reusable Achievement bullet, tagged for later CV assembly.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'tag' => ['type' => 'string'],
+                            'bullet_text' => ['type' => 'string'],
+                        ],
+                        'required' => ['tag', 'bullet_text'],
+                    ],
+                ],
+                [
+                    'name' => 'retire_achievement',
+                    'description' => 'Soft-retire an Achievement so it stops appearing in new document assembly.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => ['achievement_id' => ['type' => 'string']],
+                        'required' => ['achievement_id'],
+                    ],
+                ],
+                [
+                    'name' => 'get_achievements',
+                    'description' => 'Query Achievements, optionally filtered by tag, for CV assembly from chat.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => ['tags' => ['type' => 'array', 'items' => ['type' => 'string']]],
+                    ],
+                ],
+                [
+                    'name' => 'generate_application_documents',
+                    'description' => 'Assemble cv_markdown / cover_letter_markdown from Achievement + the research brief, save as draft, return for review.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'tags' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        ],
+                        'required' => ['application_id'],
+                    ],
+                ],
+                [
+                    'name' => 'export_application_pdf',
+                    'description' => 'Render the current markdown to PDF via CvStyle.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'document' => ['type' => 'string', 'enum' => ['cv', 'cover_letter']],
+                        ],
+                        'required' => ['application_id', 'document'],
+                    ],
+                ],
+            );
+        }
         if (config('services.jira.enabled', true)) {
             $tools[] = [
                 'name' => 'sync_jira',
@@ -937,6 +1106,19 @@ class McpController extends Controller
             'upsert_working_memory' => $this->upsertWorkingMemory($params),
             'get_attention_overview' => $this->getAttentionOverview($params),
             'sync_jira' => $this->syncJira($params),
+            'add_prospect' => $this->addProspect($params),
+            'score_prospect' => $this->scoreProspect($params),
+            'promote_prospect' => $this->promoteProspect($params),
+            'create_application' => $this->createApplication($params),
+            'update_application_stage' => $this->updateApplicationStage($params),
+            'log_interaction' => $this->logInteraction($params),
+            'get_pipeline_status' => $this->getPipelineStatus($params),
+            'search_applications' => $this->searchApplications($params),
+            'add_achievement' => $this->addAchievement($params),
+            'retire_achievement' => $this->retireAchievement($params),
+            'get_achievements' => $this->getAchievements($params),
+            'generate_application_documents' => $this->generateApplicationDocuments($params),
+            'export_application_pdf' => $this->exportApplicationPdf($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
     }
@@ -1912,6 +2094,333 @@ class McpController extends Controller
         }
 
         return $out;
+    }
+
+    private function addProspect(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'company' => 'required|string|max:255',
+            'role_title' => 'required|string|max:255',
+            'source' => ['required', 'string', Rule::in(\App\Models\JobProspect::SOURCES)],
+            'url' => 'sometimes|nullable|string|max:500',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $prospect = \App\Models\JobProspect::query()->create([
+            'user_id' => auth()->id(),
+            'company' => $params['company'],
+            'role_title' => $params['role_title'],
+            'source' => $params['source'],
+            'url' => $params['url'] ?? null,
+            'status' => 'new',
+            'discovered_at' => now(),
+        ]);
+
+        return ['data' => ['prospect_id' => $prospect->id]];
+    }
+
+    private function scoreProspect(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'prospect_id' => 'required|uuid',
+            'fit_score' => 'required|integer|min:0|max:100',
+            'notes' => 'sometimes|nullable|string',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $prospect = \App\Models\JobProspect::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['prospect_id']);
+
+        $prospect->update([
+            'fit_score' => $params['fit_score'],
+            'notes' => $params['notes'] ?? $prospect->notes,
+            'status' => 'scored',
+            'scored_at' => now(),
+        ]);
+
+        return ['data' => ['prospect_id' => $prospect->id]];
+    }
+
+    private function promoteProspect(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'prospect_id' => 'required|uuid',
+            'stage' => ['sometimes', 'nullable', 'string', Rule::in(\App\Models\Application::STAGES)],
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $prospect = \App\Models\JobProspect::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['prospect_id']);
+
+        $application = app(\App\Services\JobSearch\ProspectPromotionService::class)
+            ->promote($prospect, $params['stage'] ?? null);
+
+        return ['data' => ['application_id' => $application->id]];
+    }
+
+    private function createApplication(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'company' => 'required|string|max:255',
+            'role_title' => 'required|string|max:255',
+            'source' => 'sometimes|nullable|string|max:20',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $company = \App\Models\Company::query()->firstOrCreate(
+            ['user_id' => auth()->id(), 'name' => $params['company']],
+            []
+        );
+
+        $application = \App\Models\Application::query()->create([
+            'user_id' => auth()->id(),
+            'company_id' => $company->id,
+            'role_title' => $params['role_title'],
+            'stage' => 'researching',
+            'source' => $params['source'] ?? null,
+            'last_activity_at' => now(),
+        ]);
+
+        return ['data' => ['application_id' => $application->id]];
+    }
+
+    private function updateApplicationStage(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'application_id' => 'required|uuid',
+            'stage' => ['required', 'string', Rule::in(\App\Models\Application::STAGES)],
+            'note' => 'sometimes|nullable|string',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $application = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['application_id']);
+
+        $application->update([
+            'stage' => $params['stage'],
+            'applied_at' => $params['stage'] === 'applied' && $application->applied_at === null ? now() : $application->applied_at,
+            'last_activity_at' => now(),
+        ]);
+
+        if (! empty($params['note'])) {
+            \App\Models\Interaction::query()->create([
+                'user_id' => auth()->id(),
+                'application_id' => $application->id,
+                'type' => 'note',
+                'occurred_at' => now(),
+                'summary' => $params['note'],
+            ]);
+        }
+
+        return ['data' => ['application_id' => $application->id, 'stage' => $application->stage]];
+    }
+
+    private function logInteraction(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'application_id' => 'required|uuid',
+            'type' => ['required', 'string', Rule::in(\App\Models\Interaction::TYPES)],
+            'summary' => 'required|string',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $application = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['application_id']);
+
+        $interaction = \App\Models\Interaction::query()->create([
+            'user_id' => auth()->id(),
+            'application_id' => $application->id,
+            'type' => $params['type'],
+            'occurred_at' => now(),
+            'summary' => $params['summary'],
+        ]);
+
+        $application->update(['last_activity_at' => now()]);
+
+        return ['data' => ['interaction_id' => $interaction->id]];
+    }
+
+    private function getPipelineStatus(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+
+        $prospects = \App\Models\JobProspect::query()
+            ->where('user_id', auth()->id())
+            ->whereIn('status', ['new', 'scored', 'shortlisted'])
+            ->get(['id', 'company', 'role_title', 'status', 'fit_score'])
+            ->groupBy('status');
+
+        $applications = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->whereNotIn('stage', ['rejected', 'withdrawn'])
+            ->with('company:id,name')
+            ->get(['id', 'company_id', 'role_title', 'stage'])
+            ->groupBy('stage');
+
+        return ['data' => ['prospects' => $prospects, 'applications' => $applications]];
+    }
+
+    private function searchApplications(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, ['query' => 'required|string']);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $query = trim((string) $params['query']);
+        $applications = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->where(function ($q) use ($query) {
+                $q->where('role_title', 'like', "%{$query}%")
+                    ->orWhereHas('company', fn ($c) => $c->where('name', 'like', "%{$query}%"));
+            })
+            ->with('company:id,name')
+            ->get(['id', 'company_id', 'role_title', 'stage']);
+
+        return ['data' => ['applications' => $applications]];
+    }
+
+    private function addAchievement(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'tag' => 'required|string|max:100',
+            'bullet_text' => 'required|string',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $achievement = \App\Models\Achievement::query()->create([
+            'user_id' => auth()->id(),
+            'tag' => $params['tag'],
+            'bullet_text' => $params['bullet_text'],
+            'times_used' => 0,
+        ]);
+
+        return ['data' => ['achievement_id' => $achievement->id]];
+    }
+
+    private function retireAchievement(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, ['achievement_id' => 'required|uuid']);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $achievement = \App\Models\Achievement::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['achievement_id']);
+
+        $achievement->update(['retired_at' => now()]);
+
+        return ['data' => ['achievement_id' => $achievement->id]];
+    }
+
+    private function getAchievements(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+
+        $tags = isset($params['tags']) && is_array($params['tags']) ? $params['tags'] : [];
+        $achievements = \App\Models\Achievement::query()
+            ->where('user_id', auth()->id())
+            ->active()
+            ->when($tags !== [], fn ($q) => $q->whereIn('tag', $tags))
+            ->get(['id', 'tag', 'bullet_text', 'times_used', 'last_used_at']);
+
+        return ['data' => ['achievements' => $achievements]];
+    }
+
+    private function generateApplicationDocuments(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'application_id' => 'required|uuid',
+            'tags' => 'sometimes|nullable|array',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $application = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['application_id']);
+
+        $result = app(\App\Services\Documents\DocumentAssemblyService::class)
+            ->assemble($application, $params['tags'] ?? []);
+
+        return ['data' => $result];
+    }
+
+    private function exportApplicationPdf(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'application_id' => 'required|uuid',
+            'document' => ['required', 'string', Rule::in(['cv', 'cover_letter'])],
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $application = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['application_id']);
+
+        $path = app(\App\Services\Documents\PdfExportService::class)
+            ->export($application, $params['document']);
+
+        return ['data' => ['path' => $path]];
     }
 
     private function jsonRpcError(int $code, string $message, mixed $id): JsonResponse
