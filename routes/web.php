@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AchievementController;
 use App\Http\Controllers\Api\RealtimeCheckController;
 use App\Http\Controllers\AppearanceController;
 use App\Http\Controllers\ArticleController;
@@ -23,6 +24,8 @@ use App\Http\Controllers\ImportController;
 use App\Http\Controllers\InboundEmailController;
 use App\Http\Controllers\InboxController;
 use App\Http\Controllers\JiraSettingsController;
+use App\Http\Controllers\JobApplicationController;
+use App\Http\Controllers\JobProspectController;
 use App\Http\Controllers\Learning\LearningCaptureController;
 use App\Http\Controllers\Learning\LearningLessonController;
 use App\Http\Controllers\Learning\LearningLessonNoteController;
@@ -484,4 +487,23 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard (requires authentication)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::middleware('job.search')->prefix('job-pipeline')->name('job_pipeline.')->group(function () {
+        Route::get('/applications', [JobApplicationController::class, 'index'])->name('applications.index');
+        Route::get('/applications/{application}', [JobApplicationController::class, 'show'])->name('applications.show');
+        Route::patch('/applications/{application}', [JobApplicationController::class, 'update'])->name('applications.update');
+        Route::post('/applications/{application}/export/{document}', [JobApplicationController::class, 'export'])
+            ->where('document', 'cv|cover_letter')->name('applications.export');
+
+        Route::get('/prospects', [JobProspectController::class, 'index'])->name('prospects.index');
+        Route::patch('/prospects/{prospect}', [JobProspectController::class, 'update'])->name('prospects.update');
+        Route::post('/prospects/{prospect}/shortlist', [JobProspectController::class, 'shortlist'])->name('prospects.shortlist');
+        Route::post('/prospects/{prospect}/mark-applied', [JobProspectController::class, 'markApplied'])->name('prospects.mark-applied');
+        Route::post('/prospects/{prospect}/dismiss', [JobProspectController::class, 'dismiss'])->name('prospects.dismiss');
+
+        Route::get('/achievements', [AchievementController::class, 'index'])->name('achievements.index');
+        Route::post('/achievements', [AchievementController::class, 'store'])->name('achievements.store');
+        Route::patch('/achievements/{achievement}', [AchievementController::class, 'update'])->name('achievements.update');
+        Route::post('/achievements/{achievement}/retire', [AchievementController::class, 'retire'])->name('achievements.retire');
+    });
 });

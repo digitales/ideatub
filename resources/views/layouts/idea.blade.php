@@ -96,6 +96,11 @@
                         Pulse
                     </a>
                 @endif
+                @if (config('features.job_search') && \Illuminate\Support\Facades\Route::has('job_pipeline.applications.index'))
+                    <a href="{{route('job_pipeline.applications.index')}}" class="{{$navLinkClass}}">
+                        Job Pipeline
+                    </a>
+                @endif
                 @if (config('features.memory_graph_vault'))
                     <a href="{{ route('graph.vault') }}" class="{{ $navLinkClass }}">
                         Graph
@@ -137,6 +142,11 @@
                         @if (config('features.attention_pulse') && \Illuminate\Support\Facades\Route::has('pulse.show'))
                             <a href="{{route('pulse.show')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
                                 Pulse
+                            </a>
+                        @endif
+                        @if (config('features.job_search') && \Illuminate\Support\Facades\Route::has('job_pipeline.applications.index'))
+                            <a href="{{route('job_pipeline.applications.index')}}" class="ideatub-mobile-nav-link" @click="mobileNavOpen = false">
+                                Job Pipeline
                             </a>
                         @endif
                         @if (config('features.memory_graph_vault'))
