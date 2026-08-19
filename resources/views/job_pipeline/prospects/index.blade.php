@@ -81,22 +81,22 @@
                                     },
                                 }"
                             >
-                                <td class="py-3 pr-4 font-medium text-deep-indigo whitespace-nowrap">{{ $prospect->company }}</td>
-                                <td class="py-3 pr-4 text-slate-brand whitespace-nowrap">{{ $prospect->role_title }}</td>
-                                <td class="py-3 pr-4 whitespace-nowrap">
+                                <td class="py-3 pr-4 align-top font-medium text-deep-indigo whitespace-nowrap">{{ $prospect->company }}</td>
+                                <td class="py-3 pr-4 align-top text-slate-brand whitespace-nowrap">{{ $prospect->role_title }}</td>
+                                <td class="py-3 pr-4 align-top whitespace-nowrap">
                                     <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize {{ $sourceBadgeClass($prospect->source) }}">
                                         {{ str($prospect->source)->headline() }}
                                     </span>
                                 </td>
-                                <td class="py-3 pr-4 min-w-64">
+                                <td class="py-3 pr-4 min-w-64 align-top">
                                     <textarea x-model="notes" rows="1" class="ideatub-input w-full resize-y" @blur="save()"></textarea>
                                     <p x-show="error" x-cloak x-text="error" class="text-[11px] text-red-600 mt-1"></p>
                                 </td>
-                                <td class="py-3">
-                                    <div class="flex flex-wrap gap-1.5">
-                                        <form method="POST" action="{{ route('job_pipeline.prospects.shortlist', $prospect) }}">@csrf<button type="submit" class="ideatub-btn-secondary-sm">Shortlist</button></form>
-                                        <form method="POST" action="{{ route('job_pipeline.prospects.mark-applied', $prospect) }}">@csrf<button type="submit" class="ideatub-btn-secondary-sm">Mark applied</button></form>
-                                        <form method="POST" action="{{ route('job_pipeline.prospects.dismiss', $prospect) }}">@csrf<button type="submit" class="ideatub-btn-secondary-sm">Dismiss</button></form>
+                                <td class="py-3 align-top">
+                                    <div class="flex flex-nowrap items-start gap-1.5">
+                                        <form method="POST" action="{{ route('job_pipeline.prospects.shortlist', $prospect) }}">@csrf<button type="submit" class="ideatub-btn-secondary-sm whitespace-nowrap">Shortlist</button></form>
+                                        <form method="POST" action="{{ route('job_pipeline.prospects.mark-applied', $prospect) }}">@csrf<button type="submit" class="ideatub-btn-secondary-sm whitespace-nowrap">Mark applied</button></form>
+                                        <form method="POST" action="{{ route('job_pipeline.prospects.dismiss', $prospect) }}">@csrf<button type="submit" class="ideatub-btn-secondary-sm whitespace-nowrap">Dismiss</button></form>
                                     </div>
                                 </td>
                             </tr>
