@@ -102,12 +102,12 @@
                                 <td class="py-3 pr-4 align-top font-medium text-deep-indigo whitespace-nowrap">{{ $prospect->company }}</td>
                                 <td class="py-3 pr-4 align-top text-slate-brand">
                                     @if ($prospect->url)
-                                        <a href="{{ $prospect->url }}" target="_blank" rel="noopener noreferrer" title="{{ $prospect->role_title }}" class="group flex max-w-64 items-center gap-1 hover:text-memory-violet transition-colors">
-                                            <span class="truncate">{{ $prospect->role_title }}</span>
+                                        <a href="{{ $prospect->url }}" target="_blank" rel="noopener noreferrer" title="{{ $prospect->role_title }}" class="group flex max-w-[16rem] items-center gap-1 hover:text-memory-violet transition-colors">
+                                            <span class="min-w-0 truncate">{{ $prospect->role_title }}</span>
                                             <span aria-hidden="true" class="shrink-0">↗</span>
                                         </a>
                                     @else
-                                        <span title="{{ $prospect->role_title }}" class="block max-w-64 truncate">{{ $prospect->role_title }}</span>
+                                        <span title="{{ $prospect->role_title }}" class="block max-w-[16rem] truncate">{{ $prospect->role_title }}</span>
                                     @endif
                                 </td>
                                 <td class="py-3 pr-4 align-top whitespace-nowrap">
@@ -123,12 +123,12 @@
                                         {{ $fitLabel($prospect->fit_score) }}
                                     </span>
                                 </td>
-                                <td class="py-3 pr-4 max-w-64 align-top">
+                                <td class="py-3 pr-4 max-w-[16rem] align-top">
                                     <button
                                         type="button"
                                         x-show="!expanded"
                                         @click="expanded = true; $nextTick(() => $refs.notesInput.focus())"
-                                        class="block w-full max-w-64 truncate text-left text-slate-brand hover:text-deep-indigo"
+                                        class="block w-full max-w-[16rem] truncate text-left text-slate-brand hover:text-deep-indigo"
                                         x-text="notes || '—'"
                                     ></button>
                                     <textarea
