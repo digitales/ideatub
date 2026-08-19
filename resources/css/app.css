@@ -119,6 +119,18 @@
     @apply inline-flex items-center justify-center rounded-xl bg-memory-violet px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-memory-violet/90;
   }
 
+  .ideatub-btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-medium text-slate-brand ring-1 ring-deep-indigo/10 transition hover:bg-deep-indigo/[0.03] hover:text-deep-indigo;
+  }
+
+  .ideatub-btn-secondary-sm {
+    @apply inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-brand ring-1 ring-deep-indigo/10 transition hover:bg-deep-indigo/[0.03] hover:text-deep-indigo;
+  }
+
+  .ideatub-well {
+    @apply rounded-lg bg-deep-indigo/[0.02] ring-1 ring-deep-indigo/[0.05];
+  }
+
   .ideatub-modal-backdrop {
     @apply fixed inset-0 z-40 flex items-center justify-center bg-deep-indigo/40 p-4 backdrop-blur-sm;
   }
@@ -292,6 +304,15 @@ html.dark {
 
 .dark .ideatub-btn-primary {
     @apply shadow-none;
+  }
+
+.dark .ideatub-btn-secondary,
+.dark .ideatub-btn-secondary-sm {
+    @apply text-gray-200 ring-white/10 hover:bg-white/5 hover:text-white;
+  }
+
+.dark .ideatub-well {
+    @apply bg-white/[0.03] ring-white/10;
   }
 
 .dark .ideatub-modal-backdrop {
