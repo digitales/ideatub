@@ -99,7 +99,7 @@ class JobSearchMcpTest extends TestCase
 
         $names = collect($response->json('result.tools'))->pluck('name')->all();
         foreach ([
-            'add_prospect', 'score_prospect', 'promote_prospect', 'create_application',
+            'add_prospect', 'score_prospect', 'promote_prospect', 'update_prospect_status', 'create_application',
             'update_application_stage', 'log_interaction', 'get_pipeline_status',
             'search_applications', 'add_achievement', 'retire_achievement', 'get_achievements',
             'generate_application_documents', 'export_application_pdf',
@@ -120,7 +120,7 @@ class JobSearchMcpTest extends TestCase
 
         $names = collect($response->json('result.tools'))->pluck('name')->all();
         foreach ([
-            'add_prospect', 'score_prospect', 'promote_prospect', 'create_application',
+            'add_prospect', 'score_prospect', 'promote_prospect', 'update_prospect_status', 'create_application',
             'update_application_stage', 'log_interaction', 'get_pipeline_status',
             'search_applications', 'add_achievement', 'retire_achievement', 'get_achievements',
             'generate_application_documents', 'export_application_pdf',
@@ -247,6 +247,56 @@ class JobSearchMcpTest extends TestCase
                 'document' => 'cv',
                 'base64_content' => base64_encode('x'),
             ],
+        ]);
+
+        $response->assertOk();
+        $this->assertNotNull($response->json('error'));
+    }
+
+    #[Test]
+    public function test_update_prospect_status_sets_status(): void
+    {
+        config(['features.job_search' => true]);
+        [$key, $user] = $this->validKeyAndUser();
+        $prospect = JobProspect::factory()->for($user)->create(['status' => 'new']);
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0', 'id' => 1, 'method' => 'update_prospect_status',
+            'params' => ['prospect_id' => (string) $prospect->id, 'status' => 'dismissed'],
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('dismissed', $response->json('result.data.status'));
+        $this->assertDatabaseHas('job_prospects', ['id' => $prospect->id, 'status' => 'dismissed']);
+    }
+
+    #[Test]
+    public function test_update_prospect_status_rejects_promoted(): void
+    {
+        config(['features.job_search' => true]);
+        [$key, $user] = $this->validKeyAndUser();
+        $prospect = JobProspect::factory()->for($user)->create(['status' => 'shortlisted']);
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0', 'id' => 1, 'method' => 'update_prospect_status',
+            'params' => ['prospect_id' => (string) $prospect->id, 'status' => 'promoted'],
+        ]);
+
+        $response->assertOk();
+        $this->assertNotNull($response->json('error'));
+        $this->assertStringContainsString('promote_prospect', $response->json('error.message'));
+        $this->assertDatabaseHas('job_prospects', ['id' => $prospect->id, 'status' => 'shortlisted']);
+    }
+
+    #[Test]
+    public function test_update_prospect_status_fails_when_flag_disabled(): void
+    {
+        config(['features.job_search' => false]);
+        [$key] = $this->validKeyAndUser();
+
+        $response = $this->mcpPost($key, [
+            'jsonrpc' => '2.0', 'id' => 1, 'method' => 'update_prospect_status',
+            'params' => ['prospect_id' => (string) \Illuminate\Support\Str::uuid(), 'status' => 'dismissed'],
         ]);
 
         $response->assertOk();

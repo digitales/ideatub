@@ -156,6 +156,7 @@ class McpController extends Controller
                 'add_prospect',
                 'score_prospect',
                 'promote_prospect',
+                'update_prospect_status',
                 'create_application',
                 'update_application_stage',
                 'log_interaction',
@@ -773,6 +774,18 @@ class McpController extends Controller
                     ],
                 ],
                 [
+                    'name' => 'update_prospect_status',
+                    'description' => 'Set a JobProspect\'s status directly (e.g. shortlisted, dismissed). For bulk backfill from ai-job-search sync without a human clicking through the UI. Cannot set status to promoted, that must go through promote_prospect so promoted_application_id stays in sync.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'prospect_id' => ['type' => 'string'],
+                            'status' => ['type' => 'string', 'enum' => array_values(array_diff(\App\Models\JobProspect::STATUSES, ['promoted']))],
+                        ],
+                        'required' => ['prospect_id', 'status'],
+                    ],
+                ],
+                [
                     'name' => 'create_application',
                     'description' => 'Create an Application directly, bypassing the prospect stage, for a role that does not need sourcing.',
                     'inputSchema' => [
@@ -1164,6 +1177,7 @@ class McpController extends Controller
             'add_prospect' => $this->addProspect($params),
             'score_prospect' => $this->scoreProspect($params),
             'promote_prospect' => $this->promoteProspect($params),
+            'update_prospect_status' => $this->updateProspectStatus($params),
             'create_application' => $this->createApplication($params),
             'update_application_stage' => $this->updateApplicationStage($params),
             'log_interaction' => $this->logInteraction($params),
@@ -2232,6 +2246,33 @@ class McpController extends Controller
             ->promote($prospect, $params['stage'] ?? null);
 
         return ['data' => ['application_id' => $application->id]];
+    }
+
+    private function updateProspectStatus(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+
+        if (($params['status'] ?? null) === 'promoted') {
+            throw new \InvalidArgumentException('Cannot set status to promoted directly; use promote_prospect so promoted_application_id stays in sync.');
+        }
+
+        $v = Validator::make($params, [
+            'prospect_id' => 'required|uuid',
+            'status' => ['required', 'string', Rule::in(array_values(array_diff(\App\Models\JobProspect::STATUSES, ['promoted'])))],
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $prospect = \App\Models\JobProspect::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['prospect_id']);
+
+        $prospect->update(['status' => $params['status']]);
+
+        return ['data' => ['prospect_id' => $prospect->id, 'status' => $prospect->status]];
     }
 
     private function createApplication(array $params): array
