@@ -1,60 +1,110 @@
 @extends('layouts.idea')
 
+@section('title', 'Prospects — IdeaTub')
+
 @section('content')
-<table class="w-full text-sm">
-    <thead>
-        <tr class="text-left text-gray-500">
-            <th>Company</th><th>Role</th><th>Source</th><th>Notes</th><th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach ($prospects as $prospect)
-            <tr
-                class="border-t"
-                x-data="{
-                    notes: @js($prospect->notes ?? ''),
-                    saving: false,
-                    error: '',
-                    async save() {
-                        if (this.saving) return;
-                        this.saving = true;
-                        this.error = '';
-                        try {
-                            const res = await fetch('{{ route('job_pipeline.prospects.update', $prospect) }}', {
-                                method: 'PATCH',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    Accept: 'application/json',
-                                    'X-Requested-With': 'XMLHttpRequest',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
-                                },
-                                body: JSON.stringify({ notes: this.notes }),
-                            });
-                            if (!res.ok) {
-                                this.error = 'Failed to save notes.';
-                            }
-                        } catch {
-                            this.error = 'Network error. Try again.';
-                        } finally {
-                            this.saving = false;
-                        }
-                    },
-                }"
-            >
-                <td>{{ $prospect->company }}</td>
-                <td>{{ $prospect->role_title }}</td>
-                <td>{{ $prospect->source }}</td>
-                <td>
-                    <textarea x-model="notes" rows="1" class="border rounded w-full text-sm" @blur="save()"></textarea>
-                    <p x-show="error" x-text="error" class="text-[11px] text-red-600 mt-1"></p>
-                </td>
-                <td class="flex gap-1">
-                    <form method="POST" action="{{ route('job_pipeline.prospects.shortlist', $prospect) }}">@csrf<button class="px-2 py-1 border rounded text-xs">Shortlist</button></form>
-                    <form method="POST" action="{{ route('job_pipeline.prospects.mark-applied', $prospect) }}">@csrf<button class="px-2 py-1 border rounded text-xs">Mark Applied</button></form>
-                    <form method="POST" action="{{ route('job_pipeline.prospects.dismiss', $prospect) }}">@csrf<button class="px-2 py-1 border rounded text-xs">Dismiss</button></form>
-                </td>
-            </tr>
-        @endforeach
-    </tbody>
-</table>
+@php
+    $sourceBadgeClass = fn (string $source) => match ($source) {
+        'linkedin' => 'border-sky-300/70 bg-sky-50 text-sky-900 dark:border-sky-400/30 dark:bg-sky-950/40 dark:text-sky-100',
+        'referral' => 'border-neural-teal/30 bg-neural-teal/15 text-neural-teal',
+        'direct' => 'border-memory-violet/20 bg-memory-violet/10 text-memory-violet',
+        default => 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600/40 dark:bg-slate-900/60 dark:text-slate-200',
+    };
+@endphp
+<div class="max-w-7xl mx-auto px-6 pt-10 pb-20 w-full">
+    @if (session('success'))
+        <div class="mb-6 rounded-2xl bg-neural-teal/10 px-4 py-3 text-sm text-neural-teal ring-1 ring-neural-teal/20">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    <header class="mb-8">
+        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-memory-violet/90 mb-2">Job pipeline</p>
+        <div class="flex flex-wrap items-end justify-between gap-4">
+            <div class="min-w-0">
+                <h1 class="text-3xl font-semibold tracking-tight text-deep-indigo">Prospects</h1>
+                <p class="mt-1.5 text-sm text-slate-brand max-w-[48ch]">
+                    {{ $prospects->count() === 1 ? '1 role' : $prospects->count().' roles' }} sourced and not yet decided on.
+                </p>
+            </div>
+            <a href="{{ route('job_pipeline.applications.index') }}" class="ideatub-btn-secondary shrink-0">Applications</a>
+        </div>
+    </header>
+
+    @if ($prospects->isEmpty())
+        <div class="ideatub-surface-muted px-6 py-12 text-center">
+            <p class="text-sm text-slate-brand/70 max-w-sm mx-auto">No open prospects. Add one via the <code class="text-xs">add_prospect</code> MCP tool, or from your sourcing workflow.</p>
+        </div>
+    @else
+        <div class="-mx-6 -my-2 overflow-x-auto px-6 py-2">
+            <div class="inline-block min-w-full align-middle">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-slate-brand/60">
+                            <th class="pb-2 pr-4 font-medium whitespace-nowrap">Company</th>
+                            <th class="pb-2 pr-4 font-medium whitespace-nowrap">Role</th>
+                            <th class="pb-2 pr-4 font-medium whitespace-nowrap">Source</th>
+                            <th class="pb-2 pr-4 font-medium whitespace-nowrap w-full">Notes</th>
+                            <th class="pb-2 font-medium whitespace-nowrap">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-deep-indigo/[0.05]">
+                        @foreach ($prospects as $prospect)
+                            <tr
+                                x-data="{
+                                    notes: @js($prospect->notes ?? ''),
+                                    saving: false,
+                                    error: '',
+                                    async save() {
+                                        if (this.saving) return;
+                                        this.saving = true;
+                                        this.error = '';
+                                        try {
+                                            const res = await fetch('{{ route('job_pipeline.prospects.update', $prospect) }}', {
+                                                method: 'PATCH',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    Accept: 'application/json',
+                                                    'X-Requested-With': 'XMLHttpRequest',
+                                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
+                                                },
+                                                body: JSON.stringify({ notes: this.notes }),
+                                            });
+                                            if (!res.ok) {
+                                                this.error = 'Failed to save notes.';
+                                            }
+                                        } catch {
+                                            this.error = 'Network error. Try again.';
+                                        } finally {
+                                            this.saving = false;
+                                        }
+                                    },
+                                }"
+                            >
+                                <td class="py-3 pr-4 font-medium text-deep-indigo whitespace-nowrap">{{ $prospect->company }}</td>
+                                <td class="py-3 pr-4 text-slate-brand whitespace-nowrap">{{ $prospect->role_title }}</td>
+                                <td class="py-3 pr-4 whitespace-nowrap">
+                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize {{ $sourceBadgeClass($prospect->source) }}">
+                                        {{ str($prospect->source)->headline() }}
+                                    </span>
+                                </td>
+                                <td class="py-3 pr-4 min-w-64">
+                                    <textarea x-model="notes" rows="1" class="ideatub-input w-full resize-y" @blur="save()"></textarea>
+                                    <p x-show="error" x-cloak x-text="error" class="text-[11px] text-red-600 mt-1"></p>
+                                </td>
+                                <td class="py-3">
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <form method="POST" action="{{ route('job_pipeline.prospects.shortlist', $prospect) }}">@csrf<button type="submit" class="ideatub-btn-secondary-sm">Shortlist</button></form>
+                                        <form method="POST" action="{{ route('job_pipeline.prospects.mark-applied', $prospect) }}">@csrf<button type="submit" class="ideatub-btn-secondary-sm">Mark applied</button></form>
+                                        <form method="POST" action="{{ route('job_pipeline.prospects.dismiss', $prospect) }}">@csrf<button type="submit" class="ideatub-btn-secondary-sm">Dismiss</button></form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+</div>
 @endsection
