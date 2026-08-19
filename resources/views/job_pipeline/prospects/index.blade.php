@@ -10,6 +10,22 @@
         'direct' => 'border-memory-violet/20 bg-memory-violet/10 text-memory-violet',
         default => 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600/40 dark:bg-slate-900/60 dark:text-slate-200',
     };
+    $fitLabel = fn (?int $score) => match (true) {
+        $score === null => 'Not scored',
+        $score >= 75 => 'Strong Fit',
+        $score >= 60 => 'Good Fit',
+        $score >= 45 => 'Moderate Fit',
+        $score >= 30 => 'Weak Fit',
+        default => 'Poor Fit',
+    };
+    $fitBadgeClass = fn (?int $score) => match (true) {
+        $score === null => 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600/40 dark:bg-slate-900/60 dark:text-slate-200',
+        $score >= 75 => 'border-emerald-300/70 bg-emerald-50 text-emerald-900 dark:border-emerald-400/30 dark:bg-emerald-950/40 dark:text-emerald-100',
+        $score >= 60 => 'border-sky-300/70 bg-sky-50 text-sky-900 dark:border-sky-400/30 dark:bg-sky-950/40 dark:text-sky-100',
+        $score >= 45 => 'border-amber-300/70 bg-amber-50 text-amber-900 dark:border-amber-400/30 dark:bg-amber-950/40 dark:text-amber-100',
+        $score >= 30 => 'border-orange-300/70 bg-orange-50 text-orange-900 dark:border-orange-400/30 dark:bg-orange-950/40 dark:text-orange-100',
+        default => 'border-rose-300/70 bg-rose-50 text-rose-900 dark:border-rose-400/30 dark:bg-rose-950/40 dark:text-rose-100',
+    };
 @endphp
 <div class="max-w-7xl mx-auto px-6 pt-10 pb-20 w-full">
     @if (session('success'))
@@ -44,6 +60,8 @@
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Company</th>
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Role</th>
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap">Source</th>
+                            <th class="pb-2 pr-4 font-medium whitespace-nowrap">Score</th>
+                            <th class="pb-2 pr-4 font-medium whitespace-nowrap">Fit</th>
                             <th class="pb-2 pr-4 font-medium whitespace-nowrap w-full">Notes</th>
                             <th class="pb-2 font-medium whitespace-nowrap">Actions</th>
                         </tr>
@@ -82,10 +100,30 @@
                                 }"
                             >
                                 <td class="py-3 pr-4 align-top font-medium text-deep-indigo whitespace-nowrap">{{ $prospect->company }}</td>
-                                <td class="py-3 pr-4 align-top text-slate-brand whitespace-nowrap">{{ $prospect->role_title }}</td>
+                                <td class="py-3 pr-4 align-top text-slate-brand whitespace-nowrap">
+                                    @if ($prospect->url)
+                                        <a href="{{ $prospect->url }}" target="_blank" rel="noopener noreferrer" class="hover:text-memory-violet transition-colors">
+                                            {{ $prospect->role_title }} <span aria-hidden="true">↗</span>
+                                        </a>
+                                    @else
+                                        {{ $prospect->role_title }}
+                                    @endif
+                                </td>
                                 <td class="py-3 pr-4 align-top whitespace-nowrap">
                                     <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize {{ $sourceBadgeClass($prospect->source) }}">
                                         {{ str($prospect->source)->headline() }}
+                                    </span>
+                                </td>
+                                <td class="py-3 pr-4 align-top whitespace-nowrap">
+                                    @if ($prospect->fit_score === null)
+                                        <span class="text-slate-brand/40">—</span>
+                                    @else
+                                        {{ $prospect->fit_score }}
+                                    @endif
+                                </td>
+                                <td class="py-3 pr-4 align-top whitespace-nowrap">
+                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium {{ $fitBadgeClass($prospect->fit_score) }}">
+                                        {{ $fitLabel($prospect->fit_score) }}
                                     </span>
                                 </td>
                                 <td class="py-3 pr-4 min-w-64 align-top">
