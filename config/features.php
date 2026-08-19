@@ -12,4 +12,5 @@ return [
     'memory_graph_semantic' => env('FEATURE_MEMORY_GRAPH_SEMANTIC', false),
     'memory_graph_vault' => env('FEATURE_MEMORY_GRAPH_VAULT', false),
     'memory_graph_suggestions' => env('FEATURE_MEMORY_GRAPH_SUGGESTIONS', false),
+    'job_search' => env('FEATURE_JOB_SEARCH', false),
 ];
