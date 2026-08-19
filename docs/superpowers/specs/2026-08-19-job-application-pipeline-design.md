@@ -78,7 +78,10 @@ companies
 applications
   id, company_id (FK), job_prospect_id (nullable FK -> job_prospects.id), role_title,
   stage (enum), source, salary_min, salary_max,
-  applied_at, last_activity_at, research_thought_id (FK -> thoughts.id, nullable),
+  applied_at, last_activity_at,
+  job_posting_thought_id (nullable FK -> thoughts.id),
+  research_thought_id (nullable FK -> thoughts.id),
+  outcome_thought_id (nullable FK -> thoughts.id),
   cv_markdown (nullable, editable draft), cover_letter_markdown (nullable, editable draft),
   cv_pdf_path (nullable), cover_letter_pdf_path (nullable),
   cv_exported_at (nullable), cover_letter_exported_at (nullable),
@@ -103,6 +106,13 @@ Reuses the existing `Thought` model for anything narrative (research briefs, deb
 `job_prospects.notes` is a plain free-text field, deliberately not a `Thought`, for jotting things down while a prospect is still cheap (why it caught your eye, a recruiter's throwaway comment, a salary hint from a LinkedIn post) before it's worth the weight of a full research entry. On promotion this is not dropped: if `notes` is non-empty, it seeds the initial content of the `Application`'s `research_thought_id` (a `Thought` is created at promotion time rather than left until the Research stage, pre-filled with the prospect's notes so nothing typed early is lost).
 
 `cv_markdown` / `cover_letter_markdown` are the editable drafts, assembled from `Achievement` + the research brief at the Build stage, then hand-edited in `ideatub` before export. `cv_pdf_path` / `cover_letter_pdf_path` and the matching `*_exported_at` timestamps only get set by the explicit export action (§5, §6), never automatically on save, so a markdown edit after export leaves a stale PDF on disk rather than silently regenerating one mid-edit. Whether to surface that staleness in the UI (a "markdown changed since export" flag) is a nice-to-have, not required for v1.
+
+**§3a Everything an application touches, linked and viewable in one place (added 19 Aug, `ai-job-search` integration).** The goal isn't just prospects/applications tracking, it's every artifact the application process produces reachable from the `Application` record: the job posting, the CV and cover letter, the company research, the outcome, and the interaction history. Three of those already had a home (`cv_markdown`/`cover_letter_markdown`, `research_thought_id`, `interactions`); two didn't, added above:
+
+- `job_posting_thought_id` — the full posting text, captured once when the application is created, so a dead listing (postings expire constantly, this is exactly why `ai-job-search`'s own archive exists) never becomes unrecoverable.
+- `outcome_thought_id` — the cumulative resolution narrative: status, interview stages reached, feedback, what to do differently. Mirrors `ai-job-search`'s `outcome.md` exactly, one thought per application, updated in place across the application's lifecycle rather than reconstructed. Distinct from `interactions.debrief_thought_id`, which is a debrief tied to one specific event (e.g. notes from a single interview stage); this is the application-level running summary.
+
+`cv_pdf_path` / `cover_letter_pdf_path` need one more capability to actually satisfy "viewable in `ideatub`": today they're only ever written by `ideatub`'s own export action (§5, §6), which doesn't exist yet (§7 Task 9). Until that ships, `ai-job-search` is still generating the CV/cover letter itself via LaTeX, on Ross's machine, not `ideatub`'s server, so there is nothing for `ideatub` to point a path at. The fix isn't to fake a local path, it's a small upload capability (§6, `attach_application_document`) that pushes the actual compiled PDF bytes to `ideatub`'s storage and sets `cv_pdf_path`/`cover_letter_pdf_path` from there. Not throwaway: once Task 9 ships and `ideatub` generates natively, `export_application_pdf` writes the same two columns from the server side instead, `attach_application_document` stays available as the general "upload an override PDF" path (e.g. a manually tweaked final version).
 
 ## §4 Pipeline stages
 
@@ -138,6 +148,8 @@ No Filament, no Livewire, `ideatub` doesn't run either. Standard controller-plus
 
 **`JobApplicationController`** (or similarly named, final name a Task 5 detail): `index` returns `job_pipeline.applications.board`, a Kanban-style board grouped by `stage`, plus a list view sortable by `last_activity_at`. `show` returns `job_pipeline.applications.show`, the `Application` detail page, with `Company` and `Interaction` shown as related records loaded off the model, not separate resources, just eager-loaded relations rendered inline, the same way `ProjectController::show` already loads `thoughts`/`contextThought` onto one page.
 
+**This detail page is the "everything in one place" view (§3a).** Everything the application process touches renders on it, nothing requires navigating elsewhere: the job posting (`job_posting_thought_id`), company research (`research_thought_id`), the CV and cover letter (markdown editor + PDF, §5 below), the full interaction timeline (`interactions`, oldest to newest, each with its `debrief_thought_id` expandable inline if present), and the outcome (`outcome_thought_id`, shown once it exists, editable in place as the application resolves). One page, matches the goal directly rather than scattering these across separate views that each need a link back to the application.
+
 The `Application` detail page also carries the document editor: two markdown `<textarea>` fields (`cv_markdown`, `cover_letter_markdown`) with an Alpine-driven live preview panel rendered through `CvStyle`'s CSS, and an **Export PDF** button per document, a POST route that renders the current markdown to `cv_pdf_path` / `cover_letter_pdf_path` and stamps `*_exported_at`. Editing never auto-exports, exporting is a separate explicit request so a mid-edit draft is never accidentally shipped.
 
 **`JobProspectController`**: `index` returns `job_pipeline.prospects.index`, a plain list (no board, volume's too high and low-effort for a Kanban to earn its keep here), with a `notes` `<textarea>` per row that autosaves on blur via a small Alpine/fetch call to a `PATCH` endpoint, and three one-click row actions, each a small POST form (or Alpine `fetch`, no full reload) hitting a dedicated controller action:
@@ -165,6 +177,10 @@ New tools alongside the existing `capture_thought` / `get_working_memory` set:
 - `get_achievements(tags?)` — queries `Achievement` for CV assembly from chat, works standalone or as part of the Build stage
 - `generate_application_documents(application_id)` — assembles `cv_markdown` / `cover_letter_markdown` from `Achievement` + the research brief, saves as the draft, returns the markdown for review before export. This is the tool `ai-job-search`'s `/apply` calls instead of generating its own LaTeX (§8): it requests tailored content per application from `ideatub` rather than owning generation itself
 - `export_application_pdf(application_id, document)` — renders the current (possibly hand-edited) markdown to PDF via `CvStyle`, `document` is `cv` or `cover_letter`, mirrors the Export PDF button (§5)
+- `add_job_posting(application_id, content)` — sets `job_posting_thought_id` (§3a), the full posting text captured once so a later-dead listing stays recoverable
+- `add_application_research(application_id, content, title?)` — sets `research_thought_id` (§3a). Closes a gap in the original design: the data model always had `research_thought_id`, nothing exposed a way to set it until now
+- `update_application_outcome(application_id, content)` — upserts `outcome_thought_id` (§3a), same in-place-update semantics as `upsert_working_memory`, safe to call repeatedly as an application progresses rather than only once on final resolution
+- `attach_application_document(application_id, document, base64_content, filename?)` — uploads PDF bytes and sets `cv_pdf_path` / `cover_letter_pdf_path` (§3a), `document` is `cv` or `cover_letter`. The bridge for anything generating documents outside `ideatub` (`ai-job-search`'s LaTeX pipeline today, any manual override later)
 
 Every tool above checks `config('features.job_search')` first (§2c) and returns a clear "feature disabled" error rather than executing when it's off. This is what closes the loop identified in the tool-fit ranking: pipeline status and updates become reachable from Claude, Cowork, or Cursor without opening the app, the same way Scanner's prospect data already is.
 
@@ -172,14 +188,14 @@ Every tool above checks `config('features.job_search')` first (§2c) and returns
 
 Task-by-task, each as its own worktree per the existing convention.
 
-- [ ] **Task 1** — migrations: `job_prospects`, `companies`, `applications`, `interactions`, `achievements`
-- [ ] **Task 2** — `job_search` feature flag: `config/features.php` entry, `EnsureJobSearchEnabled` middleware, matching the existing `Ensure*Enabled` pattern (§2c). Built early so every task after this gates behind it from the start rather than retrofitting
-- [ ] **Task 3** — models + relationships, `Achievement` as a standalone model (§1), `application_stage` and `prospect_status` enums, factory/seeders for local testing
-- [ ] **Task 4** — bidirectional linking to `Thought` (reuse existing linking service rather than duplicating it)
-- [ ] **Task 5** — MCP tools (§6), each checking `config('features.job_search')` first, tested against a local MCP client before wiring into Claude
-- [ ] **Task 6** — controllers, Blade views, and policies: pipeline board, prospects list (inline `notes`, Shortlist/Mark Applied/Dismiss row actions, §5), `Achievement`'s own index, and the `Application` document editor (markdown fields + Export PDF action, §5), all behind the Task 2 middleware
-- [ ] **Task 7** — seed `Achievement` manually via its index view and `add_achievement`, using the old CV `.tex` files as reference only, no import parser (§8)
-- [ ] **Task 8** — promotion logic: `promote_prospect` creates the `Application`, copies over company/role/source, sets `job_prospect_id`, seeds `research_thought_id` from `notes` when present, honours the optional stage override for the fast-applied path
+- [x] **Task 1** — migrations: `job_prospects`, `companies`, `applications`, `interactions`, `achievements`
+- [x] **Task 2** — `job_search` feature flag: `config/features.php` entry, `EnsureJobSearchEnabled` middleware, matching the existing `Ensure*Enabled` pattern (§2c). Built early so every task after this gates behind it from the start rather than retrofitting
+- [x] **Task 3** — models + relationships, `Achievement` as a standalone model (§1), `application_stage` and `prospect_status` enums, factory/seeders for local testing
+- [x] **Task 4** — bidirectional linking to `Thought` (reuse existing linking service rather than duplicating it)
+- [x] **Task 5** — MCP tools (§6), each checking `config('features.job_search')` first, tested against a local MCP client before wiring into Claude. Includes the §3a additions (`add_job_posting`, `add_application_research`, `update_application_outcome`, `attach_application_document`) needed before `ai-job-search` integration (Task 10) can wire up the "everything linked and viewable" goal — **gap-fill added 19 Aug**: `job_posting_thought_id`/`outcome_thought_id` columns plus the four §3a tools were the only piece of Task 5 not yet exposed; closed by this pass
+- [x] **Task 6** — controllers, Blade views, and policies: pipeline board, prospects list (inline `notes`, Shortlist/Mark Applied/Dismiss row actions, §5), `Achievement`'s own index, and the `Application` document editor (markdown fields + Export PDF action, §5), all behind the Task 2 middleware
+- [x] **Task 7** — seed `Achievement` manually via its index view and `add_achievement`, using the old CV `.tex` files as reference only, no import parser (§8)
+- [x] **Task 8** — promotion logic: `promote_prospect` creates the `Application`, copies over company/role/source, sets `job_prospect_id`, seeds `research_thought_id` from `notes` when present, honours the optional stage override for the fast-applied path
 - [ ] **Task 9** — document generation service: markdown assembly from `Achievement` + research brief (`generate_application_documents`), `CvStyle` as CSS, `spatie/browsershot` for the HTML → PDF export (`export_application_pdf`)
 - [ ] **Task 10** — `ai-job-search` integration: register `ideatub`'s MCP server in its `.claude/settings.json`, wire `/scrape` and `/rank` to `add_prospect`/`score_prospect` (§4a), wire `/apply` to `generate_application_documents` in place of its own LaTeX generation (§8)
 - [ ] **Task 11** — dry run: one real prospect end to end, sourced via `ai-job-search` → score → shortlist → promote → research → fit check → build (markdown, edit, export) → log → debrief, plus a check that flipping `FEATURE_JOB_SEARCH` off cleanly hides everything without touching data

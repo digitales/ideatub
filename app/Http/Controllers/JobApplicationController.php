@@ -36,7 +36,7 @@ class JobApplicationController extends Controller
 
         $this->authorize('view', $application);
 
-        $application->load(['company', 'interactions', 'researchThought']);
+        $application->load(['company', 'interactions', 'researchThought', 'jobPostingThought', 'outcomeThought']);
 
         return view('job_pipeline.applications.show', ['application' => $application]);
     }

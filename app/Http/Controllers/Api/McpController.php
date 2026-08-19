@@ -166,6 +166,10 @@ class McpController extends Controller
                 'get_achievements',
                 'generate_application_documents',
                 'export_application_pdf',
+                'add_job_posting',
+                'add_application_research',
+                'update_application_outcome',
+                'attach_application_document',
             );
         }
 
@@ -874,6 +878,57 @@ class McpController extends Controller
                         'required' => ['application_id', 'document'],
                     ],
                 ],
+                [
+                    'name' => 'add_job_posting',
+                    'description' => 'Set the full job posting text on an Application (job_posting_thought_id), so a later-dead listing stays recoverable. Safe to call again: updates the existing Thought in place rather than creating a second one.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'content' => ['type' => 'string'],
+                        ],
+                        'required' => ['application_id', 'content'],
+                    ],
+                ],
+                [
+                    'name' => 'add_application_research',
+                    'description' => 'Set the company/role research brief on an Application (research_thought_id). Safe to call again: updates the existing Thought in place rather than creating a second one.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'content' => ['type' => 'string'],
+                            'title' => ['type' => 'string'],
+                        ],
+                        'required' => ['application_id', 'content'],
+                    ],
+                ],
+                [
+                    'name' => 'update_application_outcome',
+                    'description' => 'Upsert the cumulative outcome narrative on an Application (outcome_thought_id): status, interview stages reached, feedback, what to do differently. Safe to call repeatedly across the application lifecycle, same in-place-update semantics as upsert_working_memory.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'content' => ['type' => 'string'],
+                        ],
+                        'required' => ['application_id', 'content'],
+                    ],
+                ],
+                [
+                    'name' => 'attach_application_document',
+                    'description' => 'Upload PDF bytes (base64) for an Application\'s CV or cover letter, setting cv_pdf_path / cover_letter_pdf_path and the matching *_exported_at timestamp. The bridge for anything generating documents outside ideatub.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'document' => ['type' => 'string', 'enum' => ['cv', 'cover_letter']],
+                            'base64_content' => ['type' => 'string'],
+                            'filename' => ['type' => 'string'],
+                        ],
+                        'required' => ['application_id', 'document', 'base64_content'],
+                    ],
+                ],
             );
         }
         if (config('services.jira.enabled', true)) {
@@ -1119,6 +1174,10 @@ class McpController extends Controller
             'get_achievements' => $this->getAchievements($params),
             'generate_application_documents' => $this->generateApplicationDocuments($params),
             'export_application_pdf' => $this->exportApplicationPdf($params),
+            'add_job_posting' => $this->addJobPosting($params),
+            'add_application_research' => $this->addApplicationResearch($params),
+            'update_application_outcome' => $this->updateApplicationOutcome($params),
+            'attach_application_document' => $this->attachApplicationDocument($params),
             default => throw new \InvalidArgumentException("Unknown method: {$method}"),
         };
     }
@@ -2421,6 +2480,137 @@ class McpController extends Controller
             ->export($application, $params['document']);
 
         return ['data' => ['path' => $path]];
+    }
+
+    private function addJobPosting(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'application_id' => 'required|uuid',
+            'content' => 'required|string',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $application = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['application_id']);
+
+        if ($application->job_posting_thought_id !== null) {
+            $application->jobPostingThought()->update(['content' => $params['content']]);
+        } else {
+            $thought = Thought::create([
+                'user_id' => auth()->id(),
+                'content' => $params['content'],
+                'source' => 'job_search',
+            ]);
+            $application->update(['job_posting_thought_id' => $thought->id]);
+        }
+
+        return ['data' => ['application_id' => $application->id, 'job_posting_thought_id' => $application->job_posting_thought_id]];
+    }
+
+    private function addApplicationResearch(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'application_id' => 'required|uuid',
+            'content' => 'required|string',
+            'title' => 'sometimes|nullable|string|max:255',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $application = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['application_id']);
+
+        if ($application->research_thought_id !== null) {
+            $application->researchThought()->update(['content' => $params['content']]);
+        } else {
+            $thought = Thought::create([
+                'user_id' => auth()->id(),
+                'content' => $params['content'],
+                'source' => 'job_search',
+            ]);
+            $application->update(['research_thought_id' => $thought->id]);
+        }
+
+        return ['data' => ['application_id' => $application->id, 'research_thought_id' => $application->research_thought_id]];
+    }
+
+    private function updateApplicationOutcome(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'application_id' => 'required|uuid',
+            'content' => 'required|string',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $application = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['application_id']);
+
+        if ($application->outcome_thought_id !== null) {
+            $application->outcomeThought()->update(['content' => $params['content']]);
+        } else {
+            $thought = Thought::create([
+                'user_id' => auth()->id(),
+                'content' => $params['content'],
+                'source' => 'job_search',
+            ]);
+            $application->update(['outcome_thought_id' => $thought->id]);
+        }
+
+        return ['data' => ['application_id' => $application->id, 'outcome_thought_id' => $application->outcome_thought_id]];
+    }
+
+    private function attachApplicationDocument(array $params): array
+    {
+        if (! config('features.job_search')) {
+            throw new \InvalidArgumentException('Job search feature is disabled.');
+        }
+        $v = Validator::make($params, [
+            'application_id' => 'required|uuid',
+            'document' => ['required', 'string', Rule::in(['cv', 'cover_letter'])],
+            'base64_content' => 'required|string',
+            'filename' => 'sometimes|nullable|string|max:255',
+        ]);
+        if ($v->fails()) {
+            throw new \InvalidArgumentException($v->errors()->first());
+        }
+
+        $application = \App\Models\Application::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($params['application_id']);
+
+        $bytes = base64_decode((string) $params['base64_content'], true);
+        if ($bytes === false) {
+            throw new \InvalidArgumentException('base64_content is not valid base64.');
+        }
+
+        $document = $params['document'];
+        $path = "job_pipeline/{$application->id}/{$document}.pdf";
+        \Illuminate\Support\Facades\Storage::disk('local')->put($path, $bytes);
+
+        if ($document === 'cv') {
+            $application->update(['cv_pdf_path' => $path, 'cv_exported_at' => now()]);
+        } else {
+            $application->update(['cover_letter_pdf_path' => $path, 'cover_letter_exported_at' => now()]);
+        }
+
+        return ['data' => ['application_id' => $application->id, 'path' => $path]];
     }
 
     private function jsonRpcError(int $code, string $message, mixed $id): JsonResponse

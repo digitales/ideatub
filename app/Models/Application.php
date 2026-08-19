@@ -18,6 +18,7 @@ class Application extends Model
     protected $fillable = [
         'user_id', 'company_id', 'job_prospect_id', 'role_title', 'stage', 'source',
         'salary_min', 'salary_max', 'applied_at', 'last_activity_at', 'research_thought_id',
+        'job_posting_thought_id', 'outcome_thought_id',
         'cv_markdown', 'cover_letter_markdown', 'cv_pdf_path', 'cover_letter_pdf_path',
         'cv_exported_at', 'cover_letter_exported_at',
     ];
@@ -50,6 +51,16 @@ class Application extends Model
     public function researchThought(): BelongsTo
     {
         return $this->belongsTo(Thought::class, 'research_thought_id');
+    }
+
+    public function jobPostingThought(): BelongsTo
+    {
+        return $this->belongsTo(Thought::class, 'job_posting_thought_id');
+    }
+
+    public function outcomeThought(): BelongsTo
+    {
+        return $this->belongsTo(Thought::class, 'outcome_thought_id');
     }
 
     public function interactions(): HasMany

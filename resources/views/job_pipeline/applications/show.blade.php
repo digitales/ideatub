@@ -39,6 +39,13 @@
         </div>
     </header>
 
+    @if ($application->jobPostingThought)
+        <section class="ideatub-surface p-6 mb-10">
+            <h2 class="text-sm font-semibold text-deep-indigo mb-3">Job posting</h2>
+            <div class="ideatub-well whitespace-pre-wrap p-3 text-xs leading-5 text-deep-indigo">{{ $application->jobPostingThought->content }}</div>
+        </section>
+    @endif
+
     <section class="ideatub-surface p-6" x-data="{ cv: @js($application->cv_markdown ?? ''), coverLetter: @js($application->cover_letter_markdown ?? '') }">
         <h2 class="text-sm font-semibold text-deep-indigo mb-4">Documents</h2>
         <form method="POST" action="{{ route('job_pipeline.applications.update', $application) }}">
@@ -102,5 +109,12 @@
             </ul>
         @endif
     </section>
+
+    @if ($application->outcomeThought)
+        <section class="ideatub-surface p-6 mt-10">
+            <h2 class="text-sm font-semibold text-deep-indigo mb-3">Outcome</h2>
+            <div class="ideatub-well whitespace-pre-wrap p-3 text-xs leading-5 text-deep-indigo">{{ $application->outcomeThought->content }}</div>
+        </section>
+    @endif
 </div>
 @endsection

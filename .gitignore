@@ -27,3 +27,4 @@ yarn-error.log
 /storage/app/oauth-mcp-*.pem
 *.log
 .superpowers/
+.codex/
