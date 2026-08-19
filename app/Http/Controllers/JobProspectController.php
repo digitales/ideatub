@@ -10,6 +10,10 @@ class JobProspectController extends Controller
 {
     public function index()
     {
+        if (! config('features.job_search')) {
+            abort(404);
+        }
+
         $this->authorize('viewAny', JobProspect::class);
 
         $prospects = JobProspect::query()
@@ -23,6 +27,10 @@ class JobProspectController extends Controller
 
     public function update(Request $request, JobProspect $prospect)
     {
+        if (! config('features.job_search')) {
+            abort(404);
+        }
+
         $this->authorize('update', $prospect);
 
         $request->validate(['notes' => ['nullable', 'string']]);
@@ -33,6 +41,10 @@ class JobProspectController extends Controller
 
     public function shortlist(JobProspect $prospect)
     {
+        if (! config('features.job_search')) {
+            abort(404);
+        }
+
         $this->authorize('update', $prospect);
 
         $prospect->update(['status' => 'shortlisted']);
@@ -42,6 +54,10 @@ class JobProspectController extends Controller
 
     public function markApplied(JobProspect $prospect, ProspectPromotionService $promotionService)
     {
+        if (! config('features.job_search')) {
+            abort(404);
+        }
+
         $this->authorize('update', $prospect);
 
         $promotionService->promote($prospect, 'applied');
@@ -51,6 +67,10 @@ class JobProspectController extends Controller
 
     public function dismiss(JobProspect $prospect)
     {
+        if (! config('features.job_search')) {
+            abort(404);
+        }
+
         $this->authorize('update', $prospect);
 
         $prospect->update(['status' => 'dismissed']);

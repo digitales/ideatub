@@ -143,25 +143,30 @@ class McpController extends Controller
             'get_working_memory_version',
             'get_compaction',
             'upsert_working_memory',
-            'add_prospect',
-            'score_prospect',
-            'promote_prospect',
-            'create_application',
-            'update_application_stage',
-            'log_interaction',
-            'get_pipeline_status',
-            'search_applications',
-            'add_achievement',
-            'retire_achievement',
-            'get_achievements',
-            'generate_application_documents',
-            'export_application_pdf',
         ];
         if (config('features.attention_pulse')) {
             $base[] = 'get_attention_overview';
         }
         if (config('services.jira.enabled', true)) {
             $base[] = 'sync_jira';
+        }
+        if (config('features.job_search')) {
+            array_push(
+                $base,
+                'add_prospect',
+                'score_prospect',
+                'promote_prospect',
+                'create_application',
+                'update_application_stage',
+                'log_interaction',
+                'get_pipeline_status',
+                'search_applications',
+                'add_achievement',
+                'retire_achievement',
+                'get_achievements',
+                'generate_application_documents',
+                'export_application_pdf',
+            );
         }
 
         return $base;
@@ -720,152 +725,157 @@ class McpController extends Controller
                     'required' => ['scope_type', 'scope_key', 'content'],
                 ],
             ],
-            [
-                'name' => 'add_prospect',
-                'description' => 'Add a job prospect: cheap, fire-and-forget sourcing entry, no research yet.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'company' => ['type' => 'string'],
-                        'role_title' => ['type' => 'string'],
-                        'source' => ['type' => 'string', 'enum' => \App\Models\JobProspect::SOURCES],
-                        'url' => ['type' => 'string'],
-                    ],
-                    'required' => ['company', 'role_title', 'source'],
-                ],
-            ],
-            [
-                'name' => 'score_prospect',
-                'description' => 'Set a fit score and optional notes on a prospect, moving it to scored.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'prospect_id' => ['type' => 'string'],
-                        'fit_score' => ['type' => 'integer'],
-                        'notes' => ['type' => 'string'],
-                    ],
-                    'required' => ['prospect_id', 'fit_score'],
-                ],
-            ],
-            [
-                'name' => 'promote_prospect',
-                'description' => 'Promote a shortlisted prospect into an Application. Defaults to researching; pass applied for the already-applied-elsewhere fast path.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'prospect_id' => ['type' => 'string'],
-                        'stage' => ['type' => 'string', 'enum' => \App\Models\Application::STAGES],
-                    ],
-                    'required' => ['prospect_id'],
-                ],
-            ],
-            [
-                'name' => 'create_application',
-                'description' => 'Create an Application directly, bypassing the prospect stage, for a role that does not need sourcing.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'company' => ['type' => 'string'],
-                        'role_title' => ['type' => 'string'],
-                        'source' => ['type' => 'string'],
-                    ],
-                    'required' => ['company', 'role_title'],
-                ],
-            ],
-            [
-                'name' => 'update_application_stage',
-                'description' => 'Move an Application to a new stage, optionally logging a note.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'application_id' => ['type' => 'string'],
-                        'stage' => ['type' => 'string', 'enum' => \App\Models\Application::STAGES],
-                        'note' => ['type' => 'string'],
-                    ],
-                    'required' => ['application_id', 'stage'],
-                ],
-            ],
-            [
-                'name' => 'log_interaction',
-                'description' => 'Log an interaction (interview, follow_up, rejection, offer, note) against an Application.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'application_id' => ['type' => 'string'],
-                        'type' => ['type' => 'string', 'enum' => \App\Models\Interaction::TYPES],
-                        'summary' => ['type' => 'string'],
-                    ],
-                    'required' => ['application_id', 'type', 'summary'],
-                ],
-            ],
-            [
-                'name' => 'get_pipeline_status',
-                'description' => 'Return all open prospects and applications grouped by stage.',
-                'inputSchema' => ['type' => 'object', 'properties' => (object) []],
-            ],
-            [
-                'name' => 'search_applications',
-                'description' => 'Search applications by company or role title.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => ['query' => ['type' => 'string']],
-                    'required' => ['query'],
-                ],
-            ],
-            [
-                'name' => 'add_achievement',
-                'description' => 'Add a reusable Achievement bullet, tagged for later CV assembly.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'tag' => ['type' => 'string'],
-                        'bullet_text' => ['type' => 'string'],
-                    ],
-                    'required' => ['tag', 'bullet_text'],
-                ],
-            ],
-            [
-                'name' => 'retire_achievement',
-                'description' => 'Soft-retire an Achievement so it stops appearing in new document assembly.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => ['achievement_id' => ['type' => 'string']],
-                    'required' => ['achievement_id'],
-                ],
-            ],
-            [
-                'name' => 'get_achievements',
-                'description' => 'Query Achievements, optionally filtered by tag, for CV assembly from chat.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => ['tags' => ['type' => 'array', 'items' => ['type' => 'string']]],
-                ],
-            ],
-            [
-                'name' => 'generate_application_documents',
-                'description' => 'Assemble cv_markdown / cover_letter_markdown from Achievement + the research brief, save as draft, return for review.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'application_id' => ['type' => 'string'],
-                        'tags' => ['type' => 'array', 'items' => ['type' => 'string']],
-                    ],
-                    'required' => ['application_id'],
-                ],
-            ],
-            [
-                'name' => 'export_application_pdf',
-                'description' => 'Render the current markdown to PDF via CvStyle.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'application_id' => ['type' => 'string'],
-                        'document' => ['type' => 'string', 'enum' => ['cv', 'cover_letter']],
-                    ],
-                    'required' => ['application_id', 'document'],
-                ],
-            ],
         ];
+        if (config('features.job_search')) {
+            array_push(
+                $tools,
+                [
+                    'name' => 'add_prospect',
+                    'description' => 'Add a job prospect: cheap, fire-and-forget sourcing entry, no research yet.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'company' => ['type' => 'string'],
+                            'role_title' => ['type' => 'string'],
+                            'source' => ['type' => 'string', 'enum' => \App\Models\JobProspect::SOURCES],
+                            'url' => ['type' => 'string'],
+                        ],
+                        'required' => ['company', 'role_title', 'source'],
+                    ],
+                ],
+                [
+                    'name' => 'score_prospect',
+                    'description' => 'Set a fit score and optional notes on a prospect, moving it to scored.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'prospect_id' => ['type' => 'string'],
+                            'fit_score' => ['type' => 'integer'],
+                            'notes' => ['type' => 'string'],
+                        ],
+                        'required' => ['prospect_id', 'fit_score'],
+                    ],
+                ],
+                [
+                    'name' => 'promote_prospect',
+                    'description' => 'Promote a shortlisted prospect into an Application. Defaults to researching; pass applied for the already-applied-elsewhere fast path.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'prospect_id' => ['type' => 'string'],
+                            'stage' => ['type' => 'string', 'enum' => \App\Models\Application::STAGES],
+                        ],
+                        'required' => ['prospect_id'],
+                    ],
+                ],
+                [
+                    'name' => 'create_application',
+                    'description' => 'Create an Application directly, bypassing the prospect stage, for a role that does not need sourcing.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'company' => ['type' => 'string'],
+                            'role_title' => ['type' => 'string'],
+                            'source' => ['type' => 'string'],
+                        ],
+                        'required' => ['company', 'role_title'],
+                    ],
+                ],
+                [
+                    'name' => 'update_application_stage',
+                    'description' => 'Move an Application to a new stage, optionally logging a note.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'stage' => ['type' => 'string', 'enum' => \App\Models\Application::STAGES],
+                            'note' => ['type' => 'string'],
+                        ],
+                        'required' => ['application_id', 'stage'],
+                    ],
+                ],
+                [
+                    'name' => 'log_interaction',
+                    'description' => 'Log an interaction (interview, follow_up, rejection, offer, note) against an Application.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'type' => ['type' => 'string', 'enum' => \App\Models\Interaction::TYPES],
+                            'summary' => ['type' => 'string'],
+                        ],
+                        'required' => ['application_id', 'type', 'summary'],
+                    ],
+                ],
+                [
+                    'name' => 'get_pipeline_status',
+                    'description' => 'Return all open prospects and applications grouped by stage.',
+                    'inputSchema' => ['type' => 'object', 'properties' => (object) []],
+                ],
+                [
+                    'name' => 'search_applications',
+                    'description' => 'Search applications by company or role title.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => ['query' => ['type' => 'string']],
+                        'required' => ['query'],
+                    ],
+                ],
+                [
+                    'name' => 'add_achievement',
+                    'description' => 'Add a reusable Achievement bullet, tagged for later CV assembly.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'tag' => ['type' => 'string'],
+                            'bullet_text' => ['type' => 'string'],
+                        ],
+                        'required' => ['tag', 'bullet_text'],
+                    ],
+                ],
+                [
+                    'name' => 'retire_achievement',
+                    'description' => 'Soft-retire an Achievement so it stops appearing in new document assembly.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => ['achievement_id' => ['type' => 'string']],
+                        'required' => ['achievement_id'],
+                    ],
+                ],
+                [
+                    'name' => 'get_achievements',
+                    'description' => 'Query Achievements, optionally filtered by tag, for CV assembly from chat.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => ['tags' => ['type' => 'array', 'items' => ['type' => 'string']]],
+                    ],
+                ],
+                [
+                    'name' => 'generate_application_documents',
+                    'description' => 'Assemble cv_markdown / cover_letter_markdown from Achievement + the research brief, save as draft, return for review.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'tags' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        ],
+                        'required' => ['application_id'],
+                    ],
+                ],
+                [
+                    'name' => 'export_application_pdf',
+                    'description' => 'Render the current markdown to PDF via CvStyle.',
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'application_id' => ['type' => 'string'],
+                            'document' => ['type' => 'string', 'enum' => ['cv', 'cover_letter']],
+                        ],
+                        'required' => ['application_id', 'document'],
+                    ],
+                ],
+            );
+        }
         if (config('services.jira.enabled', true)) {
             $tools[] = [
                 'name' => 'sync_jira',

@@ -92,6 +92,7 @@ class JobSearchMcpTest extends TestCase
     #[Test]
     public function test_tools_list_includes_all_job_search_tools(): void
     {
+        config(['features.job_search' => true]);
         [$key] = $this->validKeyAndUser();
 
         $response = $this->mcpPost($key, ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']);
@@ -104,6 +105,25 @@ class JobSearchMcpTest extends TestCase
             'generate_application_documents', 'export_application_pdf',
         ] as $name) {
             $this->assertContains($name, $names, "Missing tool: {$name}");
+        }
+    }
+
+    #[Test]
+    public function test_tools_list_excludes_job_search_tools_when_flag_disabled(): void
+    {
+        config(['features.job_search' => false]);
+        [$key] = $this->validKeyAndUser();
+
+        $response = $this->mcpPost($key, ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']);
+
+        $names = collect($response->json('result.tools'))->pluck('name')->all();
+        foreach ([
+            'add_prospect', 'score_prospect', 'promote_prospect', 'create_application',
+            'update_application_stage', 'log_interaction', 'get_pipeline_status',
+            'search_applications', 'add_achievement', 'retire_achievement', 'get_achievements',
+            'generate_application_documents', 'export_application_pdf',
+        ] as $name) {
+            $this->assertNotContains($name, $names, "Tool should not be advertised: {$name}");
         }
     }
 }

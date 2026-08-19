@@ -40,6 +40,6 @@ class PdfExportService
     {
         $body = Str::markdown($markdown);
 
-        return '<html><head><style>'.CvStyle::css().'</style></head><body>'.$body.'</body></html>';
+        return '<html><head><meta charset="utf-8"><style>'.CvStyle::css().'</style></head><body>'.$body.'</body></html>';
     }
 }

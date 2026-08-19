@@ -9,10 +9,22 @@
         @csrf
         @method('PATCH')
         <label class="block font-medium">CV (markdown)</label>
-        <textarea name="cv_markdown" x-model="cv" rows="12" class="w-full border rounded p-2 font-mono text-sm"></textarea>
+        <div class="grid grid-cols-2 gap-4">
+            <textarea name="cv_markdown" x-model="cv" rows="12" class="w-full border rounded p-2 font-mono text-sm"></textarea>
+            <div>
+                <p class="text-xs font-medium text-gray-500 mb-1">Preview</p>
+                <pre x-text="cv" class="whitespace-pre-wrap border rounded p-2 text-sm bg-gray-50" style="min-height: 100%;"></pre>
+            </div>
+        </div>
 
         <label class="block font-medium mt-4">Cover letter (markdown)</label>
-        <textarea name="cover_letter_markdown" x-model="coverLetter" rows="10" class="w-full border rounded p-2 font-mono text-sm"></textarea>
+        <div class="grid grid-cols-2 gap-4">
+            <textarea name="cover_letter_markdown" x-model="coverLetter" rows="10" class="w-full border rounded p-2 font-mono text-sm"></textarea>
+            <div>
+                <p class="text-xs font-medium text-gray-500 mb-1">Preview</p>
+                <pre x-text="coverLetter" class="whitespace-pre-wrap border rounded p-2 text-sm bg-gray-50" style="min-height: 100%;"></pre>
+            </div>
+        </div>
 
         <button type="submit" class="mt-4 px-4 py-2 bg-gray-900 text-white rounded">Save draft</button>
     </form>
@@ -26,6 +38,12 @@
             @csrf
             <button type="submit" class="px-4 py-2 border rounded">Export Cover Letter PDF</button>
         </form>
+        @if ($application->cv_pdf_path)
+            <a href="{{ route('job_pipeline.applications.download', [$application, 'cv']) }}" class="px-4 py-2 border rounded">Download CV PDF</a>
+        @endif
+        @if ($application->cover_letter_pdf_path)
+            <a href="{{ route('job_pipeline.applications.download', [$application, 'cover_letter']) }}" class="px-4 py-2 border rounded">Download Cover Letter PDF</a>
+        @endif
     </div>
 </div>
 

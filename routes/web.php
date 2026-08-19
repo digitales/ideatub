@@ -494,6 +494,8 @@ Route::middleware('auth')->group(function () {
         Route::patch('/applications/{application}', [JobApplicationController::class, 'update'])->name('applications.update');
         Route::post('/applications/{application}/export/{document}', [JobApplicationController::class, 'export'])
             ->where('document', 'cv|cover_letter')->name('applications.export');
+        Route::get('/applications/{application}/download/{document}', [JobApplicationController::class, 'download'])
+            ->where('document', 'cv|cover_letter')->name('applications.download');
 
         Route::get('/prospects', [JobProspectController::class, 'index'])->name('prospects.index');
         Route::patch('/prospects/{prospect}', [JobProspectController::class, 'update'])->name('prospects.update');

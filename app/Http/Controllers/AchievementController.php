@@ -9,6 +9,10 @@ class AchievementController extends Controller
 {
     public function index(Request $request)
     {
+        if (! config('features.job_search')) {
+            abort(404);
+        }
+
         $this->authorize('viewAny', Achievement::class);
 
         $achievements = Achievement::query()
@@ -22,6 +26,10 @@ class AchievementController extends Controller
 
     public function store(Request $request)
     {
+        if (! config('features.job_search')) {
+            abort(404);
+        }
+
         $this->authorize('create', Achievement::class);
 
         $request->validate(['tag' => 'required|string|max:100', 'bullet_text' => 'required|string']);
@@ -38,6 +46,10 @@ class AchievementController extends Controller
 
     public function update(Request $request, Achievement $achievement)
     {
+        if (! config('features.job_search')) {
+            abort(404);
+        }
+
         $this->authorize('update', $achievement);
 
         $request->validate(['tag' => 'required|string|max:100', 'bullet_text' => 'required|string']);
@@ -48,6 +60,10 @@ class AchievementController extends Controller
 
     public function retire(Achievement $achievement)
     {
+        if (! config('features.job_search')) {
+            abort(404);
+        }
+
         $this->authorize('update', $achievement);
 
         $achievement->update(['retired_at' => now()]);
