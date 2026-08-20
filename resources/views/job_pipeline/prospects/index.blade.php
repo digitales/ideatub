@@ -52,7 +52,22 @@
             <p class="text-sm text-slate-brand/70 max-w-sm mx-auto">No open prospects. Add one via the <code class="text-xs">add_prospect</code> MCP tool, or from your sourcing workflow.</p>
         </div>
     @else
-        <div class="ideatub-scroll-x -mx-6 -my-2 overflow-x-auto whitespace-nowrap px-6 py-2">
+        <div
+            class="relative"
+            x-data="{
+                canScrollRight: false,
+                checkScroll() {
+                    const el = this.$refs.prospectsScroll;
+                    this.canScrollRight = el.scrollWidth - el.scrollLeft - el.clientWidth > 4;
+                },
+            }"
+            x-init="checkScroll(); window.addEventListener('resize', checkScroll)"
+        >
+            <div
+                x-ref="prospectsScroll"
+                @scroll="checkScroll()"
+                class="ideatub-scroll-x -mx-6 -my-2 overflow-x-auto whitespace-nowrap px-6 py-2"
+            >
             <div class="inline-block min-w-full align-middle">
                 <table class="w-full text-sm">
                     <thead>
@@ -154,6 +169,13 @@
                     </tbody>
                 </table>
             </div>
+            </div>
+            <div
+                x-show="canScrollRight"
+                x-cloak
+                aria-hidden="true"
+                class="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#eef2ff] to-transparent dark:from-gray-950"
+            ></div>
         </div>
     @endif
 </div>
